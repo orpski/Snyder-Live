@@ -21,7 +21,7 @@ h1,h2,.heading{font-family:'Barlow Condensed',sans-serif;}
 </style>
 </head>
 <body>
-<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v31</div>
+<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v32</div>
 <div id="root"><div style="padding:20px;color:#60b8f0;">Loading...</div></div>
 <div id="err" style="display:none;position:fixed;inset:0;background:#1a0a0a;color:#f87171;padding:16px;font-size:11px;font-family:monospace;overflow:auto;white-space:pre-wrap;z-index:9999;"></div>
 <script>
@@ -1264,12 +1264,16 @@ function CourseEditor({course,sb,flash,load,onClose}){
     try{
       if(course.isNew){
         if(!name.trim()){flash('Enter a name','error');setSaving(false);return;}
-        await sb.from('cup_courses').insert({name:name.trim(),holes,location:'',image_url:imageUrl.trim()||null});
+        const courseData={name:name.trim(),holes,location:''};
+        try{courseData.image_url=imageUrl.trim()||null;}catch(e){}
+        await sb.from('cup_courses').insert(courseData);
       } else {
-        await sb.from('cup_courses').update({name:name.trim()||course.name,holes,image_url:imageUrl.trim()||null}).eq('id',course.id);
+        const updateData={name:name.trim()||course.name,holes};
+        try{updateData.image_url=imageUrl.trim()||null;}catch(e){}
+        await sb.from('cup_courses').update(updateData).eq('id',course.id);
       }
       await load();flash('Saved');onClose();
-    }catch(e){flash('Error: '+e.message,'error');}
+    }catch(e){flash('Error: '+(e.message||JSON.stringify(e)),'error');console.error('Save error:',e);}
     setSaving(false);
   }
 
