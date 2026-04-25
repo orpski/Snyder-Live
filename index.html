@@ -21,7 +21,7 @@ h1,h2,.heading{font-family:'Barlow Condensed',sans-serif;}
 </style>
 </head>
 <body>
-<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v28</div>
+<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v29</div>
 <div id="root"><div style="padding:20px;color:#60b8f0;">Loading...</div></div>
 <div id="err" style="display:none;position:fixed;inset:0;background:#1a0a0a;color:#f87171;padding:16px;font-size:11px;font-family:monospace;overflow:auto;white-space:pre-wrap;z-index:9999;"></div>
 <script>
@@ -682,27 +682,22 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
 
   useEffect(()=>{
     if(!round||!round.id)return;
-    // Always load from DB to ensure scores persist across navigation
+    // On mount: load ALL saved scores from DB - DB is the source of truth
+    // This ensures players can leave the app mid-round and return exactly where they were
     sb.from('cup_scores').select('*').eq('round_id',round.id).then(({data})=>{
       if(!data||data.length===0)return;
       const m={};
-      data.forEach(s=>{if(!m[s.hole_number])m[s.hole_number]={};m[s.hole_number][s.player_id]=s.gross_score;});
-      setHoleScores(prev=>{
-        // Merge: keep any unsaved local scores, but fill in saved ones
-        const merged={...m};
-        Object.entries(prev).forEach(([h,ps])=>{
-          Object.entries(ps).forEach(([pid,g])=>{
-            if(!merged[h])merged[h]={};
-            merged[h][pid]=g;
-          });
-        });
-        return merged;
+      data.forEach(s=>{
+        if(!m[s.hole_number])m[s.hole_number]={};
+        m[s.hole_number][s.player_id]=s.gross_score;
       });
+      // Fully replace local state with DB values - always trust the server
+      setHoleScores(m);
     });
   },[round&&round.id]);
 
   function getHole(n){return holes.find(h=>h.hole===n)||{hole:n,par:4,stroke_index:n,yards:0};}
-  async function autoSave(holeNum,pid,val,newScores){
+  async function autoSave(holeNum,pid,val){
     const hd=getHole(holeNum);
     const hcp=parseFloat(playingHcps[pid]!=null?playingHcps[pid]:grpPlayers.find(p=>p.id===pid)&&grpPlayers.find(p=>p.id===pid).current_handicap||0);
     const pts=val===-1?0:calcStableford(val,hd.par,hd.stroke_index,hcp)||0;
@@ -711,18 +706,22 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         round_id:round.id,player_id:pid,hole_number:holeNum,
         gross_score:val,stableford_points:pts,par:hd.par,stroke_index:hd.stroke_index,
       },{onConflict:'round_id,player_id,hole_number'});
-    }catch(e){console.error('Auto-save failed:',e);}
+      // Score is saved - no need to show toast for every single score
+    }catch(e){
+      console.error('Auto-save failed:',e);
+      flash('Save failed - check connection','error');
+    }
   }
 
   function setScore(holeNum,pid,val){
     setHoleScores(prev=>{
       const updated={...prev,[holeNum]:{...(prev[holeNum]||{}),[pid]:val}};
-      // Auto-save this score immediately
-      autoSave(holeNum,pid,val,updated);
-      // Check if all players scored this hole - flash confirmation
+      // Auto-save this score immediately to DB so it persists if player leaves app
+      autoSave(holeNum,pid,val);
+      // When ALL players on this hole are scored, show confirmation
       const holeData=updated[holeNum]||{};
       const allScored=grpPlayers.every(p=>holeData[p.id]!==undefined);
-      if(allScored)setTimeout(()=>flash('Hole '+holeNum+' saved'),100);
+      if(allScored)setTimeout(()=>flash('Hole '+holeNum+' ✓ saved'),100);
       return updated;
     });
   }
@@ -1003,13 +1002,19 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             <div style={{fontSize:11,color:'rgba(255,255,255,0.5)'}}>Sign in as a player to enter scores</div>
           </div>
         )}
+        {canEdit&&(
+          <div style={{background:'rgba(0,112,187,0.12)',borderBottom:'1px solid rgba(0,112,187,0.2)',padding:'5px 14px',display:'flex',alignItems:'center',gap:6}}>
+            <div style={{width:6,height:6,borderRadius:'50%',background:'#4ade80',flexShrink:0}}/>
+            <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>Scores save automatically — safe to close &amp; return</div>
+          </div>
+        )}
         <div style={{padding:'10px 14px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
           <button onClick={()=>setView('home')} style={{...S.gho,padding:'6px 10px',fontSize:12}}>Exit</button>
           <div style={{textAlign:'center',flex:1,margin:'0 8px'}}>
             <div style={{fontSize:12,color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{round.name||course&&course.name||'Scorecard'}</div>
             {round.join_code&&<div style={{fontSize:11,color:'#0070BB'}}>Code: {round.join_code}</div>}
           </div>
-          <button onClick={saveAll} disabled={saving} style={{...S.pri,padding:'7px 12px',fontSize:12,opacity:saving?0.6:1}}>{saving?'...':'Save'}</button>
+          <button onClick={saveAll} disabled={saving} style={{...S.pri,padding:'7px 12px',fontSize:12,opacity:saving?0.6:1}}>{saving?'Saving...':'Sync All'}</button>
         </div>
         {course&&(
           <div style={{padding:'4px 14px',background:'rgba(0,50,120,0.35)',borderTop:'1px solid rgba(255,255,255,0.1)',display:'flex',gap:14,alignItems:'center',overflowX:'auto'}}>
