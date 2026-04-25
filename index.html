@@ -1,4 +1,4 @@
-<!-- SNYDER LIVE v35 -->
+<!-- SNYDER LIVE v37 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -23,7 +23,7 @@ h1,h2,.heading{font-family:'Barlow Condensed',sans-serif;}
 </style>
 </head>
 <body>
-<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v35</div>
+<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v37</div>
 <div id="root"><div style="padding:20px;color:#60b8f0;">Loading...</div></div>
 <div id="err" style="display:none;position:fixed;inset:0;background:#1a0a0a;color:#f87171;padding:16px;font-size:11px;font-family:monospace;overflow:auto;white-space:pre-wrap;z-index:9999;"></div>
 <script>
@@ -610,7 +610,8 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     try{
       const course=courses.find(co=>co.id===setup.course_id);
       const today=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-      const roundName=setup.name||(course&&course.name+' - '+today)||'Round';
+      const creatorName=currentUser&&currentUser.display_name?currentUser.display_name.split(' ')[0]+"'s Round":null;
+      const roundName=setup.name||creatorName||(course&&course.name+' - '+today)||'Round';
       const joinCode=Math.random().toString(36).substring(2,6).toUpperCase();
       const playerIds=participants.map(p=>p.id);
       const playingHcps={};
@@ -662,7 +663,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
         </div>
         <div style={{padding:16}}>
           <label style={S.lbl}>Round Name (optional)</label>
-          <input style={{...S.inp,marginBottom:12}} value={setup.name} onChange={e=>setSetup(q=>({...q,name:e.target.value}))} placeholder="e.g. Saturday Morning"/>
+          <input style={{...S.inp,marginBottom:12}} value={setup.name} onChange={e=>setSetup(q=>({...q,name:e.target.value}))} placeholder={"e.g. "+(currentUser?currentUser.display_name.split(' ')[0]+"'s Round":"Saturday Morning")}/>
           <label style={S.lbl}>Course</label>
           <select style={{...S.inp,marginBottom:12}} value={setup.course_id} onChange={e=>setSetup(q=>({...q,course_id:e.target.value}))}>
             <option value="">Select course...</option>
@@ -1043,19 +1044,20 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             <button onClick={async()=>{
               try{
                 const el=document.getElementById('full-card-content');
-                const canvas=await html2canvas(el,{backgroundColor:'#0a1528',scale:2,useCORS:true,logging:false});
-                canvas.toBlob(blob=>{
+                if(!el){flash('Error capturing card','error');return;}
+                const canvas=await html2canvas(el,{backgroundColor:'#0a1528',scale:2,useCORS:true,logging:false,allowTaint:true});
+                canvas.toBlob(async blob=>{
                   if(!blob)return;
                   const file=new File([blob],'scorecard.png',{type:'image/png'});
-                  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-                    navigator.share({files:[file],title:'Scorecard - '+((course&&course.name)||''),text:'Full scorecard'}).catch(()=>{});
+                  if(navigator.share&&navigator.canShare({files:[file]})){
+                    await navigator.share({files:[file],title:'Scorecard - '+(course&&course.name||'')});
                   } else {
                     const url=URL.createObjectURL(blob);
                     const a=document.createElement('a');a.href=url;a.download='scorecard.png';a.click();
                     URL.revokeObjectURL(url);
                   }
                 },'image/png');
-              }catch(e){flash('Share failed','error');}
+              }catch(e){flash('Share: '+e.message,'error');}
             }} style={{...S.pri,padding:'8px 16px',fontSize:13,background:'#25D366'}}>Share Card</button>
           </div>
           <div id="f9-card"><div style={{padding:'8px 12px',background:'rgba(0,0,0,0.3)',marginBottom:8,borderRadius:8}}><div style={{fontSize:13,color:'#fff',fontWeight:600}}>{course&&course.name||round.course_name}</div><div style={{fontSize:11,color:'#60b8f0'}}>Par {holes.reduce((t,h)=>t+h.par,0)} - {holes.reduce((t,h)=>t+(h.yards||0),0)}y - Front 9</div></div><MiniCard holeList={front9} label="FRONT 9"/></div>
@@ -1127,15 +1129,21 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
           <div style={{display:'flex',gap:8,marginTop:16}}>
             <button onClick={async()=>{
               try{
-                const el=document.getElementById('f9-card');
-                const canvas=await html2canvas(el,{backgroundColor:'#0a1528',scale:2,useCORS:true,logging:false});
-                canvas.toBlob(blob=>{
+                const el=document.getElementById('f9-review-page');
+                if(!el){flash('Error capturing','error');return;}
+                const canvas=await html2canvas(el,{backgroundColor:'#0a1528',scale:2,useCORS:true,logging:false,allowTaint:true});
+                canvas.toBlob(async blob=>{
                   if(!blob)return;
                   const file=new File([blob],'front9.png',{type:'image/png'});
-                  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file],title:'Front 9 Scorecard'}).catch(()=>{});}
-                  else{const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='front9.png';a.click();URL.revokeObjectURL(url);}
+                  if(navigator.share&&navigator.canShare({files:[file]})){
+                    await navigator.share({files:[file],title:'Front 9 - '+(course&&course.name||'')});
+                  } else {
+                    const url=URL.createObjectURL(blob);
+                    const a=document.createElement('a');a.href=url;a.download='front9.png';a.click();
+                    URL.revokeObjectURL(url);
+                  }
                 },'image/png');
-              }catch(e){flash('Share failed','error');}
+              }catch(e){flash('Share: '+e.message,'error');}
             }} style={{...S.pri,flex:1,padding:12,fontSize:13,background:'#25D366'}}>Share F9</button>
             <button onClick={()=>{saveAll();setShowReview(false);}} style={{...S.pri,flex:1,padding:12,fontSize:13}}>Back 9</button>
           </div>
@@ -1156,19 +1164,23 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             <div style={{fontSize:11,color:'rgba(255,255,255,0.4)'}}>Sign in to score</div>
           </div>
         )}
-        <div style={{padding:'10px 14px',display:'flex',alignItems:'center',gap:10}}>
+        <div style={{padding:'10px 14px',display:'flex',alignItems:'center',gap:8}}>
           <button onClick={()=>setView('home')} style={{...S.gho,padding:'6px 10px',fontSize:12}}>Exit</button>
-          {/* Course badge */}
-          <div style={{width:40,height:40,borderRadius:10,overflow:'hidden',flexShrink:0,background:'linear-gradient(135deg,#0a3d6b,#0070BB)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:'rgba(255,255,255,0.6)',border:'1px solid rgba(255,255,255,0.15)'}}>
+          <div style={{width:38,height:38,borderRadius:8,overflow:'hidden',flexShrink:0,background:'linear-gradient(135deg,#0a3d6b,#0070BB)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'rgba(255,255,255,0.7)',border:'1px solid rgba(255,255,255,0.15)'}}>
             {course&&course.image_url
-              ?<img src={course.image_url} alt={course.name} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>{e.target.style.display='none';}}/>
-              :<div style={{textAlign:'center',lineHeight:1.2,fontSize:9,padding:2}}>{(course&&course.name||'?').split(' ').map(w=>w[0]).join('').slice(0,4)}</div>
+              ?<img src={course.image_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>{e.target.style.display='none';}}/>
+              :<div style={{textAlign:'center',lineHeight:1.2,padding:2}}>{(course&&course.name||'?').split(' ').map(w=>w[0]).join('').slice(0,4)}</div>
             }
           </div>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:13,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{course&&course.name||round.course_name||'Scorecard'}</div>
-            <div style={{fontSize:11,color:'#60b8f0'}}>{round.name||''}{round.join_code?' · Code: '+round.join_code:''}</div>
+            <div style={{fontSize:10,color:'#60b8f0'}}>{new Date(round.created_at||Date.now()).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</div>
           </div>
+          {round.join_code&&<button onClick={()=>{
+            const url='https://snyder-live.vercel.app?watch='+round.join_code;
+            if(navigator.share){navigator.share({title:'Watch live - '+( course&&course.name||''),url});}
+            else{navigator.clipboard&&navigator.clipboard.writeText(url);flash('Watch link copied!');}
+          }} style={{background:'#0070BB',border:'none',color:'#fff',borderRadius:8,padding:'6px 10px',fontSize:11,fontWeight:600,cursor:'pointer',flexShrink:0}}>Share</button>}
         </div>
         {course&&(
           <div style={{padding:'4px 14px',background:'rgba(0,50,120,0.35)',borderTop:'1px solid rgba(255,255,255,0.1)',display:'flex',gap:14,alignItems:'center',overflowX:'auto'}}>
@@ -1282,17 +1294,16 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         </div>
       )}
 
-      {canEdit&&(
-        <div style={{padding:16}}>
-          <button onClick={async()=>{
-            await saveAll();
-            // Mark round as complete
-            await sb.from('cup_rounds').update({status:'complete'}).eq('id',round.id);
-            await load();
-            setEndStep(0);setShowEnd(true);
-          }} style={{...S.pri,width:'100%',padding:13,fontSize:14,background:'#0a8a4a'}}>Finish Round</button>
-        </div>
-      )}
+      <div style={{padding:'8px 16px 24px'}}>
+        {canEdit&&<button onClick={async()=>{
+          if(!window.confirm('Finish this round? It will be removed from Live Scores.'))return;
+          await saveAll();
+          await sb.from('cup_rounds').update({status:'complete'}).eq('id',round.id);
+          await load();
+          setEndStep(0);setShowEnd(true);
+        }} style={{...S.pri,width:'100%',padding:13,fontSize:14,background:'#0a8a4a',marginBottom:0}}>Finish Round</button>}
+        {!canEdit&&<div style={{textAlign:'center',padding:'10px',fontSize:12,color:'rgba(255,255,255,0.3)'}}>View only - sign in as a player to score</div>}
+      </div>
 
       <ScoreInput/>
     </div>
