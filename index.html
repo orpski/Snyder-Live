@@ -22,7 +22,7 @@ h1,h2,.heading{font-family:'Barlow Condensed',sans-serif;}
 </style>
 </head>
 <body>
-<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v33</div>
+<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v34</div>
 <div id="root"><div style="padding:20px;color:#60b8f0;">Loading...</div></div>
 <div id="err" style="display:none;position:fixed;inset:0;background:#1a0a0a;color:#f87171;padding:16px;font-size:11px;font-family:monospace;overflow:auto;white-space:pre-wrap;z-index:9999;"></div>
 <script>
@@ -742,6 +742,14 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   },[round&&round.id]);
 
   function getHole(n){return holes.find(h=>h.hole===n)||{hole:n,par:4,stroke_index:n,yards:0};}
+  function checkSkipped(targetHole){
+    for(let h=1;h<targetHole;h++){
+      const allScored=grpPlayers.every(p=>(holeScores[h]||{})[p.id]!==undefined);
+      if(!allScored)return h;
+    }
+    return null;
+  }
+
   async function autoSave(holeNum,pid,val){
     const hd=getHole(holeNum);
     const hcp=parseFloat(playingHcps[pid]!=null?playingHcps[pid]:(grpPlayers.find(p=>p.id===pid)||{}).current_handicap||0);
@@ -846,14 +854,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         setTimeout(()=>{setInputVal('');setInputHole({holeNum,pid:grpPlayers[pIdx+1].id});},150);
       }
     }
-    function checkSkipped(targetHole){
-      // Check if any earlier holes are missing scores
-      for(let h=1;h<targetHole;h++){
-        const allScored=grpPlayers.every(p=>(holeScores[h]||{})[p.id]!==undefined);
-        if(!allScored)return h;
-      }
-      return null;
-    }
+
     function blob(){
       setScore(holeNum,pid,-1);setInputHole(null);
       const pIdx=grpPlayers.findIndex(p=>p.id===pid);
@@ -972,7 +973,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
                 <div style={{fontSize:12,color:'#60b8f0',marginBottom:4}}>{((p.name||p.display_name)||'?').split(' ')[0]}</div>
                 <div style={{fontSize:32,color:'#fff',lineHeight:1}}>{back9.reduce((t,h)=>{const g=(holeScores[h.hole]||{})[p.id];return t+(g===-1?0:(getPts(g,h.hole,p.id)||0));},0)}</div>
                 <div style={{fontSize:10,color:'#60b8f0',marginTop:2}}>back 9</div>
-                <div style={{fontSize:13,color:'rgba(255,255,255,0.5)',marginTop:4}}>{getRunning(p.id,18)} total</div>
+                <div style={{fontSize:13,color:'rgba(255,255,255,0.5)',marginTop:4}}>{getRunning(p.id,holes.length)} total</div>
               </div>
             ))}
           </div>
@@ -1014,7 +1015,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
               <div style={{fontSize:11,color:'#60b8f0'}}>Total</div>
               {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:11,color:'#60b8f0'}}>{((p.name||p.display_name)||'?').split(' ')[0]}</div>)}
               <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:6}}>Stableford</div>
-              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:22,color:'#fff',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:4}}>{getRunning(p.id,18)}</div>)}
+              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:22,color:'#fff',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:4}}>{getRunning(p.id,holes.length)}</div>)}
             </div>
           </div>
         </div>
@@ -1035,7 +1036,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
                   <div style={{fontSize:18,color:'#fff'}}>{((p.name||p.display_name)||'?').split(' ')[0]}</div>
                   <div style={{textAlign:'right'}}>
-                    <div style={{fontSize:28,color:'#60b8f0',lineHeight:1}}>{getRunning(p.id,18)}</div>
+                    <div style={{fontSize:28,color:'#60b8f0',lineHeight:1}}>{getRunning(p.id,holes.length)}</div>
                     <div style={{fontSize:10,color:'rgba(255,255,255,0.4)'}}>pts</div>
                   </div>
                 </div>
@@ -1136,7 +1137,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
           <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.15em',fontWeight:600,marginBottom:10}}>LIVE LEADERBOARD</div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
             {[...grpPlayers].sort((a,b)=>getRunning(b.id,18)-getRunning(a.id,18)).map((p,rank)=>{
-              const total=getRunning(p.id,18);
+              const total=getRunning(p.id,holes.length);
               const holesPlayed=Object.keys(holeScores).filter(h=>( holeScores[h]||{})[p.id]!==undefined).length;
               const lastHole=Math.max(0,...Object.keys(holeScores).filter(h=>(holeScores[h]||{})[p.id]!==undefined).map(Number));
               const lastPts=lastHole>0?getPts((holeScores[lastHole]||{})[p.id],lastHole,p.id):null;
