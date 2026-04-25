@@ -1,3 +1,4 @@
+<!-- SNYDER LIVE v35 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -679,7 +680,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
             <div onClick={()=>setSetup(q=>({...q,is_private:!q.is_private}))} style={{width:48,height:28,borderRadius:14,background:setup.is_private?'#0070BB':'rgba(255,255,255,0.2)',cursor:'pointer',position:'relative',transition:'background 0.2s',flexShrink:0}}>
               <div style={{position:'absolute',top:3,left:setup.is_private?22:3,width:22,height:22,borderRadius:'50%',background:'#fff',transition:'left 0.2s'}}/>
             </div>
-          </div>'''
+          </div>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
             <label style={{...S.lbl,margin:0}}>Players ({participants.length})</label>
             <button onClick={()=>setShowPicker(true)} style={{...S.pri,padding:'6px 14px',fontSize:12}}>+ Add</button>
