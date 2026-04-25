@@ -21,7 +21,7 @@ h1,h2,.heading{font-family:'Barlow Condensed',sans-serif;}
 </style>
 </head>
 <body>
-<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v30</div>
+<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v31</div>
 <div id="root"><div style="padding:20px;color:#60b8f0;">Loading...</div></div>
 <div id="err" style="display:none;position:fixed;inset:0;background:#1a0a0a;color:#f87171;padding:16px;font-size:11px;font-family:monospace;overflow:auto;white-space:pre-wrap;z-index:9999;"></div>
 <script>
@@ -683,22 +683,27 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
 
   useEffect(()=>{
     if(!round||!round.id)return;
-    // Always load from DB to ensure scores persist across navigation
+    // Load from localStorage first (instant)
+    try{
+      const local=JSON.parse(localStorage.getItem('scores_'+round.id)||'{}');
+      if(Object.keys(local).length>0){
+        setHoleScores(prev=>({...local,...prev}));
+      }
+    }catch(e){}
+    // Then load from Supabase (authoritative)
     sb.from('cup_scores').select('*').eq('round_id',round.id).then(({data})=>{
       if(!data||data.length===0)return;
       const m={};
-      data.forEach(s=>{if(!m[s.hole_number])m[s.hole_number]={};m[s.hole_number][s.player_id]=s.gross_score;});
+      data.forEach(s=>{
+        if(!m[s.hole_number])m[s.hole_number]={};
+        m[s.hole_number][s.player_id]=s.gross_score;
+      });
       setHoleScores(prev=>{
-        // Merge: keep any unsaved local scores, but fill in saved ones
-        const merged={...m};
-        Object.entries(prev).forEach(([h,ps])=>{
-          Object.entries(ps).forEach(([pid,g])=>{
-            if(!merged[h])merged[h]={};
-            merged[h][pid]=g;
-          });
-        });
+        const merged={...prev,...m};
         return merged;
       });
+      // Update localStorage with DB data
+      try{localStorage.setItem('scores_'+round.id,JSON.stringify(m));}catch(e){}
     });
   },[round&&round.id]);
 
@@ -707,6 +712,15 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     const hd=getHole(holeNum);
     const hcp=parseFloat(playingHcps[pid]!=null?playingHcps[pid]:(grpPlayers.find(p=>p.id===pid)||{}).current_handicap||0);
     const pts=val===-1?0:calcStableford(val,hd.par,hd.stroke_index,hcp)||0;
+    // Save to localStorage immediately as backup
+    try{
+      const key='scores_'+round.id;
+      const existing=JSON.parse(localStorage.getItem(key)||'{}');
+      if(!existing[holeNum])existing[holeNum]={};
+      existing[holeNum][pid]=val;
+      localStorage.setItem(key,JSON.stringify(existing));
+    }catch(e){}
+    // Save to Supabase
     const{error}=await sb.from('cup_scores').upsert({
       round_id:round.id,player_id:pid,hole_number:holeNum,
       gross_score:val,stableford_points:pts,par:hd.par,stroke_index:hd.stroke_index,
@@ -715,20 +729,15 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   }
 
   function setScore(holeNum,pid,val){
-    // Save immediately - don't wait for state update
-    autoSave(holeNum,pid,val).then(()=>{
-      // Check if all players scored this hole after save
-      setHoleScores(prev=>{
-        const updated={...prev,[holeNum]:{...(prev[holeNum]||{}),[pid]:val}};
-        const allScored=grpPlayers.every(p=>(updated[holeNum]||{})[p.id]!==undefined);
-        if(allScored)setTimeout(()=>flash('Hole '+holeNum+' saved'),100);
-        return updated;
-      });
-    }).catch(e=>{
-      flash('Save failed: '+e.message,'error');
-      // Still update state even if save failed
-      setHoleScores(prev=>({...prev,[holeNum]:{...(prev[holeNum]||{}),[pid]:val}}));
+    // Update state immediately
+    setHoleScores(prev=>{
+      const updated={...prev,[holeNum]:{...(prev[holeNum]||{}),[pid]:val}};
+      const allScored=grpPlayers.every(p=>(updated[holeNum]||{})[p.id]!==undefined);
+      if(allScored)setTimeout(()=>flash('Hole '+holeNum+' saved'),200);
+      return updated;
     });
+    // Save in background
+    autoSave(holeNum,pid,val).catch(e=>flash('Save error: '+e.message,'error'));
   }
 
   function getPts(gross,holeNum,pid){
