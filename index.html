@@ -10,6 +10,7 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -21,7 +22,7 @@ h1,h2,.heading{font-family:'Barlow Condensed',sans-serif;}
 </style>
 </head>
 <body>
-<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v32</div>
+<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v33</div>
 <div id="root"><div style="padding:20px;color:#60b8f0;">Loading...</div></div>
 <div id="err" style="display:none;position:fixed;inset:0;background:#1a0a0a;color:#f87171;padding:16px;font-size:11px;font-family:monospace;overflow:auto;white-space:pre-wrap;z-index:9999;"></div>
 <script>
@@ -729,14 +730,28 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   }
 
   function setScore(holeNum,pid,val){
-    // Update state immediately
     setHoleScores(prev=>{
       const updated={...prev,[holeNum]:{...(prev[holeNum]||{}),[pid]:val}};
       const allScored=grpPlayers.every(p=>(updated[holeNum]||{})[p.id]!==undefined);
-      if(allScored)setTimeout(()=>flash('Hole '+holeNum+' saved'),200);
+      if(allScored){
+        setTimeout(()=>flash('Hole '+holeNum+' saved'),200);
+        // Auto-trigger front 9 review after hole 9
+        if(holeNum===9){
+          const allFront9=Array.from({length:9},(_,i)=>i+1).every(h=>
+            grpPlayers.every(p=>(updated[h]||{})[p.id]!==undefined)
+          );
+          if(allFront9)setTimeout(()=>setShowReview(true),600);
+        }
+        // Auto-trigger end review after hole 18
+        if(holeNum===18){
+          const allBack9=Array.from({length:9},(_,i)=>i+10).every(h=>
+            grpPlayers.every(p=>(updated[h]||{})[p.id]!==undefined)
+          );
+          if(allBack9)setTimeout(()=>{setEndStep(0);setShowEnd(true);},600);
+        }
+      }
       return updated;
     });
-    // Save in background
     autoSave(holeNum,pid,val).catch(e=>flash('Save error: '+e.message,'error'));
   }
 
@@ -950,9 +965,30 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         <div style={{position:'sticky',top:0,background:'#0a1f3d',borderBottom:'1px solid rgba(255,255,255,0.1)',padding:'12px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <button onClick={()=>setEndStep(1)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Full Card</button>
           <div style={{fontSize:16,color:'#fff'}}>Stats</div>
+          <button onClick={async()=>{
+            // Screenshot the stats page and share to WhatsApp
+            try{
+              const el=document.getElementById('stats-card');
+              if(!el){alert('Stats not ready');return;}
+              const canvas=await html2canvas(el,{backgroundColor:'#0a1528',scale:2,useCORS:true,logging:false});
+              canvas.toBlob(blob=>{
+                if(!blob)return;
+                const file=new File([blob],'scorecard.png',{type:'image/png'});
+                if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+                  navigator.share({files:[file],title:'Scorecard',text:'Check out our scorecard!'}).catch(()=>{});
+                } else {
+                  // Fallback - download the image
+                  const url=URL.createObjectURL(blob);
+                  const a=document.createElement('a');
+                  a.href=url;a.download='scorecard.png';a.click();
+                  URL.revokeObjectURL(url);
+                }
+              },'image/png');
+            }catch(e){flash('Share failed: '+e.message,'error');}
+          }} style={{...S.pri,padding:'8px 14px',fontSize:13,background:'#25D366',marginRight:8}}>Share</button>
           <button onClick={()=>{setShowEnd(false);setView('home');}} style={{...S.pri,padding:'8px 14px',fontSize:13}}>Done</button>
         </div>
-        <div style={{padding:16}}>
+        <div id="stats-card" style={{padding:16,background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)'}}>
           {grpPlayers.map(p=>{
             const st=getStats(p.id);
             return(
