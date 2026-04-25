@@ -21,7 +21,7 @@ h1,h2,.heading{font-family:'Barlow Condensed',sans-serif;}
 </style>
 </head>
 <body>
-<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v27</div>
+<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v28</div>
 <div id="root"><div style="padding:20px;color:#60b8f0;">Loading...</div></div>
 <div id="err" style="display:none;position:fixed;inset:0;background:#1a0a0a;color:#f87171;padding:16px;font-size:11px;font-family:monospace;overflow:auto;white-space:pre-wrap;z-index:9999;"></div>
 <script>
@@ -259,7 +259,7 @@ function App(){
   const[appData,setAppData]=useState({players:[],courses:[],rounds:[],groups:[],competitions:[],scores:[],cupUsers:[],guests:[]});
   const[selectedRound,setSelectedRound]=useState(null);
   const[selectedComp,setSelectedComp]=useState(null);
-  const isAdmin=currentUser&&currentUser.username==='admin';
+  const isAdmin=true; // Admin panel is password protected internally
 
   function setView(v){
     if(v!=='home')window.history.pushState({view:v},'',null);
@@ -379,21 +379,26 @@ function App(){
 
       {/* Bottom tab bar */}
       <div style={{position:'fixed',bottom:0,left:0,right:0,background:'#0d2548',borderTop:'1px solid rgba(255,255,255,0.1)',display:'flex',padding:'8px 0 20px'}}>
-        {[
-          {id:'play',label:'PLAY',color:'#0070BB'},
-          {id:'live',label:'SCORES',color:'rgba(255,255,255,0.4)'},
-          {id:'tournaments',label:'CUP',color:'rgba(255,255,255,0.4)'},
-          {id:'profile',label:'PROFILE',color:'rgba(255,255,255,0.4)'},
-        ].map(tab=>(
-          <button key={tab.id} onClick={()=>tab.id==='profile'?(currentUser?setView('profile'):setShowAuth(true)):setView(tab.id)} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:tab.color}}>
-            <div style={{fontSize:18,marginBottom:1}}>{tab.id==='play'?'G':tab.id==='live'?'S':tab.id==='tournaments'?'C':'P'}</div>
-            <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>{tab.label}</div>
-          </button>
-        ))}
-        {isAdmin&&<button onClick={()=>setView('admin')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
-          <div style={{width:24,height:24,borderRadius:6,background:'rgba(255,255,255,0.06)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700}}>A</div>
+        <button onClick={()=>setView('play')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'#0070BB'}}>
+          <div style={{fontSize:18,marginBottom:1}}>G</div>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>PLAY</div>
+        </button>
+        <button onClick={()=>setView('live')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
+          <div style={{fontSize:18,marginBottom:1}}>S</div>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>SCORES</div>
+        </button>
+        <button onClick={()=>setView('tournaments')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
+          <div style={{fontSize:18,marginBottom:1}}>C</div>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>CUP</div>
+        </button>
+        <button onClick={()=>currentUser?setView('profile'):setShowAuth(true)} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
+          <div style={{fontSize:18,marginBottom:1}}>P</div>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>PROFILE</div>
+        </button>
+        <button onClick={()=>setView('admin')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
+          <div style={{fontSize:18,marginBottom:1}}>A</div>
           <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>ADMIN</div>
-        </button>}
+        </button>
       </div>
 
       {showAuth&&<UserAuth onLogin={u=>{setCurrentUser(u);setShowAuth(false);flash('Welcome '+u.display_name);}} onClose={()=>setShowAuth(false)}/>}
