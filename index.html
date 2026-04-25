@@ -22,7 +22,7 @@ h1,h2,.heading{font-family:'Barlow Condensed',sans-serif;}
 </style>
 </head>
 <body>
-<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v34</div>
+<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v35</div>
 <div id="root"><div style="padding:20px;color:#60b8f0;">Loading...</div></div>
 <div id="err" style="display:none;position:fixed;inset:0;background:#1a0a0a;color:#f87171;padding:16px;font-size:11px;font-family:monospace;overflow:auto;white-space:pre-wrap;z-index:9999;"></div>
 <script>
@@ -269,7 +269,27 @@ function App(){
   }
 
   useEffect(()=>{
-    setTimeout(()=>setSplash(false),3000);
+    // Check for watch link ?watch=CODE
+    const params=new URLSearchParams(window.location.search);
+    const watchCode=params.get('watch');
+    if(watchCode){
+      setSplash(false);
+      // Load and go straight to watch mode
+      sb.from('cup_rounds').select('*').eq('join_code',watchCode.toUpperCase()).single().then(async({data:rd})=>{
+        if(!rd){flash('Round not found','error');return;}
+        const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
+        const po=(rps||[]).map(rp=>({id:rp.user_id||rp.guest_id||rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0}));
+        const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
+        const{data:grps}=await sb.from('cup_groups').select('*').eq('round_id',rd.id);
+        const grp=grps&&grps[0];
+        if(grp){
+          setSelectedRound({...rd,_group:{...grp,participants:po,playing_handicaps:hm}});
+          setViewRaw('play');
+        }
+      });
+    } else {
+      setTimeout(()=>setSplash(false),3000);
+    }
     const saved=localStorage.getItem('snyder_user');
     if(saved){try{setCurrentUser(JSON.parse(saved));}catch(e){}}
     loadAll();
@@ -299,7 +319,12 @@ function App(){
 
   const{players,courses,rounds,groups,competitions,scores,cupUsers,guests}=appData;
   const activeComp=competitions.find(c=>c.status==='active')||competitions[0];
-  const liveRounds=rounds.filter(r=>r.status==='live');
+  const liveRounds=rounds.filter(r=>{
+    if(r.status!=='live')return false;
+    if(!r.is_private)return true;
+    // Private - only show if current user is logged in (players will see it in their profile)
+    return currentUser!=null;
+  });
 
   const props={...appData,sb,flash,setView,load:loadAll,isAdmin,currentUser,setSelectedRound,selectedRound,holeScores,setHoleScores};
 
@@ -344,16 +369,21 @@ function App(){
                 const rdGroups=groups.filter(g=>g.round_id===rd.id);
                 const course=courses.find(co=>co.id===rd.course_id);
                 return(
-                  <div key={rd.id} style={{minWidth:200,borderRadius:14,overflow:'hidden',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)',cursor:'pointer',flexShrink:0}} onClick={()=>{setSelectedRound(rd);setView('live');}}>
+                  <div key={rd.id} style={{minWidth:200,borderRadius:14,overflow:'hidden',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)',flexShrink:0}}>
                     <div style={{height:110,background:'linear-gradient(135deg,#0a3d6b 0%,#1a5fa8 60%,#0070BB 100%)',display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
                       <div style={{fontSize:40,opacity:0.3}}>G</div>
                       <div style={{position:'absolute',top:8,right:8,background:'#ef4444',borderRadius:20,padding:'3px 8px',fontSize:10,color:'#fff',fontWeight:700,letterSpacing:'0.05em'}}>LIVE</div>
                     </div>
-                    <div style={{padding:'10px 12px'}}>
+                    <div style={{padding:'10px 12px',cursor:'pointer'}} onClick={()=>{setSelectedRound(rd);setView('live');}}>
                       <div style={{fontSize:15,color:'#fff',fontWeight:600,marginBottom:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||rd.course_name||'Round'}</div>
                       <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:4}}>{rd.course_name}</div>
                       <div style={{fontSize:11,color:'rgba(255,255,255,0.5)'}}>{rdGroups.length} group{rdGroups.length!==1?'s':''} scoring</div>
                     </div>
+                    {rd.join_code&&(
+                      <div style={{padding:'6px 12px',borderTop:'1px solid rgba(255,255,255,0.08)',display:'flex',gap:6}}>
+                        <button onClick={e=>{e.stopPropagation();const url='https://snyder-live.vercel.app?watch='+rd.join_code;if(navigator.share){navigator.share({title:'Watch live scoring',text:'Follow the round live',url});}else{navigator.clipboard&&navigator.clipboard.writeText(url);flash('Link copied!');};}} style={{flex:1,background:'#0070BB',border:'none',color:'#fff',borderRadius:6,padding:'5px 8px',fontSize:10,fontWeight:600,cursor:'pointer',letterSpacing:'0.05em'}}>SHARE LINK</button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -410,7 +440,12 @@ function App(){
 }
 
 function LiveScoringView({rounds,groups,sb,flash,setView,selectedComp,activeComp,setSelectedRound}){
-  const liveRounds=rounds.filter(r=>r.status==='live');
+  const liveRounds=rounds.filter(r=>{
+    if(r.status!=='live')return false;
+    if(!r.is_private)return true;
+    // Private - only show if current user is logged in (players will see it in their profile)
+    return currentUser!=null;
+  });
   return(
     <div style={{minHeight:'100vh',paddingBottom:40}}>
       <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
@@ -539,11 +574,16 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   const[step,setStep]=useState('menu');
   const[activeRound,setActiveRound]=useState(null);
   const[activeGroup,setActiveGroup]=useState(null);
-  const[setup,setSetup]=useState({name:'',course_id:'',tee:'White'});
+  const[setup,setSetup]=useState({name:'',course_id:'',tee:'White',is_private:false});
   const[participants,setParticipants]=useState([]);
   const[saving,setSaving]=useState(false);
   const[showPicker,setShowPicker]=useState(false);
-  const liveRounds=rounds.filter(r=>r.status==='live');
+  const liveRounds=rounds.filter(r=>{
+    if(r.status!=='live')return false;
+    if(!r.is_private)return true;
+    // Private - only show if current user is logged in (players will see it in their profile)
+    return currentUser!=null;
+  });
 
   useEffect(()=>{
     if(selectedRound&&selectedRound._group){
@@ -577,7 +617,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
 
       const{data:rd}=await sb.from('cup_rounds').insert({
         name:roundName,course_id:setup.course_id,course_name:course&&course.name||'',
-        status:'live',tee:setup.tee,day_number:1,join_code:joinCode,
+        status:'live',tee:setup.tee,day_number:1,join_code:joinCode,is_private:setup.is_private||false,
       }).select().single();
 
       const{data:grp}=await sb.from('cup_groups').insert({
@@ -628,9 +668,18 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
             {courses.map(co=><option key={co.id} value={co.id}>{co.name}</option>)}
           </select>
           <label style={S.lbl}>Tee</label>
-          <select style={{...S.inp,marginBottom:16}} value={setup.tee} onChange={e=>setSetup(q=>({...q,tee:e.target.value}))}>
+          <select style={{...S.inp,marginBottom:12}} value={setup.tee} onChange={e=>setSetup(q=>({...q,tee:e.target.value}))}>
             {['White','Yellow','Red','Orange'].map(t=><option key={t}>{t}</option>)}
           </select>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',background:'rgba(255,255,255,0.06)',borderRadius:10,marginBottom:16,border:'1px solid rgba(255,255,255,0.12)'}}>
+            <div>
+              <div style={{fontSize:14,color:'#fff',fontWeight:500}}>Private Round</div>
+              <div style={{fontSize:11,color:'#60b8f0',marginTop:2}}>Only visible to players in the round</div>
+            </div>
+            <div onClick={()=>setSetup(q=>({...q,is_private:!q.is_private}))} style={{width:48,height:28,borderRadius:14,background:setup.is_private?'#0070BB':'rgba(255,255,255,0.2)',cursor:'pointer',position:'relative',transition:'background 0.2s',flexShrink:0}}>
+              <div style={{position:'absolute',top:3,left:setup.is_private?22:3,width:22,height:22,borderRadius:'50%',background:'#fff',transition:'left 0.2s'}}/>
+            </div>
+          </div>'''
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
             <label style={{...S.lbl,margin:0}}>Players ({participants.length})</label>
             <button onClick={()=>setShowPicker(true)} style={{...S.pri,padding:'6px 14px',fontSize:12}}>+ Add</button>
@@ -1008,7 +1057,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
               }catch(e){flash('Share failed','error');}
             }} style={{...S.pri,padding:'8px 16px',fontSize:13,background:'#25D366'}}>Share Card</button>
           </div>
-          <MiniCard holeList={front9} label="FRONT 9"/>
+          <div id="f9-card"><div style={{padding:'8px 12px',background:'rgba(0,0,0,0.3)',marginBottom:8,borderRadius:8}}><div style={{fontSize:13,color:'#fff',fontWeight:600}}>{course&&course.name||round.course_name}</div><div style={{fontSize:11,color:'#60b8f0'}}>Par {holes.reduce((t,h)=>t+h.par,0)} - {holes.reduce((t,h)=>t+(h.yards||0),0)}y - Front 9</div></div><MiniCard holeList={front9} label="FRONT 9"/></div>
           <MiniCard holeList={back9} label="BACK 9"/>
           <div style={{...S.card}}>
             <div style={{display:'grid',gridTemplateColumns:'80px '+grpPlayers.map(()=>'1fr').join(' '),gap:6,alignItems:'center'}}>
@@ -1074,7 +1123,21 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             ))}
           </div>
           <MiniCard holeList={front9} label="FRONT 9"/>
-          <button onClick={()=>{saveAll();setShowReview(false);}} style={{...S.pri,width:'100%',marginTop:16,padding:13,fontSize:15}}>Continue to Back 9</button>
+          <div style={{display:'flex',gap:8,marginTop:16}}>
+            <button onClick={async()=>{
+              try{
+                const el=document.getElementById('f9-card');
+                const canvas=await html2canvas(el,{backgroundColor:'#0a1528',scale:2,useCORS:true,logging:false});
+                canvas.toBlob(blob=>{
+                  if(!blob)return;
+                  const file=new File([blob],'front9.png',{type:'image/png'});
+                  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file],title:'Front 9 Scorecard'}).catch(()=>{});}
+                  else{const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='front9.png';a.click();URL.revokeObjectURL(url);}
+                },'image/png');
+              }catch(e){flash('Share failed','error');}
+            }} style={{...S.pri,flex:1,padding:12,fontSize:13,background:'#25D366'}}>Share F9</button>
+            <button onClick={()=>{saveAll();setShowReview(false);}} style={{...S.pri,flex:1,padding:12,fontSize:13}}>Back 9</button>
+          </div>
         </div>
       </div>
     );
