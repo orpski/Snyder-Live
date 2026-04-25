@@ -450,6 +450,39 @@ function LiveScoringView({rounds,groups,sb,flash,setView,selectedComp,activeComp
             );
           })
         }
+        {/* Today's finished rounds */}
+        {(()=>{
+          const today=new Date().toDateString();
+          const finishedToday=rounds.filter(r=>r.status==='complete'&&new Date(r.created_at).toDateString()===today);
+          if(!finishedToday.length)return null;
+          return(
+            <div style={{marginTop:20}}>
+              <div style={{fontSize:11,color:'#60b8f0',letterSpacing:'0.15em',fontWeight:600,marginBottom:10}}>FINISHED TODAY</div>
+              {finishedToday.map(rd=>{
+                const rdGroups=groups.filter(g=>g.round_id===rd.id);
+                return(
+                  <div key={rd.id} style={{...S.card,marginBottom:8,cursor:'pointer',opacity:0.8}} onClick={async()=>{
+                    const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
+                    const po=(rps||[]).map(rp=>({id:rp.user_id||rp.guest_id||rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0}));
+                    const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
+                    if(rdGroups[0]){
+                      setSelectedRound({...rd,_group:{...rdGroups[0],participants:po,playing_handicaps:hm}});
+                      setView('play');
+                    }
+                  }}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <div>
+                        <div style={{fontSize:14,color:'#fff',fontWeight:500}}>{rd.name||rd.course_name}</div>
+                        <div style={{fontSize:11,color:'#60b8f0'}}>{rd.course_name} - Finished</div>
+                      </div>
+                      <div style={{fontSize:11,color:'#1b5e20',background:'rgba(27,94,32,0.15)',borderRadius:6,padding:'3px 8px',fontWeight:600}}>Done</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -813,6 +846,14 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         setTimeout(()=>{setInputVal('');setInputHole({holeNum,pid:grpPlayers[pIdx+1].id});},150);
       }
     }
+    function checkSkipped(targetHole){
+      // Check if any earlier holes are missing scores
+      for(let h=1;h<targetHole;h++){
+        const allScored=grpPlayers.every(p=>(holeScores[h]||{})[p.id]!==undefined);
+        if(!allScored)return h;
+      }
+      return null;
+    }
     function blob(){
       setScore(holeNum,pid,-1);setInputHole(null);
       const pIdx=grpPlayers.findIndex(p=>p.id===pid);
@@ -904,7 +945,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
                 const g=(holeScores[hd.hole]||{})[p.id];
                 const pts=g===-1?0:getPts(g,hd.hole,p.id);
                 return[
-                  <div key={p.id+'g'} style={{textAlign:'center',fontSize:14,color:g===-1?'rgba(255,255,255,0.3)':g?'#fff':'rgba(255,255,255,0.2)'}}>{g===-1?'o':g||'.'}</div>,
+                  <div key={p.id+'g'} style={{textAlign:'center',fontSize:14,color:g===-1?'rgba(255,255,255,0.3)':g?'#fff':'rgba(255,255,255,0.2)'}}>{ g===-1?'0':g||'.' }</div>,
                   <div key={p.id+'p'} style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
                     {(g>0||g===-1)&&<div style={{background:g===-1?'rgba(40,40,40,0.9)':ptsColor(pts),borderRadius:4,width:28,height:22,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:'#fff'}}>{pts}</div>}
                   </div>
@@ -946,7 +987,26 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
           <div style={{fontSize:16,color:'#fff'}}>Full Scorecard</div>
           <button onClick={()=>setEndStep(2)} style={{...S.pri,padding:'8px 16px',fontSize:14}}>Stats</button>
         </div>
-        <div style={{padding:16}}>
+        <div id="full-card-content" style={{padding:16}}>
+          <div style={{display:'flex',justifyContent:'flex-end',marginBottom:12}}>
+            <button onClick={async()=>{
+              try{
+                const el=document.getElementById('full-card-content');
+                const canvas=await html2canvas(el,{backgroundColor:'#0a1528',scale:2,useCORS:true,logging:false});
+                canvas.toBlob(blob=>{
+                  if(!blob)return;
+                  const file=new File([blob],'scorecard.png',{type:'image/png'});
+                  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+                    navigator.share({files:[file],title:'Scorecard - '+((course&&course.name)||''),text:'Full scorecard'}).catch(()=>{});
+                  } else {
+                    const url=URL.createObjectURL(blob);
+                    const a=document.createElement('a');a.href=url;a.download='scorecard.png';a.click();
+                    URL.revokeObjectURL(url);
+                  }
+                },'image/png');
+              }catch(e){flash('Share failed','error');}
+            }} style={{...S.pri,padding:'8px 16px',fontSize:13,background:'#25D366'}}>Share Card</button>
+          </div>
           <MiniCard holeList={front9} label="FRONT 9"/>
           <MiniCard holeList={back9} label="BACK 9"/>
           <div style={{...S.card}}>
@@ -965,27 +1025,6 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         <div style={{position:'sticky',top:0,background:'#0a1f3d',borderBottom:'1px solid rgba(255,255,255,0.1)',padding:'12px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <button onClick={()=>setEndStep(1)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Full Card</button>
           <div style={{fontSize:16,color:'#fff'}}>Stats</div>
-          <button onClick={async()=>{
-            // Screenshot the stats page and share to WhatsApp
-            try{
-              const el=document.getElementById('stats-card');
-              if(!el){alert('Stats not ready');return;}
-              const canvas=await html2canvas(el,{backgroundColor:'#0a1528',scale:2,useCORS:true,logging:false});
-              canvas.toBlob(blob=>{
-                if(!blob)return;
-                const file=new File([blob],'scorecard.png',{type:'image/png'});
-                if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-                  navigator.share({files:[file],title:'Scorecard',text:'Check out our scorecard!'}).catch(()=>{});
-                } else {
-                  // Fallback - download the image
-                  const url=URL.createObjectURL(blob);
-                  const a=document.createElement('a');
-                  a.href=url;a.download='scorecard.png';a.click();
-                  URL.revokeObjectURL(url);
-                }
-              },'image/png');
-            }catch(e){flash('Share failed: '+e.message,'error');}
-          }} style={{...S.pri,padding:'8px 14px',fontSize:13,background:'#25D366',marginRight:8}}>Share</button>
           <button onClick={()=>{setShowEnd(false);setView('home');}} style={{...S.pri,padding:'8px 14px',fontSize:13}}>Done</button>
         </div>
         <div id="stats-card" style={{padding:16,background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)'}}>
@@ -1047,9 +1086,9 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)'}}>
       <div style={{position:'sticky',top:0,zIndex:10,background:'linear-gradient(160deg,#0a1528,#0d2040)',borderBottom:'2px solid #0070BB'}}>
         {!canEdit&&(
-          <div style={{background:'rgba(255,193,7,0.15)',borderBottom:'1px solid rgba(255,193,7,0.3)',padding:'8px 14px',display:'flex',alignItems:'center',gap:8}}>
-            <div style={{fontSize:12,color:'#fbbf24',fontWeight:600}}>View mode</div>
-            <div style={{fontSize:11,color:'rgba(255,255,255,0.5)'}}>Sign in as a player to enter scores</div>
+          <div style={{background:'rgba(0,112,187,0.2)',borderBottom:'1px solid rgba(0,112,187,0.3)',padding:'8px 14px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <div style={{fontSize:12,color:'#60b8f0',fontWeight:600}}>Spectator View</div>
+            <div style={{fontSize:11,color:'rgba(255,255,255,0.4)'}}>Sign in to score</div>
           </div>
         )}
         <div style={{padding:'10px 14px',display:'flex',alignItems:'center',gap:10}}>
@@ -1091,6 +1130,38 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         </div>
       </div>
 
+      {/* Spectator live leaderboard */}
+      {!canEdit&&(
+        <div style={{padding:'12px 14px',background:'rgba(0,0,0,0.2)',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
+          <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.15em',fontWeight:600,marginBottom:10}}>LIVE LEADERBOARD</div>
+          <div style={{display:'flex',flexDirection:'column',gap:6}}>
+            {[...grpPlayers].sort((a,b)=>getRunning(b.id,18)-getRunning(a.id,18)).map((p,rank)=>{
+              const total=getRunning(p.id,18);
+              const holesPlayed=Object.keys(holeScores).filter(h=>( holeScores[h]||{})[p.id]!==undefined).length;
+              const lastHole=Math.max(0,...Object.keys(holeScores).filter(h=>(holeScores[h]||{})[p.id]!==undefined).map(Number));
+              const lastPts=lastHole>0?getPts((holeScores[lastHole]||{})[p.id],lastHole,p.id):null;
+              return(
+                <div key={p.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',background:rank===0?'rgba(184,134,11,0.15)':'rgba(255,255,255,0.05)',borderRadius:10,border:rank===0?'1px solid rgba(184,134,11,0.3)':'1px solid rgba(255,255,255,0.08)'}}>
+                  <div style={{fontSize:18,fontWeight:700,color:rank===0?'#fbbf24':'rgba(255,255,255,0.4)',width:24,textAlign:'center'}}>{rank+1}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:14,color:'#fff',fontWeight:600}}>{(p.name||p.display_name||'?').split(' ')[0]}</div>
+                    <div style={{fontSize:11,color:'#60b8f0'}}>{holesPlayed} holes played{lastHole>0?' · Hole '+lastHole:''}</div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:28,color:'#fff',fontWeight:700,lineHeight:1}}>{total}</div>
+                    <div style={{fontSize:9,color:'#60b8f0',letterSpacing:'0.1em'}}>PTS</div>
+                  </div>
+                  {lastPts!==null&&lastHole>0&&(
+                    <div style={{width:32,height:32,borderRadius:8,background:ptsColor(lastPts),display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,color:'#fff',fontWeight:700}}>{lastPts}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{fontSize:10,color:'rgba(255,255,255,0.3)',textAlign:'center',marginTop:8}}>Scroll down to see full scorecard</div>
+        </div>
+      )}
+
       {['FRONT 9','BACK 9'].map((label,sec)=>(
         <div key={label}>
           <div style={{padding:'4px 12px',fontSize:10,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(0,0,0,0.3)'}}>{label}</div>
@@ -1111,11 +1182,19 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
                   const shots=Math.floor(hcp/18)+((hcp%18)>=hd.stroke_index?1:0);
                   const running=getRunning(p.id,hd.hole);
                   return(
-                    <div key={p.id} onClick={()=>{if(!canEdit)return;setInputVal(gross&&gross>0?String(gross):'');setInputHole({holeNum:hd.hole,pid:p.id});}} style={{minHeight:rowH,position:'relative',display:'flex',alignItems:'center',justifyContent:'center',cursor:canEdit?'pointer':'default',background:gross&&gross!==-1?ptsColor(pts):gross===-1?'rgba(20,20,20,0.8)':'rgba(255,255,255,0.04)',borderLeft:'1px solid rgba(255,255,255,0.06)'}}>
+                    <div key={p.id} onClick={()=>{
+                          if(!canEdit)return;
+                          const skipped=checkSkipped(hd.hole);
+                          if(skipped&&skipped!==hd.hole){
+                            if(!window.confirm('You have not entered hole '+skipped+' yet. Continue anyway?'))return;
+                          }
+                          setInputVal(gross&&gross>0?String(gross):'');
+                          setInputHole({holeNum:hd.hole,pid:p.id});
+                        }} style={{minHeight:rowH,position:'relative',display:'flex',alignItems:'center',justifyContent:'center',cursor:canEdit?'pointer':'default',background:gross&&gross!==-1?ptsColor(pts):gross===-1?'rgba(20,20,20,0.8)':'rgba(255,255,255,0.04)',borderLeft:'1px solid rgba(255,255,255,0.06)'}}>
                       {shots>0&&<div style={{position:'absolute',top:5,left:6,display:'flex',gap:2}}>{Array.from({length:shots}).map((_,i)=><div key={i} style={{width:6,height:6,borderRadius:'50%',background:'#f59e0b'}}/>)}</div>}
                       {gross>0||gross===-1?(
                         <div>
-                          <div style={{fontSize:28,color:'#fff',lineHeight:1,textAlign:'center'}}>{gross===-1?'o':gross}</div>
+                          <div style={{fontSize:28,color:'#fff',lineHeight:1,textAlign:'center'}}>{gross===-1?'0':gross}</div>
                           {pts!==null&&<div style={{position:'absolute',top:6,right:8,fontSize:11,color:'rgba(255,255,255,0.9)',background:'rgba(0,0,0,0.3)',borderRadius:4,padding:'1px 5px'}}>{pts}pt</div>}
                           {gross>0&&<div style={{position:'absolute',bottom:5,right:7,fontSize:11,color:'rgba(255,255,255,0.7)'}}>{running}</div>}
                         </div>
@@ -1140,7 +1219,13 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
 
       {canEdit&&(
         <div style={{padding:16}}>
-          <button onClick={async()=>{await saveAll();setEndStep(0);setShowEnd(true);}} style={{...S.pri,width:'100%',padding:13,fontSize:14,background:'#0a8a4a'}}>Finish Round</button>
+          <button onClick={async()=>{
+            await saveAll();
+            // Mark round as complete
+            await sb.from('cup_rounds').update({status:'complete'}).eq('id',round.id);
+            await load();
+            setEndStep(0);setShowEnd(true);
+          }} style={{...S.pri,width:'100%',padding:13,fontSize:14,background:'#0a8a4a'}}>Finish Round</button>
         </div>
       )}
 
