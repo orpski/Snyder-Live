@@ -584,7 +584,7 @@ function App(){
 // Live scores and completed scores view
 // Lists active rounds, this week’s cards and older monthly cards
 // =========================================================
-function LiveScoringView({rounds,groups,scores,players,cupUsers,sb,flash,setView,selectedComp,activeComp,setSelectedRound,currentUser}){
+function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash,setView,selectedComp,activeComp,setSelectedRound,currentUser}){
   const liveRounds=rounds.filter(r=>{
     if(!isLiveRound(r))return false;
     if(!r.is_private)return true;
