@@ -9,7 +9,8 @@ const{useState,useEffect,useRef}=React;
 const SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 const ADMIN_PW='admin2025';
-const GOLF_API='UHWIG5FFJSUFGN2XEMUQWFVLBE';
+// GolfCourseAPI removed from the live frontend in v45.
+// Course data should be added manually or imported later through a safer backend/admin workflow.
 // =========================================================
 // Supabase client setup
 // =========================================================
@@ -1569,70 +1570,27 @@ function CoursesTab({courses,sb,flash,load}){
   const[editingCourse,setEditingCourse]=useState(null);
 
   async function searchCourses(){
-    const cleanQuery=query.trim();
+    const cleanQuery=query.trim().toLowerCase();
+    setHasSearched(true);
+    setSearching(false);
+    setResults([]);
     if(!cleanQuery){
-      setResults([]);
-      setSearchError('Type a golf club or course name first.');
-      setHasSearched(false);
+      setSearchError('Type a golf club or course name first, or use Manual to add one.');
       return;
     }
-    setSearching(true);
-    setSearchError('');
-    setHasSearched(true);
-    setResults([]);
-    try{
-      const res=await fetch('https://api.golfcourseapi.com/v1/search?search_query='+encodeURIComponent(cleanQuery),{headers:{Authorization:'Key '+GOLF_API}});
-      let d=null;
-      try{d=await res.json();}catch(jsonErr){d=null;}
-      if(!res.ok){
-        throw new Error((d&&(d.message||d.error))||('API returned '+res.status));
-      }
-      const found=Array.isArray(d&&d.courses)?d.courses:[];
-      setResults(found);
-      if(!found.length)setSearchError('No courses found. Try a shorter name, or use Manual instead.');
-    }catch(e){
-      console.error('Course search failed',e);
-      setResults([]);
-      setSearchError('Search failed. You can still add the course manually.');
-      flash('Course search failed','error');
-    }finally{
-      setSearching(false);
+    const localMatches=(courses||[]).filter(c=>{
+      const haystack=((c.name||'')+' '+(c.location||'')).toLowerCase();
+      return haystack.includes(cleanQuery);
+    });
+    if(localMatches.length){
+      setSearchError('That course is already saved below. Use Edit Holes to check yardages and stroke indexes.');
+      return;
     }
+    setSearchError('Live golf API search is disabled for now because it was crashing on mobile. Use Manual to add yardages and stroke indexes safely.');
   }
 
   async function importCourse(course){
-    if(!course||!course.id){flash('Could not import this course','error');return;}
-    setImporting(course.id);
-    try{
-      const res=await fetch('https://api.golfcourseapi.com/v1/courses/'+course.id,{headers:{Authorization:'Key '+GOLF_API}});
-      let d=null;
-      try{d=await res.json();}catch(jsonErr){d=null;}
-      if(!res.ok){
-        throw new Error((d&&(d.message||d.error))||('API returned '+res.status));
-      }
-      const full=(d&&d.course)||course;
-      const allTees=[...((full.tees&&full.tees.male)||[]),...((full.tees&&full.tees.female)||[])];
-      const tee=allTees.find(t=>t.tee_name&&t.tee_name.toLowerCase().includes('white'))||allTees[0];
-      let holes=[];
-      if(tee&&Array.isArray(tee.holes)){
-        holes=tee.holes.slice(0,18).map((h,i)=>({
-          hole:Number(h.hole_number||i+1),
-          par:Number(h.par||4),
-          stroke_index:Number(h.stroke_index||h.handicap||i+1),
-          yards:Number(h.yardage||h.yards||0)
-        }));
-      }
-      if(!holes.length)holes=Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1,yards:0}));
-      const payload={name:full.club_name||course.club_name||course.name||'Imported course',location:full.location||course.location||'',holes,api_id:String(course.id)};
-      const{error}=await sb.from('cup_courses').insert(payload);
-      if(error)throw error;
-      await load();flash('Course imported');setResults([]);setQuery('');setSearchError('');setHasSearched(false);setShowSearch(false);
-    }catch(e){
-      console.error('Course import failed',e);
-      flash('Import failed - use Manual instead','error');
-    }finally{
-      setImporting(null);
-    }
+    flash('Import is disabled for now - use Manual instead','error');
   }
 
   async function deleteCourse(course){
@@ -1653,17 +1611,17 @@ function CoursesTab({courses,sb,flash,load}){
   return(
     <div>
       <div style={{display:'flex',gap:8,marginBottom:16}}>
-        <button onClick={()=>setShowSearch(s=>!s)} style={{...S.pri,flex:1,fontSize:13}}>Search API</button>
+        <button onClick={()=>setShowSearch(s=>!s)} style={{...S.pri,flex:1,fontSize:13}}>Search Course</button>
         <button onClick={()=>setEditingCourse({name:'',holes:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1,yards:0})),isNew:true})} style={{...S.gho,flex:1,fontSize:13}}>Manual</button>
       </div>
       {showSearch&&(
         <div style={{...S.card,marginBottom:16}}>
           <div style={{display:'flex',gap:8,marginBottom:12}}>
-            <input style={{...S.inp,flex:1}} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search courses..." onKeyDown={e=>e.key==='Enter'&&searchCourses()}/>
-            <button onClick={searchCourses} disabled={searching} style={{...S.pri,padding:'10px 16px',fontSize:13,opacity:searching?0.6:1}}>{searching?'Searching...':'Search'}</button>
+            <input style={{...S.inp,flex:1}} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search saved courses..." onKeyDown={e=>e.key==='Enter'&&searchCourses()}/>
+            <button onClick={searchCourses} disabled={searching} style={{...S.pri,padding:'10px 16px',fontSize:13,opacity:searching?0.6:1}}>Search</button>
           </div>
           {searchError&&<div style={{fontSize:12,color:'#ffd36a',marginBottom:10,lineHeight:1.4}}>{searchError}</div>}
-          {hasSearched&&!searching&&!searchError&&!results.length&&<div style={{fontSize:12,color:'#8ea0ad',marginBottom:10}}>No courses found. Use Manual to add yardages and stroke indexes yourself.</div>}
+          {hasSearched&&!searching&&!searchError&&!results.length&&<div style={{fontSize:12,color:'#8ea0ad',marginBottom:10}}>No saved course found. Use Manual to add yardages and stroke indexes yourself.</div>}
           {results.map(r=>(
             <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,padding:'8px 12px',background:'rgba(255,255,255,0.06)',borderRadius:8}}>
               <div style={{flex:1}}>
