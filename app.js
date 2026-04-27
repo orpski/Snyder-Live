@@ -9,7 +9,7 @@ const{useState,useEffect,useRef}=React;
 const SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 const ADMIN_PW='admin2025';
-// GolfCourseAPI removed from the live frontend in v45; v47 groups tee colours under one course choice and tidies scorecard meta.
+// GolfCourseAPI removed from the live frontend in v45; v47-fixed adds safe course presets and badges.
 // Course data should be added manually or imported later through a safer backend/admin workflow.
 // =========================================================
 // Supabase client setup
@@ -39,35 +39,30 @@ const WHITLEY_BAY_PRESETS=[
     {hole:1,par:5,stroke_index:10,yards:375},{hole:2,par:5,stroke_index:14,yards:388},{hole:3,par:3,stroke_index:16,yards:149},{hole:4,par:4,stroke_index:18,yards:310},{hole:5,par:4,stroke_index:8,yards:340},{hole:6,par:5,stroke_index:4,yards:458},{hole:7,par:4,stroke_index:2,yards:358},{hole:8,par:4,stroke_index:6,yards:322},{hole:9,par:3,stroke_index:12,yards:142},{hole:10,par:4,stroke_index:9,yards:319},{hole:11,par:4,stroke_index:13,yards:340},{hole:12,par:5,stroke_index:1,yards:522},{hole:13,par:3,stroke_index:15,yards:161},{hole:14,par:4,stroke_index:3,yards:372},{hole:15,par:4,stroke_index:5,yards:326},{hole:16,par:5,stroke_index:7,yards:370},{hole:17,par:3,stroke_index:17,yards:118},{hole:18,par:5,stroke_index:11,yards:384}
   ]}
 ];
-
-function getBaseCourseName(name){
-  return String(name||'').replace(/\s*-\s*(White|Yellow|Red|Orange|Blue|Black|Green)\s+Tee\s*$/i,'').trim();
-}
-function getTeeFromCourseName(name){
-  const m=String(name||'').match(/\s*-\s*(White|Yellow|Red|Orange|Blue|Black|Green)\s+Tee\s*$/i);
-  return m?m[1].charAt(0).toUpperCase()+m[1].slice(1).toLowerCase():'';
-}
-function getCourseDisplayName(course,round){
-  return getBaseCourseName((course&&course.name)||(round&&round.course_name)||'');
-}
-function getCourseChoices(courses){
-  const map=new Map();
+function cleanCourseName(name){return String(name||'').replace(/\s*-\s*(White|Yellow|Red|Orange)\s*Tee\s*$/i,'').trim();}
+function courseTeeFromName(name){const m=String(name||'').match(/\s*-\s*(White|Yellow|Red|Orange)\s*Tee\s*$/i);return m?m[1].charAt(0).toUpperCase()+m[1].slice(1).toLowerCase():'';}
+function getCourseName(course,round){return cleanCourseName((course&&course.name)||(round&&round.course_name)||'');}
+function getCourseDisplayName(course,round){return getCourseName(course,round);}
+function getCourseOptions(courses){
+  const byName=new Map();
   (courses||[]).forEach(c=>{
-    const base=getBaseCourseName(c.name);
-    if(base&&!map.has(base))map.set(base,c);
+    if(!c||!c.id)return;
+    const base=cleanCourseName(c.name);
+    if(!base)return;
+    const tee=courseTeeFromName(c.name)||c.tee||'White';
+    if(!byName.has(base))byName.set(base,{name:base,course:c,tees:{}});
+    const item=byName.get(base);
+    item.tees[tee]=c;
+    if(!item.course||tee==='White')item.course=c;
   });
-  return Array.from(map.entries()).map(([name,course])=>({name,course}));
+  return Array.from(byName.values()).sort((a,b)=>a.name.localeCompare(b.name));
 }
-function getCourseTees(courses,baseName){
-  const tees=(courses||[]).filter(c=>getBaseCourseName(c.name)===baseName).map(c=>({tee:getTeeFromCourseName(c.name)||'White',course:c}));
-  const order=['White','Yellow','Red','Orange','Blue','Black','Green'];
-  return tees.sort((a,b)=>order.indexOf(a.tee)-order.indexOf(b.tee));
+function findCourseForTee(courses,baseName,tee){
+  const cleanBase=cleanCourseName(baseName);
+  const option=getCourseOptions(courses).find(o=>o.name===cleanBase);
+  if(!option)return null;
+  return option.tees[tee]||option.course||Object.values(option.tees)[0]||null;
 }
-function findCourseForBaseAndTee(courses,baseName,tee){
-  return (courses||[]).find(c=>getBaseCourseName(c.name)===baseName&&(getTeeFromCourseName(c.name)||'White').toLowerCase()===String(tee||'').toLowerCase())
-    ||(courses||[]).find(c=>getBaseCourseName(c.name)===baseName);
-}
-function getCourseName(course,round){return getCourseDisplayName(course,round);}
 function getCourseBadge(course,round){
   if(course&&course.image_url)return course.image_url;
   const name=getCourseName(course,round).toLowerCase();
@@ -434,10 +429,20 @@ function App(){
     // Private - only show if current user is logged in (players will see it in their profile)
     return currentUser!=null;
   });
-  const courseChoices=getCourseChoices(courses);
-  const selectedCourse=courses.find(co=>co.id===setup.course_id);
-  const selectedBase=getBaseCourseName(selectedCourse&&selectedCourse.name);
-  const availableTees=selectedBase?getCourseTees(courses,selectedBase):[];
+  const courseOptions=getCourseOptions(courses);
+  const selectedCourseOption=courseOptions.find(o=>o.name===setup.course_name)||courseOptions.find(o=>o.course&&o.course.id===setup.course_id)||null;
+  const availableTees=selectedCourseOption?Object.keys(selectedCourseOption.tees):['White','Yellow','Red','Orange'];
+  function chooseCourse(baseName){
+    const option=courseOptions.find(o=>o.name===baseName);
+    const nextCourse=option?(option.tees[setup.tee]||option.tees.White||option.course):null;
+    const nextTee=nextCourse?(courseTeeFromName(nextCourse.name)||setup.tee):setup.tee;
+    setSetup(q=>({...q,course_name:baseName,course_id:nextCourse?nextCourse.id:'',tee:nextTee}));
+  }
+  function chooseTee(tee){
+    const baseName=setup.course_name||(selectedCourseOption&&selectedCourseOption.name)||'';
+    const nextCourse=findCourseForTee(courses,baseName,tee);
+    setSetup(q=>({...q,tee,course_id:nextCourse?nextCourse.id:q.course_id}));
+  }
   const completedRounds=sortRoundsNewestFirst(rounds.filter(isCompletedRound));
   const thisWeekStart=startOfThisWeek();
   const thisWeeksCards=completedRounds.filter(r=>new Date(roundStartValue(r))>=thisWeekStart);
@@ -799,7 +804,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   const[step,setStep]=useState('menu');
   const[activeRound,setActiveRound]=useState(null);
   const[activeGroup,setActiveGroup]=useState(null);
-  const[setup,setSetup]=useState({name:'',course_id:'',tee:'White',is_private:false});
+  const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false});
   const[participants,setParticipants]=useState([]);
   const[saving,setSaving]=useState(false);
   const[showPicker,setShowPicker]=useState(false);
@@ -835,17 +840,18 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     if(participants.length===0){flash('Add players','error');return;}
     setSaving(true);
     try{
-      const course=courses.find(co=>co.id===setup.course_id);
+      const course=courses.find(co=>co.id===setup.course_id)||findCourseForTee(courses,setup.course_name,setup.tee);
       const today=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
       const creatorName=currentUser&&currentUser.display_name?currentUser.display_name.split(' ')[0]+"'s Round":null;
-      const roundName=setup.name||creatorName||(course&&course.name+' - '+today)||'Round';
+      const courseBaseName=getCourseDisplayName(course)||setup.course_name;
+      const roundName=setup.name||creatorName||(courseBaseName+' - '+today)||'Round';
       const joinCode=Math.random().toString(36).substring(2,6).toUpperCase();
       const playerIds=participants.map(p=>p.id);
       const playingHcps={};
       participants.forEach(p=>{playingHcps[p.id]=p.playing_handicap||0;});
 
       const{data:rd}=await sb.from('cup_rounds').insert({
-        name:roundName,course_id:setup.course_id,course_name:getBaseCourseName(course&&course.name)||'',
+        name:roundName,course_id:(course&&course.id)||setup.course_id,course_name:courseBaseName||'',
         status:'live',tee:setup.tee,day_number:1,join_code:joinCode,is_private:setup.is_private||false,
       }).select().single();
 
@@ -898,22 +904,13 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
           <label style={S.lbl}>Round Name (optional)</label>
           <input style={{...S.inp,marginBottom:12}} value={setup.name} onChange={e=>setSetup(q=>({...q,name:e.target.value}))} placeholder={"e.g. "+(currentUser?currentUser.display_name.split(' ')[0]+"'s Round":"Saturday Morning")}/>
           <label style={S.lbl}>Course</label>
-          <select style={{...S.inp,marginBottom:12}} value={selectedBase||''} onChange={e=>{
-            const base=e.target.value;
-            const match=findCourseForBaseAndTee(courses,base,setup.tee)||findCourseForBaseAndTee(courses,base,'White');
-            const tee=getTeeFromCourseName(match&&match.name)||setup.tee||'White';
-            setSetup(q=>({...q,course_id:match?match.id:'',tee}));
-          }}>
+          <select style={{...S.inp,marginBottom:12}} value={setup.course_name} onChange={e=>chooseCourse(e.target.value)}>
             <option value="">Select course...</option>
-            {courseChoices.map(co=><option key={co.name} value={co.name}>{co.name}</option>)}
+            {courseOptions.map(co=><option key={co.name} value={co.name}>{co.name}</option>)}
           </select>
           <label style={S.lbl}>Tee</label>
-          <select style={{...S.inp,marginBottom:12}} value={setup.tee} onChange={e=>{
-            const tee=e.target.value;
-            const match=findCourseForBaseAndTee(courses,selectedBase,tee);
-            setSetup(q=>({...q,tee,course_id:match?match.id:q.course_id}));
-          }} disabled={!selectedBase}>
-            {(availableTees.length?availableTees.map(t=>t.tee):['White','Yellow','Red','Orange']).map(t=><option key={t}>{t}</option>)}
+          <select style={{...S.inp,marginBottom:12}} value={setup.tee} onChange={e=>chooseTee(e.target.value)} disabled={!setup.course_name}>
+            {(availableTees.length?availableTees:['White','Yellow','Red','Orange']).map(t=><option key={t}>{t}</option>)}
           </select>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',background:'rgba(255,255,255,0.06)',borderRadius:10,marginBottom:16,border:'1px solid rgba(255,255,255,0.12)'}}>
             <div>
@@ -1452,12 +1449,12 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
           </div>
           {round.join_code&&<button onClick={()=>{
             const url='https://snyder-live.vercel.app?watch='+round.join_code;
-            if(navigator.share){navigator.share({title:'Watch live - '+(getCourseDisplayName(course,round)||''),url});}
+            if(navigator.share){navigator.share({title:'Watch live - '+( course&&course.name||''),url});}
             else{navigator.clipboard&&navigator.clipboard.writeText(url);flash('Watch link copied!');}
           }} style={{background:'#0070BB',border:'none',color:'#fff',borderRadius:8,padding:'6px 10px',fontSize:11,fontWeight:600,cursor:'pointer',flexShrink:0}}>Share</button>}
         </div>
         {course&&(
-          <div style={{padding:'4px 14px',background:'rgba(0,50,120,0.35)',borderTop:'1px solid rgba(255,255,255,0.1)',display:'flex',gap:14,alignItems:'center',overflowX:'auto'}}>
+          <div style={{padding:'4px 14px',background:'rgba(0,50,120,0.35)',borderTop:'1px solid rgba(255,255,255,0.1)',display:'flex',gap:'6px 14px',alignItems:'center',flexWrap:'wrap'}}>
             <span style={{fontSize:12,color:'#fff',whiteSpace:'nowrap'}}>Par {totalPar}</span>
             {totalYards>0&&<span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap'}}>{totalYards}y</span>}
             <span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap'}}>{holes.length} holes</span>
@@ -1649,18 +1646,6 @@ function CoursesTab({courses,sb,flash,load}){
   const[importing,setImporting]=useState(null);
   const[editingCourse,setEditingCourse]=useState(null);
 
-  async function addWhitleyBayPreset(){
-    try{
-      const existingNames=new Set((courses||[]).map(c=>(c.name||'').toLowerCase()));
-      const toAdd=WHITLEY_BAY_PRESETS.filter(c=>!existingNames.has(c.name.toLowerCase()));
-      if(!toAdd.length){flash('Whitley Bay is already saved');return;}
-      const {error}=await sb.from('cup_courses').insert(toAdd);
-      if(error)throw error;
-      await load();
-      flash('Whitley Bay added');
-    }catch(e){flash('Error adding Whitley Bay: '+(e.message||e),'error');}
-  }
-
   async function searchCourses(){
     const cleanQuery=query.trim().toLowerCase();
     setHasSearched(true);
@@ -1728,10 +1713,10 @@ function CoursesTab({courses,sb,flash,load}){
       {courses.map(course=>(
         <div key={course.id} style={{...S.card,marginBottom:12}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-            <div style={{fontSize:15,color:'#fff'}}>{course.name}</div>
+            <div style={{fontSize:15,color:'#fff'}}>{cleanCourseName(course.name)}</div>
             <button onClick={()=>deleteCourse(course)} style={{...S.dan,padding:'4px 10px',fontSize:12}}>Delete</button>
           </div>
-          <div style={{fontSize:12,color:'#60b8f0',marginBottom:8}}>{(course.holes||[]).length} holes</div>
+          <div style={{fontSize:12,color:'#60b8f0',marginBottom:8}}>{courseTeeFromName(course.name)||'Course'} tee • {(course.holes||[]).length} holes</div>
           <button onClick={()=>setEditingCourse(course)} style={{...S.gho,width:'100%',fontSize:13}}>Edit Holes</button>
         </div>
       ))}
