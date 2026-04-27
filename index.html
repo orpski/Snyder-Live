@@ -1,4 +1,4 @@
-<!-- SNYDER LIVE v40 -->
+<!-- SNYDER LIVE v41 -->
 <!-- =========================================================
      DOCUMENT SETUP
      ========================================================= -->
@@ -38,7 +38,7 @@ h1,h2,.heading{font-family:'Barlow Condensed',sans-serif;}
      Version badge, React mount point and error display container
      ========================================================= -->
 <body>
-<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v40</div>
+<div id="version" style="position:fixed;top:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:99999">v41</div>
 <div id="root"><div style="padding:20px;color:#60b8f0;">Loading...</div></div>
 <div id="err" style="display:none;position:fixed;inset:0;background:#1a0a0a;color:#f87171;padding:16px;font-size:11px;font-family:monospace;overflow:auto;white-space:pre-wrap;z-index:9999;"></div>
 <!-- =========================================================
@@ -133,6 +133,18 @@ function startOfThisWeek(){
   d.setHours(0,0,0,0);
   d.setDate(d.getDate()+diff);
   return d;
+}
+function isLiveRound(round){
+  return round&&round.status==='live';
+}
+function isCompletedRound(round){
+  return round&&(round.status==='complete'||round.status==='completed');
+}
+function sortRoundsNewestFirst(list){
+  return [...list].sort((a,b)=>new Date(roundStartValue(b))-new Date(roundStartValue(a)));
+}
+function groupRoundsByMonth(list){
+  return list.reduce((acc,r)=>{const key=monthKey(roundStartValue(r));if(!acc[key])acc[key]=[];acc[key].push(r);return acc;},{});
 }
 
 // =========================================================
@@ -410,16 +422,16 @@ function App(){
   // Live vs completed round grouping
   // ---------------------------------------------------------
   const liveRounds=rounds.filter(r=>{
-    if(r.status!=='live')return false;
+    if(!isLiveRound(r))return false;
     if(!r.is_private)return true;
     // Private - only show if current user is logged in (players will see it in their profile)
     return currentUser!=null;
   });
-  const completedRounds=rounds.filter(r=>r.status==='complete').sort((a,b)=>new Date(roundStartValue(b))-new Date(roundStartValue(a)));
+  const completedRounds=sortRoundsNewestFirst(rounds.filter(isCompletedRound));
   const thisWeekStart=startOfThisWeek();
   const thisWeeksCards=completedRounds.filter(r=>new Date(roundStartValue(r))>=thisWeekStart);
   const olderCards=completedRounds.filter(r=>new Date(roundStartValue(r))<thisWeekStart);
-  const olderCardsByMonth=olderCards.reduce((acc,r)=>{const key=monthKey(roundStartValue(r));if(!acc[key])acc[key]=[];acc[key].push(r);return acc;},{});
+  const olderCardsByMonth=groupRoundsByMonth(olderCards);
     // ---------------------------------------------------------
   // Round opening / scorecard hydration
   // ---------------------------------------------------------
@@ -442,7 +454,7 @@ function App(){
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>
             <div style={{fontSize:14,color:'#fff',fontWeight:500}}>{rd.name||rd.course_name}</div>
-            <div style={{fontSize:11,color:'#60b8f0'}}>Round start: {formatRoundStart(rd)}</div>
+            <div style={{fontSize:11,color:'#60b8f0'}}>Round started: {formatRoundStart(rd)}</div>
           </div>
           <div style={{fontSize:11,color:'#1b5e20',background:'rgba(27,94,32,0.15)',borderRadius:6,padding:'3px 8px',fontWeight:600}}>Completed</div>
         </div>
@@ -569,16 +581,16 @@ function App(){
 // =========================================================
 function LiveScoringView({rounds,groups,sb,flash,setView,selectedComp,activeComp,setSelectedRound,currentUser}){
   const liveRounds=rounds.filter(r=>{
-    if(r.status!=='live')return false;
+    if(!isLiveRound(r))return false;
     if(!r.is_private)return true;
     // Private - only show if current user is logged in (players will see it in their profile)
     return currentUser!=null;
   });
-  const completedRounds=rounds.filter(r=>r.status==='complete').sort((a,b)=>new Date(roundStartValue(b))-new Date(roundStartValue(a)));
+  const completedRounds=sortRoundsNewestFirst(rounds.filter(isCompletedRound));
   const thisWeekStart=startOfThisWeek();
   const thisWeeksCards=completedRounds.filter(r=>new Date(roundStartValue(r))>=thisWeekStart);
   const olderCards=completedRounds.filter(r=>new Date(roundStartValue(r))<thisWeekStart);
-  const olderCardsByMonth=olderCards.reduce((acc,r)=>{const key=monthKey(roundStartValue(r));if(!acc[key])acc[key]=[];acc[key].push(r);return acc;},{});
+  const olderCardsByMonth=groupRoundsByMonth(olderCards);
   async function openRound(rd){
     const rdGroups=groups.filter(g=>g.round_id===rd.id);
     const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
@@ -595,7 +607,7 @@ function LiveScoringView({rounds,groups,sb,flash,setView,selectedComp,activeComp
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>
             <div style={{fontSize:14,color:'#fff',fontWeight:500}}>{rd.name||rd.course_name}</div>
-            <div style={{fontSize:11,color:'#60b8f0'}}>Round start: {formatRoundStart(rd)}</div>
+            <div style={{fontSize:11,color:'#60b8f0'}}>Round started: {formatRoundStart(rd)}</div>
           </div>
           <div style={{fontSize:11,color:'#1b5e20',background:'rgba(27,94,32,0.15)',borderRadius:6,padding:'3px 8px',fontWeight:600}}>Completed</div>
         </div>
@@ -733,7 +745,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   const[saving,setSaving]=useState(false);
   const[showPicker,setShowPicker]=useState(false);
   const liveRounds=rounds.filter(r=>{
-    if(r.status!=='live')return false;
+    if(!isLiveRound(r))return false;
     if(!r.is_private)return true;
     // Private - only show if current user is logged in (players will see it in their profile)
     return currentUser!=null;
@@ -923,7 +935,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
 
   // Determine if current user can edit
   const playerIds=(group&&group.player_ids)||grpPlayers.map(p=>p.id);
-  const canEdit=round.status==='live'&&currentUser&&(playerIds.includes(currentUser.id)||grpPlayers.some(p=>p.id===currentUser.id));
+  const canEdit=isLiveRound(round)&&currentUser&&(playerIds.includes(currentUser.id)||grpPlayers.some(p=>p.id===currentUser.id));
 
   const[saving,setSaving]=useState(false);
   const[showReview,setShowReview]=useState(false);
@@ -1498,12 +1510,13 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         {canEdit&&<button onClick={async()=>{
           if(!window.confirm('Finish this round? It will be removed from Live Scores.'))return;
           await saveAll();
-          await sb.from('cup_rounds').update({status:'complete'}).eq('id',round.id);
+          const{error}=await sb.from('cup_rounds').update({status:'complete'}).eq('id',round.id);
+          if(error){flash(error.message||'Could not finish round','error');return;}
           round.status='complete';
           await load();
           setEndStep(0);setShowEnd(true);
         }} style={{...S.pri,width:'100%',padding:13,fontSize:14,background:'#0a8a4a',marginBottom:0}}>Finish Round</button>}
-        {!canEdit&&<div style={{textAlign:'center',padding:'10px',fontSize:12,color:'rgba(255,255,255,0.3)'}}>{round.status==='complete'?'Completed round - view only':'View only - sign in as a player to score'}</div>}
+        {!canEdit&&<div style={{textAlign:'center',padding:'10px',fontSize:12,color:'rgba(255,255,255,0.3)'}}>{isCompletedRound(round)?'Completed round - view only':'View only - sign in as a player to score'}</div>}
       </div>
 
       <ScoreInput/>
@@ -1732,11 +1745,12 @@ function CourseEditor({course,sb,flash,load,onClose}){
 // Round listing and administrative round controls
 // =========================================================
 function RoundsTab({rounds,groups,sb,flash,load}){
-  const live=rounds.filter(r=>r.status==='live');
-  const others=rounds.filter(r=>r.status!=='live');
+  const live=rounds.filter(isLiveRound);
+  const others=rounds.filter(r=>!isLiveRound(r));
 
   async function endRound(rd){
-    await sb.from('cup_rounds').update({status:'complete'}).eq('id',rd.id);
+    const{error}=await sb.from('cup_rounds').update({status:'complete'}).eq('id',rd.id);
+    if(error){flash(error.message||'Could not end round','error');return;}
     await load();flash('Round ended');
   }
   async function deleteRound(rd){
@@ -1831,7 +1845,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
           </div>
         ):allComps.map(comp=>{
           const compRounds=rounds.filter(r=>r.competition_id===comp.id);
-          const liveRound=compRounds.find(r=>r.status==='live');
+          const liveRound=compRounds.find(isLiveRound);
           return(
             <div key={comp.id} style={{borderRadius:14,marginBottom:10,cursor:'pointer',background:'linear-gradient(135deg,rgba(0,112,187,0.2) 0%,rgba(10,32,64,0.8) 100%)',border:'1px solid rgba(0,112,187,0.25)',padding:16,overflow:'hidden'}} onClick={()=>setSelectedComp(comp)}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
