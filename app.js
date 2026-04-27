@@ -439,15 +439,40 @@ function App(){
     return (person&&(person.display_name||person.name||person.username))||'Player';
   }
   function leaderboardForRound(rd){
-    const rdScores=(scores||[]).filter(sc=>sc.round_id===rd.id);
-    const totals={};const holes={};
-    rdScores.forEach(sc=>{
-      const pid=sc.player_id;
-      totals[pid]=(totals[pid]||0)+(parseInt(sc.stableford_points)||0);
-      if(!holes[pid])holes[pid]=new Set();
-      holes[pid].add(sc.hole_number);
+    const totals={};const holes={};const seen=new Set();
+    const rdGroups=groups.filter(g=>g.round_id===rd.id);
+    const hcpMap={};
+    rdGroups.forEach(g=>{
+      Object.assign(hcpMap,g.playing_handicaps||{});
+      (g.player_ids||[]).forEach(pid=>{if(totals[pid]==null)totals[pid]=0;});
     });
-    groups.filter(g=>g.round_id===rd.id).forEach(g=>(g.player_ids||[]).forEach(pid=>{if(totals[pid]==null)totals[pid]=0;}));
+    function addScore(pid,holeNum,pts){
+      if(!pid||!holeNum)return;
+      const key=pid+'|'+holeNum;
+      if(seen.has(key))return;
+      seen.add(key);
+      totals[pid]=(totals[pid]||0)+(parseInt(pts)||0);
+      if(!holes[pid])holes[pid]=new Set();
+      holes[pid].add(Number(holeNum));
+    }
+    (scores||[]).filter(sc=>sc.round_id===rd.id).forEach(sc=>{
+      addScore(sc.player_id,sc.hole_number,sc.stableford_points);
+    });
+    // Scores saved in this browser are instant; appData.scores may not have refreshed yet after exiting a round.
+    try{
+      const local=JSON.parse(localStorage.getItem('scores_'+rd.id)||'{}');
+      const course=courses.find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee);
+      const courseHoles=(course&&Array.isArray(course.holes))?course.holes:[];
+      Object.keys(local||{}).forEach(h=>{
+        const holeNum=parseInt(h);
+        const hd=courseHoles.find(x=>parseInt(x.hole)===holeNum)||{par:4,stroke_index:holeNum};
+        Object.keys(local[h]||{}).forEach(pid=>{
+          const gross=parseInt(local[h][pid]);
+          const pts=calcStableford(gross,parseInt(hd.par)||4,parseInt(hd.stroke_index)||holeNum,parseFloat(hcpMap[pid]||0));
+          addScore(pid,holeNum,pts);
+        });
+      });
+    }catch(e){}
     return Object.keys(totals).map(pid=>({id:pid,name:getDisplayName(pid),total:totals[pid]||0,holes:holes[pid]?holes[pid].size:0})).sort((a,b)=>b.total-a.total);
   }
   function CompletedCard({rd}){
@@ -611,15 +636,40 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
     return (person&&(person.display_name||person.name||person.username))||'Player';
   }
   function leaderboardForRound(rd){
-    const rdScores=(scores||[]).filter(sc=>sc.round_id===rd.id);
-    const totals={};const holes={};
-    rdScores.forEach(sc=>{
-      const pid=sc.player_id;
-      totals[pid]=(totals[pid]||0)+(parseInt(sc.stableford_points)||0);
-      if(!holes[pid])holes[pid]=new Set();
-      holes[pid].add(sc.hole_number);
+    const totals={};const holes={};const seen=new Set();
+    const rdGroups=groups.filter(g=>g.round_id===rd.id);
+    const hcpMap={};
+    rdGroups.forEach(g=>{
+      Object.assign(hcpMap,g.playing_handicaps||{});
+      (g.player_ids||[]).forEach(pid=>{if(totals[pid]==null)totals[pid]=0;});
     });
-    groups.filter(g=>g.round_id===rd.id).forEach(g=>(g.player_ids||[]).forEach(pid=>{if(totals[pid]==null)totals[pid]=0;}));
+    function addScore(pid,holeNum,pts){
+      if(!pid||!holeNum)return;
+      const key=pid+'|'+holeNum;
+      if(seen.has(key))return;
+      seen.add(key);
+      totals[pid]=(totals[pid]||0)+(parseInt(pts)||0);
+      if(!holes[pid])holes[pid]=new Set();
+      holes[pid].add(Number(holeNum));
+    }
+    (scores||[]).filter(sc=>sc.round_id===rd.id).forEach(sc=>{
+      addScore(sc.player_id,sc.hole_number,sc.stableford_points);
+    });
+    // Scores saved in this browser are instant; appData.scores may not have refreshed yet after exiting a round.
+    try{
+      const local=JSON.parse(localStorage.getItem('scores_'+rd.id)||'{}');
+      const course=courses.find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee);
+      const courseHoles=(course&&Array.isArray(course.holes))?course.holes:[];
+      Object.keys(local||{}).forEach(h=>{
+        const holeNum=parseInt(h);
+        const hd=courseHoles.find(x=>parseInt(x.hole)===holeNum)||{par:4,stroke_index:holeNum};
+        Object.keys(local[h]||{}).forEach(pid=>{
+          const gross=parseInt(local[h][pid]);
+          const pts=calcStableford(gross,parseInt(hd.par)||4,parseInt(hd.stroke_index)||holeNum,parseFloat(hcpMap[pid]||0));
+          addScore(pid,holeNum,pts);
+        });
+      });
+    }catch(e){}
     return Object.keys(totals).map(pid=>({id:pid,name:getDisplayName(pid),total:totals[pid]||0,holes:holes[pid]?holes[pid].size:0})).sort((a,b)=>b.total-a.total);
   }
   function CompletedCard({rd}){
