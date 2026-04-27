@@ -1,0 +1,7 @@
+/* Base reset and global element defaults */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Inter',sans-serif;background:linear-gradient(160deg,#0a1528 0%,#0d2040 40%,#0a1830 100%);min-height:100vh;color:#fff;}
+input,button,select{font-family:'Inter',sans-serif;}
+input:focus{outline:2px solid #0070BB;}
+::-webkit-scrollbar{display:none;}
+h1,h2,.heading{font-family:'Barlow Condensed',sans-serif;}

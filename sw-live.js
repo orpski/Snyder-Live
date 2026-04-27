@@ -1,4 +1,6 @@
-const CACHE='snyder-live-v1';
-self.addEventListener('install',e=>{self.skipWaiting();});
-self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});
-self.addEventListener('fetch',e=>{if(e.request.url.includes('supabase')||e.request.url.includes('unpkg'))return;e.respondWith(fetch(e.request).catch(()=>caches.match('/index.html')));});
+// SNYDER LIVE v43 service worker
+const CACHE_NAME = 'snyder-live-v43';
+const ASSETS = ['./','./index.html','./styles.css','./app.js','./manifest-live.json','./icon-live-192.png','./icon-live-512.png'];
+self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())); });
+self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.map(key => key !== CACHE_NAME ? caches.delete(key) : null))).then(() => self.clients.claim())); });
+self.addEventListener('fetch', event => { if (event.request.method !== 'GET') return; event.respondWith(fetch(event.request).then(response => { const clone = response.clone(); caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone)); return response; }).catch(() => caches.match(event.request).then(cached => cached || caches.match('./index.html')))); });
