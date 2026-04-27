@@ -9,7 +9,7 @@ const{useState,useEffect,useRef}=React;
 const SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 const ADMIN_PW='admin2025';
-// GolfCourseAPI removed from the live frontend in v45; v47-fixed adds safe course presets and badges.
+// GolfCourseAPI removed from the live frontend in v45; v47-fixed uses safe course presets and badges.
 // Course data should be added manually or imported later through a safer backend/admin workflow.
 // =========================================================
 // Supabase client setup
@@ -43,26 +43,10 @@ function cleanCourseName(name){return String(name||'').replace(/\s*-\s*(White|Ye
 function courseTeeFromName(name){const m=String(name||'').match(/\s*-\s*(White|Yellow|Red|Orange)\s*Tee\s*$/i);return m?m[1].charAt(0).toUpperCase()+m[1].slice(1).toLowerCase():'';}
 function getCourseName(course,round){return cleanCourseName((course&&course.name)||(round&&round.course_name)||'');}
 function getCourseDisplayName(course,round){return getCourseName(course,round);}
-function getCourseOptions(courses){
-  const byName=new Map();
-  (courses||[]).forEach(c=>{
-    if(!c||!c.id)return;
-    const base=cleanCourseName(c.name);
-    if(!base)return;
-    const tee=courseTeeFromName(c.name)||c.tee||'White';
-    if(!byName.has(base))byName.set(base,{name:base,course:c,tees:{}});
-    const item=byName.get(base);
-    item.tees[tee]=c;
-    if(!item.course||tee==='White')item.course=c;
-  });
-  return Array.from(byName.values()).sort((a,b)=>a.name.localeCompare(b.name));
-}
-function findCourseForTee(courses,baseName,tee){
-  const cleanBase=cleanCourseName(baseName);
-  const option=getCourseOptions(courses).find(o=>o.name===cleanBase);
-  if(!option)return null;
-  return option.tees[tee]||option.course||Object.values(option.tees)[0]||null;
-}
+function courseKey(course){return cleanCourseName(course&&course.name).toLowerCase()+'|'+(courseTeeFromName(course&&course.name)||course&&course.tee||'White').toLowerCase();}
+function mergePresetCourses(dbCourses){const merged=[...(dbCourses||[])];const keys=new Set(merged.map(courseKey));(WHITLEY_BAY_PRESETS||[]).forEach((preset,i)=>{const tee=courseTeeFromName(preset.name)||['White','Yellow','Red'][i]||'White';const withId={...preset,id:preset.id||('preset-whitley-bay-'+tee.toLowerCase()),tee};if(!keys.has(courseKey(withId))){merged.push(withId);keys.add(courseKey(withId));}});return merged;}
+function getCourseOptions(courses){const byName=new Map();(courses||[]).forEach(c=>{if(!c)return;const base=cleanCourseName(c.name);if(!base)return;const tee=courseTeeFromName(c.name)||c.tee||'White';if(!byName.has(base))byName.set(base,{name:base,course:c,tees:{}});const item=byName.get(base);item.tees[tee]=c;if(!item.course||tee==='White')item.course=c;});return Array.from(byName.values()).sort((a,b)=>a.name.localeCompare(b.name));}
+function findCourseForTee(courses,baseName,tee){const cleanBase=cleanCourseName(baseName);const option=getCourseOptions(courses).find(o=>o.name===cleanBase);if(!option)return null;return option.tees[tee]||option.course||Object.values(option.tees)[0]||null;}
 function getCourseBadge(course,round){
   if(course&&course.image_url)return course.image_url;
   const name=getCourseName(course,round).toLowerCase();
@@ -415,7 +399,7 @@ function App(){
       sb.from('cup_users').select('*').then(r=>r.data||[]),
       sb.from('cup_guests').select('*').then(r=>r.data||[]),
     ]);
-    setAppData({players,courses,rounds,groups,competitions,scores,cupUsers,guests});
+    setAppData({players,courses:mergePresetCourses(courses),rounds,groups,competitions,scores,cupUsers,guests});
   }
 
   const{players,courses,rounds,groups,competitions,scores,cupUsers,guests}=appData;
@@ -429,20 +413,6 @@ function App(){
     // Private - only show if current user is logged in (players will see it in their profile)
     return currentUser!=null;
   });
-  const courseOptions=getCourseOptions(courses);
-  const selectedCourseOption=courseOptions.find(o=>o.name===setup.course_name)||courseOptions.find(o=>o.course&&o.course.id===setup.course_id)||null;
-  const availableTees=selectedCourseOption?Object.keys(selectedCourseOption.tees):['White','Yellow','Red','Orange'];
-  function chooseCourse(baseName){
-    const option=courseOptions.find(o=>o.name===baseName);
-    const nextCourse=option?(option.tees[setup.tee]||option.tees.White||option.course):null;
-    const nextTee=nextCourse?(courseTeeFromName(nextCourse.name)||setup.tee):setup.tee;
-    setSetup(q=>({...q,course_name:baseName,course_id:nextCourse?nextCourse.id:'',tee:nextTee}));
-  }
-  function chooseTee(tee){
-    const baseName=setup.course_name||(selectedCourseOption&&selectedCourseOption.name)||'';
-    const nextCourse=findCourseForTee(courses,baseName,tee);
-    setSetup(q=>({...q,tee,course_id:nextCourse?nextCourse.id:q.course_id}));
-  }
   const completedRounds=sortRoundsNewestFirst(rounds.filter(isCompletedRound));
   const thisWeekStart=startOfThisWeek();
   const thisWeeksCards=completedRounds.filter(r=>new Date(roundStartValue(r))>=thisWeekStart);
@@ -814,6 +784,11 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     // Private - only show if current user is logged in (players will see it in their profile)
     return currentUser!=null;
   });
+  const courseOptions=getCourseOptions(courses);
+  const selectedCourseOption=courseOptions.find(o=>o.name===setup.course_name)||courseOptions.find(o=>o.course&&o.course.id===setup.course_id)||null;
+  const availableTees=selectedCourseOption?Object.keys(selectedCourseOption.tees):['White','Yellow','Red','Orange'];
+  function chooseCourse(baseName){const option=courseOptions.find(o=>o.name===baseName);const nextCourse=option?(option.tees[setup.tee]||option.tees.White||option.course):null;const nextTee=nextCourse?(courseTeeFromName(nextCourse.name)||nextCourse.tee||setup.tee):setup.tee;setSetup(q=>({...q,course_name:baseName,course_id:nextCourse?nextCourse.id:'',tee:nextTee}));}
+  function chooseTee(tee){const baseName=setup.course_name||(selectedCourseOption&&selectedCourseOption.name)||'';const nextCourse=findCourseForTee(courses,baseName,tee);setSetup(q=>({...q,tee,course_id:nextCourse?nextCourse.id:q.course_id}));}
 
   useEffect(()=>{
     if(selectedRound&&selectedRound._group){
@@ -1716,7 +1691,7 @@ function CoursesTab({courses,sb,flash,load}){
             <div style={{fontSize:15,color:'#fff'}}>{cleanCourseName(course.name)}</div>
             <button onClick={()=>deleteCourse(course)} style={{...S.dan,padding:'4px 10px',fontSize:12}}>Delete</button>
           </div>
-          <div style={{fontSize:12,color:'#60b8f0',marginBottom:8}}>{courseTeeFromName(course.name)||'Course'} tee • {(course.holes||[]).length} holes</div>
+          <div style={{fontSize:12,color:'#60b8f0',marginBottom:8}}>{courseTeeFromName(course.name)||course.tee||'Course'} tee • {(course.holes||[]).length} holes</div>
           <button onClick={()=>setEditingCourse(course)} style={{...S.gho,width:'100%',fontSize:13}}>Edit Holes</button>
         </div>
       ))}
@@ -1920,7 +1895,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
                 {liveRound?(
                   <div style={{background:'#ef4444',borderRadius:20,padding:'4px 10px',fontSize:10,color:'#fff',fontWeight:700,letterSpacing:'0.05em',flexShrink:0}}>LIVE</div>
                 ):(
-                  <div style={{fontSize:20,color:'rgba(255,255,255,0.2)'}}>></div>
+                  <div style={{fontSize:20,color:'rgba(255,255,255,0.2)'}}>&gt;</div>
                 )}
               </div>
             </div>
