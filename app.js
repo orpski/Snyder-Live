@@ -417,6 +417,26 @@ function App(){
 
   const{players,courses,rounds,groups,competitions,scores,cupUsers,guests}=appData;
   const activeComp=competitions.find(c=>c.status==='active')||competitions[0];
+
+  function rowsToHoleScores(rows){
+    const m={};
+    (rows||[]).forEach(s=>{
+      if(!m[s.hole_number])m[s.hole_number]={};
+      m[s.hole_number][s.player_id]=s.gross_score;
+    });
+    return m;
+  }
+
+  async function hydrateRoundScores(roundId){
+    if(!roundId){setHoleScores({});return;}
+    let local={};
+    try{local=JSON.parse(localStorage.getItem('scores_'+roundId)||'{}')||{};}catch(e){local={};}
+    const{data:dbScores}=await sb.from('cup_scores').select('*').eq('round_id',roundId);
+    const dbMap=rowsToHoleScores(dbScores||[]);
+    const merged={...local,...dbMap};
+    setHoleScores(merged);
+    try{if(Object.keys(dbMap).length>0)localStorage.setItem('scores_'+roundId,JSON.stringify(merged));}catch(e){}
+  }
     // ---------------------------------------------------------
   // Live vs completed round grouping
   // ---------------------------------------------------------
@@ -466,6 +486,7 @@ function App(){
     const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
     if(rdGroups[0]){
       const canScore=userCanScoreRound(currentUser,rdGroups[0],rps);
+      await hydrateRoundScores(rd.id);
       setSelectedRound({...rd,_spectator:!canScore,_group:{...rdGroups[0],participants:po,playing_handicaps:hm}});
       setView('play');
     }
@@ -667,7 +688,7 @@ function App(){
 // Live scores and completed scores view
 // Lists active rounds, this week’s cards and older monthly cards
 // =========================================================
-function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash,setView,selectedComp,activeComp,setSelectedRound,currentUser}){
+function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash,setView,selectedComp,activeComp,setSelectedRound,currentUser,setHoleScores,holeScores}){
   const liveRounds=rounds.filter(r=>{
     if(!isLiveRound(r))return false;
     if(!r.is_private)return true;
@@ -710,6 +731,17 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
     const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
     if(rdGroups[0]){
       const canScore=userCanScoreRound(currentUser,rdGroups[0],rps);
+      let local={};
+      try{local=JSON.parse(localStorage.getItem('scores_'+rd.id)||'{}')||{};}catch(e){local={};}
+      const{data:dbScores}=await sb.from('cup_scores').select('*').eq('round_id',rd.id);
+      const dbMap={};
+      (dbScores||[]).forEach(s=>{
+        if(!dbMap[s.hole_number])dbMap[s.hole_number]={};
+        dbMap[s.hole_number][s.player_id]=s.gross_score;
+      });
+      const merged={...local,...dbMap};
+      if(setHoleScores)setHoleScores(merged);
+      try{if(Object.keys(dbMap).length>0)localStorage.setItem('scores_'+rd.id,JSON.stringify(merged));}catch(e){}
       setSelectedRound({...rd,_spectator:!canScore,_group:{...rdGroups[0],participants:po,playing_handicaps:hm}});
       setView('play');
     }
@@ -939,9 +971,19 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
     if(rdGroups[0]){
       const canScore=userCanScoreRound(currentUser,rdGroups[0],rps);
+      let local={};
+      try{local=JSON.parse(localStorage.getItem('scores_'+rd.id)||'{}')||{};}catch(e){local={};}
+      const{data:dbScores}=await sb.from('cup_scores').select('*').eq('round_id',rd.id);
+      const dbMap={};
+      (dbScores||[]).forEach(s=>{
+        if(!dbMap[s.hole_number])dbMap[s.hole_number]={};
+        dbMap[s.hole_number][s.player_id]=s.gross_score;
+      });
+      const merged={...local,...dbMap};
       setActiveRound({...rd,_spectator:!canScore});
       setActiveGroup({...rdGroups[0],participants:po,playing_handicaps:hm});
-      setHoleScores({});
+      setHoleScores(merged);
+      try{if(Object.keys(dbMap).length>0)localStorage.setItem('scores_'+rd.id,JSON.stringify(merged));}catch(e){}
       setStep('scorecard');
     }
   }
@@ -951,6 +993,17 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
       setActiveRound(selectedRound);
       setActiveGroup(selectedRound._group);
       setHoleScores({});
+      sb.from('cup_scores').select('*').eq('round_id',selectedRound.id).then(({data})=>{
+        const m={};
+        (data||[]).forEach(s=>{
+          if(!m[s.hole_number])m[s.hole_number]={};
+          m[s.hole_number][s.player_id]=s.gross_score;
+        });
+        if(Object.keys(m).length>0){
+          setHoleScores(m);
+          try{localStorage.setItem('scores_'+selectedRound.id,JSON.stringify(m));}catch(e){}
+        }
+      });
       setStep('scorecard');
       // Clear so next visit to PlayGolf starts fresh
       setSelectedRound(null);
