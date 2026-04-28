@@ -9,7 +9,7 @@ const{useState,useEffect,useRef}=React;
 const SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 const ADMIN_PW='admin2025';
-// GolfCourseAPI removed from the live frontend in v45; v56 uses safe course presets and badges.
+// GolfCourseAPI removed from the live frontend in v45; v57 uses safe course presets and badges.
 // Course data should be added manually or imported later through a safer backend/admin workflow.
 // =========================================================
 // Supabase client setup
@@ -1266,8 +1266,8 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   const[lastRefreshed,setLastRefreshed]=useState('');
   const[pullDistance,setPullDistance]=useState(0);
   const pullStartY=useRef(null);
-  const PULL_REFRESH_THRESHOLD=170;
-  const PULL_REFRESH_MAX=210;
+  const PULL_REFRESH_THRESHOLD=95;
+  const PULL_REFRESH_MAX=140;
   const[showReview,setShowReview]=useState(false);
   const[showEnd,setShowEnd]=useState(false);
   const[endStep,setEndStep]=useState(0);
@@ -1320,7 +1320,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
 
   function handlePullStart(e){
     const y=e.touches&&e.touches[0]?e.touches[0].clientY:null;
-    if(window.scrollY<=2&&!inputHole&&y!==null&&y<120){
+    if(window.scrollY<=5&&!inputHole&&y!==null&&y<220){
       pullStartY.current=y;
     }
   }
@@ -1329,8 +1329,9 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     const y=e.touches&&e.touches[0]?e.touches[0].clientY:null;
     if(y==null)return;
     const dy=y-pullStartY.current;
-    if(dy>0&&window.scrollY<=2){
-      const dist=Math.min(PULL_REFRESH_MAX,dy);
+    if(dy>0&&window.scrollY<=5){
+      const eased=Math.round(dy*0.75);
+      const dist=Math.min(PULL_REFRESH_MAX,eased);
       setPullDistance(dist);
     }
   }
@@ -1406,31 +1407,46 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   // ---------------------------------------------------------
   function setScore(holeNum,pid,val){
     saveLocalScore(holeNum,pid,val);
+    const row=buildScoreRow(holeNum,pid,val);
+    setCloudStatus('');
+    setCloudError('');
+    saveScoreRowToCloud(sb,row)
+      .then(result=>{
+        if(!result.ok){
+          try{
+            const key='pending_scores_'+round.id;
+            const pending=JSON.parse(localStorage.getItem(key)||'[]');
+            pending.push(row);
+            localStorage.setItem(key,JSON.stringify(pending));
+          }catch(e){}
+          setCloudStatus('');
+          setCloudError(result.error||'Cloud save failed');
+          flash('Score saved on this phone only: '+(result.error||'Cloud save failed'),'error');
+          return;
+        }
+        setCloudStatus('');
+        setCloudError('');
+        setLastRefreshed(new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
+        if(load)setTimeout(()=>load(),300);
+      })
+      .catch(e=>{
+        setCloudStatus('');
+        setCloudError(e.message||String(e));
+        flash('Score saved on this phone only: '+(e.message||String(e)),'error');
+      });
     setHoleScores(prev=>{
       const updated={...prev,[holeNum]:{...(prev[holeNum]||{}),[pid]:val}};
-      const holeMap=updated[holeNum]||{};
-      const allScored=grpPlayers.every(p=>holeMap[p.id]!==undefined);
-      if(allScored){
-        saveCompletedHoleToCloud(holeNum,holeMap)
-          .then(()=>setTimeout(()=>flash('Hole '+holeNum+' saved to cloud'),200))
-          .catch(e=>flash('Hole '+holeNum+' saved on this phone only: '+e.message,'error'));
-        // Auto-trigger front 9 review after hole 9
-        if(holeNum===9){
-          const allFront9=Array.from({length:9},(_,i)=>i+1).every(h=>
-            grpPlayers.every(p=>(updated[h]||{})[p.id]!==undefined)
-          );
-          if(allFront9)setTimeout(()=>setShowReview(true),600);
-        }
-        // Auto-trigger end review after hole 18
-        if(holeNum===18){
-          const allBack9=Array.from({length:9},(_,i)=>i+10).every(h=>
-            grpPlayers.every(p=>(updated[h]||{})[p.id]!==undefined)
-          );
-          if(allBack9)setTimeout(()=>{setEndStep(0);setShowEnd(true);},600);
-        }
-      }else{
-        setCloudStatus('Hole '+holeNum+' saved on this phone. Cloud save will run when all players have a score.');
-        setCloudError('');
+      if(holeNum===9){
+        const allFront9=Array.from({length:9},(_,i)=>i+1).every(h=>
+          grpPlayers.every(p=>(updated[h]||{})[p.id]!==undefined)
+        );
+        if(allFront9)setTimeout(()=>setShowReview(true),600);
+      }
+      if(holeNum===18){
+        const allBack9=Array.from({length:9},(_,i)=>i+10).every(h=>
+          grpPlayers.every(p=>(updated[h]||{})[p.id]!==undefined)
+        );
+        if(allBack9)setTimeout(()=>{setEndStep(0);setShowEnd(true);},600);
       }
       return updated;
     });
@@ -1878,7 +1894,10 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
 
       {['FRONT 9','BACK 9'].map((label,sec)=>(
         <div key={label}>
-          <div style={{padding:'4px 12px',fontSize:10,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(0,0,0,0.3)'}}>{label}</div>
+          <div style={{padding:'4px 12px',fontSize:10,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+            <span>{label}</span>
+            {label==='BACK 9'&&<button onClick={()=>refreshScoresFromCloud(true)} disabled={refreshing} style={{border:'1px solid rgba(96,184,240,0.35)',background:'rgba(0,112,187,0.22)',color:'#90ccf0',borderRadius:999,padding:'4px 9px',fontSize:10,fontWeight:700,opacity:refreshing?0.6:1}}>Refresh</button>}
+          </div>
           {holes.slice(sec*9,(sec+1)*9).map((hd,idx)=>{
             const hcpMap={};
             grpPlayers.forEach(p=>{hcpMap[p.id]=parseFloat(playingHcps[p.id]!=null?playingHcps[p.id]:p.current_handicap||0);});
@@ -1932,11 +1951,10 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
       )}
 
       <div style={{padding:'8px 16px 24px'}}>
-        {canEdit&&(
-          <div style={{marginBottom:10,padding:'10px 12px',borderRadius:10,background:cloudError?'rgba(239,68,68,0.12)':'rgba(0,112,187,0.10)',border:'1px solid '+(cloudError?'rgba(239,68,68,0.35)':'rgba(0,112,187,0.25)')}}>
-            <div style={{fontSize:12,color:cloudError?'#fca5a5':'#90ccf0',marginBottom:cloudError?8:0}}>{cloudStatus||'Scores auto-save to cloud when everyone has scored the hole.'}</div>
-            {cloudError&&<div style={{fontSize:11,color:'#fca5a5',marginBottom:8}}>Other players will not see latest scores until this syncs.<br/>Error: {cloudError}</div>}
-            {cloudError&&<button disabled={saving} onClick={saveAll} style={{...S.gho,width:'100%',fontSize:13,opacity:saving?0.6:1}}>{saving?'Retrying...':'Retry cloud sync now'}</button>}
+        {canEdit&&cloudError&&(
+          <div style={{marginBottom:10,padding:'10px 12px',borderRadius:10,background:'rgba(239,68,68,0.12)',border:'1px solid rgba(239,68,68,0.35)'}}>
+            <div style={{fontSize:11,color:'#fca5a5',marginBottom:8}}>Other players will not see latest scores until this syncs.<br/>Error: {cloudError}</div>
+            <button disabled={saving} onClick={saveAll} style={{...S.gho,width:'100%',fontSize:13,opacity:saving?0.6:1}}>{saving?'Retrying...':'Retry cloud sync now'}</button>
           </div>
         )}
         {canEdit&&<button onClick={async()=>{
