@@ -1742,7 +1742,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
       <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)',paddingBottom:40}}>
         <div style={{position:'sticky',top:0,background:'#0a1f3d',borderBottom:'1px solid rgba(255,255,255,0.1)',padding:'12px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div style={{fontSize:16,color:'#fff'}}>Front 9 Review</div>
-          <button onClick={()=>setShowReview(false)} style={{...S.pri,padding:'8px 16px',fontSize:14}}>Back 9</button>
+          <button onClick={goToBack9} style={{...S.pri,padding:'8px 16px',fontSize:14}}>Back 9</button>
         </div>
         <div id="f9-review-page" style={{padding:16}}>
           <div style={{display:'flex',gap:10,marginBottom:16}}>
@@ -1756,25 +1756,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
           </div>
           <MiniCard holeList={front9} label="FRONT 9"/>
           <div style={{display:'flex',gap:8,marginTop:16}}>
-            <button onClick={async()=>{
-              try{
-                const el=document.getElementById('f9-review-page');
-                if(!el){flash('Error capturing','error');return;}
-                const canvas=await html2canvas(el,{backgroundColor:'#0a1528',scale:2,useCORS:true,logging:false,allowTaint:true});
-                canvas.toBlob(async blob=>{
-                  if(!blob)return;
-                  const file=new File([blob],'front9.png',{type:'image/png'});
-                  if(navigator.share&&navigator.canShare({files:[file]})){
-                    await navigator.share({files:[file],title:'Front 9 - '+(course&&course.name||'')});
-                  } else {
-                    const url=URL.createObjectURL(blob);
-                    const a=document.createElement('a');a.href=url;a.download='front9.png';a.click();
-                    URL.revokeObjectURL(url);
-                  }
-                },'image/png');
-              }catch(e){flash('Share: '+e.message,'error');}
-            }} style={{...S.pri,flex:1,padding:12,fontSize:13,background:'#25D366'}}>Share F9</button>
-            <button onClick={()=>{saveAll();setShowReview(false);}} style={{...S.pri,flex:1,padding:12,fontSize:13}}>Back 9</button>
+            <button onClick={goToBack9} style={{...S.pri,flex:1,padding:12,fontSize:13}}>Back 9</button>
           </div>
         </div>
       </div>
@@ -1783,6 +1765,14 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
 
   const rowH=80;
   const f9complete=front9.every(hd=>grpPlayers.every(p=>(holeScores[hd.hole]||{})[p.id]!==undefined));
+  function goToBack9(){
+    saveAll();
+    setShowReview(false);
+    setTimeout(()=>{
+      const el=document.getElementById('hole-10');
+      if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+    },120);
+  }
 
   return(
     <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)',overflowX:'hidden',touchAction:inputHole?'none':'auto'}}>
@@ -1878,7 +1868,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             const hcpMap={};
             grpPlayers.forEach(p=>{hcpMap[p.id]=parseFloat(playingHcps[p.id]!=null?playingHcps[p.id]:p.current_handicap||0);});
             return(
-              <div key={hd.hole} style={{display:'grid',gridTemplateColumns:'80px '+grpPlayers.map(()=>'1fr').join(' '),borderBottom:'1px solid rgba(255,255,255,0.06)',background:idx%2===0?'rgba(255,255,255,0.03)':'rgba(0,0,0,0.1)'}}>
+              <div id={'hole-'+hd.hole} key={hd.hole} style={{scrollMarginTop:72,display:'grid',gridTemplateColumns:'80px '+grpPlayers.map(()=>'1fr').join(' '),borderBottom:'1px solid rgba(255,255,255,0.06)',background:idx%2===0?'rgba(255,255,255,0.03)':'rgba(0,0,0,0.1)'}}>
                 <div style={{padding:'8px 12px'}}>
                   <div style={{fontSize:22,color:'#fff',lineHeight:1}}>{hd.hole}</div>
                   <div style={{fontSize:11,color:'#60b8f0',marginTop:2}}>Par {hd.par}</div>
@@ -1905,7 +1895,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
                         <div>
                           <div style={{fontSize:24,color:'#fff',lineHeight:1,textAlign:'center',fontWeight:800}}>{gross===-1?'0':gross}</div>
                           {pts!==null&&<div style={{position:'absolute',top:5,right:5,fontSize:10,color:'rgba(255,255,255,0.95)',background:'rgba(0,0,0,0.35)',borderRadius:6,padding:'2px 5px',fontWeight:800}}>{pts}pt</div>}
-                          {gross>0&&<div title='Total points so far' style={{position:'absolute',bottom:5,right:5,minWidth:22,height:18,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'rgba(203,213,225,0.78)',background:'rgba(30,41,59,0.58)',border:'1px solid rgba(148,163,184,0.24)',borderRadius:999,padding:'1px 5px',fontWeight:800,boxShadow:'0 1px 3px rgba(0,0,0,0.14)'}}>{running}<span style={{fontSize:7,marginLeft:1,opacity:0.75}}>pt</span></div>}
+                          {gross>0&&<div title='Total points so far' style={{position:'absolute',bottom:5,right:5,minWidth:28,height:19,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:'#dbeafe',background:'rgba(96,184,240,0.18)',border:'1px solid rgba(96,184,240,0.32)',borderRadius:999,padding:'1px 6px',fontWeight:800,boxShadow:'0 1px 3px rgba(0,0,0,0.14)'}}>{running}pt</div>}
                         </div>
                       ):(
                         <div style={{fontSize:11,color:'rgba(255,255,255,0.2)'}}>TAP</div>
