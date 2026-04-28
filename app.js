@@ -9,7 +9,7 @@ const{useState,useEffect,useRef}=React;
 const SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 const ADMIN_PW='admin2025';
-// GolfCourseAPI removed from the live frontend in v45; v57 uses safe course presets and badges.
+// GolfCourseAPI removed from the live frontend in v45; v64 uses safe course presets and badges.
 // Course data should be added manually or imported later through a safer backend/admin workflow.
 // =========================================================
 // Supabase client setup
@@ -545,8 +545,9 @@ function App(){
     const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
     const po=(rps||[]).map(rp=>({id:rp.user_id||rp.guest_id||rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0}));
     const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
-    if(rdGroups[0]){
-      const canScore=userCanScoreRound(currentUser,rdGroups[0],rps);
+    const userGroup=(currentUser&&rdGroups.find(g=>Array.isArray(g.player_ids)&&g.player_ids.includes(currentUser.id)))||rdGroups[0];
+    if(userGroup){
+      const canScore=userCanScoreRound(currentUser,userGroup,rps);
       await hydrateRoundScores(rd.id);
       setSelectedRound({...rd,_spectator:!canScore,_group:{...rdGroups[0],participants:po,playing_handicaps:hm}});
       setView('play');
@@ -1001,6 +1002,25 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
   );
 }
 
+function splitIntoGolfGroups(participants,range){
+  const list=[...(participants||[])];
+  let groupCount=1;
+  if(range==='5-8')groupCount=2;
+  else if(range==='9-12')groupCount=3;
+  else if(range==='more')groupCount=Math.max(1,Math.ceil(list.length/4));
+  groupCount=Math.max(groupCount,Math.ceil(list.length/4)||1);
+  const groups=Array.from({length:groupCount},()=>[]);
+  list.forEach((p,i)=>groups[Math.min(Math.floor(i/4),groupCount-1)].push(p));
+  return groups.filter((g,i)=>g.length>0 || i===0);
+}
+function playerRangeLabel(range){
+  if(range==='1-4')return '1–4 players';
+  if(range==='5-8')return '5–8 players';
+  if(range==='9-12')return '9–12 players';
+  if(range==='more')return 'More than 12 players';
+  return 'Choose players';
+}
+
 // =========================================================
 // Play Golf flow
 // Round setup, player selection, joining live rounds and launch into scorecard
@@ -1013,6 +1033,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   const[participants,setParticipants]=useState([]);
   const[saving,setSaving]=useState(false);
   const[showPicker,setShowPicker]=useState(false);
+  const[playerRange,setPlayerRange]=useState(null);
   const liveRounds=rounds.filter(r=>{
     if(!isLiveRound(r))return false;
     if(!r.is_private)return true;
@@ -1042,7 +1063,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
       });
       const merged={...local,...dbMap};
       setActiveRound({...rd,_spectator:!canScore});
-      setActiveGroup({...rdGroups[0],participants:po,playing_handicaps:hm});
+      setActiveGroup({...userGroup,participants:po.filter(p=>!userGroup.player_ids||userGroup.player_ids.includes(p.id)),playing_handicaps:userGroup.playing_handicaps||hm});
       setHoleScores(merged);
       try{if(Object.keys(dbMap).length>0)localStorage.setItem('scores_'+rd.id,JSON.stringify(merged));}catch(e){}
       setStep('scorecard');
@@ -1100,9 +1121,15 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
         status:'live',tee:setup.tee,day_number:1,join_code:joinCode,is_private:setup.is_private||false,
       }).select().single();
 
-      const{data:grp}=await sb.from('cup_groups').insert({
-        round_id:rd.id,group_number:1,player_ids:playerIds,playing_handicaps:playingHcps,
-      }).select().single();
+      const groupBuckets=splitIntoGolfGroups(participants,playerRange);
+      const groupRows=groupBuckets.map((bucket,idx)=>({
+        round_id:rd.id,
+        group_number:idx+1,
+        player_ids:bucket.map(p=>p.id),
+        playing_handicaps:bucket.reduce((acc,p)=>{acc[p.id]=p.playing_handicap||0;return acc;},{})
+      }));
+      const{data:createdGroups,error:groupErr}=await sb.from('cup_groups').insert(groupRows).select();
+      if(groupErr)throw groupErr;
 
       for(const p of participants){
         await sb.from('cup_round_players').upsert({
@@ -1120,8 +1147,11 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
       }));
 
       await load();
-      setActiveRound({...rd,join_code:joinCode});
-      setActiveGroup({...grp,playing_handicaps:playingHcps,participants:po,player_ids:playerIds});
+      const scorerGroup=(createdGroups||[]).find(g=>currentUser&&Array.isArray(g.player_ids)&&g.player_ids.includes(currentUser.id))||(createdGroups||[])[0];
+      const scorerIds=(scorerGroup&&scorerGroup.player_ids)||playerIds;
+      const scorerParticipants=po.filter(p=>scorerIds.includes(p.id));
+      setActiveRound({...rd,join_code:joinCode,_allParticipants:po});
+      setActiveGroup({...scorerGroup,playing_handicaps:(scorerGroup&&scorerGroup.playing_handicaps)||playingHcps,participants:scorerParticipants,player_ids:scorerIds});
       setHoleScores({}); // Fresh scores for new round
       setStep('scorecard');
     }catch(e){flash('Error: '+e.message,'error');}
@@ -1136,16 +1166,53 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   }
 
     // ---------------------------------------------------------
+  // Player count screen
+  // ---------------------------------------------------------
+  if(step==='playerCount'){
+    const options=[
+      {key:'1-4',title:'1–4 players',sub:'One 4-ball or smaller'},
+      {key:'5-8',title:'5–8 players',sub:'Two groups'},
+      {key:'9-12',title:'9–12 players',sub:'Three groups'},
+      {key:'more',title:'More',sub:'More than three groups'},
+    ];
+    return(
+      <div style={{minHeight:'100vh',paddingBottom:40}}>
+        <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
+          <button onClick={()=>setStep('menu')} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button>
+          <div style={{fontSize:16,color:'#fff'}}>How many players?</div>
+        </div>
+        <div style={{padding:16}}>
+          <div style={{fontSize:13,color:'#90ccf0',marginBottom:12}}>This sets up the day and creates the live overall leaderboard between groups.</div>
+          {options.map(o=>(
+            <div key={o.key} onClick={()=>{setPlayerRange(o.key);setStep('setup');}} style={{...S.card,marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+              <div>
+                <div style={{fontSize:18,color:'#fff',fontWeight:800}}>{o.title}</div>
+                <div style={{fontSize:12,color:'#60b8f0',marginTop:2}}>{o.sub}</div>
+              </div>
+              <div style={{fontSize:20,color:'#60b8f0'}}>›</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+    // ---------------------------------------------------------
   // Round setup screen
   // ---------------------------------------------------------
   if(step==='setup'){
     return(
       <div style={{minHeight:'100vh',paddingBottom:40}}>
         <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
-          <button onClick={()=>setStep('menu')} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button>
+          <button onClick={()=>setStep('playerCount')} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button>
           <div style={{fontSize:16,color:'#fff'}}>Start a Round</div>
         </div>
         <div style={{padding:16}}>
+          <div style={{...S.card,marginBottom:12,background:'rgba(0,112,187,0.12)',borderColor:'rgba(0,112,187,0.25)'}}>
+            <div style={{fontSize:12,color:'#60b8f0',letterSpacing:'0.08em',textTransform:'uppercase'}}>Day setup</div>
+            <div style={{fontSize:16,color:'#fff',fontWeight:800,marginTop:3}}>{playerRangeLabel(playerRange)}</div>
+            <div style={{fontSize:12,color:'rgba(255,255,255,0.55)',marginTop:4}}>Players will be split into groups of up to 4 for the overall leaderboard.</div>
+          </div>
           <label style={S.lbl}>Round Name (optional)</label>
           <input style={{...S.inp,marginBottom:12}} value={setup.name} onChange={e=>setSetup(q=>({...q,name:e.target.value}))} placeholder={"e.g. "+(currentUser?currentUser.display_name.split(' ')[0]+"'s Round":"Saturday Morning")}/>
           <label style={S.lbl}>Course</label>
@@ -1182,6 +1249,17 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
               <button onClick={()=>setParticipants(prev=>prev.filter(pp=>pp.id!==p.id))} style={{...S.dan,padding:'4px 10px',fontSize:12}}>x</button>
             </div>
           ))}
+          {participants.length>0&&(
+            <div style={{...S.card,marginTop:12,background:'rgba(255,255,255,0.04)'}}>
+              <div style={{fontSize:12,color:'#60b8f0',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:8}}>Groups preview</div>
+              {splitIntoGolfGroups(participants,playerRange).map((bucket,idx)=>(
+                <div key={idx} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:idx?'1px solid rgba(255,255,255,0.06)':'none'}}>
+                  <div style={{width:64,fontSize:12,color:'#90ccf0',fontWeight:800}}>Group {idx+1}</div>
+                  <div style={{flex:1,fontSize:13,color:'#fff'}}>{bucket.map(p=>(p.display_name||p.name||'Player').split(' ')[0]).join(', ')||'Add players'}</div>
+                </div>
+              ))}
+            </div>
+          )}
           <button onClick={startRound} disabled={saving||!setup.course_id} style={{...S.pri,width:'100%',padding:14,fontSize:15,marginTop:12,opacity:saving||!setup.course_id?0.5:1}}>
             {saving?'Starting...':'Start Round - Go Live!'}
           </button>
@@ -1198,7 +1276,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
         <div style={{fontSize:16,color:'#fff'}}>Play Golf</div>
       </div>
       <div style={{padding:16}}>
-        <div style={{...S.card,marginBottom:12,cursor:'pointer',textAlign:'center',padding:24}} onClick={()=>setStep('setup')}>
+        <div style={{...S.card,marginBottom:12,cursor:'pointer',textAlign:'center',padding:24}} onClick={()=>setStep('playerCount')}>
           <div style={{fontSize:16,color:'#fff',marginBottom:4}}>Start a New Round</div>
           <div style={{fontSize:13,color:'#60b8f0'}}>Pick a course, add players, go live</div>
         </div>
@@ -1269,6 +1347,9 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   const[endStep,setEndStep]=useState(0);
   const[inputHole,setInputHole]=useState(null);
   const[inputVal,setInputVal]=useState('');
+  const[showOverall,setShowOverall]=useState(false);
+  const[overallPlayers,setOverallPlayers]=useState([]);
+  const[overallScores,setOverallScores]=useState([]);
 
     // ---------------------------------------------------------
   // Score loading / hydration
@@ -1310,6 +1391,52 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     }finally{
       setRefreshing(false);
     }
+  }
+
+  async function openOverallLeaderboard(){
+    try{
+      const [{data:rps,error:rpErr},{data:scs,error:scErr}]=await Promise.all([
+        sb.from('cup_round_players').select('*').eq('round_id',round.id),
+        sb.from('cup_scores').select('*').eq('round_id',round.id)
+      ]);
+      if(rpErr)throw rpErr;
+      if(scErr)throw scErr;
+      setOverallPlayers((rps||[]).map(rp=>({
+        id:rp.user_id||rp.guest_id||rp.id,
+        name:rp.display_name||'Player',
+        playing_handicap:rp.playing_handicap||0
+      })));
+      setOverallScores(scs||[]);
+      setShowOverall(true);
+    }catch(e){
+      flash('Leaderboard failed: '+(e.message||String(e)),'error');
+    }
+  }
+  function overallLeaderboardRows(){
+    const playerMap={};
+    (overallPlayers.length?overallPlayers:grpPlayers).forEach(p=>{playerMap[p.id]=p;});
+    const scoreRows=overallScores.length?overallScores:Object.keys(holeScores||{}).flatMap(h=>Object.keys(holeScores[h]||{}).map(pid=>{
+      const gross=holeScores[h][pid];
+      const hd=getHole(parseInt(h));
+      const hcp=parseFloat(playingHcps[pid]||0);
+      return {player_id:pid,hole_number:parseInt(h),gross_score:gross,stableford_points:gross===-1?0:calcStableford(gross,hd.par,hd.stroke_index,hcp)||0};
+    }));
+    const totals={}; const holesPlayed={};
+    Object.keys(playerMap).forEach(pid=>{totals[pid]=0;holesPlayed[pid]=new Set();});
+    scoreRows.forEach(s=>{
+      const pid=s.player_id;
+      if(!pid)return;
+      if(totals[pid]==null)totals[pid]=0;
+      totals[pid]+=parseInt(s.stableford_points)||0;
+      if(!holesPlayed[pid])holesPlayed[pid]=new Set();
+      if(s.hole_number)holesPlayed[pid].add(Number(s.hole_number));
+    });
+    return Object.keys(totals).map(pid=>({
+      id:pid,
+      name:(playerMap[pid]&&playerMap[pid].name)||'Player',
+      total:totals[pid]||0,
+      holes:holesPlayed[pid]?holesPlayed[pid].size:0
+    })).sort((a,b)=>b.total-a.total||b.holes-a.holes);
   }
 
   function getHole(n){return holes.find(h=>h.hole===n)||{hole:n,par:4,stroke_index:n,yards:0};}
@@ -1790,6 +1917,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             <div style={{fontSize:13,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{getCourseDisplayName(course,round)||'Scorecard'}</div>
             <div style={{fontSize:10,color:'#60b8f0'}}>Round start: {roundStartText}</div>
           </div>
+          <button onClick={openOverallLeaderboard} style={{background:'rgba(255,255,255,0.08)',border:'1px solid rgba(96,184,240,0.28)',color:'#90ccf0',borderRadius:8,padding:'6px 9px',fontSize:11,fontWeight:700,cursor:'pointer',flexShrink:0}}>Overall</button>
           {round.join_code&&<button onClick={()=>{
             const url='https://snyder-live.vercel.app?watch='+round.join_code;
             if(navigator.share){navigator.share({title:'Watch live - '+( course&&course.name||''),url});}
@@ -1936,6 +2064,33 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         {!canEdit&&<div style={{textAlign:'center',padding:'10px',fontSize:12,color:'rgba(255,255,255,0.3)'}}>{isCompletedRound(round)?'Completed round - view only':'View only - sign in as a player to score'}</div>}
       </div>
 
+      {showOverall&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.78)',zIndex:9998,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={e=>{if(e.target===e.currentTarget)setShowOverall(false);}}>
+          <div style={{width:'100%',maxWidth:520,maxHeight:'82vh',overflowY:'auto',background:'#0d2548',borderTop:'1px solid rgba(255,255,255,0.16)',borderRadius:'18px 18px 0 0',padding:16}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+              <div>
+                <div style={{fontSize:18,color:'#fff',fontWeight:800}}>Overall Leaderboard</div>
+                <div style={{fontSize:12,color:'#60b8f0'}}>All groups in this round</div>
+              </div>
+              <button onClick={()=>setShowOverall(false)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Close</button>
+            </div>
+            <button onClick={openOverallLeaderboard} style={{...S.pri,width:'100%',marginBottom:12,fontSize:13}}>Refresh leaderboard</button>
+            {overallLeaderboardRows().map((r,idx)=>(
+              <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:idx===0?'rgba(184,134,11,0.15)':'rgba(255,255,255,0.06)',border:'1px solid '+(idx===0?'rgba(184,134,11,0.3)':'rgba(255,255,255,0.08)'),borderRadius:12,marginBottom:8}}>
+                <div style={{width:28,textAlign:'center',fontSize:18,color:idx===0?'#fbbf24':'rgba(255,255,255,0.48)',fontWeight:900}}>{idx+1}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:15,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</div>
+                  <div style={{fontSize:11,color:'#60b8f0'}}>Thru {r.holes}</div>
+                </div>
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontSize:28,color:'#fff',fontWeight:900,lineHeight:1}}>{r.total}</div>
+                  <div style={{fontSize:9,color:'#60b8f0',letterSpacing:'0.12em'}}>PTS</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <ScoreInput/>
     </div>
   );
@@ -1978,9 +2133,18 @@ function AdminPanel({courses,rounds,groups,sb,flash,setView,load,cupUsers}){
         {tab==='users'&&(
           <div>
             {(cupUsers||[]).map(u=>(
-              <div key={u.id} style={{...S.card,marginBottom:8}}>
-                <div style={{fontSize:14,color:'#fff'}}>{u.display_name}</div>
-                <div style={{fontSize:11,color:'#60b8f0'}}>@{u.username} - HCP {u.handicap} - PIN: {u.pin}</div>
+              <div key={u.id} style={{...S.card,marginBottom:8,display:'flex',alignItems:'center',gap:10}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,color:'#fff',fontWeight:700}}>{u.display_name}</div>
+                  <div style={{fontSize:11,color:'#60b8f0'}}>@{u.username} - HCP {u.handicap} - PIN: {u.pin}</div>
+                </div>
+                <button onClick={async()=>{
+                  if(!window.confirm('Remove '+(u.display_name||u.username)+'? They will no longer be able to log in. Past scorecards will stay.'))return;
+                  const{error}=await sb.from('cup_users').delete().eq('id',u.id);
+                  if(error){flash(error.message||'Could not remove user','error');return;}
+                  flash('User removed');
+                  await load();
+                }} style={{...S.dan,padding:'7px 10px',fontSize:12}}>Remove</button>
               </div>
             ))}
           </div>
