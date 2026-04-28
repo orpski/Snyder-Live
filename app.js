@@ -1264,14 +1264,6 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   const[cloudError,setCloudError]=useState('');
   const[refreshing,setRefreshing]=useState(false);
   const[lastRefreshed,setLastRefreshed]=useState('');
-  const[pullDistance,setPullDistance]=useState(0);
-  const[pullReady,setPullReady]=useState(false);
-  const pullStartY=useRef(null);
-  const pullDistanceRef=useRef(0);
-  const pullActive=useRef(false);
-  const PULL_REFRESH_START=90;
-  const PULL_REFRESH_THRESHOLD=120;
-  const PULL_REFRESH_MAX=170;
   const[showReview,setShowReview]=useState(false);
   const[showEnd,setShowEnd]=useState(false);
   const[endStep,setEndStep]=useState(0);
@@ -1317,52 +1309,6 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
       if(showMessage)flash('Refresh failed: '+(e.message||String(e)),'error');
     }finally{
       setRefreshing(false);
-      setPullDistance(0);
-      setPullReady(false);
-      pullDistanceRef.current=0;
-      pullStartY.current=null;
-      pullActive.current=false;
-    }
-  }
-
-  function getScrollTop(){
-    return (document.scrollingElement&&document.scrollingElement.scrollTop)||document.documentElement.scrollTop||document.body.scrollTop||window.scrollY||0;
-  }
-  function handlePullStart(e){
-    const y=e.touches&&e.touches[0]?e.touches[0].clientY:null;
-    if(getScrollTop()<=3&&!inputHole&&y!==null){
-      pullStartY.current=y;
-      pullDistanceRef.current=0;
-      pullActive.current=false;
-      setPullReady(false);
-    }
-  }
-  function handlePullMove(e){
-    if(pullStartY.current==null||refreshing)return;
-    const y=e.touches&&e.touches[0]?e.touches[0].clientY:null;
-    if(y==null)return;
-    const dy=y-pullStartY.current;
-    if(dy<=0){pullDistanceRef.current=0;setPullDistance(0);setPullReady(false);return;}
-    if(getScrollTop()>3&&!pullActive.current){pullStartY.current=null;pullDistanceRef.current=0;setPullDistance(0);setPullReady(false);return;}
-    if(dy>PULL_REFRESH_START){
-      pullActive.current=true;
-      if(e.cancelable)e.preventDefault();
-      const dist=Math.min(PULL_REFRESH_MAX,Math.round((dy-PULL_REFRESH_START)*0.6));
-      pullDistanceRef.current=dist;
-      setPullDistance(dist);
-      setPullReady(dist>=PULL_REFRESH_THRESHOLD);
-    }
-  }
-  function handlePullEnd(){
-    const dist=pullDistanceRef.current;
-    pullStartY.current=null;
-    pullActive.current=false;
-    pullDistanceRef.current=0;
-    setPullReady(false);
-    if(dist>=PULL_REFRESH_THRESHOLD){
-      refreshScoresFromCloud(true);
-    }else{
-      setPullDistance(0);
     }
   }
 
@@ -1825,12 +1771,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   const f9complete=front9.every(hd=>grpPlayers.every(p=>(holeScores[hd.hole]||{})[p.id]!==undefined));
 
   return(
-    <div onTouchStart={handlePullStart} onTouchMove={handlePullMove} onTouchEnd={handlePullEnd} style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)',overflowX:'hidden',touchAction:inputHole?'none':'pan-y',overscrollBehaviorY:'contain'}}>
-      {(refreshing||pullDistance>8)&&(
-        <div style={{position:'fixed',top:8,left:'50%',transform:'translateX(-50%)',zIndex:9998,padding:'7px 12px',borderRadius:999,background:'rgba(10,31,61,0.95)',border:'1px solid rgba(96,184,240,0.35)',color:'#90ccf0',fontSize:12,boxShadow:'0 8px 20px rgba(0,0,0,0.25)'}}>
-          {refreshing?'Refreshing scores...':pullReady?'Release to refresh':'Pull further to refresh'}
-        </div>
-      )}
+    <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)',overflowX:'hidden',touchAction:inputHole?'none':'auto'}}>
       <div style={{position:'sticky',top:0,zIndex:10,background:'linear-gradient(160deg,#0a1528,#0d2040)',borderBottom:'2px solid #0070BB'}}>
         {!canEdit&&(
           <div style={{background:'rgba(0,112,187,0.2)',borderBottom:'1px solid rgba(0,112,187,0.3)',padding:'8px 14px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -1877,7 +1818,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
       </div>
 
       <div style={{padding:'6px 14px',fontSize:11,color:'rgba(144,204,240,0.75)',borderBottom:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.14)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-        <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{refreshing?'Refreshing latest scores...':lastRefreshed?'Last updated '+lastRefreshed:'Pull down or tap refresh for latest scores'}</span>
+        <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{refreshing?'Refreshing latest scores...':lastRefreshed?'Last updated '+lastRefreshed:'Tap refresh for latest scores'}</span>
         <button onClick={()=>refreshScoresFromCloud(true)} disabled={refreshing} style={{border:'1px solid rgba(96,184,240,0.35)',background:'rgba(0,112,187,0.22)',color:'#90ccf0',borderRadius:999,padding:'5px 10px',fontSize:11,fontWeight:700,flexShrink:0,opacity:refreshing?0.6:1}}>Refresh</button>
       </div>
 
@@ -1950,7 +1891,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
                         <div>
                           <div style={{fontSize:24,color:'#fff',lineHeight:1,textAlign:'center',fontWeight:800}}>{gross===-1?'0':gross}</div>
                           {pts!==null&&<div style={{position:'absolute',top:5,right:5,fontSize:10,color:'rgba(255,255,255,0.95)',background:'rgba(0,0,0,0.35)',borderRadius:6,padding:'2px 5px',fontWeight:800}}>{pts}pt</div>}
-                          {gross>0&&<div title='Total points so far' style={{position:'absolute',bottom:5,right:5,minWidth:18,height:18,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:'#06121f',background:'rgba(144,204,240,0.92)',border:'1px solid rgba(255,255,255,0.55)',borderRadius:999,padding:'1px 5px',fontWeight:900,boxShadow:'0 1px 4px rgba(0,0,0,0.25)'}}>{running}</div>}
+                          {gross>0&&<div title='Total points so far' style={{position:'absolute',bottom:5,right:5,minWidth:18,height:18,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:'rgba(226,232,240,0.9)',background:'rgba(51,65,85,0.72)',border:'1px solid rgba(148,163,184,0.38)',borderRadius:999,padding:'1px 5px',fontWeight:900,boxShadow:'0 1px 4px rgba(0,0,0,0.18)'}}>{running}</div>}
                         </div>
                       ):(
                         <div style={{fontSize:11,color:'rgba(255,255,255,0.2)'}}>TAP</div>
