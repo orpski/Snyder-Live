@@ -9,7 +9,7 @@ const{useState,useEffect,useRef}=React;
 const SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 const ADMIN_PW='admin2025';
-// GolfCourseAPI removed from the live frontend in v45; v48 uses safe course presets and badges.
+// GolfCourseAPI removed from the live frontend in v45; v49 uses safe course presets and badges.
 // Course data should be added manually or imported later through a safer backend/admin workflow.
 // =========================================================
 // Supabase client setup
@@ -88,6 +88,7 @@ const S={
   lbl:{fontSize:12,color:'#60b8f0',letterSpacing:'0.08em',textTransform:'uppercase',display:'block',marginBottom:6},
   card:{background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:14,padding:16},
 };
+const NO_SELECT={userSelect:'none',WebkitUserSelect:'none',WebkitTouchCallout:'none',touchAction:'manipulation'};
 
 // =========================================================
 // Golf scoring helpers
@@ -425,6 +426,30 @@ function App(){
     // Private - only show if current user is logged in (players will see it in their profile)
     return currentUser!=null;
   });
+  const liveRoundIds=liveRounds.map(r=>r.id).filter(Boolean);
+  const[publicScores,setPublicScores]=useState([]);
+  const[publicRoundPlayers,setPublicRoundPlayers]=useState({});
+  useEffect(()=>{
+    let alive=true;
+    async function refreshLiveRoundData(){
+      if(!liveRoundIds.length){setPublicScores([]);setPublicRoundPlayers({});return;}
+      const[{data:scoreRows},{data:roundPlayers}]=await Promise.all([
+        sb.from('cup_scores').select('*').in('round_id',liveRoundIds),
+        sb.from('cup_round_players').select('*').in('round_id',liveRoundIds)
+      ]);
+      if(!alive)return;
+      setPublicScores(scoreRows||[]);
+      const byRound={};
+      (roundPlayers||[]).forEach(rp=>{
+        if(!byRound[rp.round_id])byRound[rp.round_id]=[];
+        byRound[rp.round_id].push(rp);
+      });
+      setPublicRoundPlayers(byRound);
+    }
+    refreshLiveRoundData();
+    const timer=setInterval(refreshLiveRoundData,15000);
+    return()=>{alive=false;clearInterval(timer);};
+  },[liveRoundIds.join('|')]);
   const completedRounds=sortRoundsNewestFirst(rounds.filter(isCompletedRound));
   const myRounds=myRoundsForUser(rounds,groups,currentUser);
   const thisWeekStart=startOfThisWeek();
@@ -491,7 +516,7 @@ function App(){
   }
   function CompletedCard({rd}){
     return(
-      <div style={{...S.card,marginBottom:8,cursor:'pointer',opacity:0.9}} onClick={()=>openRound(rd)}>
+      <div style={{...S.card,...NO_SELECT,marginBottom:8,cursor:'pointer',opacity:0.9}} onClick={()=>openRound(rd)}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
           <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
             <CourseBadge course={courses.find(co=>co.id===rd.course_id)} round={rd} size={34}/>
@@ -549,7 +574,7 @@ function App(){
                 const rdGroups=groups.filter(g=>g.round_id===rd.id);
                 const course=courses.find(co=>co.id===rd.course_id);
                 return(
-                  <div key={rd.id} onClick={()=>{window.history.replaceState({view:'home'},'',null);setSelectedRound(rd);setView('live');}} style={{minWidth:200,borderRadius:14,overflow:'hidden',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)',flexShrink:0,cursor:'pointer'}}>
+                  <div key={rd.id} onClick={()=>{window.history.replaceState({view:'home'},'',null);setSelectedRound(rd);setView('live');}} style={{...NO_SELECT,minWidth:200,borderRadius:14,overflow:'hidden',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)',flexShrink:0,cursor:'pointer'}}>
                     <div style={{height:110,background:'linear-gradient(135deg,#0a3d6b 0%,#1a5fa8 60%,#0070BB 100%)',display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
                       <CourseBadge course={course} round={rd} size={76}/>
                       <div style={{position:'absolute',top:8,right:8,background:'#ef4444',borderRadius:20,padding:'3px 8px',fontSize:10,color:'#fff',fontWeight:700,letterSpacing:'0.05em'}}>LIVE</div>
@@ -590,7 +615,7 @@ function App(){
                 const course=courses.find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee);
                 const live=isLiveRound(rd);
                 return(
-                  <div key={rd.id} onClick={()=>openRound(rd)} style={{...S.card,marginBottom:8,cursor:'pointer',display:'flex',alignItems:'center',gap:10}}>
+                  <div key={rd.id} onClick={()=>openRound(rd)} style={{...S.card,...NO_SELECT,marginBottom:8,cursor:'pointer',display:'flex',alignItems:'center',gap:10}}>
                     <CourseBadge course={course} round={rd} size={34}/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:14,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||getCourseDisplayName(course,rd)||'Round'}</div>
@@ -649,6 +674,30 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
     // Private - only show if current user is logged in (players will see it in their profile)
     return currentUser!=null;
   });
+  const liveRoundIds=liveRounds.map(r=>r.id).filter(Boolean);
+  const[publicScores,setPublicScores]=useState([]);
+  const[publicRoundPlayers,setPublicRoundPlayers]=useState({});
+  useEffect(()=>{
+    let alive=true;
+    async function refreshLiveRoundData(){
+      if(!liveRoundIds.length){setPublicScores([]);setPublicRoundPlayers({});return;}
+      const[{data:scoreRows},{data:roundPlayers}]=await Promise.all([
+        sb.from('cup_scores').select('*').in('round_id',liveRoundIds),
+        sb.from('cup_round_players').select('*').in('round_id',liveRoundIds)
+      ]);
+      if(!alive)return;
+      setPublicScores(scoreRows||[]);
+      const byRound={};
+      (roundPlayers||[]).forEach(rp=>{
+        if(!byRound[rp.round_id])byRound[rp.round_id]=[];
+        byRound[rp.round_id].push(rp);
+      });
+      setPublicRoundPlayers(byRound);
+    }
+    refreshLiveRoundData();
+    const timer=setInterval(refreshLiveRoundData,15000);
+    return()=>{alive=false;clearInterval(timer);};
+  },[liveRoundIds.join('|')]);
   const completedRounds=sortRoundsNewestFirst(rounds.filter(isCompletedRound));
   const thisWeekStart=startOfThisWeek();
   const thisWeeksCards=completedRounds.filter(r=>new Date(roundStartValue(r))>=thisWeekStart);
@@ -672,10 +721,19 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
   function leaderboardForRound(rd){
     const totals={};const holes={};const seen=new Set();
     const rdGroups=groups.filter(g=>g.round_id===rd.id);
-    const hcpMap={};
+    const rdRoundPlayers=publicRoundPlayers[rd.id]||[];
+    const hcpMap={};const nameMap={};
     rdGroups.forEach(g=>{
       Object.assign(hcpMap,g.playing_handicaps||{});
       (g.player_ids||[]).forEach(pid=>{if(totals[pid]==null)totals[pid]=0;});
+    });
+    rdRoundPlayers.forEach(rp=>{
+      const pid=rp.user_id||rp.guest_id||rp.id;
+      if(pid){
+        if(totals[pid]==null)totals[pid]=0;
+        hcpMap[pid]=rp.playing_handicap||hcpMap[pid]||0;
+        nameMap[pid]=rp.display_name||nameMap[pid];
+      }
     });
     function addScore(pid,holeNum,pts){
       if(!pid||!holeNum)return;
@@ -686,7 +744,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
       if(!holes[pid])holes[pid]=new Set();
       holes[pid].add(Number(holeNum));
     }
-    (scores||[]).filter(sc=>sc.round_id===rd.id).forEach(sc=>{
+    [...(scores||[]),...(publicScores||[])].filter(sc=>sc.round_id===rd.id).forEach(sc=>{
       addScore(sc.player_id,sc.hole_number,sc.stableford_points);
     });
     // Scores saved in this browser are instant; appData.scores may not have refreshed yet after exiting a round.
@@ -704,11 +762,11 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
         });
       });
     }catch(e){}
-    return Object.keys(totals).map(pid=>({id:pid,name:getDisplayName(pid),total:totals[pid]||0,holes:holes[pid]?holes[pid].size:0})).sort((a,b)=>b.total-a.total);
+    return Object.keys(totals).map(pid=>({id:pid,name:nameMap[pid]||getDisplayName(pid),total:totals[pid]||0,holes:holes[pid]?holes[pid].size:0})).sort((a,b)=>b.total-a.total);
   }
   function CompletedCard({rd}){
     return(
-      <div style={{...S.card,marginBottom:8,cursor:'pointer',opacity:0.9}} onClick={()=>openRound(rd)}>
+      <div style={{...S.card,...NO_SELECT,marginBottom:8,cursor:'pointer',opacity:0.9}} onClick={()=>openRound(rd)}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
           <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
             <CourseBadge course={courses.find(co=>co.id===rd.course_id)} round={rd} size={34}/>
@@ -738,7 +796,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
             const rdGroups=groups.filter(g=>g.round_id===rd.id);
             const board=leaderboardForRound(rd);
             return(
-              <div key={rd.id} style={{...S.card,marginBottom:16,cursor:'pointer',borderColor:'rgba(239,68,68,0.3)'}} onClick={()=>openRound(rd)}>
+              <div key={rd.id} style={{...S.card,...NO_SELECT,marginBottom:16,cursor:'pointer',borderColor:'rgba(239,68,68,0.3)'}} onClick={()=>openRound(rd)}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:10}}>
                   <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
                     <CourseBadge course={courses.find(co=>co.id===rd.course_id)} round={rd} size={38}/>
@@ -1431,6 +1489,9 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
               {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:22,color:'#fff',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:4}}>{getRunning(p.id,holes.length)}</div>)}
             </div>
           </div>
+        </div>
+        <div style={{padding:'0 16px 24px'}}>
+          <button onClick={()=>{setShowEnd(false);setView('home');}} style={{...S.pri,width:'100%',padding:15,fontSize:16,marginTop:4}}>Home</button>
         </div>
       </div>
     );
