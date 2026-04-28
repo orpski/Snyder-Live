@@ -9,7 +9,7 @@ const{useState,useEffect,useRef}=React;
 const SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 const ADMIN_PW='admin2025';
-// GolfCourseAPI removed from the live frontend in v45; v49 uses safe course presets and badges.
+// GolfCourseAPI removed from the live frontend in v45; v53 uses safe course presets and badges.
 // Course data should be added manually or imported later through a safer backend/admin workflow.
 // =========================================================
 // Supabase client setup
@@ -136,7 +136,12 @@ async function saveScoreRowsToCloud(sb,rows){
   if(!cleanRows.length)return {ok:true,count:0};
 
   // First try a proper batch upsert. This is what makes other players/spectators see scores.
-  let res=await sb.from('cup_scores').upsert(cleanRows,{onConflict:'round_id,player_id,hole_number'});
+  let res;
+  try{
+    res=await sb.from('cup_scores').upsert(cleanRows,{onConflict:'round_id,player_id,hole_number'});
+  }catch(e){
+    return {ok:false,error:'Network/cloud request failed: '+(e&&e.message?e.message:String(e))};
+  }
   if(!res.error)return {ok:true,count:cleanRows.length};
   const first=res.error.message||String(res.error);
 
@@ -150,8 +155,14 @@ async function saveScoreRowsToCloud(sb,rows){
       .select('round_id');
     if(upd.error)return {ok:false,error:upd.error.message||first};
     if(!upd.data||upd.data.length===0){
-      const ins=await sb.from('cup_scores').insert(row);
-      if(ins.error)return {ok:false,error:ins.error.message||first};
+      let ins=await sb.from('cup_scores').insert(row);
+      if(ins.error){
+        const msg=ins.error.message||first;
+        if(msg.toLowerCase().includes('null value')&&msg.toLowerCase().includes('id')){
+          ins=await sb.from('cup_scores').insert({...row,id:newId()});
+        }
+      }
+      if(ins.error)return {ok:false,error:(ins.error.message||first)+' | row='+JSON.stringify(row)};
     }
   }
   return {ok:true,count:cleanRows.length};
@@ -605,7 +616,7 @@ function App(){
 
   if(splash)return(
     <div style={{position:'fixed',inset:0,background:'#0a1f3d',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',zIndex:9999}}>
-      <img src={LOGO} alt="Snyder Live" style={{width:200,height:200,objectFit:'contain',animation:'fadeIn 0.8s ease-in'}}/>
+      <img src={"./icon-live-512.png"} alt="Snyder Live" style={{width:200,height:200,objectFit:'contain',animation:'fadeIn 0.8s ease-in'}}/>
       <div style={{fontSize:18,color:'#60b8f0',letterSpacing:'0.3em',fontFamily:"'Barlow Condensed',sans-serif",marginTop:16,fontWeight:700}}>SNYDER LIVE</div>
       <style>{`@keyframes fadeIn{from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}}`}</style>
     </div>
@@ -621,7 +632,7 @@ function App(){
     <div style={{minHeight:'100vh',paddingBottom:60,background:'linear-gradient(180deg,#0d2548 0%,#0a1f3d 100%)'}}>
       {/* Top nav */}
       <div style={{background:'#0d2548',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
-        <img src={LOGO} alt="Snyder Live" style={{width:36,height:36,objectFit:'contain',borderRadius:8}}/>
+        <img src={"./icon-live-512.png"} alt="Snyder Live" style={{width:36,height:36,objectFit:'contain',borderRadius:8}}/>
         <div style={{fontSize:15,color:'#fff',fontWeight:700,letterSpacing:'0.15em',fontFamily:"'Barlow Condensed',sans-serif"}}>SNYDER LIVE</div>
         {currentUser
           ?<button onClick={()=>setView('profile')} style={{background:'none',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
@@ -1866,8 +1877,8 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         {canEdit&&(
           <div style={{marginBottom:10,padding:'10px 12px',borderRadius:10,background:cloudError?'rgba(239,68,68,0.12)':'rgba(0,112,187,0.10)',border:'1px solid '+(cloudError?'rgba(239,68,68,0.35)':'rgba(0,112,187,0.25)')}}>
             <div style={{fontSize:12,color:cloudError?'#fca5a5':'#90ccf0',marginBottom:cloudError?8:0}}>{cloudStatus||'Scores auto-save to cloud when everyone has scored the hole.'}</div>
-            {cloudError&&<div style={{fontSize:11,color:'#fca5a5',marginBottom:8}}>Other players will not see latest scores until this syncs.</div>}
-            {cloudError&&<button disabled={saving} onClick={saveAll} style={{...S.gho,width:'100%',fontSize:13,opacity:saving?0.6:1}}>{saving?'Retrying...':'Retry cloud sync'}</button>}
+            {cloudError&&<div style={{fontSize:11,color:'#fca5a5',marginBottom:8}}>Other players will not see latest scores until this syncs.<br/>Error: {cloudError}</div>}
+            {cloudError&&<button disabled={saving} onClick={saveAll} style={{...S.gho,width:'100%',fontSize:13,opacity:saving?0.6:1}}>{saving?'Retrying...':'Retry cloud sync now'}</button>}
           </div>
         )}
         {canEdit&&<button onClick={async()=>{
