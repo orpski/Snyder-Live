@@ -1,4 +1,4 @@
-// SNYDER LIVE v65.2
+// SNYDER LIVE v65.3
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -10,7 +10,7 @@ const{useState,useEffect,useRef}=React;
 const SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 const ADMIN_PW='admin2025';
-// GolfCourseAPI removed from the live frontend in v45; v65.2 uses safe course presets and badges.
+// GolfCourseAPI removed from the live frontend in v45; v65.3 uses safe course presets and badges.
 // Course data should be added manually or imported later through a safer backend/admin workflow.
 // =========================================================
 // Supabase client setup
@@ -2029,14 +2029,36 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             <span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap',textTransform:'capitalize'}}>{round.tee||'White'} tee</span>
           </div>
         )}
-        {allGroups.length>1&&<div style={{display:'flex',gap:6,padding:'7px 12px',overflowX:'auto',borderTop:'1px solid rgba(255,255,255,0.08)',background:'rgba(0,0,0,0.16)'}}>
-          <button onClick={()=>{setActiveGroupId('leaderboard');openOverallLeaderboard(false);}} style={{border:'1px solid '+(activeGroupId==='leaderboard'?'rgba(96,184,240,0.8)':'rgba(255,255,255,0.14)'),background:activeGroupId==='leaderboard'?'rgba(96,184,240,0.22)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:999,padding:'7px 12px',fontSize:12,fontWeight:900,whiteSpace:'nowrap',flexShrink:0}}>Leaderboard</button>
-          {allGroups.map((g,idx)=>(
-            <button key={g.id||idx} onClick={()=>setActiveGroupId(g.id)} style={{border:'1px solid '+(normaliseId(activeGroupId)===normaliseId(g.id)?groupColour(g.group_number||idx+1):'rgba(255,255,255,0.14)'),background:normaliseId(activeGroupId)===normaliseId(g.id)?'rgba(255,255,255,0.14)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:999,padding:'7px 12px',fontSize:12,fontWeight:900,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
-              <span style={{width:8,height:8,borderRadius:'50%',background:groupColour(g.group_number||idx+1),display:'inline-block'}}></span> Group {groupLetter(g.group_number||idx+1)}
+        {allGroups.length>1&&<>
+          {(()=>{const leader=overallLeaderboardRows()[0];return (
+            <button onClick={()=>{setActiveGroupId('leaderboard');openOverallLeaderboard(false);}} style={{width:'calc(100% - 24px)',margin:'8px 12px 6px',padding:'10px 12px',borderRadius:12,border:'1px solid rgba(245,158,11,0.55)',background:'linear-gradient(135deg,rgba(245,158,11,0.95),rgba(180,83,9,0.9))',boxShadow:'0 8px 22px rgba(180,83,9,0.22)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,cursor:'pointer',textAlign:'left'}}>
+              <div style={{display:'flex',flexDirection:'column',lineHeight:1.05}}>
+                <span style={{fontSize:14,fontWeight:950,letterSpacing:'0.06em',textTransform:'uppercase'}}>Leaderboard</span>
+                <span style={{fontSize:10,color:'rgba(255,255,255,0.78)',marginTop:3}}>Tap to view live standings</span>
+              </div>
+              <div style={{textAlign:'right',minWidth:0,flexShrink:0}}>
+                {leader?(
+                  <>
+                    <div style={{fontSize:12,fontWeight:900,whiteSpace:'nowrap',maxWidth:138,overflow:'hidden',textOverflow:'ellipsis'}}>{leader.name}</div>
+                    <div style={{fontSize:18,fontWeight:950,lineHeight:1,marginTop:2}}>{leader.total}pt</div>
+                  </>
+                ):(
+                  <>
+                    <div style={{fontSize:12,fontWeight:900}}>No scores yet</div>
+                    <div style={{fontSize:10,color:'rgba(255,255,255,0.75)',marginTop:2}}>Waiting</div>
+                  </>
+                )}
+              </div>
             </button>
-          ))}
-        </div>}
+          );})()}
+          <div style={{display:'flex',gap:6,padding:'4px 12px 7px',overflowX:'auto',borderTop:'1px solid rgba(255,255,255,0.08)',background:'rgba(0,0,0,0.16)'}}>
+            {allGroups.map((g,idx)=>(
+              <button key={g.id||idx} onClick={()=>setActiveGroupId(g.id)} style={{border:'1px solid '+(normaliseId(activeGroupId)===normaliseId(g.id)?groupColour(g.group_number||idx+1):'rgba(255,255,255,0.14)'),background:normaliseId(activeGroupId)===normaliseId(g.id)?'rgba(255,255,255,0.14)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:999,padding:'7px 12px',fontSize:12,fontWeight:900,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+                <span style={{width:8,height:8,borderRadius:'50%',background:groupColour(g.group_number||idx+1),display:'inline-block'}}></span> Group {groupLetter(g.group_number||idx+1)}
+              </button>
+            ))}
+          </div>
+        </>}
         {activeGroupId!=='leaderboard'&&<div style={{display:'flex',gap:4,padding:'6px 12px',overflowX:'auto'}}>
           {holes.map(h=>{
             const done=grpPlayers.every(p=>(holeScores[h.hole]||{})[p.id]!==undefined);
