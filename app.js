@@ -9,7 +9,7 @@ const{useState,useEffect,useRef}=React;
 const SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 const ADMIN_PW='admin2025';
-// GolfCourseAPI removed from the live frontend in v45; v47-fixed uses safe course presets and badges.
+// GolfCourseAPI removed from the live frontend in v45; v48 uses safe course presets and badges.
 // Course data should be added manually or imported later through a safer backend/admin workflow.
 // =========================================================
 // Supabase client setup
@@ -47,6 +47,18 @@ function courseKey(course){return cleanCourseName(course&&course.name).toLowerCa
 function mergePresetCourses(dbCourses){const merged=[...(dbCourses||[])];const keys=new Set(merged.map(courseKey));(WHITLEY_BAY_PRESETS||[]).forEach((preset,i)=>{const tee=courseTeeFromName(preset.name)||['White','Yellow','Red'][i]||'White';const withId={...preset,id:preset.id||('preset-whitley-bay-'+tee.toLowerCase()),tee};if(!keys.has(courseKey(withId))){merged.push(withId);keys.add(courseKey(withId));}});return merged;}
 function getCourseOptions(courses){const byName=new Map();(courses||[]).forEach(c=>{if(!c)return;const base=cleanCourseName(c.name);if(!base)return;const tee=courseTeeFromName(c.name)||c.tee||'White';if(!byName.has(base))byName.set(base,{name:base,course:c,tees:{}});const item=byName.get(base);item.tees[tee]=c;if(!item.course||tee==='White')item.course=c;});return Array.from(byName.values()).sort((a,b)=>a.name.localeCompare(b.name));}
 function findCourseForTee(courses,baseName,tee){const cleanBase=cleanCourseName(baseName);const option=getCourseOptions(courses).find(o=>o.name===cleanBase);if(!option)return null;return option.tees[tee]||option.course||Object.values(option.tees)[0]||null;}
+function idMatches(a,b){return a!=null&&b!=null&&String(a)===String(b);}
+function userCanScoreRound(currentUser,group,roundPlayers){
+  if(!currentUser)return false;
+  const uid=currentUser.id;
+  const groupIds=(group&&group.player_ids)||[];
+  if(groupIds.some(id=>idMatches(id,uid)))return true;
+  return (roundPlayers||[]).some(rp=>idMatches(rp.user_id,uid)||idMatches(rp.id,uid)&&rp.is_host);
+}
+function myRoundsForUser(rounds,groups,currentUser){
+  if(!currentUser)return [];
+  return sortRoundsNewestFirst((rounds||[]).filter(r=>(groups||[]).some(g=>g.round_id===r.id&&((g.player_ids||[]).some(pid=>idMatches(pid,currentUser.id))))));
+}
 function getCourseBadge(course,round){
   if(course&&course.image_url)return course.image_url;
   const name=getCourseName(course,round).toLowerCase();
@@ -414,6 +426,7 @@ function App(){
     return currentUser!=null;
   });
   const completedRounds=sortRoundsNewestFirst(rounds.filter(isCompletedRound));
+  const myRounds=myRoundsForUser(rounds,groups,currentUser);
   const thisWeekStart=startOfThisWeek();
   const thisWeeksCards=completedRounds.filter(r=>new Date(roundStartValue(r))>=thisWeekStart);
   const olderCards=completedRounds.filter(r=>new Date(roundStartValue(r))<thisWeekStart);
@@ -427,7 +440,8 @@ function App(){
     const po=(rps||[]).map(rp=>({id:rp.user_id||rp.guest_id||rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0}));
     const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
     if(rdGroups[0]){
-      setSelectedRound({...rd,_spectator:true,_group:{...rdGroups[0],participants:po,playing_handicaps:hm}});
+      const canScore=userCanScoreRound(currentUser,rdGroups[0],rps);
+      setSelectedRound({...rd,_spectator:!canScore,_group:{...rdGroups[0],participants:po,playing_handicaps:hm}});
       setView('play');
     }
   }
@@ -569,6 +583,25 @@ function App(){
             </div>
             <div style={{width:52,height:52,borderRadius:'50%',background:'rgba(255,255,255,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24}}>+</div>
           </div>
+          {currentUser&&myRounds.length>0&&(
+            <div style={{marginTop:18}}>
+              <div style={{fontSize:18,color:'#fff',fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.03em',marginBottom:10}}>My Rounds</div>
+              {myRounds.slice(0,4).map(rd=>{
+                const course=courses.find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee);
+                const live=isLiveRound(rd);
+                return(
+                  <div key={rd.id} onClick={()=>openRound(rd)} style={{...S.card,marginBottom:8,cursor:'pointer',display:'flex',alignItems:'center',gap:10}}>
+                    <CourseBadge course={course} round={rd} size={34}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:14,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||getCourseDisplayName(course,rd)||'Round'}</div>
+                      <div style={{fontSize:11,color:'#60b8f0'}}>{live?'Continue scoring':'Completed'} · {formatRoundStart(rd)}</div>
+                    </div>
+                    <div style={{fontSize:10,color:live?'#fff':'#60b8f0',background:live?'#ef4444':'rgba(96,184,240,0.12)',borderRadius:20,padding:'4px 8px',fontWeight:700}}>{live?'LIVE':'DONE'}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
         </div>
 
@@ -627,7 +660,8 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
     const po=(rps||[]).map(rp=>({id:rp.user_id||rp.guest_id||rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0}));
     const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
     if(rdGroups[0]){
-      setSelectedRound({...rd,_spectator:true,_group:{...rdGroups[0],participants:po,playing_handicaps:hm}});
+      const canScore=userCanScoreRound(currentUser,rdGroups[0],rps);
+      setSelectedRound({...rd,_spectator:!canScore,_group:{...rdGroups[0],participants:po,playing_handicaps:hm}});
       setView('play');
     }
   }
@@ -834,11 +868,25 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     // Private - only show if current user is logged in (players will see it in their profile)
     return currentUser!=null;
   });
+  const myRounds=myRoundsForUser(rounds,groups,currentUser);
   const courseOptions=getCourseOptions(courses);
   const selectedCourseOption=courseOptions.find(o=>o.name===setup.course_name)||courseOptions.find(o=>o.course&&o.course.id===setup.course_id)||null;
   const availableTees=selectedCourseOption?Object.keys(selectedCourseOption.tees):['White','Yellow','Red','Orange'];
   function chooseCourse(baseName){const option=courseOptions.find(o=>o.name===baseName);const nextCourse=option?(option.tees[setup.tee]||option.tees.White||option.course):null;const nextTee=nextCourse?(courseTeeFromName(nextCourse.name)||nextCourse.tee||setup.tee):setup.tee;setSetup(q=>({...q,course_name:baseName,course_id:nextCourse?nextCourse.id:'',tee:nextTee}));}
   function chooseTee(tee){const baseName=setup.course_name||(selectedCourseOption&&selectedCourseOption.name)||'';const nextCourse=findCourseForTee(courses,baseName,tee);setSetup(q=>({...q,tee,course_id:nextCourse?nextCourse.id:q.course_id}));}
+  async function continueRound(rd){
+    const rdGroups=groups.filter(g=>g.round_id===rd.id);
+    const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
+    const po=(rps||[]).map(rp=>({id:rp.user_id||rp.guest_id||rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0}));
+    const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
+    if(rdGroups[0]){
+      const canScore=userCanScoreRound(currentUser,rdGroups[0],rps);
+      setActiveRound({...rd,_spectator:!canScore});
+      setActiveGroup({...rdGroups[0],participants:po,playing_handicaps:hm});
+      setHoleScores({});
+      setStep('scorecard');
+    }
+  }
 
   useEffect(()=>{
     if(selectedRound&&selectedRound._group){
@@ -982,23 +1030,35 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
           <div style={{fontSize:16,color:'#fff',marginBottom:4}}>Start a New Round</div>
           <div style={{fontSize:13,color:'#60b8f0'}}>Pick a course, add players, go live</div>
         </div>
-        {liveRounds.length>0&&(
+        {currentUser&&myRounds.length>0&&(
           <div>
-            <div style={{fontSize:12,color:'#60b8f0',margin:'16px 0 8px',letterSpacing:'0.1em'}}>JOIN LIVE ROUND</div>
-            {liveRounds.map(rd=>
+            <div style={{fontSize:12,color:'#60b8f0',margin:'16px 0 8px',letterSpacing:'0.1em'}}>MY ROUNDS</div>
+            {myRounds.map(rd=>{
+              const course=courses.find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee);
+              const live=isLiveRound(rd);
+              return(
+                <div key={rd.id} style={{...S.card,marginBottom:6,cursor:'pointer',borderColor:live?'rgba(239,68,68,0.3)':'rgba(255,255,255,0.1)'}} onClick={()=>continueRound(rd)}>
+                  <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    <CourseBadge course={course} round={rd} size={32}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:14,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||getCourseDisplayName(course,rd)||'Round'}</div>
+                      <div style={{fontSize:12,color:'#60b8f0'}}>{live?'Continue scoring':'Completed'} · {rd.tee||'White'} tee</div>
+                    </div>
+                    <div style={{fontSize:10,color:live?'#fff':'#60b8f0',background:live?'#ef4444':'rgba(96,184,240,0.12)',borderRadius:20,padding:'4px 8px',fontWeight:700}}>{live?'LIVE':'DONE'}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {liveRounds.filter(rd=>!myRounds.some(m=>m.id===rd.id)).length>0&&(
+          <div>
+            <div style={{fontSize:12,color:'#60b8f0',margin:'16px 0 8px',letterSpacing:'0.1em'}}>WATCH LIVE ROUND</div>
+            {liveRounds.filter(rd=>!myRounds.some(m=>m.id===rd.id)).map(rd=>
               groups.filter(g=>g.round_id===rd.id).map(grp=>(
-                <div key={grp.id} style={{...S.card,marginBottom:6,cursor:'pointer',borderColor:'rgba(239,68,68,0.3)'}}
-                  onClick={async()=>{
-                    const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
-                    const po=(rps||[]).map(rp=>({id:rp.user_id||rp.guest_id||rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0}));
-                    const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
-                    setActiveRound(rd);
-                    setActiveGroup({...grp,participants:po,playing_handicaps:hm});
-                    setHoleScores({}); // Clear for this round, will reload from DB
-                    setStep('scorecard');
-                  }}>
+                <div key={grp.id} style={{...S.card,marginBottom:6,cursor:'pointer',borderColor:'rgba(239,68,68,0.3)'}} onClick={()=>continueRound(rd)}>
                   <div style={{fontSize:14,color:'#ef4444',marginBottom:2}}>{rd.name||rd.course_name}</div>
-                  <div style={{fontSize:12,color:'#60b8f0'}}>{rd.course_name} - Group {grp.group_number}</div>
+                  <div style={{fontSize:12,color:'#60b8f0'}}>{rd.course_name} - Spectator view</div>
                 </div>
               ))
             )}
