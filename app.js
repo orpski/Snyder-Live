@@ -9,7 +9,7 @@ const{useState,useEffect,useRef}=React;
 const SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 const ADMIN_PW='admin2025';
-// GolfCourseAPI removed from the live frontend in v45; v53 uses safe course presets and badges.
+// GolfCourseAPI removed from the live frontend in v45; v54 uses safe course presets and badges.
 // Course data should be added manually or imported later through a safer backend/admin workflow.
 // =========================================================
 // Supabase client setup
@@ -72,7 +72,7 @@ function getCourseInitials(course,round){
 function CourseBadge({course,round,size=38}){
   const src=getCourseBadge(course,round);
   return <div style={{width:size,height:size,borderRadius:size>=70?'50%':10,overflow:'hidden',flexShrink:0,background:'linear-gradient(135deg,#0a3d6b,#0070BB)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:Math.max(9,Math.round(size/4)),fontWeight:700,color:'rgba(255,255,255,0.7)',border:'1px solid rgba(255,255,255,0.18)',boxShadow:size>=70?'0 10px 24px rgba(0,0,0,0.25)':'none'}}>
-    {src?<img src={src} alt='' style={{width:'100%',height:'100%',objectFit:'contain',background:'rgba(255,255,255,0.92)'}} onError={e=>{e.currentTarget.style.display='none';}}/>:<div style={{textAlign:'center',lineHeight:1.1,padding:2}}>{getCourseInitials(course,round)}</div>}
+    {src?<img src={src} alt='' style={{width:'100%',height:'100%',objectFit:'contain',background:'transparent',padding:size>=70?4:2,boxSizing:'border-box'}} onError={e=>{e.currentTarget.style.display='none';}}/>:<div style={{textAlign:'center',lineHeight:1.1,padding:2}}>{getCourseInitials(course,round)}</div>}
   </div>;
 }
 
@@ -616,7 +616,7 @@ function App(){
 
   if(splash)return(
     <div style={{position:'fixed',inset:0,background:'#0a1f3d',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',zIndex:9999}}>
-      <img src={"./icon-live-512.png"} alt="Snyder Live" style={{width:200,height:200,objectFit:'contain',animation:'fadeIn 0.8s ease-in'}}/>
+      <img src={LOGO} alt="Snyder Live" style={{width:200,height:200,objectFit:'contain',animation:'fadeIn 0.8s ease-in'}}/>
       <div style={{fontSize:18,color:'#60b8f0',letterSpacing:'0.3em',fontFamily:"'Barlow Condensed',sans-serif",marginTop:16,fontWeight:700}}>SNYDER LIVE</div>
       <style>{`@keyframes fadeIn{from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}}`}</style>
     </div>
@@ -632,7 +632,7 @@ function App(){
     <div style={{minHeight:'100vh',paddingBottom:60,background:'linear-gradient(180deg,#0d2548 0%,#0a1f3d 100%)'}}>
       {/* Top nav */}
       <div style={{background:'#0d2548',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
-        <img src={"./icon-live-512.png"} alt="Snyder Live" style={{width:36,height:36,objectFit:'contain',borderRadius:8}}/>
+        <img src={LOGO} alt="Snyder Live" style={{width:36,height:36,objectFit:'contain'}}/>
         <div style={{fontSize:15,color:'#fff',fontWeight:700,letterSpacing:'0.15em',fontFamily:"'Barlow Condensed',sans-serif"}}>SNYDER LIVE</div>
         {currentUser
           ?<button onClick={()=>setView('profile')} style={{background:'none',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
@@ -1261,6 +1261,10 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   const[saving,setSaving]=useState(false);
   const[cloudStatus,setCloudStatus]=useState('');
   const[cloudError,setCloudError]=useState('');
+  const[refreshing,setRefreshing]=useState(false);
+  const[lastRefreshed,setLastRefreshed]=useState('');
+  const[pullDistance,setPullDistance]=useState(0);
+  const pullStartY=useRef(null);
   const[showReview,setShowReview]=useState(false);
   const[showEnd,setShowEnd]=useState(false);
   const[endStep,setEndStep]=useState(0);
@@ -1281,21 +1285,61 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
       }
     }catch(e){}
     // Then load from Supabase (authoritative)
-    sb.from('cup_scores').select('*').eq('round_id',round.id).then(({data})=>{
-      if(!data||data.length===0)return;
+    refreshScoresFromCloud(false);
+  },[round&&round.id]);
+
+  async function refreshScoresFromCloud(showMessage=true){
+    if(!round||!round.id||refreshing)return;
+    setRefreshing(true);
+    try{
+      const {data,error}=await sb.from('cup_scores').select('*').eq('round_id',round.id);
+      if(error)throw error;
       const m={};
-      data.forEach(s=>{
+      (data||[]).forEach(s=>{
         if(!m[s.hole_number])m[s.hole_number]={};
         m[s.hole_number][s.player_id]=s.gross_score;
       });
-      setHoleScores(prev=>{
-        const merged={...prev,...m};
-        return merged;
-      });
-      // Update localStorage with DB data
-      try{localStorage.setItem('scores_'+round.id,JSON.stringify(m));}catch(e){}
-    });
-  },[round&&round.id]);
+      if(Object.keys(m).length>0){
+        setHoleScores(prev=>({...prev,...m}));
+        try{localStorage.setItem('scores_'+round.id,JSON.stringify(m));}catch(e){}
+      }
+      const t=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+      setLastRefreshed(t);
+      if(showMessage)flash('Scorecard refreshed');
+    }catch(e){
+      if(showMessage)flash('Refresh failed: '+(e.message||String(e)),'error');
+    }finally{
+      setRefreshing(false);
+      setPullDistance(0);
+      pullStartY.current=null;
+    }
+  }
+
+  function handlePullStart(e){
+    if(window.scrollY<=2&&!inputHole){
+      pullStartY.current=e.touches&&e.touches[0]?e.touches[0].clientY:null;
+    }
+  }
+  function handlePullMove(e){
+    if(pullStartY.current==null||refreshing)return;
+    const y=e.touches&&e.touches[0]?e.touches[0].clientY:null;
+    if(y==null)return;
+    const dy=y-pullStartY.current;
+    if(dy>0&&window.scrollY<=2){
+      const dist=Math.min(95,dy);
+      setPullDistance(dist);
+      if(dy>35&&e.cancelable)e.preventDefault();
+    }
+  }
+  function handlePullEnd(){
+    const dist=pullDistance;
+    pullStartY.current=null;
+    if(dist>70){
+      refreshScoresFromCloud(true);
+    }else{
+      setPullDistance(0);
+    }
+  }
 
   function getHole(n){return holes.find(h=>h.hole===n)||{hole:n,par:4,stroke_index:n,yards:0};}
   function checkSkipped(targetHole){
@@ -1348,6 +1392,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     }
     setCloudStatus('Hole '+holeNum+' saved to cloud');
     setCloudError('');
+    setLastRefreshed(new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
     try{localStorage.removeItem('pending_scores_'+round.id);}catch(e){}
     // Pull latest public data after a successful cloud save.
     if(load)setTimeout(()=>load(),300);
@@ -1483,8 +1528,8 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     }
 
     const modal=(
-      <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:16}} onClick={e=>{if(e.target===e.currentTarget)setInputHole(null);}}>
-        <div style={{background:'#0d2548',border:'1px solid rgba(255,255,255,0.2)',borderRadius:16,padding:16,width:'100%',maxWidth:340}}>
+      <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,width:'100vw',maxWidth:'100vw',overflow:'hidden',background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:16,boxSizing:'border-box'}} onClick={e=>{if(e.target===e.currentTarget)setInputHole(null);}}>
+        <div style={{background:'#0d2548',border:'1px solid rgba(255,255,255,0.2)',borderRadius:16,padding:16,width:'100%',maxWidth:'min(340px,calc(100vw - 32px))',boxSizing:'border-box'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}>
             <div>
               <div style={{fontSize:16,color:'#fff'}}>Hole {holeNum} - {pName}</div>
@@ -1740,7 +1785,12 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   const f9complete=front9.every(hd=>grpPlayers.every(p=>(holeScores[hd.hole]||{})[p.id]!==undefined));
 
   return(
-    <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)'}}>
+    <div onTouchStart={handlePullStart} onTouchMove={handlePullMove} onTouchEnd={handlePullEnd} style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)',overscrollBehaviorY:'contain',overflowX:'hidden',touchAction:inputHole?'none':'pan-y'}}>
+      {(refreshing||pullDistance>8)&&(
+        <div style={{position:'fixed',top:8,left:'50%',transform:'translateX(-50%)',zIndex:9998,padding:'7px 12px',borderRadius:999,background:'rgba(10,31,61,0.95)',border:'1px solid rgba(96,184,240,0.35)',color:'#90ccf0',fontSize:12,boxShadow:'0 8px 20px rgba(0,0,0,0.25)'}}>
+          {refreshing?'Refreshing scores...':pullDistance>70?'Release to refresh':'Pull to refresh'}
+        </div>
+      )}
       <div style={{position:'sticky',top:0,zIndex:10,background:'linear-gradient(160deg,#0a1528,#0d2040)',borderBottom:'2px solid #0070BB'}}>
         {!canEdit&&(
           <div style={{background:'rgba(0,112,187,0.2)',borderBottom:'1px solid rgba(0,112,187,0.3)',padding:'8px 14px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -1784,6 +1834,10 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             </div>
           ))}
         </div>
+      </div>
+
+      <div style={{padding:'6px 14px',fontSize:11,color:'rgba(144,204,240,0.75)',textAlign:'center',borderBottom:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.14)'}}>
+        {refreshing?'Refreshing latest scores...':lastRefreshed?'Last updated '+lastRefreshed+' · pull down to refresh':'Pull down to refresh scores'}
       </div>
 
       {/* Spectator live leaderboard */}
