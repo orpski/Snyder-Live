@@ -1,4 +1,4 @@
-// SNYDER LIVE v65.1 verified build
+// SNYDER LIVE v65.2
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -10,7 +10,7 @@ const{useState,useEffect,useRef}=React;
 const SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 const ADMIN_PW='admin2025';
-// GolfCourseAPI removed from the live frontend in v45; v65.1 uses safe course presets and badges.
+// GolfCourseAPI removed from the live frontend in v45; v65.2 uses safe course presets and badges.
 // Course data should be added manually or imported later through a safer backend/admin workflow.
 // =========================================================
 // Supabase client setup
@@ -1061,6 +1061,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   const courseOptions=getCourseOptions(courses);
   const selectedCourseOption=courseOptions.find(o=>o.name===setup.course_name)||courseOptions.find(o=>o.course&&o.course.id===setup.course_id)||null;
   const availableTees=selectedCourseOption?Object.keys(selectedCourseOption.tees):['White','Yellow','Red','Orange'];
+  const isSingleGroupDay=(playerRange==='1-4'||groupSetup.length<=1);
   function resetGroupsForRange(range){
     const count=groupCountForRange(range);
     const flat=groupSetup.flat();
@@ -1250,11 +1251,11 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
           <div style={{fontSize:16,color:'#fff'}}>Start a Round</div>
         </div>
         <div style={{padding:16}}>
-          <div style={{...S.card,marginBottom:12,background:'rgba(0,112,187,0.12)',borderColor:'rgba(0,112,187,0.25)'}}>
+          {!isSingleGroupDay&&<div style={{...S.card,marginBottom:12,background:'rgba(0,112,187,0.12)',borderColor:'rgba(0,112,187,0.25)'}}>
             <div style={{fontSize:12,color:'#60b8f0',letterSpacing:'0.08em',textTransform:'uppercase'}}>Day setup</div>
             <div style={{fontSize:16,color:'#fff',fontWeight:800,marginTop:3}}>{playerRangeLabel(playerRange)}</div>
             <div style={{fontSize:12,color:'rgba(255,255,255,0.55)',marginTop:4}}>Players will be split into groups of up to 4 for the overall leaderboard.</div>
-          </div>
+          </div>}
           <label style={S.lbl}>Round Name (optional)</label>
           <input style={{...S.inp,marginBottom:12}} value={setup.name} onChange={e=>setSetup(q=>({...q,name:e.target.value}))} placeholder={"e.g. "+(currentUser?currentUser.display_name.split(' ')[0]+"'s Round":"Saturday Morning")}/>
           <label style={S.lbl}>Course</label>
@@ -1276,14 +1277,24 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
             </div>
           </div>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-            <label style={{...S.lbl,margin:0}}>Groups ({participants.length} players)</label>
+            <label style={{...S.lbl,margin:0}}>{isSingleGroupDay?'Players':'Groups'} ({participants.length} players)</label>
           </div>
           {currentUser&&!participants.find(p=>normaliseId(p.id)===normaliseId(currentUser.id))&&(
             <button onClick={()=>{setPickerGroup(0);addP({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap});}} style={{...S.gho,width:'100%',marginBottom:10,fontSize:13}}>
-              + Add yourself to Group A
+              {isSingleGroupDay?'+ Add yourself':'+ Add yourself to Group A'}
             </button>
           )}
-          <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:12}}>
+          {isSingleGroupDay ? <div style={{marginBottom:12}}>
+            <button onClick={()=>{setPickerGroup(0);setShowPicker(true);}} style={{...S.pri,width:'100%',marginBottom:10,fontSize:13}}>+ Add Player</button>
+            {participants.length===0&&<div style={{...S.card,fontSize:13,color:'rgba(255,255,255,0.5)',textAlign:'center'}}>No players added yet</div>}
+            {participants.map(p=>(
+              <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,padding:'10px 12px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
+                <div style={{flex:1,fontSize:14,color:'#fff',fontWeight:700}}>{p.display_name||p.name}</div>
+                <input type="number" value={p.playing_handicap} onChange={e=>updateGroupHandicap(0,p.id,e.target.value)} style={{...S.inp,width:60,padding:'4px 8px',fontSize:13,textAlign:'center'}}/>
+                <button onClick={()=>removeFromGroup(0,p.id)} style={{...S.dan,padding:'4px 10px',fontSize:12}}>x</button>
+              </div>
+            ))}
+          </div> : <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:12}}>
             {groupSetup.map((bucket,groupIdx)=>(
               <div key={groupIdx} style={{...S.card,background:'rgba(255,255,255,0.04)',borderColor:'rgba(255,255,255,0.1)'}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:8}}>
@@ -1303,7 +1314,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
                 ))}
               </div>
             ))}
-          </div>
+          </div>}
           <button onClick={startRound} disabled={saving||!setup.course_id} style={{...S.pri,width:'100%',padding:14,fontSize:15,marginTop:12,opacity:saving||!setup.course_id?0.5:1}}>
             {saving?'Starting...':'Start Round - Go Live!'}
           </button>
@@ -2018,14 +2029,14 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             <span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap',textTransform:'capitalize'}}>{round.tee||'White'} tee</span>
           </div>
         )}
-        <div style={{display:'flex',gap:6,padding:'7px 12px',overflowX:'auto',borderTop:'1px solid rgba(255,255,255,0.08)',background:'rgba(0,0,0,0.16)'}}>
+        {allGroups.length>1&&<div style={{display:'flex',gap:6,padding:'7px 12px',overflowX:'auto',borderTop:'1px solid rgba(255,255,255,0.08)',background:'rgba(0,0,0,0.16)'}}>
           <button onClick={()=>{setActiveGroupId('leaderboard');openOverallLeaderboard(false);}} style={{border:'1px solid '+(activeGroupId==='leaderboard'?'rgba(96,184,240,0.8)':'rgba(255,255,255,0.14)'),background:activeGroupId==='leaderboard'?'rgba(96,184,240,0.22)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:999,padding:'7px 12px',fontSize:12,fontWeight:900,whiteSpace:'nowrap',flexShrink:0}}>Leaderboard</button>
           {allGroups.map((g,idx)=>(
             <button key={g.id||idx} onClick={()=>setActiveGroupId(g.id)} style={{border:'1px solid '+(normaliseId(activeGroupId)===normaliseId(g.id)?groupColour(g.group_number||idx+1):'rgba(255,255,255,0.14)'),background:normaliseId(activeGroupId)===normaliseId(g.id)?'rgba(255,255,255,0.14)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:999,padding:'7px 12px',fontSize:12,fontWeight:900,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
               <span style={{width:8,height:8,borderRadius:'50%',background:groupColour(g.group_number||idx+1),display:'inline-block'}}></span> Group {groupLetter(g.group_number||idx+1)}
             </button>
           ))}
-        </div>
+        </div>}
         {activeGroupId!=='leaderboard'&&<div style={{display:'flex',gap:4,padding:'6px 12px',overflowX:'auto'}}>
           {holes.map(h=>{
             const done=grpPlayers.every(p=>(holeScores[h.hole]||{})[p.id]!==undefined);
