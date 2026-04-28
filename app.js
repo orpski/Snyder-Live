@@ -1482,6 +1482,19 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     }
   }
 
+  async function finishRoundAndGoHome(){
+    if(!canEdit)return;
+    if(!window.confirm('Finish this round? It will be removed from Live Scores.'))return;
+    const synced=await saveAll();
+    if(!synced&&!window.confirm('Scores did not sync to cloud. Finish anyway? Other players may not see them.'))return;
+    const {error}=await sb.from('cup_rounds').update({status:'complete'}).eq('id',round.id);
+    if(error){flash(error.message||'Could not finish round','error');return;}
+    round.status='complete';
+    await load();
+    setShowEnd(false);
+    setView('home');
+  }
+
     // ---------------------------------------------------------
   // Score input modal
   // ---------------------------------------------------------
@@ -1683,8 +1696,9 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             </div>
           </div>
         </div>
-        <div style={{padding:'0 16px 24px'}}>
-          <button onClick={()=>{setShowEnd(false);setView('home');}} style={{...S.pri,width:'100%',padding:15,fontSize:16,marginTop:4}}>Home</button>
+        <div style={{padding:'0 16px 24px',display:'flex',flexDirection:'column',gap:10}}>
+          {canEdit&&isLiveRound(round)&&<button onClick={finishRoundAndGoHome} style={{...S.pri,width:'100%',padding:15,fontSize:16,marginTop:4,background:'#0a8a4a'}}>Finish Round</button>}
+          <button onClick={()=>{setShowEnd(false);setView('home');}} style={{...S.gho,width:'100%',padding:15,fontSize:16,marginTop:canEdit&&isLiveRound(round)?0:4}}>Home</button>
         </div>
       </div>
     );
@@ -1730,7 +1744,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
           <div style={{fontSize:16,color:'#fff'}}>Front 9 Review</div>
           <button onClick={()=>setShowReview(false)} style={{...S.pri,padding:'8px 16px',fontSize:14}}>Back 9</button>
         </div>
-        <div style={{padding:16}}>
+        <div id="f9-review-page" style={{padding:16}}>
           <div style={{display:'flex',gap:10,marginBottom:16}}>
             {grpPlayers.map(p=>(
               <div key={p.id} style={{flex:1,...S.card,textAlign:'center'}}>
@@ -1891,7 +1905,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
                         <div>
                           <div style={{fontSize:24,color:'#fff',lineHeight:1,textAlign:'center',fontWeight:800}}>{gross===-1?'0':gross}</div>
                           {pts!==null&&<div style={{position:'absolute',top:5,right:5,fontSize:10,color:'rgba(255,255,255,0.95)',background:'rgba(0,0,0,0.35)',borderRadius:6,padding:'2px 5px',fontWeight:800}}>{pts}pt</div>}
-                          {gross>0&&<div title='Total points so far' style={{position:'absolute',bottom:5,right:5,minWidth:18,height:18,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:'rgba(226,232,240,0.9)',background:'rgba(51,65,85,0.72)',border:'1px solid rgba(148,163,184,0.38)',borderRadius:999,padding:'1px 5px',fontWeight:900,boxShadow:'0 1px 4px rgba(0,0,0,0.18)'}}>{running}</div>}
+                          {gross>0&&<div title='Total points so far' style={{position:'absolute',bottom:5,right:5,minWidth:22,height:18,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'rgba(203,213,225,0.78)',background:'rgba(30,41,59,0.58)',border:'1px solid rgba(148,163,184,0.24)',borderRadius:999,padding:'1px 5px',fontWeight:800,boxShadow:'0 1px 3px rgba(0,0,0,0.14)'}}>{running}<span style={{fontSize:7,marginLeft:1,opacity:0.75}}>pt</span></div>}
                         </div>
                       ):(
                         <div style={{fontSize:11,color:'rgba(255,255,255,0.2)'}}>TAP</div>
@@ -1905,7 +1919,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         </div>
       ))}
 
-      {f9complete&&!showReview&&(
+      {canEdit&&f9complete&&!showReview&&(
         <div style={{margin:16,...S.card,textAlign:'center',background:'rgba(0,112,187,0.15)',borderColor:'rgba(0,112,187,0.4)'}}>
           <div style={{fontSize:14,color:'#fff',marginBottom:8}}>Front 9 complete!</div>
           <button onClick={()=>{saveAll();setShowReview(true);}} style={{...S.pri,fontSize:13}}>Review Front 9</button>
@@ -1927,7 +1941,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
           if(error){flash(error.message||'Could not finish round','error');return;}
           round.status='complete';
           await load();
-          setEndStep(0);setShowEnd(true);
+          setEndStep(1);setShowEnd(true);
         }} style={{...S.pri,width:'100%',padding:13,fontSize:14,background:'#0a8a4a',marginBottom:0}}>Finish Round</button>}
         {!canEdit&&<div style={{textAlign:'center',padding:'10px',fontSize:12,color:'rgba(255,255,255,0.3)'}}>{isCompletedRound(round)?'Completed round - view only':'View only - sign in as a player to score'}</div>}
       </div>
