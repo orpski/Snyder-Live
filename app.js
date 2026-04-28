@@ -792,7 +792,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
     const po=(rps||[]).map(rp=>({id:rp.user_id||rp.guest_id||rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0}));
     const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
     if(rdGroups[0]){
-      const userGroup=(rdGroups.find(g=>currentUser&&Array.isArray(g.player_ids)&&(g.player_ids||[]).some(pid=>normaliseId(pid)===normaliseId(currentUser.id)))||rdGroups[0]);
+      const userGroup=(currentUser&&rdGroups.find(g=>Array.isArray(g.player_ids)&&g.player_ids.includes(currentUser.id)))||rdGroups[0];
       const canScore=userCanScoreRound(currentUser,userGroup,rps);
       let local={};
       try{local=JSON.parse(localStorage.getItem('scores_'+rd.id)||'{}')||{};}catch(e){local={};}
@@ -1003,29 +1003,27 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
   );
 }
 
-
-const GROUP_COLOURS=['#60a5fa','#34d399','#f59e0b','#a78bfa','#f472b6','#22d3ee'];
-function groupLetter(i){return String.fromCharCode(65+(parseInt(i,10)||1)-1);}
-function groupNameFromNumber(n){return 'Group '+groupLetter(n||1);}
-function groupColour(n){return GROUP_COLOURS[((parseInt(n,10)||1)-1)%GROUP_COLOURS.length];}
-function groupCountForRange(range){
+function groupLetter(idx){return String.fromCharCode(65+(Number(idx)||0));}
+function groupLabelFromNumber(n){return 'Group '+groupLetter((Number(n)||1)-1);}
+function groupColour(idx){
+  const colours=['#60b8f0','#22c55e','#f59e0b','#a78bfa','#f472b6','#34d399'];
+  return colours[(Number(idx)||0)%colours.length];
+}
+function targetGroupCount(range,participantCount){
   if(range==='5-8')return 2;
   if(range==='9-12')return 3;
-  if(range==='more')return 4;
+  if(range==='more')return Math.max(4,Math.ceil((participantCount||0)/4)||4);
   return 1;
 }
-function normaliseId(v){return v==null?'':String(v);}
-
 function splitIntoGolfGroups(participants,range){
   const list=[...(participants||[])];
-  let groupCount=1;
-  if(range==='5-8')groupCount=2;
-  else if(range==='9-12')groupCount=3;
-  else if(range==='more')groupCount=Math.max(1,Math.ceil(list.length/4));
-  groupCount=Math.max(groupCount,Math.ceil(list.length/4)||1);
+  const groupCount=targetGroupCount(range,list.length);
   const groups=Array.from({length:groupCount},()=>[]);
-  list.forEach((p,i)=>groups[Math.min(Math.floor(i/4),groupCount-1)].push(p));
-  return groups.filter((g,i)=>g.length>0 || i===0);
+  list.forEach((p,i)=>{
+    const idx=Math.max(0,Math.min(groupCount-1,((p.group_number||Math.floor(i/4)+1)-1)));
+    groups[idx].push(p);
+  });
+  return groups;
 }
 function playerRangeLabel(range){
   if(range==='1-4')return '1–4 players';
@@ -1045,11 +1043,10 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   const[activeGroup,setActiveGroup]=useState(null);
   const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false});
   const[participants,setParticipants]=useState([]);
-  const[groupSetup,setGroupSetup]=useState([[]]);
-  const[pickerGroup,setPickerGroup]=useState(0);
   const[saving,setSaving]=useState(false);
   const[showPicker,setShowPicker]=useState(false);
   const[playerRange,setPlayerRange]=useState(null);
+  const[activeSetupGroup,setActiveSetupGroup]=useState(1);
   const liveRounds=rounds.filter(r=>{
     if(!isLiveRound(r))return false;
     if(!r.is_private)return true;
@@ -1060,17 +1057,8 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   const courseOptions=getCourseOptions(courses);
   const selectedCourseOption=courseOptions.find(o=>o.name===setup.course_name)||courseOptions.find(o=>o.course&&o.course.id===setup.course_id)||null;
   const availableTees=selectedCourseOption?Object.keys(selectedCourseOption.tees):['White','Yellow','Red','Orange'];
-  function resetGroupsForRange(range){
-    const count=groupCountForRange(range);
-    const flat=groupSetup.flat();
-    const next=Array.from({length:count},(_,i)=>flat.filter((_,idx)=>Math.floor(idx/4)===i));
-    setGroupSetup(next);
-    setParticipants(next.flat());
-  }
-  function syncGroups(nextGroups){
-    setGroupSetup(nextGroups);
-    setParticipants(nextGroups.flat());
-  }
+  const setupGroupCount=targetGroupCount(playerRange,participants.length);
+  const setupGroups=splitIntoGolfGroups(participants,playerRange);
   function chooseCourse(baseName){const option=courseOptions.find(o=>o.name===baseName);const nextCourse=option?(option.tees[setup.tee]||option.tees.White||option.course):null;const nextTee=nextCourse?(courseTeeFromName(nextCourse.name)||nextCourse.tee||setup.tee):setup.tee;setSetup(q=>({...q,course_name:baseName,course_id:nextCourse?nextCourse.id:'',tee:nextTee}));}
   function chooseTee(tee){const baseName=setup.course_name||(selectedCourseOption&&selectedCourseOption.name)||'';const nextCourse=findCourseForTee(courses,baseName,tee);setSetup(q=>({...q,tee,course_id:nextCourse?nextCourse.id:q.course_id}));}
   async function continueRound(rd){
@@ -1079,8 +1067,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     const po=(rps||[]).map(rp=>({id:rp.user_id||rp.guest_id||rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0}));
     const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
     if(rdGroups[0]){
-      const userGroup=(rdGroups.find(g=>currentUser&&Array.isArray(g.player_ids)&&(g.player_ids||[]).some(pid=>normaliseId(pid)===normaliseId(currentUser.id)))||rdGroups[0]);
-      const canScore=userCanScoreRound(currentUser,userGroup,rps);
+      const canScore=userCanScoreRound(currentUser,rdGroups[0],rps);
       let local={};
       try{local=JSON.parse(localStorage.getItem('scores_'+rd.id)||'{}')||{};}catch(e){local={};}
       const{data:dbScores}=await sb.from('cup_scores').select('*').eq('round_id',rd.id);
@@ -1121,30 +1108,20 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   },[]);
 
   function addP(person){
-    const flat=groupSetup.flat();
-    if(flat.find(p=>normaliseId(p.id)===normaliseId(person.id))){flash('Already added');return;}
-    const idx=Math.max(0,Math.min(pickerGroup,groupSetup.length-1));
-    const next=groupSetup.map(g=>[...g]);
-    next[idx].push({...person,playing_handicap:person.current_handicap||person.handicap||0});
-    syncGroups(next);
+    if(participants.find(p=>p.id===person.id)){flash('Already added');return;}
+    const groupNumber=Math.max(1,Math.min(setupGroupCount||1,person.group_number||activeSetupGroup||1));
+    const groupSize=participants.filter(p=>(p.group_number||1)===groupNumber).length;
+    if(groupSize>=4){flash(groupLabelFromNumber(groupNumber)+' already has 4 players','error');return;}
+    setParticipants(prev=>[...prev,{...person,playing_handicap:person.current_handicap||person.handicap||0,group_number:groupNumber}]);
     setShowPicker(false);
-  }
-  function removeFromGroup(groupIdx,playerId){
-    const next=groupSetup.map((g,i)=>i===groupIdx?g.filter(p=>normaliseId(p.id)!==normaliseId(playerId)):[...g]);
-    syncGroups(next);
-  }
-  function updateGroupHandicap(groupIdx,playerId,value){
-    const next=groupSetup.map((g,i)=>i===groupIdx?g.map(p=>normaliseId(p.id)===normaliseId(playerId)?{...p,playing_handicap:parseFloat(value)||0}:p):[...g]);
-    syncGroups(next);
   }
 
     // ---------------------------------------------------------
   // Start round / create Supabase round records
   // ---------------------------------------------------------
   async function startRound(){
-    const allParticipants=groupSetup.flat();
     if(!setup.course_id){flash('Pick a course','error');return;}
-    if(allParticipants.length===0){flash('Add players','error');return;}
+    if(participants.length===0){flash('Add players','error');return;}
     setSaving(true);
     try{
       const course=courses.find(co=>co.id===setup.course_id)||findCourseForTee(courses,setup.course_name,setup.tee);
@@ -1153,16 +1130,16 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
       const courseBaseName=getCourseDisplayName(course)||setup.course_name;
       const roundName=setup.name||creatorName||(courseBaseName+' - '+today)||'Round';
       const joinCode=Math.random().toString(36).substring(2,6).toUpperCase();
-      const playerIds=allParticipants.map(p=>p.id);
+      const playerIds=participants.map(p=>p.id);
       const playingHcps={};
-      allParticipants.forEach(p=>{playingHcps[p.id]=p.playing_handicap||0;});
+      participants.forEach(p=>{playingHcps[p.id]=p.playing_handicap||0;});
 
       const{data:rd}=await sb.from('cup_rounds').insert({
         name:roundName,course_id:(course&&course.id)||setup.course_id,course_name:courseBaseName||'',
         status:'live',tee:setup.tee,day_number:1,join_code:joinCode,is_private:setup.is_private||false,
       }).select().single();
 
-      const groupBuckets=groupSetup.map(g=>g.filter(Boolean)).filter(g=>g.length>0);
+      const groupBuckets=splitIntoGolfGroups(participants,playerRange).filter(bucket=>bucket.length>0);
       const groupRows=groupBuckets.map((bucket,idx)=>({
         round_id:rd.id,
         group_number:idx+1,
@@ -1172,7 +1149,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
       const{data:createdGroups,error:groupErr}=await sb.from('cup_groups').insert(groupRows).select();
       if(groupErr)throw groupErr;
 
-      for(const p of allParticipants){
+      for(const p of participants){
         await sb.from('cup_round_players').upsert({
           round_id:rd.id,
           [p.is_guest?'guest_id':'user_id']:p.id,
@@ -1182,7 +1159,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
         });
       }
 
-      const po=allParticipants.map(p=>({
+      const po=participants.map(p=>({
         id:p.id,name:p.display_name||p.name,display_name:p.display_name||p.name,
         current_handicap:p.playing_handicap||0,handicap:p.playing_handicap||0,
       }));
@@ -1225,7 +1202,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
         <div style={{padding:16}}>
           <div style={{fontSize:13,color:'#90ccf0',marginBottom:12}}>This sets up the day and creates the live overall leaderboard between groups.</div>
           {options.map(o=>(
-            <div key={o.key} onClick={()=>{setPlayerRange(o.key);resetGroupsForRange(o.key);setStep('setup');}} style={{...S.card,marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+            <div key={o.key} onClick={()=>{setPlayerRange(o.key);setActiveSetupGroup(1);setParticipants([]);setStep('setup');}} style={{...S.card,marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
               <div>
                 <div style={{fontSize:18,color:'#fff',fontWeight:800}}>{o.title}</div>
                 <div style={{fontSize:12,color:'#60b8f0',marginTop:2}}>{o.sub}</div>
@@ -1274,34 +1251,36 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
               <div style={{position:'absolute',top:3,left:setup.is_private?22:3,width:22,height:22,borderRadius:'50%',background:'#fff',transition:'left 0.2s'}}/>
             </div>
           </div>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-            <label style={{...S.lbl,margin:0}}>Groups ({participants.length} players)</label>
-          </div>
-          {currentUser&&!participants.find(p=>normaliseId(p.id)===normaliseId(currentUser.id))&&(
-            <button onClick={()=>{setPickerGroup(0);addP({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap});}} style={{...S.gho,width:'100%',marginBottom:10,fontSize:13}}>
-              + Add yourself to Group A
-            </button>
-          )}
-          <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:12}}>
-            {groupSetup.map((bucket,groupIdx)=>(
-              <div key={groupIdx} style={{...S.card,background:'rgba(255,255,255,0.04)',borderColor:'rgba(255,255,255,0.1)'}}>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:8}}>
-                  <div style={{display:'flex',alignItems:'center',gap:8}}>
-                    <span style={{width:10,height:10,borderRadius:'50%',background:groupColour(groupIdx+1),display:'inline-block'}}></span>
-                    <div style={{fontSize:16,color:'#fff',fontWeight:900}}>Group {groupLetter(groupIdx+1)}</div>
+          <div style={{...S.card,marginTop:4,marginBottom:12,background:'rgba(255,255,255,0.04)'}}>
+            <div style={{fontSize:12,color:'#60b8f0',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:10}}>Groups</div>
+            <div style={{fontSize:12,color:'rgba(255,255,255,0.55)',marginBottom:12}}>Add players into the correct group before starting. These groups feed the live overall leaderboard.</div>
+            {Array.from({length:setupGroupCount},(_,idx)=>{
+              const groupNumber=idx+1;
+              const bucket=setupGroups[idx]||[];
+              return (
+                <div key={groupNumber} style={{marginBottom:12,padding:10,borderRadius:12,border:'1px solid rgba(255,255,255,0.08)',background:activeSetupGroup===groupNumber?'rgba(96,184,240,0.08)':'rgba(0,0,0,0.08)'}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:8}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      <span style={{width:10,height:10,borderRadius:'50%',background:groupColour(idx),display:'inline-block'}}></span>
+                      <div style={{fontSize:15,color:'#fff',fontWeight:900}}>{groupLabelFromNumber(groupNumber)}</div>
+                      <div style={{fontSize:11,color:'rgba(255,255,255,0.45)'}}>{bucket.length}/4</div>
+                    </div>
+                    <button onClick={()=>{setActiveSetupGroup(groupNumber);setShowPicker(true);}} style={{...S.pri,padding:'6px 10px',fontSize:12,opacity:bucket.length>=4?0.45:1}} disabled={bucket.length>=4}>+ Add</button>
                   </div>
-                  <button onClick={()=>{setPickerGroup(groupIdx);setShowPicker(true);}} style={{...S.pri,padding:'6px 12px',fontSize:12}}>+ Add</button>
+                  {currentUser&&!participants.find(p=>p.id===currentUser.id)&&(
+                    <button onClick={()=>{setActiveSetupGroup(groupNumber);addP({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap,group_number:groupNumber});}} style={{...S.gho,width:'100%',marginBottom:8,fontSize:13}}>+ Add yourself to {groupLabelFromNumber(groupNumber)}</button>
+                  )}
+                  {bucket.length===0&&<div style={{fontSize:12,color:'rgba(255,255,255,0.38)',padding:'8px 0'}}>No players added yet</div>}
+                  {bucket.map(p=>(
+                    <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,padding:'9px 10px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
+                      <div style={{flex:1,fontSize:14,color:'#fff',fontWeight:700}}>{p.display_name||p.name}</div>
+                      <input type="number" value={p.playing_handicap} onChange={e=>setParticipants(prev=>prev.map(pp=>pp.id===p.id?{...pp,playing_handicap:parseFloat(e.target.value)||0}:pp))} style={{...S.inp,width:60,padding:'4px 8px',fontSize:13,textAlign:'center'}}/>
+                      <button onClick={()=>setParticipants(prev=>prev.filter(pp=>pp.id!==p.id))} style={{...S.dan,padding:'4px 10px',fontSize:12}}>x</button>
+                    </div>
+                  ))}
                 </div>
-                {bucket.length===0&&<div style={{fontSize:12,color:'rgba(255,255,255,0.45)',padding:'8px 0'}}>No players added yet</div>}
-                {bucket.map(p=>(
-                  <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,marginTop:8,padding:'10px 12px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
-                    <div style={{flex:1,fontSize:14,color:'#fff',fontWeight:700}}>{p.display_name||p.name}</div>
-                    <input type="number" value={p.playing_handicap} onChange={e=>updateGroupHandicap(groupIdx,p.id,e.target.value)} style={{...S.inp,width:60,padding:'4px 8px',fontSize:13,textAlign:'center'}}/>
-                    <button onClick={()=>removeFromGroup(groupIdx,p.id)} style={{...S.dan,padding:'4px 10px',fontSize:12}}>x</button>
-                  </div>
-                ))}
-              </div>
-            ))}
+              );
+            })}
           </div>
           <button onClick={startRound} disabled={saving||!setup.course_id} style={{...S.pri,width:'100%',padding:14,fontSize:15,marginTop:12,opacity:saving||!setup.course_id?0.5:1}}>
             {saving?'Starting...':'Start Round - Go Live!'}
@@ -1369,20 +1348,16 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
 function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeScores,setHoleScores,currentUser}){
   const course=courses.find(co=>co.id===round.course_id);
   const holes=course&&course.holes&&course.holes.length>0?course.holes:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1,yards:0}));
-  const[allGroups,setAllGroups]=useState(group?[group]:[]);
-  const[allRoundPlayers,setAllRoundPlayers]=useState((group&&group.participants)||[]);
-  const[activeGroupId,setActiveGroupId]=useState(group&&group.id?group.id:'leaderboard');
-  const activeScoreGroup=activeGroupId==='leaderboard'?null:(allGroups.find(g=>normaliseId(g.id)===normaliseId(activeGroupId))||group||allGroups[0]||{});
-  const playingHcps=activeScoreGroup&&activeScoreGroup.playing_handicaps||{};
-  const participants=activeScoreGroup&&activeScoreGroup.participants||[];
-  const grpPlayers=participants.length>0?participants:(activeScoreGroup&&activeScoreGroup.player_ids||[]).map(id=>{
-    const p=allRoundPlayers.find(pl=>normaliseId(pl.id)===normaliseId(id))||players.find(pl=>normaliseId(pl.id)===normaliseId(id));
+  const playingHcps=group&&group.playing_handicaps||{};
+  const participants=group&&group.participants||[];
+  const grpPlayers=participants.length>0?participants:(group&&group.player_ids||[]).map(id=>{
+    const p=players.find(pl=>pl.id===id);
     return p||{id,name:'Player',display_name:'Player',current_handicap:playingHcps[id]||0};
   });
 
   // Determine if current user can edit
-  const playerIds=(activeScoreGroup&&activeScoreGroup.player_ids)||grpPlayers.map(p=>p.id);
-  const canEdit=activeGroupId!=='leaderboard'&&!round._spectator&&isLiveRound(round)&&currentUser&&(playerIds.some(id=>normaliseId(id)===normaliseId(currentUser.id))||grpPlayers.some(p=>normaliseId(p.id)===normaliseId(currentUser.id)));
+  const playerIds=(group&&group.player_ids)||grpPlayers.map(p=>p.id);
+  const canEdit=!round._spectator&&isLiveRound(round)&&currentUser&&(playerIds.includes(currentUser.id)||grpPlayers.some(p=>p.id===currentUser.id));
 
   const[saving,setSaving]=useState(false);
   const[cloudStatus,setCloudStatus]=useState('');
@@ -1397,6 +1372,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   const[showOverall,setShowOverall]=useState(false);
   const[overallPlayers,setOverallPlayers]=useState([]);
   const[overallScores,setOverallScores]=useState([]);
+  const[overallGroups,setOverallGroups]=useState([]);
 
     // ---------------------------------------------------------
   // Score loading / hydration
@@ -1414,42 +1390,6 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     // Then load from Supabase (authoritative)
     refreshScoresFromCloud(false);
   },[round&&round.id]);
-
-  useEffect(()=>{
-    if(!round||!round.id)return;
-    let alive=true;
-    async function loadRoundGroups(){
-      try{
-        const [{data:grps},{data:rps},{data:scs}]=await Promise.all([
-          sb.from('cup_groups').select('*').eq('round_id',round.id).order('group_number',{ascending:true}),
-          sb.from('cup_round_players').select('*').eq('round_id',round.id),
-          sb.from('cup_scores').select('*').eq('round_id',round.id)
-        ]);
-        if(!alive)return;
-        const people=(rps||[]).map(rp=>({
-          id:rp.user_id||rp.guest_id||rp.id,
-          name:rp.display_name||'Player',
-          display_name:rp.display_name||'Player',
-          current_handicap:rp.playing_handicap||0,
-          handicap:rp.playing_handicap||0,
-          playing_handicap:rp.playing_handicap||0
-        }));
-        const normalised=(grps&&grps.length?grps:[group]).filter(Boolean).map((g,idx)=>{
-          const ids=(g.player_ids||[]).map(normaliseId);
-          return {...g,group_number:g.group_number||idx+1,participants:people.filter(p=>ids.includes(normaliseId(p.id))),playing_handicaps:g.playing_handicaps||{}};
-        });
-        setAllRoundPlayers(people);
-        setAllGroups(normalised);
-        setOverallPlayers(people.map(p=>({id:p.id,name:p.display_name||p.name,playing_handicap:p.playing_handicap||0})));
-        setOverallScores(scs||[]);
-        const userGrp=normalised.find(g=>currentUser&&(g.player_ids||[]).some(id=>normaliseId(id)===normaliseId(currentUser.id)));
-        if(userGrp)setActiveGroupId(userGrp.id);
-        else if(!group||round._spectator)setActiveGroupId('leaderboard');
-      }catch(e){/* keep current group if loading extra tabs fails */}
-    }
-    loadRoundGroups();
-    return()=>{alive=false;};
-  },[round&&round.id,currentUser&&currentUser.id]);
 
   async function refreshScoresFromCloud(showMessage=true){
     if(!round||!round.id||refreshing)return;
@@ -1476,21 +1416,24 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     }
   }
 
-  async function openOverallLeaderboard(openModal=true){
+  async function openOverallLeaderboard(){
     try{
-      const [{data:rps,error:rpErr},{data:scs,error:scErr}]=await Promise.all([
+      const [{data:rps,error:rpErr},{data:scs,error:scErr},{data:grps,error:grpErr}]=await Promise.all([
         sb.from('cup_round_players').select('*').eq('round_id',round.id),
-        sb.from('cup_scores').select('*').eq('round_id',round.id)
+        sb.from('cup_scores').select('*').eq('round_id',round.id),
+        sb.from('cup_groups').select('*').eq('round_id',round.id).order('group_number',{ascending:true})
       ]);
       if(rpErr)throw rpErr;
       if(scErr)throw scErr;
+      if(grpErr)throw grpErr;
       setOverallPlayers((rps||[]).map(rp=>({
         id:rp.user_id||rp.guest_id||rp.id,
         name:rp.display_name||'Player',
         playing_handicap:rp.playing_handicap||0
       })));
       setOverallScores(scs||[]);
-      if(openModal)setShowOverall(true);
+      setOverallGroups(grps||[]);
+      setShowOverall(true);
     }catch(e){
       flash('Leaderboard failed: '+(e.message||String(e)),'error');
     }
@@ -1498,7 +1441,6 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   function overallLeaderboardRows(){
     const playerMap={};
     (overallPlayers.length?overallPlayers:grpPlayers).forEach(p=>{playerMap[p.id]=p;});
-    (allGroups||[]).forEach((g,idx)=>{(g.player_ids||[]).forEach(pid=>{const key=normaliseId(pid); if(playerMap[key])playerMap[key]={...playerMap[key],groupNumber:g.group_number||idx+1};});});
     const scoreRows=overallScores.length?overallScores:Object.keys(holeScores||{}).flatMap(h=>Object.keys(holeScores[h]||{}).map(pid=>{
       const gross=holeScores[h][pid];
       const hd=getHole(parseInt(h));
@@ -1515,12 +1457,16 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
       if(!holesPlayed[pid])holesPlayed[pid]=new Set();
       if(s.hole_number)holesPlayed[pid].add(Number(s.hole_number));
     });
+    function playerGroupNumber(pid){
+      const g=(overallGroups||[]).find(gr=>Array.isArray(gr.player_ids)&&gr.player_ids.includes(pid));
+      return g?g.group_number:((group&&Array.isArray(group.player_ids)&&group.player_ids.includes(pid))?group.group_number:1);
+    }
     return Object.keys(totals).map(pid=>({
       id:pid,
       name:(playerMap[pid]&&playerMap[pid].name)||'Player',
-      groupNumber:(playerMap[pid]&&playerMap[pid].groupNumber)||1,
       total:totals[pid]||0,
-      holes:holesPlayed[pid]?holesPlayed[pid].size:0
+      holes:holesPlayed[pid]?holesPlayed[pid].size:0,
+      groupNumber:playerGroupNumber(pid)
     })).sort((a,b)=>b.total-a.total||b.holes-a.holes);
   }
 
@@ -1841,6 +1787,47 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     );
   }
 
+  if(showOverall){
+    const rows=overallLeaderboardRows();
+    return (
+      <div style={{minHeight:'100vh',paddingBottom:40}}>
+        <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
+          <button onClick={()=>setShowOverall(false)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button>
+          <div style={{flex:1}}>
+            <div style={{fontSize:17,color:'#fff',fontWeight:900}}>Overall Leaderboard</div>
+            <div style={{fontSize:11,color:'#60b8f0'}}>All groups in this round</div>
+          </div>
+          <button onClick={openOverallLeaderboard} style={{...S.pri,padding:'7px 10px',fontSize:12}}>{refreshing?'Refreshing...':'Refresh'}</button>
+        </div>
+        <div style={{padding:16}}>
+          <div style={{display:'flex',gap:8,overflowX:'auto',marginBottom:12,paddingBottom:2}}>
+            {(overallGroups.length?overallGroups:[group]).filter(Boolean).map((g,idx)=>(
+              <div key={g.id||idx} style={{display:'flex',alignItems:'center',gap:6,padding:'6px 9px',borderRadius:999,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.08)',flexShrink:0}}>
+                <span style={{width:9,height:9,borderRadius:'50%',background:groupColour((g.group_number||idx+1)-1),display:'inline-block'}}></span>
+                <span style={{fontSize:12,color:'#fff',fontWeight:800}}>{groupLabelFromNumber(g.group_number||idx+1)}</span>
+              </div>
+            ))}
+          </div>
+          {rows.map((r,idx)=>(
+            <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'11px 12px',background:idx===0?'rgba(184,134,11,0.15)':'rgba(255,255,255,0.06)',border:'1px solid '+(idx===0?'rgba(184,134,11,0.3)':'rgba(255,255,255,0.08)'),borderRadius:14,marginBottom:9}}>
+              <div style={{width:28,textAlign:'center',fontSize:18,color:idx===0?'#fbbf24':'rgba(255,255,255,0.48)',fontWeight:900}}>{idx+1}</div>
+              <div style={{width:4,alignSelf:'stretch',borderRadius:999,background:groupColour((r.groupNumber||1)-1)}}></div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:16,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</div>
+                <div style={{fontSize:11,color:'#60b8f0'}}>{groupLabelFromNumber(r.groupNumber)} · Thru {r.holes}</div>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:30,color:'#fff',fontWeight:900,lineHeight:1}}>{r.total}</div>
+                <div style={{fontSize:9,color:'#60b8f0',letterSpacing:'0.12em'}}>PTS</div>
+              </div>
+            </div>
+          ))}
+          {rows.length===0&&<div style={{...S.card,textAlign:'center',color:'rgba(255,255,255,0.55)'}}>No scores yet</div>}
+        </div>
+      </div>
+    );
+  }
+
   if(showEnd){
     if(endStep===0)return(
       <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)',paddingBottom:40}}>
@@ -2017,21 +2004,13 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             <span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap',textTransform:'capitalize'}}>{round.tee||'White'} tee</span>
           </div>
         )}
-        <div style={{display:'flex',gap:6,padding:'7px 12px',overflowX:'auto',borderTop:'1px solid rgba(255,255,255,0.08)',background:'rgba(0,0,0,0.16)'}}>
-          <button onClick={()=>{setActiveGroupId('leaderboard');openOverallLeaderboard(false);}} style={{border:'1px solid '+(activeGroupId==='leaderboard'?'rgba(96,184,240,0.8)':'rgba(255,255,255,0.14)'),background:activeGroupId==='leaderboard'?'rgba(96,184,240,0.22)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:999,padding:'7px 12px',fontSize:12,fontWeight:900,whiteSpace:'nowrap',flexShrink:0}}>Leaderboard</button>
-          {allGroups.map((g,idx)=>(
-            <button key={g.id||idx} onClick={()=>setActiveGroupId(g.id)} style={{border:'1px solid '+(normaliseId(activeGroupId)===normaliseId(g.id)?groupColour(g.group_number||idx+1):'rgba(255,255,255,0.14)'),background:normaliseId(activeGroupId)===normaliseId(g.id)?'rgba(255,255,255,0.14)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:999,padding:'7px 12px',fontSize:12,fontWeight:900,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
-              <span style={{width:8,height:8,borderRadius:'50%',background:groupColour(g.group_number||idx+1),display:'inline-block'}}></span> Group {groupLetter(g.group_number||idx+1)}
-            </button>
-          ))}
-        </div>
-        {activeGroupId!=='leaderboard'&&<div style={{display:'flex',gap:4,padding:'6px 12px',overflowX:'auto'}}>
+        <div style={{display:'flex',gap:4,padding:'6px 12px',overflowX:'auto'}}>
           {holes.map(h=>{
             const done=grpPlayers.every(p=>(holeScores[h.hole]||{})[p.id]!==undefined);
             return <div key={h.hole} style={{minWidth:32,height:32,borderRadius:6,background:done?'#0070BB':'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:done?'#fff':'#60b8f0',flexShrink:0}}>{h.hole}</div>;
           })}
-        </div>}
-        {activeGroupId!=='leaderboard'&&<div style={{display:'grid',gridTemplateColumns:'80px '+grpPlayers.map(()=>'1fr').join(' '),padding:'4px 12px',borderTop:'1px solid rgba(255,255,255,0.1)',background:'rgba(0,50,120,0.4)',gap:6,alignItems:'center'}}>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'80px '+grpPlayers.map(()=>'1fr').join(' '),padding:'4px 12px',borderTop:'1px solid rgba(255,255,255,0.1)',background:'rgba(0,50,120,0.4)',gap:6,alignItems:'center'}}>
           <div style={{fontSize:9,color:'#60b8f0',textTransform:'uppercase',letterSpacing:'0.08em'}}>Hole</div>
           {grpPlayers.map(p=>(
             <div key={p.id} style={{textAlign:'center',padding:'3px 0'}}>
@@ -2039,30 +2018,8 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
               <div style={{fontSize:10,color:'#90ccf0',fontWeight:700}}>HCP {playingHcps[p.id]||0}</div>
             </div>
           ))}
-        </div>}
-      </div>
-
-      {activeGroupId==='leaderboard' ? <div style={{padding:16}}>
-        <div style={{...S.card,background:'rgba(0,112,187,0.10)',borderColor:'rgba(96,184,240,0.24)',marginBottom:12}}>
-          <div style={{fontSize:22,color:'#fff',fontWeight:900}}>Live Leaderboard</div>
-          <div style={{fontSize:12,color:'#90ccf0',marginTop:3}}>All groups in this round</div>
         </div>
-        <button onClick={()=>openOverallLeaderboard(false)} style={{...S.pri,width:'100%',marginBottom:12,fontSize:13}}>Refresh leaderboard</button>
-        {overallLeaderboardRows().map((r,idx)=>(
-          <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'12px',background:idx===0?'rgba(184,134,11,0.15)':'rgba(255,255,255,0.06)',border:'1px solid '+(idx===0?'rgba(184,134,11,0.3)':'rgba(255,255,255,0.08)'),borderRadius:14,marginBottom:8}}>
-            <div style={{width:30,textAlign:'center',fontSize:19,color:idx===0?'#fbbf24':'rgba(255,255,255,0.55)',fontWeight:900}}>{idx+1}</div>
-            <div style={{width:10,height:10,borderRadius:'50%',background:groupColour(r.groupNumber||1),flexShrink:0}}></div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:16,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</div>
-              <div style={{fontSize:11,color:'#90ccf0'}}>Group {groupLetter(r.groupNumber||1)} · thru {r.holes}</div>
-            </div>
-            <div style={{textAlign:'right'}}>
-              <div style={{fontSize:28,color:'#fff',fontWeight:900,lineHeight:1}}>{r.total}</div>
-              <div style={{fontSize:9,color:'#60b8f0',letterSpacing:'0.12em'}}>PTS</div>
-            </div>
-          </div>
-        ))}
-      </div> : <>
+      </div>
 
       <div style={{padding:'6px 14px',fontSize:11,color:'rgba(144,204,240,0.75)',borderBottom:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.14)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
         <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{refreshing?'Refreshing latest scores...':lastRefreshed?'Last updated '+lastRefreshed:'Tap refresh for latest scores'}</span>
@@ -2179,35 +2136,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         {!canEdit&&<div style={{textAlign:'center',padding:'10px',fontSize:12,color:'rgba(255,255,255,0.3)'}}>{isCompletedRound(round)?'Completed round - view only':'View only - sign in as a player to score'}</div>}
       </div>
 
-      </>}
 
-      {showOverall&&(
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.78)',zIndex:9998,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={e=>{if(e.target===e.currentTarget)setShowOverall(false);}}>
-          <div style={{width:'100%',maxWidth:520,maxHeight:'82vh',overflowY:'auto',background:'#0d2548',borderTop:'1px solid rgba(255,255,255,0.16)',borderRadius:'18px 18px 0 0',padding:16}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-              <div>
-                <div style={{fontSize:18,color:'#fff',fontWeight:800}}>Overall Leaderboard</div>
-                <div style={{fontSize:12,color:'#60b8f0'}}>All groups in this round</div>
-              </div>
-              <button onClick={()=>setShowOverall(false)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Close</button>
-            </div>
-            <button onClick={()=>openOverallLeaderboard(false)} style={{...S.pri,width:'100%',marginBottom:12,fontSize:13}}>Refresh leaderboard</button>
-            {overallLeaderboardRows().map((r,idx)=>(
-              <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:idx===0?'rgba(184,134,11,0.15)':'rgba(255,255,255,0.06)',border:'1px solid '+(idx===0?'rgba(184,134,11,0.3)':'rgba(255,255,255,0.08)'),borderRadius:12,marginBottom:8}}>
-                <div style={{width:28,textAlign:'center',fontSize:18,color:idx===0?'#fbbf24':'rgba(255,255,255,0.48)',fontWeight:900}}>{idx+1}</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:15,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</div>
-                  <div style={{fontSize:11,color:'#60b8f0'}}>Thru {r.holes}</div>
-                </div>
-                <div style={{textAlign:'right'}}>
-                  <div style={{fontSize:28,color:'#fff',fontWeight:900,lineHeight:1}}>{r.total}</div>
-                  <div style={{fontSize:9,color:'#60b8f0',letterSpacing:'0.12em'}}>PTS</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
       <ScoreInput/>
     </div>
   );
