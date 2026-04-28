@@ -9,7 +9,7 @@ const{useState,useEffect,useRef}=React;
 const SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 const ADMIN_PW='admin2025';
-// GolfCourseAPI removed from the live frontend in v45; v55 uses safe course presets and badges.
+// GolfCourseAPI removed from the live frontend in v45; v56 uses safe course presets and badges.
 // Course data should be added manually or imported later through a safer backend/admin workflow.
 // =========================================================
 // Supabase client setup
@@ -1266,8 +1266,8 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   const[lastRefreshed,setLastRefreshed]=useState('');
   const[pullDistance,setPullDistance]=useState(0);
   const pullStartY=useRef(null);
-  const PULL_REFRESH_THRESHOLD=105;
-  const PULL_REFRESH_MAX=130;
+  const PULL_REFRESH_THRESHOLD=170;
+  const PULL_REFRESH_MAX=210;
   const[showReview,setShowReview]=useState(false);
   const[showEnd,setShowEnd]=useState(false);
   const[endStep,setEndStep]=useState(0);
@@ -1319,8 +1319,9 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   }
 
   function handlePullStart(e){
-    if(window.scrollY<=2&&!inputHole){
-      pullStartY.current=e.touches&&e.touches[0]?e.touches[0].clientY:null;
+    const y=e.touches&&e.touches[0]?e.touches[0].clientY:null;
+    if(window.scrollY<=2&&!inputHole&&y!==null&&y<120){
+      pullStartY.current=y;
     }
   }
   function handlePullMove(e){
@@ -1331,7 +1332,6 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     if(dy>0&&window.scrollY<=2){
       const dist=Math.min(PULL_REFRESH_MAX,dy);
       setPullDistance(dist);
-      if(dy>35&&e.cancelable)e.preventDefault();
     }
   }
   function handlePullEnd(){
@@ -1788,7 +1788,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   const f9complete=front9.every(hd=>grpPlayers.every(p=>(holeScores[hd.hole]||{})[p.id]!==undefined));
 
   return(
-    <div onTouchStart={handlePullStart} onTouchMove={handlePullMove} onTouchEnd={handlePullEnd} style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)',overscrollBehaviorY:'contain',overflowX:'hidden',touchAction:inputHole?'none':'pan-y'}}>
+    <div onTouchStart={handlePullStart} onTouchMove={handlePullMove} onTouchEnd={handlePullEnd} style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)',overflowX:'hidden',touchAction:inputHole?'none':'pan-y'}}>
       {(refreshing||pullDistance>8)&&(
         <div style={{position:'fixed',top:8,left:'50%',transform:'translateX(-50%)',zIndex:9998,padding:'7px 12px',borderRadius:999,background:'rgba(10,31,61,0.95)',border:'1px solid rgba(96,184,240,0.35)',color:'#90ccf0',fontSize:12,boxShadow:'0 8px 20px rgba(0,0,0,0.25)'}}>
           {refreshing?'Refreshing scores...':pullDistance>=PULL_REFRESH_THRESHOLD?'Release to refresh':'Pull further to refresh'}
@@ -1839,8 +1839,9 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         </div>
       </div>
 
-      <div style={{padding:'6px 14px',fontSize:11,color:'rgba(144,204,240,0.75)',textAlign:'center',borderBottom:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.14)'}}>
-        {refreshing?'Refreshing latest scores...':lastRefreshed?'Last updated '+lastRefreshed+' · pull down to refresh':'Pull down to refresh scores'}
+      <div style={{padding:'6px 14px',fontSize:11,color:'rgba(144,204,240,0.75)',borderBottom:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.14)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+        <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{refreshing?'Refreshing latest scores...':lastRefreshed?'Last updated '+lastRefreshed:'Pull down further or tap refresh for latest scores'}</span>
+        <button onClick={()=>refreshScoresFromCloud(true)} disabled={refreshing} style={{border:'1px solid rgba(96,184,240,0.35)',background:'rgba(0,112,187,0.22)',color:'#90ccf0',borderRadius:999,padding:'5px 10px',fontSize:11,fontWeight:700,flexShrink:0,opacity:refreshing?0.6:1}}>Refresh</button>
       </div>
 
       {/* Spectator live leaderboard */}
