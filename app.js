@@ -1,4 +1,4 @@
-// SNYDER LIVE v69
+// SNYDER LIVE v70
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2649,6 +2649,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   const navyPlayers=cupPlayers.filter(p=>p.team_key==='navy');
   const days=(cupDays||[]).filter(d=>cup&&d.cup_id===cup.id).sort((a,b)=>(a.day_number||0)-(b.day_number||0));
   const matches=(cupMatches||[]).filter(m=>cup&&m.cup_id===cup.id).sort((a,b)=>(a.day_number||0)-(b.day_number||0)||String(a.match_type||'').localeCompare(String(b.match_type||'')));
+  const matchesByDay=groupCupMatchesByDay(matches,days).filter(group=>group.matches.length);
   const playerKey=p=>p?.id||p?.user_id;
   const availableUsers=(cupUsers||[]);
   async function createCup(){
@@ -2781,9 +2782,9 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
         <button onClick={addMatch} style={{...S.pri,width:'100%',marginTop:10}}>Save Match</button>
       </div>
       <div style={{fontSize:12,color:'#60b8f0',letterSpacing:'0.12em',fontWeight:800,marginBottom:8}}>MATCHES</div>
-      {matches.length===0?<div style={{...S.card,color:'#8ea0ad',fontSize:13}}>No matches yet.</div>:matches.map(m=><div key={m.id} style={{...S.card,marginBottom:8}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><div style={{fontSize:13,color:'#fff',fontWeight:800}}>Day {m.day_number} · {String(m.match_type||'').toUpperCase()}</div><button onClick={()=>deleteMatch(m)} style={{...S.dan,padding:'4px 8px',fontSize:11}}>Delete match</button></div>
-        <CupMatchLine match={m} cupPlayers={cupPlayers} teams={teams} editable={true} onRemove={removeFromMatch}/>
+      {matches.length===0?<div style={{...S.card,color:'#8ea0ad',fontSize:13}}>No matches yet.</div>:matchesByDay.map(group=><div key={group.day} style={{marginBottom:14}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 8px'}}><div style={{fontSize:15,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {group.day}</div><div style={{height:1,background:'rgba(255,255,255,0.12)',flex:1}}/></div>
+        {group.matches.map(m=><CupMatchCard key={m.id} match={m} cupPlayers={cupPlayers} teams={teams} editable={true} onRemove={removeFromMatch} onDelete={deleteMatch}/>)}
       </div>)}
     </div>}
   </div>;
@@ -2797,11 +2798,42 @@ function CupMatchLine({match,cupPlayers,teams,editable,onRemove}){
   };
   return <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}><div>{renderSide('gold',match.gold_player_ids||[])}</div><div style={{fontSize:11,color:'#fff',background:'rgba(255,255,255,0.08)',borderRadius:999,padding:'4px 8px'}}>A/S</div><div style={{textAlign:'right'}}>{renderSide('navy',match.navy_player_ids||[])}</div></div>;
 }
+function groupCupMatchesByDay(matches,cupDays){
+  const dayNums=new Set([...(cupDays||[]).map(d=>parseInt(d.day_number)||1),...(matches||[]).map(m=>parseInt(m.day_number)||1)]);
+  return Array.from(dayNums).sort((a,b)=>a-b).map(day=>({day,matches:(matches||[]).filter(m=>(parseInt(m.day_number)||1)===day)}));
+}
+function CupMatchCard({match,cupPlayers,teams,editable,onRemove,onDelete}){
+  const findPlayer=id=>(cupPlayers||[]).find(p=>p.id===id||p.user_id===id)||null;
+  const type=String(match.match_type||'match').toUpperCase();
+  const goldIds=match.gold_player_ids||[];
+  const navyIds=match.navy_player_ids||[];
+  const totalPlayers=goldIds.length+navyIds.length;
+  const playerChip=(teamKey,id)=>{
+    const p=findPlayer(id);
+    return <div key={teamKey+'-'+id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,border:'1px solid rgba(255,255,255,0.12)',borderRadius:10,padding:'7px 8px',background:'rgba(0,0,0,0.14)',minHeight:34}}>
+      <span style={{fontSize:12,color:teamKey==='gold'?CUP_THEME.gold.accent:CUP_THEME.navy.accent,fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p?.display_name||'Player'}</span>
+      {editable&&<button onClick={()=>onRemove(match,teamKey,id)} style={{...S.dan,padding:'2px 6px',fontSize:10,flexShrink:0}}>x</button>}
+    </div>;
+  };
+  return <div style={{...S.card,marginBottom:8,padding:12,border:'1px solid rgba(255,255,255,0.16)'}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:10}}>
+      <div><div style={{fontSize:11,color:'#60b8f0',fontWeight:900,letterSpacing:'0.12em'}}>{totalPlayers===4?'4 BALL':type}</div><div style={{fontSize:13,color:'#fff',fontWeight:900,marginTop:2}}>{type}</div></div>
+      <div style={{display:'flex',alignItems:'center',gap:7}}><div style={{fontSize:11,color:'#fff',background:'rgba(255,255,255,0.08)',borderRadius:999,padding:'4px 8px',fontWeight:800}}>A/S</div>{editable&&onDelete&&<button onClick={()=>onDelete(match)} style={{...S.dan,padding:'4px 8px',fontSize:11}}>Delete</button>}</div>
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'stretch'}}>
+      <div style={cupTeamStyle('gold',{borderRadius:12,padding:8})}><CupTeamBadge teamKey="gold" label={teams.gold.name}/><div style={{display:'grid',gap:6,marginTop:7}}>{goldIds.length?goldIds.map(id=>playerChip('gold',id)):<div style={{fontSize:12,color:'#8ea0ad',fontWeight:800}}>Empty slot</div>}</div></div>
+      <div style={{display:'flex',alignItems:'center',fontSize:12,color:'#fff',fontWeight:900}}>v</div>
+      <div style={cupTeamStyle('navy',{borderRadius:12,padding:8})}><CupTeamBadge teamKey="navy" label={teams.navy.name}/><div style={{display:'grid',gap:6,marginTop:7}}>{navyIds.length?navyIds.map(id=>playerChip('navy',id)):<div style={{fontSize:12,color:'#8ea0ad',fontWeight:800}}>Empty slot</div>}</div></div>
+    </div>
+  </div>;
+}
 function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,flash,setView,load,activeComp,selectedComp,setSelectedComp,currentUser,isAdmin,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}){
   const cup=(cupEvents||[])[0];
   const teams=cup?getCupTeams(cup,cupTeams):null;
   const playersInCup=(cupEventPlayers||[]).filter(p=>cup&&p.cup_id===cup.id);
   const matches=(cupMatches||[]).filter(m=>cup&&m.cup_id===cup.id);
+  const days=(cupDays||[]).filter(d=>cup&&d.cup_id===cup.id);
+  const matchesByDay=groupCupMatchesByDay(matches,days).filter(group=>group.matches.length);
   const goldPts=matches.reduce((a,m)=>a+(m.gold_points||0),0);
   const navyPts=matches.reduce((a,m)=>a+(m.navy_points||0),0);
   const leading=goldPts>navyPts?'gold':navyPts>goldPts?'navy':'tie';
@@ -2813,7 +2845,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
           <div style={{fontSize:12,color:'#a8c4d8',letterSpacing:'0.18em',fontWeight:800}}>LIVE CUP SCORE</div><div style={{fontSize:26,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",margin:'8px 0'}}>{cup.name}</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:12,alignItems:'center'}}><div style={{textAlign:'center'}}><CupTeamBadge teamKey="gold" label={teams.gold.name}/><div style={{fontSize:42,color:CUP_THEME.gold.accent,fontWeight:900}}>{goldPts}</div></div><div style={{fontSize:20,color:'#fff',fontWeight:900}}>v</div><div style={{textAlign:'center'}}><CupTeamBadge teamKey="navy" label={teams.navy.name}/><div style={{fontSize:42,color:CUP_THEME.navy.accent,fontWeight:900}}>{navyPts}</div></div></div>
         </div>
-        <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>MATCHES</div>{matches.length===0?<div style={{...S.card,color:'#8ea0ad',fontSize:13}}>Matches will appear here once admin adds them.</div>:matches.map(m=><div key={m.id} style={{...S.card,marginBottom:8}}><div style={{fontSize:11,color:'#60b8f0',marginBottom:7}}>Day {m.day_number} · {String(m.match_type||'').toUpperCase()}</div><CupMatchLine match={m} cupPlayers={playersInCup} teams={teams}/></div>)}
+        <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>MATCHES</div>{matches.length===0?<div style={{...S.card,color:'#8ea0ad',fontSize:13}}>Matches will appear here once admin adds them.</div>:matchesByDay.map(group=><div key={group.day} style={{marginBottom:14}}><div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 8px'}}><div style={{fontSize:15,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {group.day}</div><div style={{height:1,background:'rgba(255,255,255,0.12)',flex:1}}/></div>{group.matches.map(m=><CupMatchCard key={m.id} match={m} cupPlayers={playersInCup} teams={teams}/>)}</div>)}
         <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'18px 0 8px'}}>SINGLES STABLEFORD</div><div style={{...S.card,color:'#8ea0ad',fontSize:13}}>This leaderboard will use the existing Snyder Live scoring once Cup matches are linked to rounds.</div>
       </>}
     </div>
