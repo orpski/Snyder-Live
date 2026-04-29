@@ -733,8 +733,8 @@ function App(){
           <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>SCORES</div>
         </button>
         <button onClick={()=>setView('tournaments')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
-          <div style={{fontSize:18,marginBottom:1}}>C</div>
-          <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>CUP</div>
+          <div style={{fontSize:18,marginBottom:1,color:'#D4AF37',fontWeight:900}}>🏆</div>
+          <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em'}}>CUP</div>
         </button>
         <button onClick={()=>currentUser?setView('profile'):setShowAuth(true)} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
           <div style={{fontSize:18,marginBottom:1}}>P</div>
