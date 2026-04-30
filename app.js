@@ -1,4 +1,4 @@
-// SNYDER LIVE v81
+// SNYDER LIVE v82
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -308,20 +308,40 @@ function UserAuth({onLogin,onClose,initialMode='login',promptTitle,promptText,si
 function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAdded}){
   const[tab,setTab]=useState('search');
   const[search,setSearch]=useState('');
+  const[memberList,setMemberList]=useState(cupUsers||[]);
   const[friends,setFriends]=useState([]);
+  const[refreshingMembers,setRefreshingMembers]=useState(false);
   const[guestName,setGuestName]=useState('');
   const[guestHcp,setGuestHcp]=useState('');
 
   useEffect(()=>{
-    if(!currentUser)return;
-    sb.from('cup_friendships').select('friend_id').eq('user_id',currentUser.id).then(({data})=>{
+    setMemberList(cupUsers||[]);
+  },[cupUsers]);
+
+  useEffect(()=>{
+    loadFriends(memberList);
+  },[currentUser&&currentUser.id,memberList.length]);
+
+  async function loadFriends(users=memberList){
+    if(!currentUser){setFriends([]);return;}
+    const{data}=await sb.from('cup_friendships').select('friend_id').eq('user_id',currentUser.id);
       const ids=(data||[]).map(f=>f.friend_id);
-      setFriends(cupUsers.filter(u=>ids.includes(u.id)));
-    });
-  },[]);
+    setFriends((users||[]).filter(u=>ids.includes(u.id)));
+  }
+
+  async function refreshPlayers(){
+    setRefreshingMembers(true);
+    const{data,error}=await sb.from('cup_users').select('*').order('display_name',{ascending:true});
+    if(error){flash(error.message||'Could not refresh players','error');setRefreshingMembers(false);return;}
+    const users=data||[];
+    setMemberList(users);
+    await loadFriends(users);
+    setRefreshingMembers(false);
+    flash('Players refreshed');
+  }
 
   const searchTerm=search.trim().toLowerCase();
-  const searchRes=searchTerm.length>1?cupUsers.filter(u=>{
+  const searchRes=searchTerm.length>1?memberList.filter(u=>{
     const username=(u.username||'').toLowerCase();
     const displayName=(u.display_name||u.name||'').toLowerCase();
     return u.id!==currentUser?.id&&(username.includes(searchTerm)||displayName.includes(searchTerm));
@@ -359,9 +379,14 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
         </div>
         <div style={{flex:1,overflow:'auto',padding:16}}>
           {tab==='friends'&&(
-            friends.length===0
-              ?<div style={{color:'rgba(255,255,255,0.4)',fontSize:13,textAlign:'center',padding:20}}>No friends yet - use Search tab</div>
-              :friends.map(u=>(
+            <div>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
+                <div style={{fontSize:12,color:'#90ccf0'}}>Refresh if someone has just signed up.</div>
+                <button onClick={refreshPlayers} disabled={refreshingMembers} style={{...S.gho,padding:'6px 10px',fontSize:12,opacity:refreshingMembers?0.6:1}}>{refreshingMembers?'Refreshing...':'Refresh'}</button>
+              </div>
+              {friends.length===0
+                ?<div style={{color:'rgba(255,255,255,0.4)',fontSize:13,textAlign:'center',padding:20}}>No friends yet - use Search tab</div>
+                :friends.map(u=>(
                 <div key={u.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8,padding:'10px 12px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
                   <div>
                     <div style={{fontSize:14,color:'#fff'}}>{u.display_name}</div>
@@ -369,7 +394,8 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
                   </div>
                   <button onClick={()=>onAdd({...u,is_guest:false})} disabled={isAdded(u.id)} style={{...S.pri,padding:'6px 14px',fontSize:12,opacity:isAdded(u.id)?0.4:1}}>{isAdded(u.id)?'Added':'Add'}</button>
                 </div>
-              ))
+              ))}
+            </div>
           )}
           {tab==='search'&&(
             <div>
@@ -663,7 +689,7 @@ function App(){
           ?<button onClick={()=>setView('profile')} style={{background:'none',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
             <Avatar user={currentUser} size={32}/>
           </button>
-          :<button onClick={()=>{setAuthPrompt(null);setShowAuth(true);}} style={{...S.gho,padding:'6px 14px',fontSize:13}}>Sign In</button>
+          :<button onClick={()=>{setAuthPrompt(null);setShowAuth(true);}} style={{...S.pri,padding:'7px 12px',fontSize:12,lineHeight:1.15,boxShadow:'0 6px 18px rgba(0,112,187,0.28)'}}>Sign In / Sign up</button>
         }
       </div>
 
