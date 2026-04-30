@@ -1,4 +1,4 @@
-// SNYDER LIVE v95
+// SNYDER LIVE v96
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1638,20 +1638,10 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
             <label style={{...S.lbl,margin:0}}>{isSingleGroupDay?'Players':'Groups'} ({participants.length} players)</label>
           </div>
-          {currentUser&&!participants.find(p=>normaliseId(p.id)===normaliseId(currentUser.id))&&(
-            isSingleGroupDay ? (
-              <button onClick={()=>addPersonToGroup({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap},0)} style={{...S.gho,width:'100%',marginBottom:10,fontSize:13}}>
-                + Add yourself
-              </button>
-            ) : (
-              <div style={{display:'grid',gridTemplateColumns:`repeat(${groupSetup.length},1fr)`,gap:8,marginBottom:10}}>
-                {groupSetup.map((_,idx)=>(
-                  <button key={idx} onClick={()=>addPersonToGroup({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap},idx)} style={{...S.gho,width:'100%',fontSize:12,padding:'9px 6px'}}>
-                    + Me to {groupLetter(idx+1)}
-                  </button>
-                ))}
-              </div>
-            )
+          {currentUser&&!participants.find(p=>normaliseId(p.id)===normaliseId(currentUser.id))&&isSingleGroupDay&&(
+            <button onClick={()=>addPersonToGroup({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap},0)} style={{...S.gho,width:'100%',marginBottom:10,fontSize:13}}>
+              + Add yourself
+            </button>
           )}
           {isSingleGroupDay ? <div style={{marginBottom:12}}>
             <button onClick={()=>{setPickerGroup(0);setShowPicker(true);}} style={{...S.pri,width:'100%',marginBottom:10,fontSize:13}}>+ Add Player</button>
@@ -1669,7 +1659,13 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
             ))}
           </div> : <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:12}}>
             {groupSetup.map((bucket,groupIdx)=>(
-              <div key={groupIdx} style={{...S.card,background:'rgba(255,255,255,0.04)',borderColor:'rgba(255,255,255,0.1)'}}>
+              <React.Fragment key={groupIdx}>
+                {currentUser&&!participants.find(p=>normaliseId(p.id)===normaliseId(currentUser.id))&&(
+                  <button onClick={()=>addPersonToGroup({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap},groupIdx)} style={{...S.gho,width:'100%',fontSize:13,padding:'10px 12px',marginBottom:0}}>
+                    + Add yourself to Group {groupLetter(groupIdx+1)}
+                  </button>
+                )}
+                <div style={{...S.card,background:'rgba(255,255,255,0.04)',borderColor:'rgba(255,255,255,0.1)'}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:8}}>
                   <div style={{display:'flex',alignItems:'center',gap:8}}>
                     <span style={{width:10,height:10,borderRadius:'50%',background:groupColour(groupIdx+1),display:'inline-block'}}></span>
@@ -1689,7 +1685,8 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
                     <button onClick={()=>removeFromGroup(groupIdx,p.id)} style={{...S.dan,padding:'4px 10px',fontSize:12}}>x</button>
                   </div>
                 ))}
-              </div>
+                </div>
+              </React.Fragment>
             ))}
           </div>}
           {openRoundBlock&&(

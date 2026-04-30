@@ -1,5 +1,5 @@
-// SNYDER LIVE v95 service worker
-const CACHE_NAME = "snyder-live-v95";
+// SNYDER LIVE v96 service worker
+const CACHE_NAME = "snyder-live-v96";
 const ASSETS = ['./','./index.html','./styles.css','./app.js','./manifest-live.json','./icon-live-192.png','./icon-live-512.png','./course-whitley-bay.png','./course-tynemouth.svg'];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.map(key => key !== CACHE_NAME ? caches.delete(key) : null))).then(() => self.clients.claim())); });
