@@ -1,4 +1,4 @@
-// SNYDER LIVE v72
+// SNYDER LIVE v73
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2243,10 +2243,10 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         </div>
       ))}
 
-      {canEdit&&f9complete&&!showReview&&(
+      {f9complete&&!showReview&&(
         <div style={{margin:16,...S.card,textAlign:'center',background:'rgba(0,112,187,0.15)',borderColor:'rgba(0,112,187,0.4)'}}>
           <div style={{fontSize:14,color:'#fff',marginBottom:8}}>Front 9 complete!</div>
-          <button onClick={()=>{saveAll();setShowReview(true);}} style={{...S.pri,fontSize:13}}>Review Front 9</button>
+          <button onClick={()=>{if(canEdit)saveAll();setEndStep(2);setShowEnd(true);}} style={{...S.pri,fontSize:13}}>Stats</button>
         </div>
       )}
 
