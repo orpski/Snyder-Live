@@ -1,4 +1,4 @@
-// SNYDER LIVE v85
+// SNYDER LIVE v86
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -183,6 +183,14 @@ function roundStartValue(round){
 }
 function formatRoundStart(round){
   return new Date(roundStartValue(round)).toLocaleString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function startOfLocalDay(value){
+  const d=value?new Date(value):new Date();
+  d.setHours(0,0,0,0);
+  return d;
+}
+function isSameLocalDay(a,b){
+  return startOfLocalDay(a).getTime()===startOfLocalDay(b).getTime();
 }
 function monthKey(dateValue){
   return new Date(dateValue).toLocaleString('en-GB',{month:'long',year:'numeric'});
@@ -1149,6 +1157,8 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   const[saving,setSaving]=useState(false);
   const[showPicker,setShowPicker]=useState(false);
   const[playerRange,setPlayerRange]=useState(null);
+  const[openRoundBlock,setOpenRoundBlock]=useState(null);
+  const[openRoundBlockCanDelete,setOpenRoundBlockCanDelete]=useState(false);
   const liveRounds=rounds.filter(r=>{
     if(!isLiveRound(r))return false;
     if(!r.is_private)return true;
@@ -1156,6 +1166,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     return currentUser!=null;
   });
   const myRounds=myRoundsForUser(rounds,groups,currentUser);
+  const myLiveRounds=myRounds.filter(isLiveRound);
   const courseOptions=getCourseOptions(courses);
   const selectedCourseOption=courseOptions.find(o=>o.name===setup.course_name)||courseOptions.find(o=>o.course&&o.course.id===setup.course_id)||null;
   const availableTees=selectedCourseOption?Object.keys(selectedCourseOption.tees):['White','Yellow','Red','Orange'];
@@ -1237,6 +1248,32 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     const next=groupSetup.map((g,i)=>i===groupIdx?g.map(p=>normaliseId(p.id)===normaliseId(playerId)?{...p,playing_handicap:parseFloat(value)||0}:p):[...g]);
     syncGroups(next);
   }
+  function blockingLiveRound(){
+    return myLiveRounds[0]||null;
+  }
+  async function finishBlockedRound(){
+    if(!openRoundBlock)return;
+    const{error}=await sb.from('cup_rounds').update({status:'complete'}).eq('id',openRoundBlock.id);
+    if(error){flash(error.message||'Could not finish previous round','error');return;}
+    setOpenRoundBlock(null);
+    setOpenRoundBlockCanDelete(false);
+    await load();
+    flash('Previous round finished');
+  }
+  async function deleteBlockedRound(){
+    if(!openRoundBlock||!openRoundBlockCanDelete)return;
+    if(!window.confirm('Are you sure you want to delete this round? This cannot be undone.'))return;
+    await sb.from('cup_scores').delete().eq('round_id',openRoundBlock.id);
+    await sb.from('cup_groups').delete().eq('round_id',openRoundBlock.id);
+    await sb.from('cup_round_players').delete().eq('round_id',openRoundBlock.id);
+    const{error}=await sb.from('cup_rounds').delete().eq('id',openRoundBlock.id);
+    if(error){flash(error.message||'Could not delete previous round','error');return;}
+    try{localStorage.removeItem('scores_'+openRoundBlock.id);localStorage.removeItem('pending_scores_'+openRoundBlock.id);}catch(e){}
+    setOpenRoundBlock(null);
+    setOpenRoundBlockCanDelete(false);
+    await load();
+    flash('Previous round deleted');
+  }
 
     // ---------------------------------------------------------
   // Start round / create Supabase round records
@@ -1247,6 +1284,18 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     if(!setup.course_id){flash('Pick a course','error');return;}
     if(allParticipants.length===0){flash('Add players','error');return;}
     if(!allParticipants.some(p=>normaliseId(p.id)===normaliseId(currentUser.id))){flash('Add yourself first so at least one signed-in player is in the round','error');return;}
+    const blocked=blockingLiveRound();
+    if(blocked){
+      let canDelete=idMatches(blocked.created_by,currentUser.id);
+      if(!canDelete){
+        const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',blocked.id);
+        canDelete=(rps||[]).some(rp=>rp.is_host&&(idMatches(rp.user_id,currentUser.id)||idMatches(rp.id,currentUser.id)));
+      }
+      setOpenRoundBlock(blocked);
+      setOpenRoundBlockCanDelete(canDelete);
+      flash(isSameLocalDay(roundStartValue(blocked),Date.now())?'You already have a live round open today':'You have an unfinished round from a previous day','error');
+      return;
+    }
     setSaving(true);
     try{
       const course=courses.find(co=>co.id===setup.course_id)||findCourseForTee(courses,setup.course_name,setup.tee);
@@ -1259,10 +1308,17 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
       const playingHcps={};
       allParticipants.forEach(p=>{playingHcps[p.id]=p.playing_handicap||0;});
 
-      const{data:rd}=await sb.from('cup_rounds').insert({
+      const roundPayload={
         name:roundName,course_id:(course&&course.id)||setup.course_id,course_name:courseBaseName||'',
-        status:'live',tee:setup.tee,day_number:1,join_code:joinCode,is_private:setup.is_private||false,
-      }).select().single();
+        status:'live',tee:setup.tee,day_number:1,join_code:joinCode,is_private:setup.is_private||false,created_by:currentUser.id,
+      };
+      let{data:rd,error:roundErr}=await sb.from('cup_rounds').insert(roundPayload).select().single();
+      if(roundErr&&String(roundErr.message||'').toLowerCase().includes('created_by')){
+        delete roundPayload.created_by;
+        const retry=await sb.from('cup_rounds').insert(roundPayload).select().single();
+        rd=retry.data;roundErr=retry.error;
+      }
+      if(roundErr)throw roundErr;
 
       const groupBuckets=groupSetup.map(g=>g.filter(Boolean)).filter(g=>g.length>0);
       const groupRows=groupBuckets.map((bucket,idx)=>({
@@ -1287,6 +1343,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
       const po=allParticipants.map(p=>({
         id:p.id,name:p.display_name||p.name,display_name:p.display_name||p.name,
         current_handicap:p.playing_handicap||0,handicap:p.playing_handicap||0,
+        user_id:p.is_guest?null:p.id,guest_id:p.is_guest?p.id:null,is_host:currentUser&&normaliseId(p.id)===normaliseId(currentUser.id),
       }));
 
       await load();
@@ -1415,6 +1472,17 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
               </div>
             ))}
           </div>}
+          {openRoundBlock&&(
+            <div style={{...S.card,marginTop:12,borderColor:isSameLocalDay(roundStartValue(openRoundBlock),Date.now())?'rgba(239,68,68,0.45)':'rgba(245,158,11,0.45)',background:isSameLocalDay(roundStartValue(openRoundBlock),Date.now())?'rgba(239,68,68,0.12)':'rgba(245,158,11,0.12)'}}>
+              <div style={{fontSize:15,color:'#fff',fontWeight:900,marginBottom:5}}>{isSameLocalDay(roundStartValue(openRoundBlock),Date.now())?'You already have a live round open today':'You have an unfinished round from a previous day'}</div>
+              <div style={{fontSize:12,color:'#90ccf0',marginBottom:10}}>{openRoundBlock.name||openRoundBlock.course_name||'Round'} - {formatRoundStart(openRoundBlock)}</div>
+              <div style={{display:'grid',gridTemplateColumns:openRoundBlockCanDelete?'1fr 1fr':'1fr',gap:8,marginBottom:8}}>
+                <button onClick={finishBlockedRound} style={{...S.pri,padding:'10px 8px',fontSize:13,background:'#0a8a4a'}}>Finish Round</button>
+                {openRoundBlockCanDelete&&<button onClick={deleteBlockedRound} style={{...S.dan,padding:'10px 8px',fontSize:13}}>Delete Round</button>}
+              </div>
+              <button onClick={()=>continueRound(openRoundBlock)} style={{...S.gho,width:'100%',fontSize:13}}>Go to open round</button>
+            </div>
+          )}
           <button onClick={startRound} disabled={saving||!setup.course_id} style={{...S.pri,width:'100%',padding:14,fontSize:15,marginTop:12,opacity:saving||!setup.course_id?0.5:1}}>
             {saving?'Starting...':'Start Round - Go Live!'}
           </button>
@@ -1544,7 +1612,10 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
           display_name:rp.display_name||'Player',
           current_handicap:rp.playing_handicap||0,
           handicap:rp.playing_handicap||0,
-          playing_handicap:rp.playing_handicap||0
+          playing_handicap:rp.playing_handicap||0,
+          user_id:rp.user_id,
+          guest_id:rp.guest_id,
+          is_host:rp.is_host
         }));
         const normalised=(grps&&grps.length?grps:[group]).filter(Boolean).map((g,idx)=>{
           const ids=(g.player_ids||[]).map(normaliseId);
@@ -1831,6 +1902,25 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     setView('home');
   }
 
+  const canDeleteRound=currentUser&&!round._spectator&&(
+    idMatches(round.created_by,currentUser.id)||
+    (allRoundPlayers||[]).some(p=>p.is_host&&(idMatches(p.user_id,currentUser.id)||idMatches(p.id,currentUser.id)))
+  );
+  async function deleteRoundAndGoHome(){
+    if(!canDeleteRound)return;
+    if(!window.confirm('Are you sure you want to delete this round? This cannot be undone.'))return;
+    await sb.from('cup_scores').delete().eq('round_id',round.id);
+    await sb.from('cup_groups').delete().eq('round_id',round.id);
+    await sb.from('cup_round_players').delete().eq('round_id',round.id);
+    const{error}=await sb.from('cup_rounds').delete().eq('id',round.id);
+    if(error){flash(error.message||'Could not delete round','error');return;}
+    try{localStorage.removeItem('scores_'+round.id);localStorage.removeItem('pending_scores_'+round.id);}catch(e){}
+    await load();
+    setShowEnd(false);
+    setView('home');
+    flash('Round deleted');
+  }
+
     // ---------------------------------------------------------
   // Score input modal
   // ---------------------------------------------------------
@@ -2056,6 +2146,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         </div>
         <div style={{padding:'0 16px 24px',display:'flex',flexDirection:'column',gap:10}}>
           {canEdit&&isLiveRound(round)&&<button onClick={finishRoundAndGoHome} style={{...S.pri,width:'100%',padding:15,fontSize:16,marginTop:4,background:'#0a8a4a'}}>Finish Round</button>}
+          {canDeleteRound&&<button onClick={deleteRoundAndGoHome} style={{...S.dan,width:'100%',padding:14,fontSize:15}}>Delete Round</button>}
           <button onClick={()=>{setShowEnd(false);setView('home');}} style={{...S.gho,width:'100%',padding:15,fontSize:16,marginTop:canEdit&&isLiveRound(round)?0:4}}>Home</button>
         </div>
       </div>
@@ -2362,6 +2453,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
           await load();
           setEndStep(1);setShowEnd(true);
         }} style={{...S.pri,width:'100%',padding:13,fontSize:14,background:'#0a8a4a',marginBottom:0}}>Finish Round</button>}
+        {canDeleteRound&&<button onClick={deleteRoundAndGoHome} style={{...S.dan,width:'100%',padding:13,fontSize:14,marginTop:10}}>Delete Round</button>}
         {!canEdit&&<div style={{textAlign:'center',padding:'10px',fontSize:12,color:'rgba(255,255,255,0.3)'}}>{isCompletedRound(round)?'Completed round - view only':'View only - sign in as a player to score'}</div>}
       </div>
 
