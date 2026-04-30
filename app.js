@@ -1,4 +1,4 @@
-// SNYDER LIVE v97
+// SNYDER LIVE v98
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1881,6 +1881,8 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         setHoleScores(prev=>({...prev,...m}));
         try{localStorage.setItem('scores_'+round.id,JSON.stringify(m));}catch(e){}
       }
+      // Keep the top leaderboard button in sync with the same refresh action.
+      setOverallScores(data||[]);
       const t=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
       setLastRefreshed(t);
       if(showMessage)flash('Scorecard refreshed');
@@ -1997,6 +1999,12 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     }
     setCloudStatus('Hole '+holeNum+' saved to cloud');
     setCloudError('');
+    setOverallScores(prev=>{
+      const byKey={};
+      (prev||[]).forEach(r=>{byKey[normaliseId(r.player_id)+'_'+r.hole_number]=r;});
+      rows.forEach(r=>{byKey[normaliseId(r.player_id)+'_'+r.hole_number]=r;});
+      return Object.values(byKey);
+    });
     setLastRefreshed(new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
     try{localStorage.removeItem('pending_scores_'+round.id);}catch(e){}
     // Pull latest public data after a successful cloud save.
@@ -2027,6 +2035,11 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         }
         setCloudStatus('');
         setCloudError('');
+        setOverallScores(prev=>{
+          const key=normaliseId(row.player_id)+'_'+row.hole_number;
+          const filtered=(prev||[]).filter(r=>normaliseId(r.player_id)+'_'+r.hole_number!==key);
+          return [...filtered,row];
+        });
         setLastRefreshed(new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
         if(load)setTimeout(()=>load(),300);
       })
