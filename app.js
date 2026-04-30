@@ -1,4 +1,4 @@
-// SNYDER LIVE v78
+// SNYDER LIVE v79
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2319,7 +2319,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
 // Admin panel
 // Course, round and tournament administration entry point
 // =========================================================
-function AdminPanel({courses,rounds,groups,sb,flash,setView,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}){
+function AdminPanel({courses,rounds,groups,sb,flash,setView,load,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}){
   const[tab,setTab]=useState('courses');
   const[pw,setPw]=useState('');
   const[auth,setAuth]=useState(false);
@@ -2352,6 +2352,7 @@ function AdminPanel({courses,rounds,groups,sb,flash,setView,load,cupUsers,cupEve
         {tab==='cup'&&<CupAdminTab sb={sb} flash={flash} load={load} cupUsers={cupUsers} cupEvents={cupEvents} cupTeams={cupTeams} cupEventPlayers={cupEventPlayers} cupDays={cupDays} cupMatches={cupMatches}/>}
         {tab==='users'&&(
           <div>
+            <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.12em',margin:'0 0 8px'}}>REGISTERED USERS</div>
             {(cupUsers||[]).map(u=>(
               <div key={u.id} style={{...S.card,marginBottom:8,display:'flex',alignItems:'center',gap:10}}>
                 <div style={{flex:1,minWidth:0}}>
@@ -2367,6 +2368,26 @@ function AdminPanel({courses,rounds,groups,sb,flash,setView,load,cupUsers,cupEve
                 }} style={{...S.dan,padding:'7px 10px',fontSize:12}}>Remove</button>
               </div>
             ))}
+            <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.12em',margin:'18px 0 8px'}}>GUESTS</div>
+            {(!guests||guests.length===0)&&<div style={{...S.card,fontSize:13,color:'rgba(255,255,255,0.55)',textAlign:'center'}}>No guests saved.</div>}
+            {(guests||[]).map(g=>{
+              const creator=(cupUsers||[]).find(u=>normaliseId(u.id)===normaliseId(g.created_by));
+              return(
+                <div key={g.id} style={{...S.card,marginBottom:8,display:'flex',alignItems:'center',gap:10}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:14,color:'#fff',fontWeight:700}}>{g.name||'Guest'}</div>
+                    <div style={{fontSize:11,color:'#60b8f0'}}>Guest - HCP {g.handicap||0}{creator?' - created by '+(creator.display_name||creator.username):''}</div>
+                  </div>
+                  <button onClick={async()=>{
+                    if(!window.confirm('Delete guest '+(g.name||'Guest')+'? Use this for duplicate or mistaken guest records.'))return;
+                    const{error}=await sb.from('cup_guests').delete().eq('id',g.id);
+                    if(error){flash(error.message||'Could not delete guest','error');return;}
+                    flash('Guest deleted');
+                    await load();
+                  }} style={{...S.dan,padding:'7px 10px',fontSize:12}}>Delete</button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
