@@ -1,4 +1,4 @@
-// SNYDER LIVE v79
+// SNYDER LIVE v80
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -236,8 +236,8 @@ function Avatar({user,size=36}){
 // User authentication modal
 // Login, signup and guest entry handling
 // =========================================================
-function UserAuth({onLogin,onClose}){
-  const[mode,setMode]=useState('login');
+function UserAuth({onLogin,onClose,initialMode='login',promptTitle,promptText,signupButtonText}){
+  const[mode,setMode]=useState(initialMode);
   const[username,setUsername]=useState('');
   const[pin,setPin]=useState('');
   const[name,setName]=useState('');
@@ -273,9 +273,10 @@ function UserAuth({onLogin,onClose}){
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,padding:16}}>
       <div style={{...S.card,width:'100%',maxWidth:380}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-          <div style={{fontSize:18,color:'#fff'}}>{mode==='login'?'Sign In':'Create Account'}</div>
+          <div style={{fontSize:18,color:'#fff'}}>{promptTitle||(mode==='login'?'Sign In':'Create Account')}</div>
           <button onClick={onClose} style={{...S.gho,padding:'4px 10px',fontSize:16}}>x</button>
         </div>
+        {promptText&&<div style={{background:'rgba(0,112,187,0.14)',border:'1px solid rgba(96,184,240,0.28)',borderRadius:10,padding:'10px 12px',fontSize:13,color:'#dbeafe',lineHeight:1.35,marginBottom:12}}>{promptText}</div>}
         {err&&<div style={{background:'rgba(239,68,68,0.15)',borderRadius:8,padding:'8px 12px',fontSize:13,color:'#fca5a5',marginBottom:12}}>{err}</div>}
         {mode==='signup'&&(
           <div>
@@ -290,7 +291,7 @@ function UserAuth({onLogin,onClose}){
         <label style={S.lbl}>PIN</label>
         <input style={{...S.inp,marginBottom:16}} type="password" value={pin} onChange={e=>setPin(e.target.value)} placeholder="PIN" inputMode="numeric"/>
         <button onClick={submit} disabled={loading} style={{...S.pri,width:'100%',marginBottom:10,opacity:loading?0.6:1}}>
-          {loading?'...':(mode==='login'?'Sign In':'Create Account')}
+          {loading?'...':(mode==='login'?'Sign In':(signupButtonText||'Create Account'))}
         </button>
         <button onClick={()=>{setMode(m=>m==='login'?'signup':'login');setErr('');}} style={{...S.gho,width:'100%',fontSize:13}}>
           {mode==='login'?'New? Create account':'Already have account? Sign in'}
@@ -425,6 +426,7 @@ function App(){
   const[toast,setToast]=useState(null);
   const[currentUser,setCurrentUser]=useState(null);
   const[showAuth,setShowAuth]=useState(false);
+  const[authPrompt,setAuthPrompt]=useState(null);
   const[appData,setAppData]=useState({players:[],courses:[],rounds:[],groups:[],competitions:[],scores:[],cupUsers:[],guests:[],cupEvents:[],cupTeams:[],cupEventPlayers:[],cupDays:[],cupMatches:[]});
   const[selectedRound,setSelectedRound]=useState(null);
   const[selectedComp,setSelectedComp]=useState(null);
@@ -434,6 +436,10 @@ function App(){
   function setView(v){
     if(v!=='home')window.history.pushState({view:v},'',null);
     setViewRaw(v);
+  }
+  function promptStartRoundAuth(){
+    setAuthPrompt('startRound');
+    setShowAuth(true);
   }
 
   useEffect(()=>{
@@ -631,7 +637,7 @@ function App(){
     );
   }
 
-  const props={...appData,sb,flash,setView,load:loadAll,isAdmin,currentUser,setSelectedRound,selectedRound,holeScores,setHoleScores};
+  const props={...appData,sb,flash,setView,load:loadAll,isAdmin,currentUser,setSelectedRound,selectedRound,holeScores,setHoleScores,promptStartRoundAuth};
 
   if(splash)return(
     <div style={{position:'fixed',inset:0,background:'#0a1f3d',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',zIndex:9999}}>
@@ -657,7 +663,7 @@ function App(){
           ?<button onClick={()=>setView('profile')} style={{background:'none',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
             <Avatar user={currentUser} size={32}/>
           </button>
-          :<button onClick={()=>setShowAuth(true)} style={{...S.gho,padding:'6px 14px',fontSize:13}}>Sign In</button>
+          :<button onClick={()=>{setAuthPrompt(null);setShowAuth(true);}} style={{...S.gho,padding:'6px 14px',fontSize:13}}>Sign In</button>
         }
       </div>
 
@@ -701,7 +707,7 @@ function App(){
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
             <div style={{fontSize:22,color:'#fff',fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.03em'}}>Play Golf</div>
           </div>
-          <div onClick={()=>setView('play')} style={{borderRadius:16,overflow:'hidden',background:'linear-gradient(135deg,#0070BB 0%,#1a4a8a 60%,#0a2d5a 100%)',cursor:'pointer',padding:'20px',display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+          <div onClick={()=>currentUser?setView('play'):promptStartRoundAuth()} style={{borderRadius:16,overflow:'hidden',background:'linear-gradient(135deg,#0070BB 0%,#1a4a8a 60%,#0a2d5a 100%)',cursor:'pointer',padding:'20px',display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
             <div>
               <div style={{fontSize:20,color:'#fff',fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.03em',marginBottom:4}}>Start a Round</div>
               <div style={{fontSize:13,color:'rgba(255,255,255,0.7)'}}>Pick a course, add players, go live</div>
@@ -747,7 +753,7 @@ function App(){
           <div style={{fontSize:18,marginBottom:1,color:'#D4AF37',fontWeight:900}}>🏆</div>
           <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em'}}>CUP</div>
         </button>
-        <button onClick={()=>currentUser?setView('profile'):setShowAuth(true)} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
+        <button onClick={()=>currentUser?setView('profile'):(setAuthPrompt(null),setShowAuth(true))} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
           <div style={{fontSize:18,marginBottom:1}}>P</div>
           <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>PROFILE</div>
         </button>
@@ -757,7 +763,14 @@ function App(){
         </button>
       </div>
 
-      {showAuth&&<UserAuth onLogin={u=>{setCurrentUser(u);setShowAuth(false);flash('Welcome '+u.display_name);}} onClose={()=>setShowAuth(false)}/>}
+      {showAuth&&<UserAuth
+        initialMode={authPrompt==='startRound'?'signup':'login'}
+        promptTitle={authPrompt==='startRound'?'Quick register to start a round':null}
+        promptText={authPrompt==='startRound'?'It only takes a moment. Once one player is signed in, you can add guests to play with you and keep the round tied to a real scorer.':null}
+        signupButtonText={authPrompt==='startRound'?'Quick Register'}
+        onLogin={u=>{setCurrentUser(u);setShowAuth(false);if(authPrompt==='startRound')setView('play');setAuthPrompt(null);flash('Welcome '+u.display_name);}}
+        onClose={()=>{setShowAuth(false);setAuthPrompt(null);}}
+      />}
       <Toast toast={toast}/>
     </div>
   );
@@ -1056,7 +1069,7 @@ function playerRangeLabel(range){
 // Play Golf flow
 // Round setup, player selection, joining live rounds and launch into scorecard
 // =========================================================
-function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRound,load,isAdmin,currentUser,cupUsers,guests,selectedRound,holeScores,setHoleScores}){
+function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRound,load,isAdmin,currentUser,cupUsers,guests,selectedRound,holeScores,setHoleScores,promptStartRoundAuth}){
   const[step,setStep]=useState('menu');
   const[activeRound,setActiveRound]=useState(null);
   const[activeGroup,setActiveGroup]=useState(null);
@@ -1161,8 +1174,10 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   // ---------------------------------------------------------
   async function startRound(){
     const allParticipants=groupSetup.flat();
+    if(!currentUser){promptStartRoundAuth&&promptStartRoundAuth();return;}
     if(!setup.course_id){flash('Pick a course','error');return;}
     if(allParticipants.length===0){flash('Add players','error');return;}
+    if(!allParticipants.some(p=>normaliseId(p.id)===normaliseId(currentUser.id))){flash('Add yourself first so at least one signed-in player is in the round','error');return;}
     setSaving(true);
     try{
       const course=courses.find(co=>co.id===setup.course_id)||findCourseForTee(courses,setup.course_name,setup.tee);
@@ -1347,7 +1362,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
         <div style={{fontSize:16,color:'#fff'}}>Play Golf</div>
       </div>
       <div style={{padding:16}}>
-        <div style={{...S.card,marginBottom:12,cursor:'pointer',textAlign:'center',padding:24}} onClick={()=>setStep('playerCount')}>
+        <div style={{...S.card,marginBottom:12,cursor:'pointer',textAlign:'center',padding:24}} onClick={()=>currentUser?setStep('playerCount'):(promptStartRoundAuth&&promptStartRoundAuth())}>
           <div style={{fontSize:16,color:'#fff',marginBottom:4}}>Start a New Round</div>
           <div style={{fontSize:13,color:'#60b8f0'}}>Pick a course, add players, go live</div>
         </div>
