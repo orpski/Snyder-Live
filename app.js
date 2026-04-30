@@ -1,4 +1,4 @@
-// SNYDER LIVE v84
+// SNYDER LIVE v85
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -234,21 +234,28 @@ function Avatar({user,size=36}){
 
 function HandicapPicker({value,onChange,style={},buttonStyle={},label='Handicap'}){
   const[open,setOpen]=useState(false);
-  const current=value===''||value==null?'':parseFloat(value)||0;
+  const hasValue=!(value===''||value==null||Number.isNaN(parseFloat(value)));
+  const current=hasValue?parseFloat(value):8;
   const values=Array.from({length:61},(_,i)=>i-6);
-  const display=current===''?'HCP':current;
+  const display=current;
+  const listRef=useRef(null);
+  useEffect(()=>{
+    if(!open||!listRef.current)return;
+    const idx=Math.max(0,values.findIndex(v=>v===current));
+    listRef.current.scrollTop=Math.max(0,idx*54-92);
+  },[open,current]);
   function pick(v){onChange(v);setOpen(false);}
   return(
     <>
       <button type="button" onClick={()=>setOpen(true)} style={{...S.inp,cursor:'pointer',textAlign:'center',fontWeight:800,...buttonStyle,...style}}>{display}</button>
       {open&&(
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.78)',zIndex:300,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={e=>{if(e.target===e.currentTarget)setOpen(false);}}>
-          <div style={{width:'100%',maxWidth:420,background:'#0d2548',border:'1px solid rgba(255,255,255,0.16)',borderRadius:'18px 18px 0 0',padding:16,boxShadow:'0 -18px 45px rgba(0,0,0,0.45)'}}>
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.78)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={e=>{if(e.target===e.currentTarget)setOpen(false);}}>
+          <div style={{width:'100%',maxWidth:420,background:'#0d2548',border:'1px solid rgba(255,255,255,0.16)',borderRadius:18,padding:16,boxShadow:'0 24px 60px rgba(0,0,0,0.45)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
               <div style={{fontSize:18,color:'#fff',fontWeight:900}}>{label}</div>
               <button type="button" onClick={()=>setOpen(false)} style={{...S.gho,padding:'5px 10px',fontSize:16,lineHeight:1}}>x</button>
             </div>
-            <div style={{height:260,overflowY:'auto',scrollSnapType:'y mandatory',border:'1px solid rgba(255,255,255,0.12)',borderRadius:14,background:'rgba(255,255,255,0.05)',padding:'92px 12px'}}>
+            <div ref={listRef} style={{height:260,overflowY:'auto',scrollSnapType:'y mandatory',border:'1px solid rgba(255,255,255,0.12)',borderRadius:14,background:'rgba(255,255,255,0.05)',padding:'92px 12px'}}>
               {values.map(v=>(
                 <button type="button" key={v} onClick={()=>pick(v)} style={{width:'100%',height:48,marginBottom:6,borderRadius:10,border:v===current?'1px solid rgba(96,184,240,0.75)':'1px solid rgba(255,255,255,0.08)',background:v===current?'rgba(0,112,187,0.38)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:22,fontWeight:900,scrollSnapAlign:'center',cursor:'pointer'}}>{v}</button>
               ))}
