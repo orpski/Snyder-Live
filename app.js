@@ -1,4 +1,4 @@
-// SNYDER LIVE v93
+// SNYDER LIVE v95
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -353,7 +353,7 @@ function UserAuth({onLogin,onClose,initialMode='login',promptTitle,promptText,si
   const[username,setUsername]=useState('');
   const[pin,setPin]=useState('');
   const[name,setName]=useState('');
-  const[hcp,setHcp]=useState('');
+  const[hcp,setHcp]=useState('18.0');
   const[err,setErr]=useState('');
   const[loading,setLoading]=useState(false);
 
@@ -368,14 +368,21 @@ function UserAuth({onLogin,onClose,initialMode='login',promptTitle,promptText,si
       } else {
         const{data:ex}=await sb.from('cup_users').select('id').eq('username',username.toLowerCase().trim()).single();
         if(ex){setErr('Username taken');setLoading(false);return;}
-        const{data,error}=await sb.from('cup_users').insert({
+        const parsedHandicap=Number.isFinite(parseFloat(hcp))?parseFloat(hcp):18;
+        const userPayload={
           username:username.toLowerCase().trim(),pin:pin.trim(),
-          display_name:name.trim()||username,handicap:parseFloat(hcp)||0,
-          avatar_initial:name[0]?.toUpperCase()||'?'
-        }).select().single();
+          display_name:name.trim()||username,handicap:parsedHandicap,
+          avatar_initial:(name.trim()||username||'?')[0]?.toUpperCase()||'?'
+        };
+        const{data,error}=await sb.from('cup_users').insert(userPayload).select().single();
         if(error){setErr(error.message);setLoading(false);return;}
-        localStorage.setItem('snyder_user',JSON.stringify(data));
-        onLogin(data);
+        const savedUser={...data,handicap:Number.isFinite(parseFloat(data.handicap))?parseFloat(data.handicap):parsedHandicap};
+        if(savedUser.handicap!==parsedHandicap){
+          await sb.from('cup_users').update({handicap:parsedHandicap}).eq('id',savedUser.id);
+          savedUser.handicap=parsedHandicap;
+        }
+        localStorage.setItem('snyder_user',JSON.stringify(savedUser));
+        onLogin(savedUser);
       }
     }catch(e){setErr(e.message);}
     setLoading(false);
@@ -1317,14 +1324,17 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     }
   },[]);
 
-  function addP(person){
+  function addPersonToGroup(person,groupIdx){
     const flat=groupSetup.flat();
     if(flat.find(p=>normaliseId(p.id)===normaliseId(person.id))){flash('Already added');return;}
-    const idx=Math.max(0,Math.min(pickerGroup,groupSetup.length-1));
+    const idx=Math.max(0,Math.min(groupIdx,groupSetup.length-1));
     const next=groupSetup.map(g=>[...g]);
     next[idx].push(withPlayingHandicap(person));
     syncGroups(next);
     setShowPicker(false);
+  }
+  function addP(person){
+    addPersonToGroup(person,pickerGroup);
   }
   function removeFromGroup(groupIdx,playerId){
     const next=groupSetup.map((g,i)=>i===groupIdx?g.filter(p=>normaliseId(p.id)!==normaliseId(playerId)):[...g]);
@@ -1629,9 +1639,19 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
             <label style={{...S.lbl,margin:0}}>{isSingleGroupDay?'Players':'Groups'} ({participants.length} players)</label>
           </div>
           {currentUser&&!participants.find(p=>normaliseId(p.id)===normaliseId(currentUser.id))&&(
-            <button onClick={()=>{setPickerGroup(0);addP({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap});}} style={{...S.gho,width:'100%',marginBottom:10,fontSize:13}}>
-              {isSingleGroupDay?'+ Add yourself':'+ Add yourself to Group A'}
-            </button>
+            isSingleGroupDay ? (
+              <button onClick={()=>addPersonToGroup({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap},0)} style={{...S.gho,width:'100%',marginBottom:10,fontSize:13}}>
+                + Add yourself
+              </button>
+            ) : (
+              <div style={{display:'grid',gridTemplateColumns:`repeat(${groupSetup.length},1fr)`,gap:8,marginBottom:10}}>
+                {groupSetup.map((_,idx)=>(
+                  <button key={idx} onClick={()=>addPersonToGroup({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap},idx)} style={{...S.gho,width:'100%',fontSize:12,padding:'9px 6px'}}>
+                    + Me to {groupLetter(idx+1)}
+                  </button>
+                ))}
+              </div>
+            )
           )}
           {isSingleGroupDay ? <div style={{marginBottom:12}}>
             <button onClick={()=>{setPickerGroup(0);setShowPicker(true);}} style={{...S.pri,width:'100%',marginBottom:10,fontSize:13}}>+ Add Player</button>
