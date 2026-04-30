@@ -1,4 +1,4 @@
-// SNYDER LIVE v83
+// SNYDER LIVE v84
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -232,6 +232,34 @@ function Avatar({user,size=36}){
   );
 }
 
+function HandicapPicker({value,onChange,style={},buttonStyle={},label='Handicap'}){
+  const[open,setOpen]=useState(false);
+  const current=value===''||value==null?'':parseFloat(value)||0;
+  const values=Array.from({length:61},(_,i)=>i-6);
+  const display=current===''?'HCP':current;
+  function pick(v){onChange(v);setOpen(false);}
+  return(
+    <>
+      <button type="button" onClick={()=>setOpen(true)} style={{...S.inp,cursor:'pointer',textAlign:'center',fontWeight:800,...buttonStyle,...style}}>{display}</button>
+      {open&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.78)',zIndex:300,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={e=>{if(e.target===e.currentTarget)setOpen(false);}}>
+          <div style={{width:'100%',maxWidth:420,background:'#0d2548',border:'1px solid rgba(255,255,255,0.16)',borderRadius:'18px 18px 0 0',padding:16,boxShadow:'0 -18px 45px rgba(0,0,0,0.45)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+              <div style={{fontSize:18,color:'#fff',fontWeight:900}}>{label}</div>
+              <button type="button" onClick={()=>setOpen(false)} style={{...S.gho,padding:'5px 10px',fontSize:16,lineHeight:1}}>x</button>
+            </div>
+            <div style={{height:260,overflowY:'auto',scrollSnapType:'y mandatory',border:'1px solid rgba(255,255,255,0.12)',borderRadius:14,background:'rgba(255,255,255,0.05)',padding:'92px 12px'}}>
+              {values.map(v=>(
+                <button type="button" key={v} onClick={()=>pick(v)} style={{width:'100%',height:48,marginBottom:6,borderRadius:10,border:v===current?'1px solid rgba(96,184,240,0.75)':'1px solid rgba(255,255,255,0.08)',background:v===current?'rgba(0,112,187,0.38)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:22,fontWeight:900,scrollSnapAlign:'center',cursor:'pointer'}}>{v}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // =========================================================
 // User authentication modal
 // Login, signup and guest entry handling
@@ -283,7 +311,7 @@ function UserAuth({onLogin,onClose,initialMode='login',promptTitle,promptText,si
             <label style={S.lbl}>Display Name</label>
             <input style={{...S.inp,marginBottom:12}} value={name} onChange={e=>setName(e.target.value)} placeholder="Your name"/>
             <label style={S.lbl}>Handicap</label>
-            <input style={{...S.inp,marginBottom:12}} type="number" value={hcp} onChange={e=>setHcp(e.target.value)} placeholder="0"/>
+            <HandicapPicker value={hcp} onChange={setHcp} style={{marginBottom:12}}/>
           </div>
         )}
         <label style={S.lbl}>Username</label>
@@ -430,7 +458,7 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
                 <label style={S.lbl}>Guest Name</label>
                 <input style={{...S.inp,marginBottom:8}} value={guestName} onChange={e=>setGuestName(e.target.value)} placeholder="Name"/>
                 <label style={S.lbl}>Handicap</label>
-                <input style={{...S.inp,marginBottom:8}} type="number" value={guestHcp} onChange={e=>setGuestHcp(e.target.value)} placeholder="0"/>
+                <HandicapPicker value={guestHcp} onChange={setGuestHcp} style={{marginBottom:8}} label="Guest handicap"/>
                 <button onClick={createGuest} style={{...S.pri,width:'100%'}}>Add guest to round</button>
               </div>
               {myGuests.map(g=>(
@@ -1047,7 +1075,7 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
           <div style={{fontSize:13,color:'#fff',marginTop:8}}>HCP {currentUser&&currentUser.handicap}</div>
           {editing
             ?<div style={{marginTop:12}}>
-              <input type="number" value={hcp} onChange={e=>setHcp(e.target.value)} style={{...S.inp,marginBottom:8,textAlign:'center'}}/>
+              <HandicapPicker value={hcp} onChange={setHcp} style={{marginBottom:8}} label="Your handicap"/>
               <button onClick={saveHcp} style={{...S.pri,marginRight:8}}>Save</button>
               <button onClick={()=>setEditing(false)} style={S.gho}>Cancel</button>
             </div>
@@ -1355,7 +1383,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
             {participants.map(p=>(
               <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,padding:'10px 12px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
                 <div style={{flex:1,fontSize:14,color:'#fff',fontWeight:700}}>{p.display_name||p.name}</div>
-                <input type="number" value={p.playing_handicap} onChange={e=>updateGroupHandicap(0,p.id,e.target.value)} style={{...S.inp,width:60,padding:'4px 8px',fontSize:13,textAlign:'center'}}/>
+                <HandicapPicker value={p.playing_handicap} onChange={v=>updateGroupHandicap(0,p.id,v)} style={{width:60,padding:'4px 8px',fontSize:13}} label={(p.display_name||p.name||'Player')+' handicap'}/>
                 <button onClick={()=>removeFromGroup(0,p.id)} style={{...S.dan,padding:'4px 10px',fontSize:12}}>x</button>
               </div>
             ))}
@@ -1373,7 +1401,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
                 {bucket.map(p=>(
                   <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,marginTop:8,padding:'10px 12px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
                     <div style={{flex:1,fontSize:14,color:'#fff',fontWeight:700}}>{p.display_name||p.name}</div>
-                    <input type="number" value={p.playing_handicap} onChange={e=>updateGroupHandicap(groupIdx,p.id,e.target.value)} style={{...S.inp,width:60,padding:'4px 8px',fontSize:13,textAlign:'center'}}/>
+                    <HandicapPicker value={p.playing_handicap} onChange={v=>updateGroupHandicap(groupIdx,p.id,v)} style={{width:60,padding:'4px 8px',fontSize:13}} label={(p.display_name||p.name||'Player')+' handicap'}/>
                     <button onClick={()=>removeFromGroup(groupIdx,p.id)} style={{...S.dan,padding:'4px 10px',fontSize:12}}>x</button>
                   </div>
                 ))}
@@ -2865,7 +2893,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       <div style={{fontSize:11,color:'#9fb6c9',marginBottom:8}}>Players and handicaps are Cup-specific, so you can tweak them without breaking normal rounds.</div>
       {rows.length===0?<div style={{fontSize:12,color:'#8ea0ad',padding:'8px 0'}}>No players yet.</div>:rows.map(p=><div key={p.id} style={{borderTop:'1px solid rgba(255,255,255,0.08)',padding:'8px 0'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:6}}><input style={{...S.inp,fontSize:13,padding:'8px 9px',flex:1}} value={p.display_name||''} onChange={e=>updateCupPlayer(p,{display_name:e.target.value})}/><button onClick={()=>removeCupPlayer(p)} style={{...S.dan,padding:'7px 9px',fontSize:11}}>Remove</button></div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center'}}><label style={{fontSize:11,color:'#9fb6c9'}}>Handicap</label><input type="number" step="0.1" style={{...S.inp,width:76,fontSize:13,padding:'7px 8px',textAlign:'center'}} value={p.handicap??0} onChange={e=>updateCupPlayer(p,{handicap:e.target.value})}/></div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center'}}><label style={{fontSize:11,color:'#9fb6c9'}}>Handicap</label><HandicapPicker value={p.handicap??0} onChange={v=>updateCupPlayer(p,{handicap:v})} style={{width:76,fontSize:13,padding:'7px 8px'}} label={(p.display_name||'Player')+' handicap'}/></div>
       </div>)}
       <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid rgba(255,255,255,0.08)'}}>
         <div style={{fontSize:12,color:'#fff',fontWeight:800,marginBottom:7}}>Add existing user</div>
@@ -2874,7 +2902,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
         </select>
         <div style={{fontSize:12,color:'#fff',fontWeight:800,marginBottom:7}}>Add new player</div>
         <input style={{...S.inp,fontSize:12,marginBottom:7}} value={form.name} onChange={e=>setNewPlayer(v=>({...v,[teamKey]:{...v[teamKey],name:e.target.value}}))} placeholder="Player name"/>
-        <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:7}}><input type="number" step="0.1" style={{...S.inp,fontSize:12}} value={form.handicap} onChange={e=>setNewPlayer(v=>({...v,[teamKey]:{...v[teamKey],handicap:e.target.value}}))} placeholder="Handicap"/><button onClick={()=>addManualPlayer(teamKey)} style={{...S.pri,padding:'8px 10px',fontSize:12}}>Add</button></div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:7}}><HandicapPicker value={form.handicap} onChange={hcp=>setNewPlayer(v=>({...v,[teamKey]:{...v[teamKey],handicap:hcp}}))} style={{fontSize:12}} label="Cup player handicap"/><button onClick={()=>addManualPlayer(teamKey)} style={{...S.pri,padding:'8px 10px',fontSize:12}}>Add</button></div>
       </div>
     </div>;
   }
