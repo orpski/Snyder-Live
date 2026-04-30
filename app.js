@@ -1,4 +1,4 @@
-// SNYDER LIVE v77
+// SNYDER LIVE v78
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -305,7 +305,7 @@ function UserAuth({onLogin,onClose}){
 // Friends, guests and ad-hoc player management
 // =========================================================
 function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAdded}){
-  const[tab,setTab]=useState('friends');
+  const[tab,setTab]=useState('search');
   const[search,setSearch]=useState('');
   const[friends,setFriends]=useState([]);
   const[guestName,setGuestName]=useState('');
@@ -319,8 +319,14 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
     });
   },[]);
 
-  const searchRes=search.length>1?cupUsers.filter(u=>u.id!==currentUser?.id&&(u.username.includes(search.toLowerCase())||u.display_name.toLowerCase().includes(search.toLowerCase()))).slice(0,8):[];
+  const searchTerm=search.trim().toLowerCase();
+  const searchRes=searchTerm.length>1?cupUsers.filter(u=>{
+    const username=(u.username||'').toLowerCase();
+    const displayName=(u.display_name||u.name||'').toLowerCase();
+    return u.id!==currentUser?.id&&(username.includes(searchTerm)||displayName.includes(searchTerm));
+  }).slice(0,8):[];
   const myGuests=guests.filter(g=>!currentUser||g.created_by===currentUser.id);
+  const isAdded=id=>alreadyAdded&&alreadyAdded.some(existing=>normaliseId(existing)===normaliseId(id));
 
   async function addFriend(u){
     if(!currentUser)return;
@@ -336,15 +342,18 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
   }
 
   return(
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:150}}>
-      <div style={{background:'#0d2548',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'16px 16px 0 0',width:'100%',maxWidth:480,maxHeight:'80vh',display:'flex',flexDirection:'column'}}>
-        <div style={{padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
-          <div style={{fontSize:16,color:'#fff'}}>Add Player</div>
-          <button onClick={onClose} style={{...S.gho,padding:'4px 10px',fontSize:16}}>x</button>
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',display:'flex',alignItems:'flex-start',justifyContent:'center',zIndex:150,padding:'max(24px,8vh) 14px 14px'}}>
+      <div style={{background:'#0d2548',border:'1px solid rgba(255,255,255,0.16)',borderRadius:18,width:'100%',maxWidth:500,maxHeight:'min(78vh,680px)',display:'flex',flexDirection:'column',boxShadow:'0 24px 60px rgba(0,0,0,0.45)',overflow:'hidden'}}>
+        <div style={{padding:'14px 16px 12px',display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
+          <div>
+            <div style={{fontSize:18,color:'#fff',fontWeight:900}}>Add player</div>
+            <div style={{fontSize:12,color:'#90ccf0',marginTop:3}}>Search members or add a guest</div>
+          </div>
+          <button onClick={onClose} style={{...S.gho,padding:'5px 10px',fontSize:16,lineHeight:1}}>x</button>
         </div>
         <div style={{display:'flex',gap:6,padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
-          {['friends','search','guests'].map(t=>(
-            <button key={t} onClick={()=>setTab(t)} style={{...tab===t?S.pri:S.gho,flex:1,padding:'7px 4px',fontSize:12,textTransform:'capitalize'}}>{t}</button>
+          {[['search','Search'],['friends','Friends'],['guests','Guests']].map(([key,label])=>(
+            <button key={key} onClick={()=>setTab(key)} style={{...(tab===key?S.pri:S.gho),flex:1,padding:'8px 4px',fontSize:12}}>{label}</button>
           ))}
         </div>
         <div style={{flex:1,overflow:'auto',padding:16}}>
@@ -357,13 +366,14 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
                     <div style={{fontSize:14,color:'#fff'}}>{u.display_name}</div>
                     <div style={{fontSize:11,color:'#60b8f0'}}>HCP {u.handicap}</div>
                   </div>
-                  <button onClick={()=>onAdd({...u,is_guest:false})} disabled={alreadyAdded&&alreadyAdded.includes(u.id)} style={{...S.pri,padding:'6px 14px',fontSize:12,opacity:alreadyAdded&&alreadyAdded.includes(u.id)?0.4:1}}>Add</button>
+                  <button onClick={()=>onAdd({...u,is_guest:false})} disabled={isAdded(u.id)} style={{...S.pri,padding:'6px 14px',fontSize:12,opacity:isAdded(u.id)?0.4:1}}>{isAdded(u.id)?'Added':'Add'}</button>
                 </div>
               ))
           )}
           {tab==='search'&&(
             <div>
-              <input style={{...S.inp,marginBottom:12}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search username or name..." autoCapitalize="none"/>
+              <input style={{...S.inp,marginBottom:12,fontSize:16,padding:'12px 14px'}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search username or name..." autoCapitalize="none" autoFocus/>
+              {searchTerm.length<=1&&<div style={{...S.card,fontSize:13,color:'rgba(255,255,255,0.58)',textAlign:'center',padding:18}}>Start typing a name or username</div>}
               {searchRes.map(u=>(
                 <div key={u.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8,padding:'10px 12px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
                   <div>
@@ -372,20 +382,21 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
                   </div>
                   <div style={{display:'flex',gap:6}}>
                     <button onClick={()=>addFriend(u)} style={{...S.gho,padding:'6px 10px',fontSize:11}}>+Friend</button>
-                    <button onClick={()=>onAdd({...u,is_guest:false})} style={{...S.pri,padding:'6px 14px',fontSize:12}}>Add</button>
+                    <button onClick={()=>onAdd({...u,is_guest:false})} disabled={isAdded(u.id)} style={{...S.pri,padding:'6px 14px',fontSize:12,opacity:isAdded(u.id)?0.4:1}}>{isAdded(u.id)?'Added':'Add'}</button>
                   </div>
                 </div>
               ))}
+              {searchTerm.length>1&&searchRes.length===0&&<div style={{...S.card,fontSize:13,color:'rgba(255,255,255,0.58)',textAlign:'center',padding:18}}>No matching members found</div>}
             </div>
           )}
           {tab==='guests'&&(
             <div>
-              <div style={{marginBottom:12}}>
+              <div style={{...S.card,marginBottom:12,background:'rgba(0,112,187,0.10)',borderColor:'rgba(96,184,240,0.22)'}}>
                 <label style={S.lbl}>Guest Name</label>
                 <input style={{...S.inp,marginBottom:8}} value={guestName} onChange={e=>setGuestName(e.target.value)} placeholder="Name"/>
                 <label style={S.lbl}>Handicap</label>
                 <input style={{...S.inp,marginBottom:8}} type="number" value={guestHcp} onChange={e=>setGuestHcp(e.target.value)} placeholder="0"/>
-                <button onClick={createGuest} style={{...S.pri,width:'100%'}}>Create Guest</button>
+                <button onClick={createGuest} style={{...S.pri,width:'100%'}}>Add guest to round</button>
               </div>
               {myGuests.map(g=>(
                 <div key={g.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8,padding:'10px 12px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
