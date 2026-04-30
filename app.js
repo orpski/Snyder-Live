@@ -1,4 +1,4 @@
-// SNYDER LIVE v90
+// SNYDER LIVE v91
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -425,6 +425,7 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
   const[refreshingMembers,setRefreshingMembers]=useState(false);
   const[guestName,setGuestName]=useState('');
   const[guestHcp,setGuestHcp]=useState('');
+  const[guestCasual,setGuestCasual]=useState(false);
 
   useEffect(()=>{
     setMemberList(cupUsers||[]);
@@ -479,7 +480,7 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
   async function createGuest(){
     if(!guestName.trim())return;
     const{data}=await sb.from('cup_guests').insert({created_by:currentUser?.id,name:guestName.trim(),handicap:parseFloat(guestHcp)||0}).select().single();
-    if(data){onAdd({...data,is_guest:true,display_name:data.name});setGuestName('');setGuestHcp('');}
+    if(data){onAdd({...data,is_guest:true,display_name:data.name,is_casual:guestCasual,fixed_playing_handicap:guestCasual?(parseInt(guestHcp,10)||0):undefined});setGuestName('');setGuestHcp('');setGuestCasual(false);}
   }
 
   return(
@@ -541,8 +542,9 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
               <div style={{...S.card,marginBottom:12,background:'rgba(0,112,187,0.10)',borderColor:'rgba(96,184,240,0.22)'}}>
                 <label style={S.lbl}>Guest Name</label>
                 <input style={{...S.inp,marginBottom:8}} value={guestName} onChange={e=>setGuestName(e.target.value)} placeholder="Name"/>
-                <label style={S.lbl}>Handicap</label>
-                <HandicapPicker value={guestHcp} onChange={setGuestHcp} style={{marginBottom:8}} label="Guest handicap"/>
+                <label style={S.lbl}>{guestCasual?'Playing shots':'EG Handicap'}</label>
+                <HandicapPicker value={guestHcp} onChange={setGuestHcp} style={{marginBottom:8}} label={guestCasual?'Guest playing shots':'Guest EG handicap'} step={guestCasual?1:0.1} min={0} max={54} defaultValue={guestCasual?25:18}/>
+                <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#fff',margin:'4px 0 12px'}}><input type="checkbox" checked={guestCasual} onChange={e=>setGuestCasual(e.target.checked)}/> Casual golfer - use fixed playing shots</label>
                 <button onClick={createGuest} style={{...S.pri,width:'100%'}}>Add guest to round</button>
               </div>
               {myGuests.map(g=>(
@@ -1244,7 +1246,11 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   const isSingleGroupDay=(playerRange==='1-4'||groupSetup.length<=1);
   function withPlayingHandicap(person,course=selectedCourse,allowance=setup.allowance){
     const handicapIndex=parseFloat(person.handicap_index!=null?person.handicap_index:person.current_handicap!=null?person.current_handicap:person.handicap)||0;
-    return {...person,handicap_index:handicapIndex,current_handicap:handicapIndex,playing_handicap:calcPlayingHandicap(handicapIndex,course,allowance)};
+    if(person.is_casual){
+      const fixedShots=Math.max(0,parseInt(person.fixed_playing_handicap!=null?person.fixed_playing_handicap:(person.playing_handicap!=null?person.playing_handicap:handicapIndex),10)||0);
+      return {...person,is_casual:true,fixed_playing_handicap:fixedShots,playing_handicap:fixedShots,handicap_index:handicapIndex,current_handicap:handicapIndex};
+    }
+    return {...person,is_casual:false,handicap_index:handicapIndex,current_handicap:handicapIndex,playing_handicap:calcPlayingHandicap(handicapIndex,course,allowance)};
   }
   function resetGroupsForRange(range){
     const count=groupCountForRange(range);
@@ -1325,13 +1331,36 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     syncGroups(next);
   }
   function updateGroupHandicap(groupIdx,playerId,value){
-    const next=groupSetup.map((g,i)=>i===groupIdx?g.map(p=>normaliseId(p.id)===normaliseId(playerId)?withPlayingHandicap({...p,handicap_index:parseFloat(value)||0,current_handicap:parseFloat(value)||0}):p):[...g]);
+    const next=groupSetup.map((g,i)=>i===groupIdx?g.map(p=>{
+      if(normaliseId(p.id)!==normaliseId(playerId))return p;
+      if(p.is_casual){
+        const shots=Math.max(0,parseInt(value,10)||0);
+        return {...p,fixed_playing_handicap:shots,playing_handicap:shots};
+      }
+      return withPlayingHandicap({...p,handicap_index:parseFloat(value)||0,current_handicap:parseFloat(value)||0});
+    }):[...g]);
+    syncGroups(next);
+  }
+  function toggleCasualPlayer(groupIdx,playerId){
+    const next=groupSetup.map((g,i)=>i===groupIdx?g.map(p=>{
+      if(normaliseId(p.id)!==normaliseId(playerId))return p;
+      const makeCasual=!p.is_casual;
+      if(makeCasual){
+        const shots=Math.max(0,parseInt(p.playing_handicap!=null?p.playing_handicap:p.current_handicap,10)||0);
+        return {...p,is_casual:true,fixed_playing_handicap:shots,playing_handicap:shots};
+      }
+      return withPlayingHandicap({...p,is_casual:false});
+    }):[...g]);
     syncGroups(next);
   }
   function updatePlayingHandicap(groupIdx,playerId,value){
     const ph=Math.max(0,parseInt(value,10)||0);
-    const normalHcp=handicapIndexFromPlayingHandicap(ph,selectedCourse,setup.allowance);
-    const next=groupSetup.map((g,i)=>i===groupIdx?g.map(p=>normaliseId(p.id)===normaliseId(playerId)?{...p,playing_handicap:ph,handicap_index:normalHcp,current_handicap:normalHcp,handicap:normalHcp,_playingHandicapEdited:true}:p):[...g]);
+    const next=groupSetup.map((g,i)=>i===groupIdx?g.map(p=>{
+      if(normaliseId(p.id)!==normaliseId(playerId))return p;
+      if(p.is_casual)return {...p,playing_handicap:ph,fixed_playing_handicap:ph,_playingHandicapEdited:true};
+      const normalHcp=handicapIndexFromPlayingHandicap(ph,selectedCourse,setup.allowance);
+      return {...p,playing_handicap:ph,handicap_index:normalHcp,current_handicap:normalHcp,handicap:normalHcp,_playingHandicapEdited:true};
+    }):[...g]);
     syncGroups(next);
   }
   function blockingLiveRound(){
@@ -1401,7 +1430,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
       allParticipants.forEach(p=>{playingHcps[p.id]=p.playing_handicap||0;});
 
       for(const p of allParticipants){
-        if(p._playingHandicapEdited&&!p.is_guest){
+        if(p._playingHandicapEdited&&!p.is_guest&&!p.is_casual){
           const savedHandicap=parseFloat(p.handicap_index??p.current_handicap??p.handicap)||0;
           await sb.from('cup_users').update({handicap:savedHandicap}).eq('id',p.id);
           if(currentUser&&normaliseId(p.id)===normaliseId(currentUser.id)){
@@ -1489,11 +1518,11 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
                 <div key={p.id} style={{display:'grid',gridTemplateColumns:'1fr 82px',gap:10,alignItems:'center',padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
                   <div style={{minWidth:0}}>
                     <div style={{fontSize:16,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||p.name}</div>
-                    <div style={{fontSize:11,color:'#60b8f0'}}>Normal HCP {parseFloat(p.handicap_index??p.current_handicap??0).toFixed(1)}</div>
+                    <div style={{fontSize:11,color:'#60b8f0'}}>{p.is_casual?'Casual golfer - fixed shots':'EG HCP '+parseFloat(p.handicap_index??p.current_handicap??0).toFixed(1)}</div>
                   </div>
                   <div>
                     <label style={{fontSize:10,color:'rgba(255,255,255,0.55)',display:'block',marginBottom:3,textAlign:'center'}}>Shots</label>
-                    <input type="number" inputMode="numeric" min="0" max="54" value={p.playing_handicap||0} onChange={e=>updatePlayingHandicap(groupIdx,p.id,e.target.value)} style={{...S.inp,padding:'8px 6px',textAlign:'center',fontSize:18,fontWeight:900}} />
+                    <HandicapPicker value={p.playing_handicap||0} onChange={v=>updatePlayingHandicap(groupIdx,p.id,v)} style={{padding:'8px 6px',textAlign:'center',fontSize:18,fontWeight:900}} label={(p.display_name||p.name||'Player')+' Playing shots'} step={1} min={0} max={54} defaultValue={18}/>
                   </div>
                 </div>
               ))}
@@ -1577,7 +1606,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
               <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'center',marginBottom:10}}>
                 <div>
                   <div style={{fontSize:12,color:'#60b8f0',fontWeight:800}}>Slope {selectedCourse.slope_rating||113}</div>
-                  <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>Enter Handicap Index. Shots are calculated for this tee.</div>
+                  <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>Enter EG handicap. Tick Casual golfer for fixed playing shots.</div>
                 </div>
                 <select value={setup.allowance} onChange={e=>setSetup(q=>({...q,allowance:parseFloat(e.target.value)||1}))} style={{...S.inp,width:118,padding:'8px 10px',fontSize:12}}>
                   <option value={1}>Full shots</option>
@@ -1611,9 +1640,10 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
               <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,padding:'10px 12px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:14,color:'#fff',fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||p.name}</div>
-                  <div style={{fontSize:11,color:'#60b8f0'}}>HI {parseFloat(p.handicap_index??p.current_handicap??0).toFixed(1)} · {p.playing_handicap||0} shots</div>
+                  <div style={{fontSize:11,color:'#60b8f0'}}>{p.is_casual?'Casual · '+(p.playing_handicap||0)+' fixed shots':'EG HCP '+parseFloat(p.handicap_index??p.current_handicap??0).toFixed(1)+' · '+(p.playing_handicap||0)+' shots'}</div>
+                  <label style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:6,fontSize:11,color:'rgba(255,255,255,0.7)'}}><input type="checkbox" checked={!!p.is_casual} onChange={()=>toggleCasualPlayer(0,p.id)}/> Casual golfer</label>
                 </div>
-                <HandicapPicker value={p.handicap_index??p.current_handicap} onChange={v=>updateGroupHandicap(0,p.id,v)} style={{width:68,padding:'4px 8px',fontSize:13}} label={(p.display_name||p.name||'Player')+' Handicap Index'} step={0.1} min={0} max={54} defaultValue={8}/>
+                <HandicapPicker value={p.is_casual?(p.fixed_playing_handicap??p.playing_handicap):(p.handicap_index??p.current_handicap)} onChange={v=>updateGroupHandicap(0,p.id,v)} style={{width:76,padding:'4px 8px',fontSize:13}} label={(p.display_name||p.name||'Player')+(p.is_casual?' Playing shots':' EG Handicap')} step={p.is_casual?1:0.1} min={0} max={54} defaultValue={p.is_casual?18:8}/>
                 <button onClick={()=>removeFromGroup(0,p.id)} style={{...S.dan,padding:'4px 10px',fontSize:12}}>x</button>
               </div>
             ))}
@@ -1632,9 +1662,10 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
                   <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,marginTop:8,padding:'10px 12px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:14,color:'#fff',fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||p.name}</div>
-                      <div style={{fontSize:11,color:'#60b8f0'}}>HI {parseFloat(p.handicap_index??p.current_handicap??0).toFixed(1)} · {p.playing_handicap||0} shots</div>
+                      <div style={{fontSize:11,color:'#60b8f0'}}>{p.is_casual?'Casual · '+(p.playing_handicap||0)+' fixed shots':'EG HCP '+parseFloat(p.handicap_index??p.current_handicap??0).toFixed(1)+' · '+(p.playing_handicap||0)+' shots'}</div>
+                      <label style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:6,fontSize:11,color:'rgba(255,255,255,0.7)'}}><input type="checkbox" checked={!!p.is_casual} onChange={()=>toggleCasualPlayer(groupIdx,p.id)}/> Casual golfer</label>
                     </div>
-                    <HandicapPicker value={p.handicap_index??p.current_handicap} onChange={v=>updateGroupHandicap(groupIdx,p.id,v)} style={{width:68,padding:'4px 8px',fontSize:13}} label={(p.display_name||p.name||'Player')+' Handicap Index'} step={0.1} min={0} max={54} defaultValue={8}/>
+                    <HandicapPicker value={p.is_casual?(p.fixed_playing_handicap??p.playing_handicap):(p.handicap_index??p.current_handicap)} onChange={v=>updateGroupHandicap(groupIdx,p.id,v)} style={{width:76,padding:'4px 8px',fontSize:13}} label={(p.display_name||p.name||'Player')+(p.is_casual?' Playing shots':' EG Handicap')} step={p.is_casual?1:0.1} min={0} max={54} defaultValue={p.is_casual?18:8}/>
                     <button onClick={()=>removeFromGroup(groupIdx,p.id)} style={{...S.dan,padding:'4px 10px',fontSize:12}}>x</button>
                   </div>
                 ))}
