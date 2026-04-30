@@ -1,4 +1,4 @@
-// SNYDER LIVE v82
+// SNYDER LIVE v83
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -325,7 +325,7 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
   async function loadFriends(users=memberList){
     if(!currentUser){setFriends([]);return;}
     const{data}=await sb.from('cup_friendships').select('friend_id').eq('user_id',currentUser.id);
-      const ids=(data||[]).map(f=>f.friend_id);
+    const ids=[...new Set((data||[]).map(f=>f.friend_id))];
     setFriends((users||[]).filter(u=>ids.includes(u.id)));
   }
 
@@ -351,9 +351,17 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
 
   async function addFriend(u){
     if(!currentUser)return;
-    await sb.from('cup_friendships').upsert({user_id:currentUser.id,friend_id:u.id});
-    setFriends(prev=>[...prev,u]);
-    flash('Friend added');
+    if(friends.some(f=>normaliseId(f.id)===normaliseId(u.id))){flash((u.display_name||u.username||'Player')+' is already your friend');return;}
+    const pairs=[
+      {user_id:currentUser.id,friend_id:u.id},
+      {user_id:u.id,friend_id:currentUser.id}
+    ];
+    for(const pair of pairs){
+      const{data:existing}=await sb.from('cup_friendships').select('id').eq('user_id',pair.user_id).eq('friend_id',pair.friend_id).limit(1);
+      if(!existing||existing.length===0)await sb.from('cup_friendships').insert(pair);
+    }
+    setFriends(prev=>prev.some(f=>normaliseId(f.id)===normaliseId(u.id))?prev:[...prev,u]);
+    flash((u.display_name||u.username||'Player')+' is now your friend');
   }
 
   async function createGuest(){
@@ -408,7 +416,7 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
                     <div style={{fontSize:11,color:'#60b8f0'}}>@{u.username} - HCP {u.handicap}</div>
                   </div>
                   <div style={{display:'flex',gap:6}}>
-                    <button onClick={()=>addFriend(u)} style={{...S.gho,padding:'6px 10px',fontSize:11}}>+Friend</button>
+                    <button onClick={()=>addFriend(u)} disabled={friends.some(f=>normaliseId(f.id)===normaliseId(u.id))} style={{...S.gho,padding:'6px 10px',fontSize:11,opacity:friends.some(f=>normaliseId(f.id)===normaliseId(u.id))?0.45:1}}>{friends.some(f=>normaliseId(f.id)===normaliseId(u.id))?'Friend':'+Friend'}</button>
                     <button onClick={()=>onAdd({...u,is_guest:false})} disabled={isAdded(u.id)} style={{...S.pri,padding:'6px 14px',fontSize:12,opacity:isAdded(u.id)?0.4:1}}>{isAdded(u.id)?'Added':'Add'}</button>
                   </div>
                 </div>
