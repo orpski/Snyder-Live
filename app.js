@@ -1,4 +1,4 @@
-// SNYDER LIVE v89
+// SNYDER LIVE v90
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -161,6 +161,15 @@ function calcCourseHandicap(handicapIndex,course){
 }
 function calcPlayingHandicap(handicapIndex,course,allowance=1){
   return Math.max(0,Math.round(rawCourseHandicap(handicapIndex,course)*(parseFloat(allowance)||1)));
+}
+function handicapIndexFromPlayingHandicap(playingHandicap,course,allowance=1){
+  const ph=Math.max(0,parseFloat(playingHandicap)||0);
+  const slope=parseFloat(course&&course.slope_rating)||113;
+  const rating=parseFloat(course&&course.course_rating);
+  const par=(course&&course.holes||[]).reduce((t,h)=>t+(parseInt(h.par)||0),0)||0;
+  const ratingAdjust=Number.isFinite(rating)&&par?rating-par:0;
+  const allowed=ph/(parseFloat(allowance)||1);
+  return Math.max(0,Math.round(((allowed-ratingAdjust)*113/slope)*10)/10);
 }
 
 function ptsColor(pts){
@@ -1319,6 +1328,12 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     const next=groupSetup.map((g,i)=>i===groupIdx?g.map(p=>normaliseId(p.id)===normaliseId(playerId)?withPlayingHandicap({...p,handicap_index:parseFloat(value)||0,current_handicap:parseFloat(value)||0}):p):[...g]);
     syncGroups(next);
   }
+  function updatePlayingHandicap(groupIdx,playerId,value){
+    const ph=Math.max(0,parseInt(value,10)||0);
+    const normalHcp=handicapIndexFromPlayingHandicap(ph,selectedCourse,setup.allowance);
+    const next=groupSetup.map((g,i)=>i===groupIdx?g.map(p=>normaliseId(p.id)===normaliseId(playerId)?{...p,playing_handicap:ph,handicap_index:normalHcp,current_handicap:normalHcp,handicap:normalHcp,_playingHandicapEdited:true}:p):[...g]);
+    syncGroups(next);
+  }
   function blockingLiveRound(){
     return myLiveRounds.find(r=>!clearedLiveRoundIds.some(id=>normaliseId(id)===normaliseId(r.id)))||null;
   }
@@ -1351,7 +1366,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     // ---------------------------------------------------------
   // Start round / create Supabase round records
   // ---------------------------------------------------------
-  async function startRound(){
+  async function startRound(skipHandicapConfirm=false){
     const allParticipants=groupSetup.flat();
     if(!currentUser){promptStartRoundAuth&&promptStartRoundAuth();return;}
     if(!setup.course_id){flash('Pick a course','error');return;}
@@ -1369,6 +1384,10 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
       flash(isSameLocalDay(roundStartValue(blocked),Date.now())?'You already have a live round open today':'You have an unfinished round from a previous day','error');
       return;
     }
+    if(skipHandicapConfirm!==true){
+      setStep('confirmHandicaps');
+      return;
+    }
     setSaving(true);
     try{
       const course=courses.find(co=>co.id===setup.course_id)||findCourseForTee(courses,setup.course_name,setup.tee);
@@ -1380,6 +1399,17 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
       const playerIds=allParticipants.map(p=>p.id);
       const playingHcps={};
       allParticipants.forEach(p=>{playingHcps[p.id]=p.playing_handicap||0;});
+
+      for(const p of allParticipants){
+        if(p._playingHandicapEdited&&!p.is_guest){
+          const savedHandicap=parseFloat(p.handicap_index??p.current_handicap??p.handicap)||0;
+          await sb.from('cup_users').update({handicap:savedHandicap}).eq('id',p.id);
+          if(currentUser&&normaliseId(p.id)===normaliseId(currentUser.id)){
+            const updated={...currentUser,handicap:savedHandicap};
+            localStorage.setItem('snyder_user',JSON.stringify(updated));
+          }
+        }
+      }
 
       const roundPayload={
         name:roundName,course_id:safeCourseIdForDb(course,setup.course_id),course_name:courseBaseName||'',
@@ -1434,6 +1464,46 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
       setStep('scorecard');
     }catch(e){flash('Error: '+e.message,'error');}
     setSaving(false);
+  }
+
+    // ---------------------------------------------------------
+  // Confirm playing handicaps before round creation
+  // ---------------------------------------------------------
+  if(step==='confirmHandicaps'){
+    const activeGroups=groupSetup.map((bucket,idx)=>({bucket:bucket.filter(Boolean),groupIdx:idx})).filter(g=>g.bucket.length>0);
+    return(
+      <div style={{minHeight:'100vh',paddingBottom:40}}>
+        <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
+          <button onClick={()=>setStep('setup')} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button>
+          <div style={{fontSize:16,color:'#fff'}}>Check Playing Handicaps</div>
+        </div>
+        <div style={{padding:16}}>
+          <div style={{...S.card,marginBottom:12,background:'rgba(96,184,240,0.08)',borderColor:'rgba(96,184,240,0.2)'}}>
+            <div style={{fontSize:18,color:'#fff',fontWeight:900,marginBottom:6}}>Are these shots correct?</div>
+            <div style={{fontSize:12,color:'#90ccf0',lineHeight:1.45}}>These are calculated from each player's handicap index for {setup.course_name||'this course'} {setup.tee?('('+setup.tee+' tees)'):''}. Edit the shots here if needed, then start the round.</div>
+          </div>
+          {activeGroups.map(({bucket,groupIdx})=>(
+            <div key={groupIdx} style={{...S.card,marginBottom:12}}>
+              {activeGroups.length>1&&<div style={{fontSize:13,color:'#60b8f0',fontWeight:900,marginBottom:8}}>Group {groupLetter(groupIdx+1)}</div>}
+              {bucket.map(p=>(
+                <div key={p.id} style={{display:'grid',gridTemplateColumns:'1fr 82px',gap:10,alignItems:'center',padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:16,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||p.name}</div>
+                    <div style={{fontSize:11,color:'#60b8f0'}}>Normal HCP {parseFloat(p.handicap_index??p.current_handicap??0).toFixed(1)}</div>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:'rgba(255,255,255,0.55)',display:'block',marginBottom:3,textAlign:'center'}}>Shots</label>
+                    <input type="number" inputMode="numeric" min="0" max="54" value={p.playing_handicap||0} onChange={e=>updatePlayingHandicap(groupIdx,p.id,e.target.value)} style={{...S.inp,padding:'8px 6px',textAlign:'center',fontSize:18,fontWeight:900}} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+          <button onClick={()=>startRound(true)} disabled={saving} style={{...S.pri,width:'100%',padding:14,fontSize:15,opacity:saving?0.5:1}}>{saving?'Starting...':'Start Round'}</button>
+          <button onClick={()=>setStep('setup')} style={{...S.gho,width:'100%',padding:12,fontSize:13,marginTop:10}}>Edit players instead</button>
+        </div>
+      </div>
+    );
   }
 
     // ---------------------------------------------------------
