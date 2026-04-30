@@ -1,4 +1,4 @@
-// SNYDER LIVE v75
+// SNYDER LIVE v76
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2176,8 +2176,8 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             <div style={{fontSize:9,color:'#60b8f0',textTransform:'uppercase',letterSpacing:'0.08em'}}>Hole</div>
             {grpPlayers.map(p=>(
               <div key={p.id} style={{textAlign:'center',padding:'3px 0'}}>
-                <div style={{fontSize:16,color:'#fbbf24',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',letterSpacing:'0.01em'}}>{((p.name||p.display_name)||'?').split(' ')[0]}</div>
-                <div style={{fontSize:10,color:'#fde68a',fontWeight:700}}>HCP {playingHcps[p.id]||0}</div>
+                <div style={{fontSize:16,color:'#fb7185',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',letterSpacing:'0.01em'}}>{((p.name||p.display_name)||'?').split(' ')[0]}</div>
+                <div style={{fontSize:10,color:'#fecdd3',fontWeight:700}}>HCP {playingHcps[p.id]||0}</div>
               </div>
             ))}
           </div>
