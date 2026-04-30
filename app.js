@@ -1,4 +1,4 @@
-// SNYDER LIVE v80
+// SNYDER LIVE v81
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -767,7 +767,7 @@ function App(){
         initialMode={authPrompt==='startRound'?'signup':'login'}
         promptTitle={authPrompt==='startRound'?'Quick register to start a round':null}
         promptText={authPrompt==='startRound'?'It only takes a moment. Once one player is signed in, you can add guests to play with you and keep the round tied to a real scorer.':null}
-        signupButtonText={authPrompt==='startRound'?'Quick Register'}
+        signupButtonText={authPrompt==='startRound'?'Quick Register':null}
         onLogin={u=>{setCurrentUser(u);setShowAuth(false);if(authPrompt==='startRound')setView('play');setAuthPrompt(null);flash('Welcome '+u.display_name);}}
         onClose={()=>{setShowAuth(false);setAuthPrompt(null);}}
       />}
