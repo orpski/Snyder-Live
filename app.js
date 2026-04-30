@@ -1,4 +1,4 @@
-// SNYDER LIVE v73
+// SNYDER LIVE v74
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2104,15 +2104,6 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             return <div key={h.hole} style={{minWidth:32,height:32,borderRadius:6,background:done?'#0070BB':'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:done?'#fff':'#60b8f0',flexShrink:0}}>{h.hole}</div>;
           })}
         </div>}
-        {activeGroupId!=='leaderboard'&&<div style={{display:'grid',gridTemplateColumns:'80px '+grpPlayers.map(()=>'1fr').join(' '),padding:'4px 12px',borderTop:'1px solid rgba(255,255,255,0.1)',background:'rgba(0,50,120,0.4)',gap:6,alignItems:'center'}}>
-          <div style={{fontSize:9,color:'#60b8f0',textTransform:'uppercase',letterSpacing:'0.08em'}}>Hole</div>
-          {grpPlayers.map(p=>(
-            <div key={p.id} style={{textAlign:'center',padding:'3px 0'}}>
-              <div style={{fontSize:16,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',letterSpacing:'0.01em'}}>{((p.name||p.display_name)||'?').split(' ')[0]}</div>
-              <div style={{fontSize:10,color:'#90ccf0',fontWeight:700}}>HCP {playingHcps[p.id]||0}</div>
-            </div>
-          ))}
-        </div>}
       </div>
 
       {activeGroupId==='leaderboard' ? <div style={{padding:16}}>
@@ -2170,6 +2161,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
               );
             })}
           </div>
+          <button onClick={()=>{setEndStep(2);setShowEnd(true);}} style={{...S.pri,width:'100%',marginTop:10,fontSize:13}}>Stats</button>
           <div style={{fontSize:10,color:'rgba(255,255,255,0.3)',textAlign:'center',marginTop:8}}>Scroll down to see full scorecard</div>
         </div>
       )}
@@ -2179,6 +2171,15 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
           <div style={{padding:'4px 12px',fontSize:10,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
             <span>{label}</span>
             {label==='BACK 9'&&<button onClick={()=>refreshScoresFromCloud(true)} disabled={refreshing} style={{border:'1px solid rgba(96,184,240,0.35)',background:'rgba(0,112,187,0.22)',color:'#90ccf0',borderRadius:999,padding:'4px 9px',fontSize:10,fontWeight:700,opacity:refreshing?0.6:1}}>Refresh</button>}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'80px '+grpPlayers.map(()=>'1fr').join(' '),padding:'4px 12px',borderBottom:'1px solid rgba(255,255,255,0.1)',background:'rgba(0,50,120,0.4)',gap:6,alignItems:'center'}}>
+            <div style={{fontSize:9,color:'#60b8f0',textTransform:'uppercase',letterSpacing:'0.08em'}}>Hole</div>
+            {grpPlayers.map(p=>(
+              <div key={p.id} style={{textAlign:'center',padding:'3px 0'}}>
+                <div style={{fontSize:16,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',letterSpacing:'0.01em'}}>{((p.name||p.display_name)||'?').split(' ')[0]}</div>
+                <div style={{fontSize:10,color:'#90ccf0',fontWeight:700}}>HCP {playingHcps[p.id]||0}</div>
+              </div>
+            ))}
           </div>
           {holes.slice(sec*9,(sec+1)*9).map((hd,idx)=>{
             const hcpMap={};
