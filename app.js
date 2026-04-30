@@ -1,4 +1,4 @@
-// SNYDER LIVE v71
+// SNYDER LIVE v72
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1865,21 +1865,25 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
               })}
             </div>
           ))}
-          <div style={{display:'grid',gridTemplateColumns:cols,padding:'7px 8px',gap:4,borderTop:'1px solid rgba(255,255,255,0.16)',background:'rgba(0,112,187,0.14)',alignItems:'center'}}>
-            <div style={{textAlign:'center',fontSize:11,color:'#60b8f0',fontWeight:800}}>Gross</div>
+          <div style={{display:'grid',gridTemplateColumns:cols,padding:'8px 8px',gap:4,borderTop:'1px solid rgba(255,255,255,0.16)',background:'rgba(0,112,187,0.14)',alignItems:'center'}}>
+            <div style={{textAlign:'center',fontSize:11,color:'#60b8f0',fontWeight:800}}>{label==='BACK 9'?'Back 9':'Front 9'}</div>
             <div></div>
-            {grpPlayers.flatMap(p=>[
-              <div key={p.id+'gross-total'} style={{textAlign:'center',fontSize:15,color:'#fff',fontWeight:900}}>{getGrossTotal(p.id,holeList)}</div>,
-              <div key={p.id+'gross-spacer'}></div>
-            ])}
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:cols,padding:'7px 8px',gap:4,background:'rgba(255,255,255,0.05)',alignItems:'center'}}>
-            <div style={{textAlign:'center',fontSize:11,color:'#60b8f0',fontWeight:800}}>Stableford</div>
-            <div></div>
-            {grpPlayers.flatMap(p=>[
-              <div key={p.id+'stableford-spacer'}></div>,
-              <div key={p.id+'stableford-total'} style={{display:'flex',alignItems:'center',justifyContent:'center'}}><div style={{background:'#0070BB',borderRadius:4,width:28,height:22,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:'#fff',fontWeight:900}}>{getStablefordTotal(p.id,holeList)}</div></div>
-            ])}
+            {grpPlayers.flatMap(p=>{
+              const nineGross=getGrossTotal(p.id,holeList);
+              const nineStableford=getStablefordTotal(p.id,holeList);
+              const roundGross=getGrossTotal(p.id,holes);
+              const roundStableford=getStablefordTotal(p.id,holes);
+              return [
+                <div key={p.id+'nine-total'} style={{textAlign:'center'}}>
+                  <div style={{fontSize:10,color:'rgba(255,255,255,0.55)',fontWeight:800}}>Gross</div>
+                  <div style={{fontSize:17,color:'#fff',fontWeight:900,lineHeight:1.1}}>{nineGross}</div>
+                  <div style={{fontSize:10,color:'#60b8f0',fontWeight:900,marginTop:4}}>Stableford</div>
+                  <div style={{fontSize:18,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{nineStableford}</div>
+                  {label==='BACK 9'&&<div style={{marginTop:7,paddingTop:7,borderTop:'1px solid rgba(255,255,255,0.12)'}}><div style={{fontSize:10,color:'rgba(255,255,255,0.55)',fontWeight:800}}>Total gross</div><div style={{fontSize:18,color:'#fff',fontWeight:950,lineHeight:1.05}}>{roundGross}</div><div style={{fontSize:10,color:'#60b8f0',fontWeight:900,marginTop:3}}>Total Stableford</div><div style={{fontSize:20,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{roundStableford}</div></div>}
+                </div>,
+                <div key={p.id+'nine-total-spacer'}></div>
+              ];
+            })}
           </div>
         </div>
       </div>
@@ -2225,7 +2229,14 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
               return <div key={p.id} style={{borderLeft:'1px solid rgba(255,255,255,0.08)',padding:'7px 6px',textAlign:'center'}}>
                 <div style={{fontSize:10,color:'rgba(255,255,255,0.5)',fontWeight:800}}>Gross</div>
                 <div style={{fontSize:18,color:'#fff',fontWeight:900,lineHeight:1.1}}>{getGrossTotal(p.id,nine)}</div>
-                <div style={{fontSize:10,color:'#60b8f0',fontWeight:800,marginTop:4}}>Stableford {getStablefordTotal(p.id,nine)}</div>
+                <div style={{fontSize:10,color:'#60b8f0',fontWeight:900,marginTop:4}}>Stableford</div>
+                <div style={{fontSize:20,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{getStablefordTotal(p.id,nine)}</div>
+                {sec===1&&<div style={{marginTop:7,paddingTop:7,borderTop:'1px solid rgba(255,255,255,0.12)'}}>
+                  <div style={{fontSize:10,color:'rgba(255,255,255,0.5)',fontWeight:800}}>Total gross</div>
+                  <div style={{fontSize:19,color:'#fff',fontWeight:950,lineHeight:1.05}}>{getGrossTotal(p.id,holes)}</div>
+                  <div style={{fontSize:10,color:'#60b8f0',fontWeight:900,marginTop:4}}>Total Stableford</div>
+                  <div style={{fontSize:21,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{getStablefordTotal(p.id,holes)}</div>
+                </div>}
               </div>;
             })}
           </div>}
