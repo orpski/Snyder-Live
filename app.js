@@ -1,4 +1,4 @@
-// SNYDER LIVE v74
+// SNYDER LIVE v75
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2176,8 +2176,8 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             <div style={{fontSize:9,color:'#60b8f0',textTransform:'uppercase',letterSpacing:'0.08em'}}>Hole</div>
             {grpPlayers.map(p=>(
               <div key={p.id} style={{textAlign:'center',padding:'3px 0'}}>
-                <div style={{fontSize:16,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',letterSpacing:'0.01em'}}>{((p.name||p.display_name)||'?').split(' ')[0]}</div>
-                <div style={{fontSize:10,color:'#90ccf0',fontWeight:700}}>HCP {playingHcps[p.id]||0}</div>
+                <div style={{fontSize:16,color:'#fbbf24',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',letterSpacing:'0.01em'}}>{((p.name||p.display_name)||'?').split(' ')[0]}</div>
+                <div style={{fontSize:10,color:'#fde68a',fontWeight:700}}>HCP {playingHcps[p.id]||0}</div>
               </div>
             ))}
           </div>
@@ -2246,7 +2246,6 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
 
       {f9complete&&!showReview&&(
         <div style={{margin:16,...S.card,textAlign:'center',background:'rgba(0,112,187,0.15)',borderColor:'rgba(0,112,187,0.4)'}}>
-          <div style={{fontSize:14,color:'#fff',marginBottom:8}}>Front 9 complete!</div>
           <button onClick={()=>{if(canEdit)saveAll();setEndStep(2);setShowEnd(true);}} style={{...S.pri,fontSize:13}}>Stats</button>
         </div>
       )}
