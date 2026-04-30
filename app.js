@@ -1,4 +1,4 @@
-// SNYDER LIVE v70
+// SNYDER LIVE v71
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -440,7 +440,7 @@ function App(){
         const{data:grps}=await sb.from('cup_groups').select('*').eq('round_id',rd.id);
         const grp=grps&&grps[0];
         if(grp){
-          setSelectedRound({...rd,_spectator:true,_group:{...grp,participants:po,playing_handicaps:hm}});
+          setSelectedRound({...rd,_spectator:true,_watchLink:true,_group:{...grp,participants:po,playing_handicaps:hm}});
           setViewRaw('play');
         }
       });
@@ -1461,7 +1461,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         setOverallScores(scs||[]);
         const userGrp=normalised.find(g=>currentUser&&(g.player_ids||[]).some(id=>normaliseId(id)===normaliseId(currentUser.id)));
         if(userGrp)setActiveGroupId(userGrp.id);
-        else if(!group||round._spectator)setActiveGroupId('leaderboard');
+        else if(!group||!group.id&&round._spectator)setActiveGroupId('leaderboard');
       }catch(e){/* keep current group if loading extra tabs fails */}
     }
     loadRoundGroups();
@@ -1669,6 +1669,18 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     }
     return t;
   }
+  function getGrossTotal(pid,holeList){
+    return (holeList||[]).reduce((t,h)=>{
+      const g=(holeScores[h.hole]||{})[pid];
+      return t+(g&&g>0?parseInt(g)||0:0);
+    },0);
+  }
+  function getStablefordTotal(pid,holeList){
+    return (holeList||[]).reduce((t,h)=>{
+      const g=(holeScores[h.hole]||{})[pid];
+      return t+(g===-1?0:(getPts(g,h.hole,pid)||0));
+    },0);
+  }
 
     // ---------------------------------------------------------
   // Manual full score save
@@ -1853,6 +1865,22 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
               })}
             </div>
           ))}
+          <div style={{display:'grid',gridTemplateColumns:cols,padding:'7px 8px',gap:4,borderTop:'1px solid rgba(255,255,255,0.16)',background:'rgba(0,112,187,0.14)',alignItems:'center'}}>
+            <div style={{textAlign:'center',fontSize:11,color:'#60b8f0',fontWeight:800}}>Gross</div>
+            <div></div>
+            {grpPlayers.flatMap(p=>[
+              <div key={p.id+'gross-total'} style={{textAlign:'center',fontSize:15,color:'#fff',fontWeight:900}}>{getGrossTotal(p.id,holeList)}</div>,
+              <div key={p.id+'gross-spacer'}></div>
+            ])}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:cols,padding:'7px 8px',gap:4,background:'rgba(255,255,255,0.05)',alignItems:'center'}}>
+            <div style={{textAlign:'center',fontSize:11,color:'#60b8f0',fontWeight:800}}>Stableford</div>
+            <div></div>
+            {grpPlayers.flatMap(p=>[
+              <div key={p.id+'stableford-spacer'}></div>,
+              <div key={p.id+'stableford-total'} style={{display:'flex',alignItems:'center',justifyContent:'center'}}><div style={{background:'#0070BB',borderRadius:4,width:28,height:22,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:'#fff',fontWeight:900}}>{getStablefordTotal(p.id,holeList)}</div></div>
+            ])}
+          </div>
         </div>
       </div>
     );
@@ -1920,8 +1948,10 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             <div style={{display:'grid',gridTemplateColumns:'80px '+grpPlayers.map(()=>'1fr').join(' '),gap:6,alignItems:'center'}}>
               <div style={{fontSize:11,color:'#60b8f0'}}>Total</div>
               {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:11,color:'#60b8f0'}}>{((p.name||p.display_name)||'?').split(' ')[0]}</div>)}
-              <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:6}}>Stableford</div>
-              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:22,color:'#fff',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:4}}>{getRunning(p.id,holes.length)}</div>)}
+              <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:6}}>Gross</div>
+              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:22,color:'#fff',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:4}}>{getGrossTotal(p.id,holes)}</div>)}
+              <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',paddingTop:2}}>Stableford</div>
+              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:22,color:'#60b8f0',paddingTop:2}}>{getRunning(p.id,holes.length)}</div>)}
             </div>
           </div>
         </div>
@@ -2188,6 +2218,17 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
               </div>
             );
           })}
+          {activeGroupId!=='leaderboard'&&<div style={{display:'grid',gridTemplateColumns:'80px '+grpPlayers.map(()=>'1fr').join(' '),borderBottom:'1px solid rgba(255,255,255,0.12)',background:'rgba(0,112,187,0.12)'}}>
+            <div style={{padding:'9px 12px',fontSize:11,color:'#60b8f0',fontWeight:900,textTransform:'uppercase'}}>{sec===0?'Front':'Back'} 9</div>
+            {grpPlayers.map(p=>{
+              const nine=sec===0?front9:back9;
+              return <div key={p.id} style={{borderLeft:'1px solid rgba(255,255,255,0.08)',padding:'7px 6px',textAlign:'center'}}>
+                <div style={{fontSize:10,color:'rgba(255,255,255,0.5)',fontWeight:800}}>Gross</div>
+                <div style={{fontSize:18,color:'#fff',fontWeight:900,lineHeight:1.1}}>{getGrossTotal(p.id,nine)}</div>
+                <div style={{fontSize:10,color:'#60b8f0',fontWeight:800,marginTop:4}}>Stableford {getStablefordTotal(p.id,nine)}</div>
+              </div>;
+            })}
+          </div>}
         </div>
       ))}
 
