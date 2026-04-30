@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Tynemouth Golf Club">
+  <rect width="256" height="256" fill="#ffffff"/>
+  <path d="M34 18h188v118c0 50-37 82-94 108-57-26-94-58-94-108V18z" fill="#4b0610"/>
+  <path d="M51 35h154v101c0 38-26 64-77 88-51-24-77-50-77-88V35z" fill="none" stroke="#ffffff" stroke-width="7"/>
+  <path d="M66 50h124v83c0 31-20 51-62 71-42-20-62-40-62-71V50z" fill="none" stroke="#ffffff" stroke-width="3"/>
+  <text x="128" y="86" text-anchor="middle" font-family="Georgia, Times New Roman, serif" font-size="31" font-weight="700" fill="#ffffff">T.G.C.</text>
+  <g stroke="#ffffff" stroke-width="6" stroke-linecap="round">
+    <path d="M91 116l74 52"/>
+    <path d="M165 116l-74 52"/>
+  </g>
+  <g fill="#ffffff">
+    <path d="M128 111l7 10 12 2-8 8 2 12-13-6-13 6 2-12-8-8 12-2z"/>
+    <path d="M101 144l6 8 10 2-7 7 2 10-11-5-11 5 2-10-7-7 10-2z"/>
+    <path d="M155 144l6 8 10 2-7 7 2 10-11-5-11 5 2-10-7-7 10-2z"/>
+  </g>
+  <g fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round">
+    <path d="M82 184c-18-23-28-48-29-82"/>
+    <path d="M174 184c18-23 28-48 29-82"/>
+    <path d="M70 168l-13 2M76 158l-13-1M70 147l-12-4M73 136l-11-6M72 124l-9-8M75 113l-8-10"/>
+    <path d="M186 168l13 2M180 158l13-1M186 147l12-4M183 136l11-6M184 124l9-8M181 113l8-10"/>
+  </g>
+</svg>

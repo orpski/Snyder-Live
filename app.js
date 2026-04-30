@@ -1,4 +1,4 @@
-// SNYDER LIVE v86
+// SNYDER LIVE v87
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -40,13 +40,32 @@ const WHITLEY_BAY_PRESETS=[
     {hole:1,par:5,stroke_index:10,yards:375},{hole:2,par:5,stroke_index:14,yards:388},{hole:3,par:3,stroke_index:16,yards:149},{hole:4,par:4,stroke_index:18,yards:310},{hole:5,par:4,stroke_index:8,yards:340},{hole:6,par:5,stroke_index:4,yards:458},{hole:7,par:4,stroke_index:2,yards:358},{hole:8,par:4,stroke_index:6,yards:322},{hole:9,par:3,stroke_index:12,yards:142},{hole:10,par:4,stroke_index:9,yards:319},{hole:11,par:4,stroke_index:13,yards:340},{hole:12,par:5,stroke_index:1,yards:522},{hole:13,par:3,stroke_index:15,yards:161},{hole:14,par:4,stroke_index:3,yards:372},{hole:15,par:4,stroke_index:5,yards:326},{hole:16,par:5,stroke_index:7,yards:370},{hole:17,par:3,stroke_index:17,yards:118},{hole:18,par:5,stroke_index:11,yards:384}
   ]}
 ];
-function cleanCourseName(name){return String(name||'').replace(/\s*-\s*(White|Yellow|Red|Orange)\s*Tee\s*$/i,'').trim();}
-function courseTeeFromName(name){const m=String(name||'').match(/\s*-\s*(White|Yellow|Red|Orange)\s*Tee\s*$/i);return m?m[1].charAt(0).toUpperCase()+m[1].slice(1).toLowerCase():'';}
+const TYNEMOUTH_BADGE='course-tynemouth.svg';
+const TYNEMOUTH_PRESETS=[
+  {name:'Tynemouth Golf Club - White Tee',location:'North Shields',image_url:TYNEMOUTH_BADGE,course_rating:70.4,slope_rating:137,holes:[
+    {hole:1,par:4,stroke_index:8,yards:386},{hole:2,par:4,stroke_index:16,yards:343},{hole:3,par:3,stroke_index:10,yards:176},{hole:4,par:4,stroke_index:2,yards:381},{hole:5,par:4,stroke_index:14,yards:407},{hole:6,par:4,stroke_index:4,yards:366},{hole:7,par:3,stroke_index:18,yards:156},{hole:8,par:5,stroke_index:6,yards:510},{hole:9,par:4,stroke_index:12,yards:358},{hole:10,par:4,stroke_index:5,yards:356},{hole:11,par:3,stroke_index:11,yards:182},{hole:12,par:5,stroke_index:3,yards:549},{hole:13,par:4,stroke_index:13,yards:379},{hole:14,par:4,stroke_index:1,yards:380},{hole:15,par:4,stroke_index:15,yards:356},{hole:16,par:4,stroke_index:7,yards:356},{hole:17,par:3,stroke_index:17,yards:166},{hole:18,par:4,stroke_index:9,yards:375}
+  ]},
+  {name:'Tynemouth Golf Club - Yellow Men Tee',location:'North Shields',image_url:TYNEMOUTH_BADGE,course_rating:68.7,slope_rating:133,holes:[
+    {hole:1,par:4,stroke_index:8,yards:383},{hole:2,par:4,stroke_index:16,yards:321},{hole:3,par:3,stroke_index:10,yards:169},{hole:4,par:4,stroke_index:2,yards:371},{hole:5,par:4,stroke_index:14,yards:378},{hole:6,par:4,stroke_index:4,yards:322},{hole:7,par:3,stroke_index:18,yards:140},{hole:8,par:5,stroke_index:6,yards:500},{hole:9,par:4,stroke_index:12,yards:350},{hole:10,par:4,stroke_index:5,yards:348},{hole:11,par:3,stroke_index:11,yards:171},{hole:12,par:5,stroke_index:3,yards:534},{hole:13,par:4,stroke_index:13,yards:364},{hole:14,par:4,stroke_index:1,yards:365},{hole:15,par:4,stroke_index:15,yards:347},{hole:16,par:4,stroke_index:7,yards:328},{hole:17,par:3,stroke_index:17,yards:153},{hole:18,par:4,stroke_index:9,yards:351}
+  ]},
+  {name:'Tynemouth Golf Club - Red Men Tee',location:'North Shields',image_url:TYNEMOUTH_BADGE,course_rating:66.9,slope_rating:121,holes:[
+    {hole:1,par:4,stroke_index:8,yards:378},{hole:2,par:4,stroke_index:16,yards:306},{hole:3,par:3,stroke_index:10,yards:155},{hole:4,par:4,stroke_index:2,yards:361},{hole:5,par:4,stroke_index:14,yards:401},{hole:6,par:4,stroke_index:4,yards:304},{hole:7,par:3,stroke_index:18,yards:120},{hole:8,par:5,stroke_index:6,yards:459},{hole:9,par:4,stroke_index:12,yards:320},{hole:10,par:4,stroke_index:5,yards:296},{hole:11,par:3,stroke_index:11,yards:156},{hole:12,par:5,stroke_index:3,yards:490},{hole:13,par:4,stroke_index:13,yards:354},{hole:14,par:4,stroke_index:1,yards:346},{hole:15,par:4,stroke_index:15,yards:314},{hole:16,par:4,stroke_index:7,yards:274},{hole:17,par:3,stroke_index:17,yards:118},{hole:18,par:4,stroke_index:9,yards:343}
+  ]},
+  {name:'Tynemouth Golf Club - Red Women Tee',location:'North Shields',image_url:TYNEMOUTH_BADGE,course_rating:73.2,slope_rating:131,holes:[
+    {hole:1,par:5,stroke_index:8,yards:378},{hole:2,par:4,stroke_index:16,yards:306},{hole:3,par:3,stroke_index:10,yards:155},{hole:4,par:4,stroke_index:2,yards:361},{hole:5,par:5,stroke_index:14,yards:401},{hole:6,par:4,stroke_index:4,yards:304},{hole:7,par:3,stroke_index:18,yards:120},{hole:8,par:5,stroke_index:6,yards:459},{hole:9,par:4,stroke_index:12,yards:320},{hole:10,par:4,stroke_index:5,yards:296},{hole:11,par:3,stroke_index:11,yards:156},{hole:12,par:5,stroke_index:3,yards:490},{hole:13,par:4,stroke_index:13,yards:354},{hole:14,par:4,stroke_index:1,yards:346},{hole:15,par:4,stroke_index:15,yards:314},{hole:16,par:4,stroke_index:7,yards:274},{hole:17,par:3,stroke_index:17,yards:118},{hole:18,par:4,stroke_index:9,yards:343}
+  ]},
+  {name:'Tynemouth Golf Club - Red Women Alt Tee',location:'North Shields',image_url:TYNEMOUTH_BADGE,course_rating:72.8,slope_rating:130,holes:[
+    {hole:1,par:5,stroke_index:8,yards:378},{hole:2,par:4,stroke_index:16,yards:306},{hole:3,par:3,stroke_index:10,yards:155},{hole:4,par:4,stroke_index:2,yards:361},{hole:5,par:5,stroke_index:14,yards:401},{hole:6,par:4,stroke_index:4,yards:304},{hole:7,par:3,stroke_index:18,yards:120},{hole:8,par:5,stroke_index:6,yards:459},{hole:9,par:4,stroke_index:12,yards:320},{hole:10,par:4,stroke_index:5,yards:296},{hole:11,par:3,stroke_index:11,yards:156},{hole:12,par:5,stroke_index:3,yards:490},{hole:13,par:4,stroke_index:13,yards:354},{hole:14,par:4,stroke_index:1,yards:346},{hole:15,par:4,stroke_index:15,yards:314},{hole:16,par:4,stroke_index:7,yards:274},{hole:17,par:3,stroke_index:17,yards:118},{hole:18,par:4,stroke_index:9,yards:343}
+  ]}
+];
+function cleanCourseName(name){return String(name||'').replace(/\s*-\s*[^-]+?\s*Tee\s*$/i,'').trim();}
+function courseTeeFromName(name){const m=String(name||'').match(/\s*-\s*([^-]+?)\s*Tee\s*$/i);return m?m[1].trim().replace(/\s+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()):'';}
 function getCourseName(course,round){return cleanCourseName((course&&course.name)||(round&&round.course_name)||'');}
 function getCourseDisplayName(course,round){return getCourseName(course,round);}
 function courseKey(course){return cleanCourseName(course&&course.name).toLowerCase()+'|'+(courseTeeFromName(course&&course.name)||course&&course.tee||'White').toLowerCase();}
-function isProtectedCourse(course){const name=cleanCourseName(course&&course.name).toLowerCase();return name==='whitley bay golf club'||name.includes('whitley bay golf club');}
-function mergePresetCourses(dbCourses){const merged=[...(dbCourses||[])];const keys=new Set(merged.map(courseKey));(WHITLEY_BAY_PRESETS||[]).forEach((preset,i)=>{const tee=courseTeeFromName(preset.name)||['White','Yellow','Red'][i]||'White';const withId={...preset,id:preset.id||('preset-whitley-bay-'+tee.toLowerCase()),tee};if(!keys.has(courseKey(withId))){merged.push(withId);keys.add(courseKey(withId));}});return merged;}
+function isProtectedCourse(course){const name=cleanCourseName(course&&course.name).toLowerCase();return name==='whitley bay golf club'||name.includes('whitley bay golf club')||name==='tynemouth golf club'||name.includes('tynemouth golf club');}
+function presetIdForCourse(preset){return 'preset-'+cleanCourseName(preset.name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'-'+(courseTeeFromName(preset.name)||preset.tee||'white').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
+function mergePresetCourses(dbCourses){const merged=[...(dbCourses||[])];const keys=new Set(merged.map(courseKey));[...WHITLEY_BAY_PRESETS,...TYNEMOUTH_PRESETS].forEach(preset=>{const tee=courseTeeFromName(preset.name)||preset.tee||'White';const withId={...preset,id:preset.id||presetIdForCourse(preset),tee};if(!keys.has(courseKey(withId))){merged.push(withId);keys.add(courseKey(withId));}});return merged;}
 function getCourseOptions(courses){const byName=new Map();(courses||[]).forEach(c=>{if(!c)return;const base=cleanCourseName(c.name);if(!base)return;const tee=courseTeeFromName(c.name)||c.tee||'White';if(!byName.has(base))byName.set(base,{name:base,course:c,tees:{}});const item=byName.get(base);item.tees[tee]=c;if(!item.course||tee==='White')item.course=c;});return Array.from(byName.values()).sort((a,b)=>a.name.localeCompare(b.name));}
 function findCourseForTee(courses,baseName,tee){const cleanBase=cleanCourseName(baseName);const option=getCourseOptions(courses).find(o=>o.name===cleanBase);if(!option)return null;return option.tees[tee]||option.course||Object.values(option.tees)[0]||null;}
 function idMatches(a,b){return a!=null&&b!=null&&String(a)===String(b);}
@@ -65,6 +84,7 @@ function getCourseBadge(course,round){
   if(course&&course.image_url)return course.image_url;
   const name=getCourseName(course,round).toLowerCase();
   if(name.includes('whitley bay'))return WHITLEY_BAY_BADGE;
+  if(name.includes('tynemouth'))return TYNEMOUTH_BADGE;
   return '';
 }
 function getCourseInitials(course,round){
