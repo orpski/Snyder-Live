@@ -1,4 +1,4 @@
-// SNYDER LIVE v87
+// SNYDER LIVE v88
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -30,13 +30,13 @@ const LOGO='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAYAAAB5fY51AA
 // =========================================================
 const WHITLEY_BAY_BADGE='course-whitley-bay.png';
 const WHITLEY_BAY_PRESETS=[
-  {name:'Whitley Bay Golf Club - White Tee',location:'Whitley Bay',image_url:WHITLEY_BAY_BADGE,holes:[
-    {hole:1,par:5,stroke_index:12,yards:476},{hole:2,par:4,stroke_index:2,yards:422},{hole:3,par:3,stroke_index:18,yards:172},{hole:4,par:4,stroke_index:14,yards:377},{hole:5,par:4,stroke_index:4,yards:391},{hole:6,par:5,stroke_index:8,yards:515},{hole:7,par:4,stroke_index:6,yards:374},{hole:8,par:4,stroke_index:16,yards:352},{hole:9,par:3,stroke_index:10,yards:155},{hole:10,par:4,stroke_index:15,yards:330},{hole:11,par:4,stroke_index:5,yards:414},{hole:12,par:5,stroke_index:1,yards:582},{hole:13,par:3,stroke_index:17,yards:162},{hole:14,par:4,stroke_index:11,yards:390},{hole:15,par:4,stroke_index:9,yards:384},{hole:16,par:4,stroke_index:3,yards:409},{hole:17,par:3,stroke_index:13,yards:189},{hole:18,par:5,stroke_index:7,yards:459}
+  {name:'Whitley Bay Golf Club - White Tee',location:'Whitley Bay',image_url:WHITLEY_BAY_BADGE,course_rating:72.7,slope_rating:135,holes:[
+    {hole:1,par:5,stroke_index:12,yards:476},{hole:2,par:4,stroke_index:2,yards:422},{hole:3,par:3,stroke_index:18,yards:172},{hole:4,par:4,stroke_index:14,yards:377},{hole:5,par:4,stroke_index:4,yards:391},{hole:6,par:5,stroke_index:8,yards:515},{hole:7,par:4,stroke_index:6,yards:374},{hole:8,par:4,stroke_index:16,yards:352},{hole:9,par:3,stroke_index:10,yards:155},{hole:10,par:4,stroke_index:15,yards:356},{hole:11,par:4,stroke_index:5,yards:414},{hole:12,par:5,stroke_index:1,yards:582},{hole:13,par:3,stroke_index:17,yards:162},{hole:14,par:4,stroke_index:11,yards:390},{hole:15,par:4,stroke_index:9,yards:384},{hole:16,par:4,stroke_index:3,yards:409},{hole:17,par:3,stroke_index:13,yards:189},{hole:18,par:5,stroke_index:7,yards:459}
   ]},
-  {name:'Whitley Bay Golf Club - Yellow Tee',location:'Whitley Bay',image_url:WHITLEY_BAY_BADGE,holes:[
+  {name:'Whitley Bay Golf Club - Yellow Tee',location:'Whitley Bay',image_url:WHITLEY_BAY_BADGE,course_rating:71.5,slope_rating:127,holes:[
     {hole:1,par:5,stroke_index:12,yards:465},{hole:2,par:4,stroke_index:2,yards:406},{hole:3,par:3,stroke_index:18,yards:157},{hole:4,par:4,stroke_index:14,yards:368},{hole:5,par:4,stroke_index:4,yards:374},{hole:6,par:5,stroke_index:8,yards:501},{hole:7,par:4,stroke_index:6,yards:366},{hole:8,par:4,stroke_index:16,yards:334},{hole:9,par:3,stroke_index:10,yards:146},{hole:10,par:4,stroke_index:15,yards:337},{hole:11,par:4,stroke_index:5,yards:401},{hole:12,par:5,stroke_index:1,yards:566},{hole:13,par:3,stroke_index:17,yards:156},{hole:14,par:4,stroke_index:11,yards:381},{hole:15,par:4,stroke_index:9,yards:364},{hole:16,par:4,stroke_index:3,yards:400},{hole:17,par:3,stroke_index:13,yards:176},{hole:18,par:4,stroke_index:7,yards:406}
   ]},
-  {name:'Whitley Bay Golf Club - Red Tee',location:'Whitley Bay',image_url:WHITLEY_BAY_BADGE,holes:[
+  {name:'Whitley Bay Golf Club - Red Tee',location:'Whitley Bay',image_url:WHITLEY_BAY_BADGE,course_rating:74.1,slope_rating:134,holes:[
     {hole:1,par:5,stroke_index:10,yards:375},{hole:2,par:5,stroke_index:14,yards:388},{hole:3,par:3,stroke_index:16,yards:149},{hole:4,par:4,stroke_index:18,yards:310},{hole:5,par:4,stroke_index:8,yards:340},{hole:6,par:5,stroke_index:4,yards:458},{hole:7,par:4,stroke_index:2,yards:358},{hole:8,par:4,stroke_index:6,yards:322},{hole:9,par:3,stroke_index:12,yards:142},{hole:10,par:4,stroke_index:9,yards:319},{hole:11,par:4,stroke_index:13,yards:340},{hole:12,par:5,stroke_index:1,yards:522},{hole:13,par:3,stroke_index:15,yards:161},{hole:14,par:4,stroke_index:3,yards:372},{hole:15,par:4,stroke_index:5,yards:326},{hole:16,par:5,stroke_index:7,yards:370},{hole:17,par:3,stroke_index:17,yards:118},{hole:18,par:5,stroke_index:11,yards:384}
   ]}
 ];
@@ -122,6 +122,20 @@ function calcStableford(gross,par,si,hcp){
   const shots=Math.floor(hcp/18)+((hcp%18)>=si?1:0);
   const diff=par-(gross-shots);
   return Math.max(0,diff+2);
+}
+function rawCourseHandicap(handicapIndex,course){
+  const hi=parseFloat(handicapIndex)||0;
+  const slope=parseFloat(course&&course.slope_rating)||113;
+  const rating=parseFloat(course&&course.course_rating);
+  const par=(course&&course.holes||[]).reduce((t,h)=>t+(parseInt(h.par)||0),0)||0;
+  const ratingAdjust=Number.isFinite(rating)&&par?rating-par:0;
+  return Math.max(0,(hi*slope/113)+ratingAdjust);
+}
+function calcCourseHandicap(handicapIndex,course){
+  return Math.round(rawCourseHandicap(handicapIndex,course));
+}
+function calcPlayingHandicap(handicapIndex,course,allowance=1){
+  return Math.max(0,Math.round(rawCourseHandicap(handicapIndex,course)*(parseFloat(allowance)||1)));
 }
 
 function ptsColor(pts){
@@ -260,16 +274,17 @@ function Avatar({user,size=36}){
   );
 }
 
-function HandicapPicker({value,onChange,style={},buttonStyle={},label='Handicap'}){
+function HandicapPicker({value,onChange,style={},buttonStyle={},label='Handicap',step=1,min=-6,max=54,defaultValue=8}){
   const[open,setOpen]=useState(false);
   const hasValue=!(value===''||value==null||Number.isNaN(parseFloat(value)));
-  const current=hasValue?parseFloat(value):8;
-  const values=Array.from({length:61},(_,i)=>i-6);
-  const display=current;
+  const current=hasValue?parseFloat(value):defaultValue;
+  const count=Math.round((max-min)/step)+1;
+  const values=Array.from({length:count},(_,i)=>parseFloat((min+(i*step)).toFixed(step<1?1:0)));
+  const display=step<1?current.toFixed(1):current;
   const listRef=useRef(null);
   useEffect(()=>{
     if(!open||!listRef.current)return;
-    const idx=Math.max(0,values.findIndex(v=>v===current));
+    const idx=Math.max(0,values.findIndex(v=>Math.abs(v-current)<(step/2)));
     listRef.current.scrollTop=Math.max(0,idx*54-92);
   },[open,current]);
   function pick(v){onChange(v);setOpen(false);}
@@ -285,7 +300,7 @@ function HandicapPicker({value,onChange,style={},buttonStyle={},label='Handicap'
             </div>
             <div ref={listRef} style={{height:260,overflowY:'auto',scrollSnapType:'y mandatory',border:'1px solid rgba(255,255,255,0.12)',borderRadius:14,background:'rgba(255,255,255,0.05)',padding:'92px 12px'}}>
               {values.map(v=>(
-                <button type="button" key={v} onClick={()=>pick(v)} style={{width:'100%',height:48,marginBottom:6,borderRadius:10,border:v===current?'1px solid rgba(96,184,240,0.75)':'1px solid rgba(255,255,255,0.08)',background:v===current?'rgba(0,112,187,0.38)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:22,fontWeight:900,scrollSnapAlign:'center',cursor:'pointer'}}>{v}</button>
+                <button type="button" key={v} onClick={()=>pick(v)} style={{width:'100%',height:48,marginBottom:6,borderRadius:10,border:Math.abs(v-current)<(step/2)?'1px solid rgba(96,184,240,0.75)':'1px solid rgba(255,255,255,0.08)',background:Math.abs(v-current)<(step/2)?'rgba(0,112,187,0.38)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:22,fontWeight:900,scrollSnapAlign:'center',cursor:'pointer'}}>{step<1?v.toFixed(1):v}</button>
               ))}
             </div>
           </div>
@@ -1170,7 +1185,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   const[step,setStep]=useState('menu');
   const[activeRound,setActiveRound]=useState(null);
   const[activeGroup,setActiveGroup]=useState(null);
-  const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false});
+  const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:1});
   const[participants,setParticipants]=useState([]);
   const[groupSetup,setGroupSetup]=useState([[]]);
   const[pickerGroup,setPickerGroup]=useState(0);
@@ -1179,6 +1194,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   const[playerRange,setPlayerRange]=useState(null);
   const[openRoundBlock,setOpenRoundBlock]=useState(null);
   const[openRoundBlockCanDelete,setOpenRoundBlockCanDelete]=useState(false);
+  const[clearedLiveRoundIds,setClearedLiveRoundIds]=useState([]);
   const liveRounds=rounds.filter(r=>{
     if(!isLiveRound(r))return false;
     if(!r.is_private)return true;
@@ -1190,7 +1206,12 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   const courseOptions=getCourseOptions(courses);
   const selectedCourseOption=courseOptions.find(o=>o.name===setup.course_name)||courseOptions.find(o=>o.course&&o.course.id===setup.course_id)||null;
   const availableTees=selectedCourseOption?Object.keys(selectedCourseOption.tees):['White','Yellow','Red','Orange'];
+  const selectedCourse=courses.find(co=>co.id===setup.course_id)||findCourseForTee(courses,setup.course_name,setup.tee);
   const isSingleGroupDay=(playerRange==='1-4'||groupSetup.length<=1);
+  function withPlayingHandicap(person,course=selectedCourse,allowance=setup.allowance){
+    const handicapIndex=parseFloat(person.handicap_index!=null?person.handicap_index:person.current_handicap!=null?person.current_handicap:person.handicap)||0;
+    return {...person,handicap_index:handicapIndex,current_handicap:handicapIndex,playing_handicap:calcPlayingHandicap(handicapIndex,course,allowance)};
+  }
   function resetGroupsForRange(range){
     const count=groupCountForRange(range);
     const flat=groupSetup.flat();
@@ -1204,6 +1225,11 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   }
   function chooseCourse(baseName){const option=courseOptions.find(o=>o.name===baseName);const nextCourse=option?(option.tees[setup.tee]||option.tees.White||option.course):null;const nextTee=nextCourse?(courseTeeFromName(nextCourse.name)||nextCourse.tee||setup.tee):setup.tee;setSetup(q=>({...q,course_name:baseName,course_id:nextCourse?nextCourse.id:'',tee:nextTee}));}
   function chooseTee(tee){const baseName=setup.course_name||(selectedCourseOption&&selectedCourseOption.name)||'';const nextCourse=findCourseForTee(courses,baseName,tee);setSetup(q=>({...q,tee,course_id:nextCourse?nextCourse.id:q.course_id}));}
+  useEffect(()=>{
+    if(!selectedCourse)return;
+    const next=groupSetup.map(g=>g.map(p=>withPlayingHandicap(p,selectedCourse,setup.allowance)));
+    syncGroups(next);
+  },[setup.course_id,setup.allowance]);
   async function continueRound(rd){
     const rdGroups=groups.filter(g=>g.round_id===rd.id);
     const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
@@ -1256,7 +1282,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     if(flat.find(p=>normaliseId(p.id)===normaliseId(person.id))){flash('Already added');return;}
     const idx=Math.max(0,Math.min(pickerGroup,groupSetup.length-1));
     const next=groupSetup.map(g=>[...g]);
-    next[idx].push({...person,playing_handicap:person.current_handicap||person.handicap||0});
+    next[idx].push(withPlayingHandicap(person));
     syncGroups(next);
     setShowPicker(false);
   }
@@ -1265,16 +1291,17 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     syncGroups(next);
   }
   function updateGroupHandicap(groupIdx,playerId,value){
-    const next=groupSetup.map((g,i)=>i===groupIdx?g.map(p=>normaliseId(p.id)===normaliseId(playerId)?{...p,playing_handicap:parseFloat(value)||0}:p):[...g]);
+    const next=groupSetup.map((g,i)=>i===groupIdx?g.map(p=>normaliseId(p.id)===normaliseId(playerId)?withPlayingHandicap({...p,handicap_index:parseFloat(value)||0,current_handicap:parseFloat(value)||0}):p):[...g]);
     syncGroups(next);
   }
   function blockingLiveRound(){
-    return myLiveRounds[0]||null;
+    return myLiveRounds.find(r=>!clearedLiveRoundIds.some(id=>normaliseId(id)===normaliseId(r.id)))||null;
   }
   async function finishBlockedRound(){
     if(!openRoundBlock)return;
     const{error}=await sb.from('cup_rounds').update({status:'complete'}).eq('id',openRoundBlock.id);
     if(error){flash(error.message||'Could not finish previous round','error');return;}
+    setClearedLiveRoundIds(ids=>ids.some(id=>normaliseId(id)===normaliseId(openRoundBlock.id))?ids:[...ids,openRoundBlock.id]);
     setOpenRoundBlock(null);
     setOpenRoundBlockCanDelete(false);
     await load();
@@ -1289,6 +1316,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
     const{error}=await sb.from('cup_rounds').delete().eq('id',openRoundBlock.id);
     if(error){flash(error.message||'Could not delete previous round','error');return;}
     try{localStorage.removeItem('scores_'+openRoundBlock.id);localStorage.removeItem('pending_scores_'+openRoundBlock.id);}catch(e){}
+    setClearedLiveRoundIds(ids=>ids.some(id=>normaliseId(id)===normaliseId(openRoundBlock.id))?ids:[...ids,openRoundBlock.id]);
     setOpenRoundBlock(null);
     setOpenRoundBlockCanDelete(false);
     await load();
@@ -1335,6 +1363,11 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
       let{data:rd,error:roundErr}=await sb.from('cup_rounds').insert(roundPayload).select().single();
       if(roundErr&&String(roundErr.message||'').toLowerCase().includes('created_by')){
         delete roundPayload.created_by;
+        const retry=await sb.from('cup_rounds').insert(roundPayload).select().single();
+        rd=retry.data;roundErr=retry.error;
+      }
+      if(roundErr&&String(roundErr.message||'').toLowerCase().includes('course')){
+        roundPayload.course_id=null;
         const retry=await sb.from('cup_rounds').insert(roundPayload).select().single();
         rd=retry.data;roundErr=retry.error;
       }
@@ -1444,6 +1477,21 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
           <select style={{...S.inp,marginBottom:12}} value={setup.tee} onChange={e=>chooseTee(e.target.value)} disabled={!setup.course_name}>
             {(availableTees.length?availableTees:['White','Yellow','Red','Orange']).map(t=><option key={t}>{t}</option>)}
           </select>
+          {selectedCourse&&(
+            <div style={{...S.card,marginBottom:12,padding:12,background:'rgba(96,184,240,0.08)',borderColor:'rgba(96,184,240,0.2)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'center',marginBottom:10}}>
+                <div>
+                  <div style={{fontSize:12,color:'#60b8f0',fontWeight:800}}>Slope {selectedCourse.slope_rating||113}</div>
+                  <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>Enter Handicap Index. Shots are calculated for this tee.</div>
+                </div>
+                <select value={setup.allowance} onChange={e=>setSetup(q=>({...q,allowance:parseFloat(e.target.value)||1}))} style={{...S.inp,width:118,padding:'8px 10px',fontSize:12}}>
+                  <option value={1}>Full shots</option>
+                  <option value={0.95}>95% comp</option>
+                </select>
+              </div>
+              <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>Course rating {selectedCourse.course_rating||'-'} · Par {(selectedCourse.holes||[]).reduce((t,h)=>t+(parseInt(h.par)||0),0)||'-'}</div>
+            </div>
+          )}
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',background:'rgba(255,255,255,0.06)',borderRadius:10,marginBottom:16,border:'1px solid rgba(255,255,255,0.12)'}}>
             <div>
               <div style={{fontSize:14,color:'#fff',fontWeight:500}}>Private Round</div>
@@ -1466,8 +1514,11 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
             {participants.length===0&&<div style={{...S.card,fontSize:13,color:'rgba(255,255,255,0.5)',textAlign:'center'}}>No players added yet</div>}
             {participants.map(p=>(
               <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,padding:'10px 12px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
-                <div style={{flex:1,fontSize:14,color:'#fff',fontWeight:700}}>{p.display_name||p.name}</div>
-                <HandicapPicker value={p.playing_handicap} onChange={v=>updateGroupHandicap(0,p.id,v)} style={{width:60,padding:'4px 8px',fontSize:13}} label={(p.display_name||p.name||'Player')+' handicap'}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,color:'#fff',fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||p.name}</div>
+                  <div style={{fontSize:11,color:'#60b8f0'}}>HI {parseFloat(p.handicap_index??p.current_handicap??0).toFixed(1)} · {p.playing_handicap||0} shots</div>
+                </div>
+                <HandicapPicker value={p.handicap_index??p.current_handicap} onChange={v=>updateGroupHandicap(0,p.id,v)} style={{width:68,padding:'4px 8px',fontSize:13}} label={(p.display_name||p.name||'Player')+' Handicap Index'} step={0.1} min={0} max={54} defaultValue={8}/>
                 <button onClick={()=>removeFromGroup(0,p.id)} style={{...S.dan,padding:'4px 10px',fontSize:12}}>x</button>
               </div>
             ))}
@@ -1484,8 +1535,11 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
                 {bucket.length===0&&<div style={{fontSize:12,color:'rgba(255,255,255,0.45)',padding:'8px 0'}}>No players added yet</div>}
                 {bucket.map(p=>(
                   <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,marginTop:8,padding:'10px 12px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
-                    <div style={{flex:1,fontSize:14,color:'#fff',fontWeight:700}}>{p.display_name||p.name}</div>
-                    <HandicapPicker value={p.playing_handicap} onChange={v=>updateGroupHandicap(groupIdx,p.id,v)} style={{width:60,padding:'4px 8px',fontSize:13}} label={(p.display_name||p.name||'Player')+' handicap'}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:14,color:'#fff',fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||p.name}</div>
+                      <div style={{fontSize:11,color:'#60b8f0'}}>HI {parseFloat(p.handicap_index??p.current_handicap??0).toFixed(1)} · {p.playing_handicap||0} shots</div>
+                    </div>
+                    <HandicapPicker value={p.handicap_index??p.current_handicap} onChange={v=>updateGroupHandicap(groupIdx,p.id,v)} style={{width:68,padding:'4px 8px',fontSize:13}} label={(p.display_name||p.name||'Player')+' Handicap Index'} step={0.1} min={0} max={54} defaultValue={8}/>
                     <button onClick={()=>removeFromGroup(groupIdx,p.id)} style={{...S.dan,padding:'4px 10px',fontSize:12}}>x</button>
                   </div>
                 ))}
@@ -1567,7 +1621,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
 // Hole entry, running totals, review pages, sharing and finish-round controls
 // =========================================================
 function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeScores,setHoleScores,currentUser}){
-  const course=courses.find(co=>co.id===round.course_id);
+  const course=courses.find(co=>co.id===round.course_id)||findCourseForTee(courses,round.course_name,round.tee);
   const holes=course&&course.holes&&course.holes.length>0?course.holes:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1,yards:0}));
   const[allGroups,setAllGroups]=useState(group?[group]:[]);
   const[allRoundPlayers,setAllRoundPlayers]=useState((group&&group.participants)||[]);
