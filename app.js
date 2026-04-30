@@ -1,4 +1,4 @@
-// SNYDER LIVE v92
+// SNYDER LIVE v93
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -394,8 +394,8 @@ function UserAuth({onLogin,onClose,initialMode='login',promptTitle,promptText,si
           <div>
             <label style={S.lbl}>Display Name</label>
             <input style={{...S.inp,marginBottom:12}} value={name} onChange={e=>setName(e.target.value)} placeholder="Your name"/>
-            <label style={S.lbl}>Handicap</label>
-            <HandicapPicker value={hcp} onChange={setHcp} style={{marginBottom:12}}/>
+            <label style={S.lbl}>EG Handicap</label>
+            <HandicapPicker value={hcp} onChange={setHcp} style={{marginBottom:12}} label="EG Handicap" step={0.1} min={0} max={54} defaultValue={18}/>
           </div>
         )}
         <label style={S.lbl}>Username</label>
@@ -1161,7 +1161,7 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
           <div style={{fontSize:13,color:'#fff',marginTop:8}}>HCP {currentUser&&currentUser.handicap}</div>
           {editing
             ?<div style={{marginTop:12}}>
-              <HandicapPicker value={hcp} onChange={setHcp} style={{marginBottom:8}} label="Your handicap"/>
+              <HandicapPicker value={hcp} onChange={setHcp} style={{marginBottom:8}} label="Your EG Handicap" step={0.1} min={0} max={54} defaultValue={parseFloat(currentUser&&currentUser.handicap)||18}/>
               <button onClick={saveHcp} style={{...S.pri,marginRight:8}}>Save</button>
               <button onClick={()=>setEditing(false)} style={S.gho}>Cancel</button>
             </div>
