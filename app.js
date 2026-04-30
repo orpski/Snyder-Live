@@ -1,4 +1,4 @@
-// SNYDER LIVE v88
+// SNYDER LIVE v89
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -65,7 +65,32 @@ function getCourseDisplayName(course,round){return getCourseName(course,round);}
 function courseKey(course){return cleanCourseName(course&&course.name).toLowerCase()+'|'+(courseTeeFromName(course&&course.name)||course&&course.tee||'White').toLowerCase();}
 function isProtectedCourse(course){const name=cleanCourseName(course&&course.name).toLowerCase();return name==='whitley bay golf club'||name.includes('whitley bay golf club')||name==='tynemouth golf club'||name.includes('tynemouth golf club');}
 function presetIdForCourse(preset){return 'preset-'+cleanCourseName(preset.name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'-'+(courseTeeFromName(preset.name)||preset.tee||'white').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
-function mergePresetCourses(dbCourses){const merged=[...(dbCourses||[])];const keys=new Set(merged.map(courseKey));[...WHITLEY_BAY_PRESETS,...TYNEMOUTH_PRESETS].forEach(preset=>{const tee=courseTeeFromName(preset.name)||preset.tee||'White';const withId={...preset,id:preset.id||presetIdForCourse(preset),tee};if(!keys.has(courseKey(withId))){merged.push(withId);keys.add(courseKey(withId));}});return merged;}
+function isRealDbId(id){return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id||''));}
+function safeCourseIdForDb(course,setupCourseId){const id=(course&&course.id)||setupCourseId||null;return isRealDbId(id)?id:null;}
+function hasCourseRatingValue(value){return Number.isFinite(parseFloat(value));}
+function hasCourseHoles(course){return Array.isArray(course&&course.holes)&&course.holes.length>0;}
+function mergePresetCourses(dbCourses){
+  const presets=[...WHITLEY_BAY_PRESETS,...TYNEMOUTH_PRESETS].map(preset=>{
+    const tee=courseTeeFromName(preset.name)||preset.tee||'White';
+    return {...preset,id:preset.id||presetIdForCourse(preset),tee};
+  });
+  const presetByKey=new Map(presets.map(p=>[courseKey(p),p]));
+  const merged=(dbCourses||[]).map(course=>{
+    const preset=presetByKey.get(courseKey(course));
+    if(!preset)return course;
+    return {
+      ...course,
+      tee:course.tee||preset.tee,
+      image_url:course.image_url||preset.image_url,
+      holes:hasCourseHoles(course)?course.holes:preset.holes,
+      course_rating:hasCourseRatingValue(course.course_rating)?course.course_rating:preset.course_rating,
+      slope_rating:hasCourseRatingValue(course.slope_rating)?course.slope_rating:preset.slope_rating,
+    };
+  });
+  const keys=new Set(merged.map(courseKey));
+  presets.forEach(preset=>{if(!keys.has(courseKey(preset))){merged.push(preset);keys.add(courseKey(preset));}});
+  return merged;
+}
 function getCourseOptions(courses){const byName=new Map();(courses||[]).forEach(c=>{if(!c)return;const base=cleanCourseName(c.name);if(!base)return;const tee=courseTeeFromName(c.name)||c.tee||'White';if(!byName.has(base))byName.set(base,{name:base,course:c,tees:{}});const item=byName.get(base);item.tees[tee]=c;if(!item.course||tee==='White')item.course=c;});return Array.from(byName.values()).sort((a,b)=>a.name.localeCompare(b.name));}
 function findCourseForTee(courses,baseName,tee){const cleanBase=cleanCourseName(baseName);const option=getCourseOptions(courses).find(o=>o.name===cleanBase);if(!option)return null;return option.tees[tee]||option.course||Object.values(option.tees)[0]||null;}
 function idMatches(a,b){return a!=null&&b!=null&&String(a)===String(b);}
@@ -1357,7 +1382,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
       allParticipants.forEach(p=>{playingHcps[p.id]=p.playing_handicap||0;});
 
       const roundPayload={
-        name:roundName,course_id:(course&&course.id)||setup.course_id,course_name:courseBaseName||'',
+        name:roundName,course_id:safeCourseIdForDb(course,setup.course_id),course_name:courseBaseName||'',
         status:'live',tee:setup.tee,day_number:1,join_code:joinCode,is_private:setup.is_private||false,created_by:currentUser.id,
       };
       let{data:rd,error:roundErr}=await sb.from('cup_rounds').insert(roundPayload).select().single();
