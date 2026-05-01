@@ -1,4 +1,4 @@
-// SNYDER LIVE v99
+// SNYDER LIVE v1.0
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -67,6 +67,20 @@ function isProtectedCourse(course){const name=cleanCourseName(course&&course.nam
 function presetIdForCourse(preset){return 'preset-'+cleanCourseName(preset.name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'-'+(courseTeeFromName(preset.name)||preset.tee||'white').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
 function isRealDbId(id){return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id||''));}
 function safeCourseIdForDb(course,setupCourseId){const id=(course&&course.id)||setupCourseId||null;return isRealDbId(id)?id:null;}
+function courseSummaryLine(course,round,holes){
+  const list=holes||course&&course.holes||[];
+  const totalPar=list.reduce((t,h)=>t+(parseInt(h.par)||0),0);
+  const totalYards=list.reduce((t,h)=>t+(parseInt(h.yards)||0),0);
+  const slope=course&&course.slope_rating;
+  const rating=course&&course.course_rating;
+  const bits=[];
+  if(totalPar)bits.push('Par '+totalPar);
+  if(totalYards)bits.push(totalYards+'y');
+  bits.push((round&&round.tee||course&&course.tee||'White')+' tee');
+  if(slope)bits.push('Slope '+slope);
+  if(rating)bits.push('Rating '+rating);
+  return bits.join(' - ');
+}
 function hasCourseRatingValue(value){return Number.isFinite(parseFloat(value));}
 function hasCourseHoles(course){return Array.isArray(course&&course.holes)&&course.holes.length>0;}
 function mergePresetCourses(dbCourses){
@@ -973,7 +987,7 @@ function App(){
         </button>
         <button onClick={()=>setView('tournaments')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
           <div style={{fontSize:18,marginBottom:1,color:'#D4AF37',fontWeight:900}}>🏆</div>
-          <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em'}}>CUP</div>
+          <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em'}}>SYNDER CUP</div>
         </button>
         <button onClick={()=>currentUser?setView('profile'):(setAuthPrompt(null),setShowAuth(true))} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
           <div style={{fontSize:18,marginBottom:1}}>P</div>
@@ -2430,7 +2444,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
               }catch(e){flash('Share: '+e.message,'error');}
             }} style={{...S.pri,padding:'8px 16px',fontSize:13,background:'#25D366'}}>Share Card</button>
           </div>
-          <div style={{padding:'10px 12px',background:'rgba(0,0,0,0.3)',marginBottom:12,borderRadius:8}}><div style={{fontSize:15,color:'#fff',fontWeight:700}}>{getCourseDisplayName(course,round)}</div><div style={{fontSize:11,color:'#60b8f0',marginTop:3}}>Round start: {roundStartText}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.55)',marginTop:2}}>Par {holes.reduce((t,h)=>t+h.par,0)} - {holes.reduce((t,h)=>t+(h.yards||0),0)}y - {round.tee||'White'} tee</div></div>
+          <div style={{padding:'10px 12px',background:'rgba(0,0,0,0.3)',marginBottom:12,borderRadius:8}}><div style={{fontSize:15,color:'#fff',fontWeight:700}}>{getCourseDisplayName(course,round)}</div><div style={{fontSize:11,color:'#60b8f0',marginTop:3}}>Round start: {roundStartText}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.55)',marginTop:2}}>{courseSummaryLine(course,round,holes)}</div></div>
           <div id="f9-card"><MiniCard holeList={front9} label="FRONT 9"/></div>
           <MiniCard holeList={back9} label="BACK 9"/>
           <div style={{...S.card}}>
@@ -2552,6 +2566,8 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             {totalYards>0&&<span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap'}}>{totalYards}y</span>}
             <span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap'}}>{holes.length} holes</span>
             <span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap',textTransform:'capitalize'}}>{round.tee||'White'} tee</span>
+            {course.slope_rating&&<span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap'}}>Slope {course.slope_rating}</span>}
+            {course.course_rating&&<span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap'}}>Rating {course.course_rating}</span>}
           </div>
         )}
         {allGroups.length>1&&<>
@@ -3193,7 +3209,7 @@ function cupTeamStyle(teamKey,extra={}){const t=CUP_THEME[teamKey]||CUP_THEME.go
 function CupTeamBadge({teamKey,label}){const t=CUP_THEME[teamKey]||CUP_THEME.gold;return <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:10,fontWeight:800,letterSpacing:'0.08em',color:t.accent,textTransform:'uppercase'}}><span style={{width:8,height:8,borderRadius:999,background:t.primary,boxShadow:'0 0 10px '+t.primary}}/> {label||t.name}</span>;}
 function getCupTeams(cup,cupTeams){const rows=(cupTeams||[]).filter(t=>t.cup_id===cup.id);return {gold:rows.find(t=>t.team_key==='gold')||{name:cup.team_a_name||'Gold',team_key:'gold'},navy:rows.find(t=>t.team_key==='navy')||{name:cup.team_b_name||'Navy',team_key:'navy'}};}
 function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}){
-  const[name,setName]=useState('Snyder Cup 2026');
+  const[name,setName]=useState('Synder Cup 2026');
   const[goldName,setGoldName]=useState('Gold Team');
   const[navyName,setNavyName]=useState('Navy Team');
   const[selectedCupId,setSelectedCupId]=useState((cupEvents&&cupEvents[0]&&cupEvents[0].id)||'');
@@ -3214,7 +3230,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   const availableUsers=(cupUsers||[]);
   async function createCup(){
     try{
-      const{data,error}=await sb.from('snyder_cups').insert({name:name.trim()||'Snyder Cup',team_a_name:goldName.trim()||'Gold Team',team_b_name:navyName.trim()||'Navy Team',team_a_colour:'#D4AF37',team_b_colour:'#0B1F4D',status:'setup'}).select().single();
+      const{data,error}=await sb.from('snyder_cups').insert({name:name.trim()||'Synder Cup',team_a_name:goldName.trim()||'Gold Team',team_b_name:navyName.trim()||'Navy Team',team_a_colour:'#D4AF37',team_b_colour:'#0B1F4D',status:'setup'}).select().single();
       if(error)throw error;
       await sb.from('snyder_cup_teams').insert([{cup_id:data.id,team_key:'gold',name:goldName.trim()||'Gold Team',colour:'#D4AF37'},{cup_id:data.id,team_key:'navy',name:navyName.trim()||'Navy Team',colour:'#0B1F4D'}]);
       flash('Cup created');await load();setSelectedCupId(data.id);
@@ -3256,6 +3272,15 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     if(used&&!confirm('Remove this player from the team? They are also in matches, so remove them from matches first if needed.'))return;
     await sb.from('snyder_cup_players').delete().eq('id',p.id);flash('Player removed');await load();
   }
+  function dayMatches(day){return matches.filter(m=>(parseInt(m.day_number)||1)===(parseInt(day)||1));}
+  function isDayReleased(day){const rows=dayMatches(day);return rows.length>0&&rows.some(m=>String(m.status||'locked').toLowerCase()==='live'||String(m.status||'').toLowerCase()==='released');}
+  async function setDayReleased(day,released){
+    if(!cup)return;
+    const{error}=await sb.from('snyder_cup_matches').update({status:released?'live':'locked'}).eq('cup_id',cup.id).eq('day_number',parseInt(day)||1);
+    if(error){flash(error.message,'error');return;}
+    flash(released?'Day '+day+' released for scoring':'Day '+day+' locked');
+    await load();
+  }
   async function addDay(){if(!cup)return;const n=(days[days.length-1]?.day_number||0)+1;const{error}=await sb.from('snyder_cup_days').insert({cup_id:cup.id,day_number:n});if(error)flash(error.message,'error');else{flash('Day added');await load();}}
   async function deleteDay(d){
     if(!cup||!d.id)return;
@@ -3269,7 +3294,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     if(!cup)return;
     const limit=matchType==='doubles'?2:1;
     if(goldPick.length!==limit||navyPick.length!==limit){flash(matchType==='doubles'?'Pick 2 from each team':'Pick 1 from each team','error');return;}
-    const{error}=await sb.from('snyder_cup_matches').insert({cup_id:cup.id,day_number:parseInt(matchDay)||1,match_type:matchType,gold_player_ids:goldPick,navy_player_ids:navyPick,status:'live'});
+    const{error}=await sb.from('snyder_cup_matches').insert({cup_id:cup.id,day_number:parseInt(matchDay)||1,match_type:matchType,gold_player_ids:goldPick,navy_player_ids:navyPick,status:'locked'});
     if(error){flash(error.message,'error');return;}
     setGoldPick([]);setNavyPick([]);flash('Match added');await load();
   }
@@ -3307,7 +3332,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   }
   return <div>
     <div style={{...S.card,marginBottom:14,background:'linear-gradient(135deg,rgba(212,175,55,0.13),rgba(11,31,77,0.35))'}}>
-      <div style={{fontSize:18,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.07em'}}>SNYDER CUP SETUP</div>
+      <div style={{fontSize:18,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.07em'}}>SYNDER CUP SETUP</div>
       <div style={{fontSize:12,color:'#9fb6c9',marginTop:4}}>Professional setup panel: Cup details, teams, days, matches and quick fixes.</div>
     </div>
     {!cup&&<div style={{...S.card,marginBottom:14}}>
@@ -3330,7 +3355,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       </div>
       <div style={{...S.card,marginBottom:14}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}><div style={{fontSize:14,color:'#fff',fontWeight:800}}>Cup Days</div><button onClick={addDay} style={{...S.pri,padding:'6px 10px',fontSize:12}}>Add Day</button></div>
-        {days.length===0?<div style={{fontSize:13,color:'#8ea0ad'}}>No days yet.</div>:days.map(d=><div key={d.id||d.day_number} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,fontSize:13,color:'#60b8f0',padding:'8px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}><span>Day {d.day_number}</span><button onClick={()=>deleteDay(d)} style={{...S.dan,padding:'5px 9px',fontSize:11}}>Delete day</button></div>)}
+        {days.length===0?<div style={{fontSize:13,color:'#8ea0ad'}}>No days yet.</div>:days.map(d=>{const released=isDayReleased(d.day_number);const count=dayMatches(d.day_number).length;return <div key={d.id||d.day_number} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,fontSize:13,color:'#60b8f0',padding:'8px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}><span>Day {d.day_number} · {count} matches · {released?'Released':'Locked'}</span><div style={{display:'flex',gap:6}}><button onClick={()=>setDayReleased(d.day_number,!released)} style={{...(released?S.gho:S.pri),padding:'5px 9px',fontSize:11}}>{released?'Lock':'Release'}</button><button onClick={()=>deleteDay(d)} style={{...S.dan,padding:'5px 9px',fontSize:11}}>Delete</button></div></div>;})}
       </div>
       <div style={{...S.card,marginBottom:14}}>
         <div style={{fontSize:14,color:'#fff',fontWeight:800,marginBottom:10}}>Match Builder</div>
@@ -3362,7 +3387,7 @@ function groupCupMatchesByDay(matches,cupDays){
   const dayNums=new Set([...(cupDays||[]).map(d=>parseInt(d.day_number)||1),...(matches||[]).map(m=>parseInt(m.day_number)||1)]);
   return Array.from(dayNums).sort((a,b)=>a-b).map(day=>({day,matches:(matches||[]).filter(m=>(parseInt(m.day_number)||1)===day)}));
 }
-function CupMatchCard({match,cupPlayers,teams,editable,onRemove,onDelete}){
+function CupMatchCard({match,cupPlayers,teams,editable,onRemove,onDelete,onOpen,locked}){
   const findPlayer=id=>(cupPlayers||[]).find(p=>p.id===id||p.user_id===id)||null;
   const type=String(match.match_type||'match').toUpperCase();
   const goldIds=match.gold_player_ids||[];
@@ -3372,13 +3397,13 @@ function CupMatchCard({match,cupPlayers,teams,editable,onRemove,onDelete}){
     const p=findPlayer(id);
     return <div key={teamKey+'-'+id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,border:'1px solid rgba(255,255,255,0.12)',borderRadius:10,padding:'7px 8px',background:'rgba(0,0,0,0.14)',minHeight:34}}>
       <span style={{fontSize:12,color:teamKey==='gold'?CUP_THEME.gold.accent:CUP_THEME.navy.accent,fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p?.display_name||'Player'}</span>
-      {editable&&<button onClick={()=>onRemove(match,teamKey,id)} style={{...S.dan,padding:'2px 6px',fontSize:10,flexShrink:0}}>x</button>}
+      {editable&&<button onClick={(e)=>{e.stopPropagation();onRemove(match,teamKey,id);}} style={{...S.dan,padding:'2px 6px',fontSize:10,flexShrink:0}}>x</button>}
     </div>;
   };
-  return <div style={{...S.card,marginBottom:8,padding:12,border:'1px solid rgba(255,255,255,0.16)'}}>
+  return <div onClick={()=>{if(onOpen&&!locked)onOpen(match);}} style={{...S.card,marginBottom:8,padding:12,border:locked?'1px solid rgba(255,255,255,0.08)':'1px solid rgba(96,184,240,0.35)',opacity:locked?0.62:1,cursor:onOpen&&!locked?'pointer':'default'}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:10}}>
       <div><div style={{fontSize:11,color:'#60b8f0',fontWeight:900,letterSpacing:'0.12em'}}>{totalPlayers===4?'4 BALL':type}</div><div style={{fontSize:13,color:'#fff',fontWeight:900,marginTop:2}}>{type}</div></div>
-      <div style={{display:'flex',alignItems:'center',gap:7}}><div style={{fontSize:11,color:'#fff',background:'rgba(255,255,255,0.08)',borderRadius:999,padding:'4px 8px',fontWeight:800}}>A/S</div>{editable&&onDelete&&<button onClick={()=>onDelete(match)} style={{...S.dan,padding:'4px 8px',fontSize:11}}>Delete</button>}</div>
+      <div style={{display:'flex',alignItems:'center',gap:7}}>{locked&&<div style={{fontSize:10,color:'#fbbf24',background:'rgba(251,191,36,0.12)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:999,padding:'4px 8px',fontWeight:900}}>LOCKED</div>}<div style={{fontSize:11,color:'#fff',background:'rgba(255,255,255,0.08)',borderRadius:999,padding:'4px 8px',fontWeight:800}}>A/S</div>{editable&&onDelete&&<button onClick={(e)=>{e.stopPropagation();onDelete(match);}} style={{...S.dan,padding:'4px 8px',fontSize:11}}>Delete</button>}</div>
     </div>
     <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'stretch'}}>
       <div style={cupTeamStyle('gold',{borderRadius:12,padding:8})}><CupTeamBadge teamKey="gold" label={teams.gold.name}/><div style={{display:'grid',gap:6,marginTop:7}}>{goldIds.length?goldIds.map(id=>playerChip('gold',id)):<div style={{fontSize:12,color:'#8ea0ad',fontWeight:800}}>Empty slot</div>}</div></div>
@@ -3387,26 +3412,72 @@ function CupMatchCard({match,cupPlayers,teams,editable,onRemove,onDelete}){
     </div>
   </div>;
 }
-function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,flash,setView,load,activeComp,selectedComp,setSelectedComp,currentUser,isAdmin,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}){
+function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,flash,setView,load,setSelectedRound,currentUser,isAdmin,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}){
   const cup=(cupEvents||[])[0];
   const teams=cup?getCupTeams(cup,cupTeams):null;
   const playersInCup=(cupEventPlayers||[]).filter(p=>cup&&p.cup_id===cup.id);
   const matches=(cupMatches||[]).filter(m=>cup&&m.cup_id===cup.id);
   const days=(cupDays||[]).filter(d=>cup&&d.cup_id===cup.id);
-  const matchesByDay=groupCupMatchesByDay(matches,days).filter(group=>group.matches.length);
+  const matchesByDay=groupCupMatchesByDay(matches,days);
   const goldPts=matches.reduce((a,m)=>a+(m.gold_points||0),0);
   const navyPts=matches.reduce((a,m)=>a+(m.navy_points||0),0);
   const leading=goldPts>navyPts?'gold':navyPts>goldPts?'navy':'tie';
+  const findCupPlayer=id=>(playersInCup||[]).find(p=>p.id===id||p.user_id===id)||null;
+  const dayReleased=day=>{
+    const rows=matches.filter(m=>(parseInt(m.day_number)||1)===(parseInt(day)||1));
+    return rows.length>0&&rows.some(m=>String(m.status||'locked').toLowerCase()==='live'||String(m.status||'').toLowerCase()==='released');
+  };
+  async function openRoundForScoring(rd){
+    const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
+    const po=(rps||[]).map(rp=>({id:rp.user_id||rp.guest_id||rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0,user_id:rp.user_id,guest_id:rp.guest_id,is_host:rp.is_host}));
+    const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
+    const{data:rdGroups}=await sb.from('cup_groups').select('*').eq('round_id',rd.id).order('group_number',{ascending:true});
+    const grp=(rdGroups&&rdGroups[0])||{round_id:rd.id,group_number:1,player_ids:po.map(p=>p.id),playing_handicaps:hm};
+    setSelectedRound({...rd,_group:{...grp,participants:po,playing_handicaps:hm}});
+    setView('play');
+  }
+  async function openCupMatch(match){
+    if(!currentUser){flash('Sign in first to mark a Cup card','error');return;}
+    if(String(match.status||'locked').toLowerCase()!=='live'&&String(match.status||'').toLowerCase()!=='released'){flash('This day is locked until admin releases it','error');return;}
+    const course=(courses||[]).find(c=>hasCourseHoles(c))||(courses||[])[0];
+    if(!course){flash('Add a course before scoring Cup matches','error');return;}
+    const matchName='Synder Cup Day '+(parseInt(match.day_number)||1)+' - '+String(match.match_type||'Match')+' '+String(match.id||'').slice(0,6);
+    const existing=(rounds||[]).find(r=>r.name===matchName);
+    if(existing){await openRoundForScoring(existing);return;}
+    const ids=[...(match.gold_player_ids||[]),...(match.navy_player_ids||[])];
+    const matchPlayers=ids.map(id=>findCupPlayer(id)).filter(Boolean);
+    if(matchPlayers.length===0){flash('Add players to this match first','error');return;}
+    const joinCode=Math.random().toString(36).substring(2,6).toUpperCase();
+    const roundPayload={name:matchName,course_id:safeCourseIdForDb(course,course.id),course_name:cleanCourseName(course.name)||course.name||'',status:'live',tee:course.tee||'White',day_number:parseInt(match.day_number)||1,join_code:joinCode,is_private:false,created_by:currentUser.id};
+    let{data:rd,error:roundErr}=await sb.from('cup_rounds').insert(roundPayload).select().single();
+    if(roundErr&&String(roundErr.message||'').toLowerCase().includes('course')){roundPayload.course_id=null;const retry=await sb.from('cup_rounds').insert(roundPayload).select().single();rd=retry.data;roundErr=retry.error;}
+    if(roundErr){flash(roundErr.message,'error');return;}
+    const playerIds=matchPlayers.map(p=>p.user_id||p.id);
+    const playingHcps={};matchPlayers.forEach(p=>{playingHcps[p.user_id||p.id]=parseFloat(p.handicap||0)||0;});
+    await sb.from('cup_groups').insert({round_id:rd.id,group_number:1,player_ids:playerIds,playing_handicaps:playingHcps});
+    for(const p of matchPlayers){
+      const pid=p.user_id||p.id;
+      await sb.from('cup_round_players').upsert({round_id:rd.id,user_id:p.user_id||null,guest_id:p.user_id?null:p.id,display_name:p.display_name||'Player',playing_handicap:parseFloat(p.handicap||0)||0,is_host:normaliseId(pid)===normaliseId(currentUser.id)});
+    }
+    await load();
+    await openRoundForScoring(rd);
+  }
   return <div style={{minHeight:'100vh',paddingBottom:80}}>
-    <div style={{background:'linear-gradient(135deg,#0B1F4D,#061222)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}><button onClick={()=>setView('home')} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button><div style={{fontSize:16,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}>CUP</div><div style={{width:60}}/></div>
+    <div style={{background:'linear-gradient(135deg,#0B1F4D,#061222)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}><button onClick={()=>setView('home')} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button><div style={{display:'flex',alignItems:'center',gap:8,fontSize:16,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}><span style={{color:'#D4AF37'}}>🏆</span><span>SYNDER CUP</span></div><div style={{width:60}}/></div>
     <div style={{padding:16}}>
       {!cup?<div style={{...S.card,textAlign:'center',padding:28}}><div style={{fontSize:18,color:'#fff',fontWeight:800,marginBottom:8}}>No Cup set up yet</div><div style={{fontSize:13,color:'#8ea0ad',marginBottom:14}}>Admin can create Gold vs Navy in the Admin Cup tab.</div>{isAdmin&&<button onClick={()=>setView('admin')} style={S.pri}>Open Admin</button>}</div>:<>
+        <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>LEADERBOARDS</div>
         <div style={{borderRadius:18,padding:18,marginBottom:14,border:'1px solid rgba(212,175,55,0.28)',background:leading==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.23),rgba(11,31,77,0.45))':leading==='navy'?'linear-gradient(135deg,rgba(11,31,77,0.8),rgba(59,130,246,0.18))':'linear-gradient(135deg,rgba(212,175,55,0.12),rgba(11,31,77,0.45))'}}>
-          <div style={{fontSize:12,color:'#a8c4d8',letterSpacing:'0.18em',fontWeight:800}}>LIVE CUP SCORE</div><div style={{fontSize:26,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",margin:'8px 0'}}>{cup.name}</div>
+          <div style={{fontSize:12,color:'#a8c4d8',letterSpacing:'0.18em',fontWeight:800}}>TEAM SCORE</div><div style={{fontSize:26,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",margin:'8px 0'}}>{cup.name}</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:12,alignItems:'center'}}><div style={{textAlign:'center'}}><CupTeamBadge teamKey="gold" label={teams.gold.name}/><div style={{fontSize:42,color:CUP_THEME.gold.accent,fontWeight:900}}>{goldPts}</div></div><div style={{fontSize:20,color:'#fff',fontWeight:900}}>v</div><div style={{textAlign:'center'}}><CupTeamBadge teamKey="navy" label={teams.navy.name}/><div style={{fontSize:42,color:CUP_THEME.navy.accent,fontWeight:900}}>{navyPts}</div></div></div>
         </div>
-        <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>MATCHES</div>{matches.length===0?<div style={{...S.card,color:'#8ea0ad',fontSize:13}}>Matches will appear here once admin adds them.</div>:matchesByDay.map(group=><div key={group.day} style={{marginBottom:14}}><div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 8px'}}><div style={{fontSize:15,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {group.day}</div><div style={{height:1,background:'rgba(255,255,255,0.12)',flex:1}}/></div>{group.matches.map(m=><CupMatchCard key={m.id} match={m} cupPlayers={playersInCup} teams={teams}/>)}</div>)}
-        <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'18px 0 8px'}}>SINGLES STABLEFORD</div><div style={{...S.card,color:'#8ea0ad',fontSize:13}}>This leaderboard will use the existing Snyder Live scoring once Cup matches are linked to rounds.</div>
+        <div style={{...S.card,color:'#8ea0ad',fontSize:13,marginBottom:16}}>Player leaderboards will fill from the Snyder Live scorecards as Cup matches are scored.</div>
+        <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>DAYS</div>
+        {matches.length===0?<div style={{...S.card,color:'#8ea0ad',fontSize:13}}>Matches will appear here once admin adds them.</div>:matchesByDay.map(group=>{const released=dayReleased(group.day);return <div key={group.day} style={{marginBottom:14}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 8px'}}><div style={{fontSize:15,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {group.day}</div><div style={{fontSize:10,color:released?'#34d399':'#fbbf24',border:'1px solid '+(released?'rgba(52,211,153,0.35)':'rgba(251,191,36,0.35)'),borderRadius:999,padding:'3px 8px',fontWeight:900}}>{released?'OPEN':'LOCKED'}</div><div style={{height:1,background:'rgba(255,255,255,0.12)',flex:1}}/></div>
+          {!released&&<div style={{...S.card,color:'#fbbf24',fontSize:12,marginBottom:8,padding:10}}>Admin has not released Day {group.day} yet.</div>}
+          {group.matches.length===0?<div style={{...S.card,color:'#8ea0ad',fontSize:13}}>No matches on this day yet.</div>:group.matches.map(m=><CupMatchCard key={m.id} match={m} cupPlayers={playersInCup} teams={teams} locked={!released||String(m.status||'locked').toLowerCase()==='locked'} onOpen={openCupMatch}/>)}
+        </div>;})}
       </>}
     </div>
   </div>;
