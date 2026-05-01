@@ -1,4 +1,4 @@
-// SNYDER LIVE v98
+// SNYDER LIVE v99
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -375,14 +375,48 @@ function HandicapPicker({value,onChange,style={},buttonStyle={},label='Handicap'
 // User authentication modal
 // Login, signup and guest entry handling
 // =========================================================
-function UserAuth({onLogin,onClose,initialMode='login',promptTitle,promptText,signupButtonText}){
+function UserAuth({onLogin,onClose,initialMode='login',promptTitle,promptText,signupButtonText,guests=[],onRefresh}){
   const[mode,setMode]=useState(initialMode);
   const[username,setUsername]=useState('');
   const[pin,setPin]=useState('');
   const[name,setName]=useState('');
   const[hcp,setHcp]=useState('18.0');
+  const[claimGuestId,setClaimGuestId]=useState('');
   const[err,setErr]=useState('');
   const[loading,setLoading]=useState(false);
+  const claimableGuests=(guests||[]).filter(g=>g&&g.id&&g.name).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+  const selectedGuest=claimableGuests.find(g=>normaliseId(g.id)===normaliseId(claimGuestId));
+
+  function chooseGuest(id){
+    setClaimGuestId(id||'');
+    const guest=claimableGuests.find(g=>normaliseId(g.id)===normaliseId(id));
+    if(guest){
+      setName(guest.name||'');
+      setHcp(String(Number.isFinite(parseFloat(guest.handicap))?parseFloat(guest.handicap):18));
+    }
+  }
+
+  async function claimGuestForUser(guest,user){
+    if(!guest||!guest.id||!user||!user.id)return;
+    const guestId=guest.id;
+    const userId=user.id;
+    const displayName=user.display_name||guest.name||user.username||'Player';
+    await sb.from('cup_round_players').update({user_id:userId,guest_id:null,display_name:displayName}).eq('guest_id',guestId);
+    await sb.from('cup_scores').update({player_id:userId}).eq('player_id',guestId);
+    const{data:allGroups}=await sb.from('cup_groups').select('*');
+    const linkedGroups=(allGroups||[]).filter(grp=>(grp.player_ids||[]).some(pid=>normaliseId(pid)===normaliseId(guestId)));
+    for(const grp of linkedGroups||[]){
+      const nextIds=(grp.player_ids||[]).map(pid=>normaliseId(pid)===normaliseId(guestId)?userId:pid);
+      const nextHcps={...(grp.playing_handicaps||{})};
+      if(Object.prototype.hasOwnProperty.call(nextHcps,guestId)){
+        nextHcps[userId]=nextHcps[guestId];
+        delete nextHcps[guestId];
+      }
+      await sb.from('cup_groups').update({player_ids:nextIds,playing_handicaps:nextHcps}).eq('id',grp.id);
+    }
+    await sb.from('cup_guests').delete().eq('id',guestId);
+    if(onRefresh)await onRefresh();
+  }
 
   async function submit(){
     setErr('');setLoading(true);
@@ -408,6 +442,7 @@ function UserAuth({onLogin,onClose,initialMode='login',promptTitle,promptText,si
           await sb.from('cup_users').update({handicap:parsedHandicap}).eq('id',savedUser.id);
           savedUser.handicap=parsedHandicap;
         }
+        if(selectedGuest)await claimGuestForUser(selectedGuest,savedUser);
         localStorage.setItem('snyder_user',JSON.stringify(savedUser));
         onLogin(savedUser);
       }
@@ -426,6 +461,17 @@ function UserAuth({onLogin,onClose,initialMode='login',promptTitle,promptText,si
         {err&&<div style={{background:'rgba(239,68,68,0.15)',borderRadius:8,padding:'8px 12px',fontSize:13,color:'#fca5a5',marginBottom:12}}>{err}</div>}
         {mode==='signup'&&(
           <div>
+            {claimableGuests.length>0&&(
+              <div style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:12,padding:12,marginBottom:12}}>
+                <div style={{fontSize:13,color:'#fff',fontWeight:800,marginBottom:4}}>Are you already on the guest list?</div>
+                <div style={{fontSize:12,color:'rgba(255,255,255,0.65)',lineHeight:1.35,marginBottom:10}}>Choose yourself here and your guest entry will become this account.</div>
+                <select value={claimGuestId} onChange={e=>chooseGuest(e.target.value)} style={{...S.inp,marginBottom:selectedGuest?8:0}}>
+                  <option value="">No, create a new user</option>
+                  {claimableGuests.map(g=><option key={g.id} value={g.id}>{g.name} - HCP {g.handicap||0}</option>)}
+                </select>
+                {selectedGuest&&<div style={{fontSize:12,color:'#90ccf0'}}>Selected guest: {selectedGuest.name}. This will remove them from the guest list.</div>}
+              </div>
+            )}
             <label style={S.lbl}>Display Name</label>
             <input style={{...S.inp,marginBottom:12}} value={name} onChange={e=>setName(e.target.value)} placeholder="Your name"/>
             <label style={S.lbl}>EG Handicap</label>
@@ -944,6 +990,8 @@ function App(){
         promptTitle={authPrompt==='startRound'?'Quick register to start a round':null}
         promptText={authPrompt==='startRound'?'It only takes a moment. Once one player is signed in, you can add guests to play with you and keep the round tied to a real scorer.':null}
         signupButtonText={authPrompt==='startRound'?'Quick Register':null}
+        guests={guests}
+        onRefresh={loadAll}
         onLogin={u=>{setCurrentUser(u);setShowAuth(false);if(authPrompt==='startRound')setView('play');setAuthPrompt(null);flash('Welcome '+u.display_name);}}
         onClose={()=>{setShowAuth(false);setAuthPrompt(null);}}
       />}
