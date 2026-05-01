@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.04
+// SNYDER LIVE v1.05
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -961,7 +961,7 @@ function App(){
                     <CourseBadge course={course} round={rd} size={34}/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:14,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||getCourseDisplayName(course,rd)||'Round'}</div>
-                      <div style={{fontSize:11,color:'#60b8f0'}}>{live?'Continue scoring':'Completed'} Â· {formatRoundStart(rd)}</div>
+                      <div style={{fontSize:11,color:'#60b8f0'}}>{live?'Continue scoring':'Completed'} - {formatRoundStart(rd)}</div>
                     </div>
                     <div style={{fontSize:10,color:live?'#fff':'#60b8f0',background:live?'#ef4444':'rgba(96,184,240,0.12)',borderRadius:20,padding:'4px 8px',fontWeight:700}}>{live?'LIVE':'DONE'}</div>
                   </div>
@@ -1016,7 +1016,7 @@ function App(){
 
 // =========================================================
 // Live scores and completed scores view
-// Lists active rounds, this weekâ€™s cards and older monthly cards
+// Lists active rounds, this week's cards and older monthly cards
 // =========================================================
 function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash,setView,selectedComp,activeComp,setSelectedRound,currentUser,setHoleScores,holeScores}){
   const liveRounds=rounds.filter(r=>{
@@ -1179,7 +1179,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
                   ))}
                 </div>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',borderTop:'1px solid rgba(255,255,255,0.08)',paddingTop:10}}>
-                  <div style={{fontSize:11,color:'rgba(255,255,255,0.5)'}}>{rdGroups.length} group{rdGroups.length!==1?'s':''} live Â· Tap to view</div>
+                  <div style={{fontSize:11,color:'rgba(255,255,255,0.5)'}}>{rdGroups.length} group{rdGroups.length!==1?'s':''} live - Tap to view</div>
                   <button onClick={e=>{e.stopPropagation();openRound(rd);}} style={{...S.pri,padding:'7px 10px',fontSize:11}}>Check Scorecard</button>
                 </div>
               </div>
@@ -1290,9 +1290,9 @@ function splitIntoGolfGroups(participants,range){
   return groups.filter((g,i)=>g.length>0 || i===0);
 }
 function playerRangeLabel(range){
-  if(range==='1-4')return '1â€“4 players';
-  if(range==='5-8')return '5â€“8 players';
-  if(range==='9-12')return '9â€“12 players';
+  if(range==='1-4')return '1-4 players';
+  if(range==='5-8')return '5-8 players';
+  if(range==='9-12')return '9-12 players';
   if(range==='more')return 'More than 12 players';
   return 'Choose players';
 }
@@ -1634,9 +1634,9 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
   // ---------------------------------------------------------
   if(step==='playerCount'){
     const options=[
-      {key:'1-4',title:'1â€“4 players',sub:'One 4-ball or smaller'},
-      {key:'5-8',title:'5â€“8 players',sub:'Two groups'},
-      {key:'9-12',title:'9â€“12 players',sub:'Three groups'},
+      {key:'1-4',title:'1-4 players',sub:'One 4-ball or smaller'},
+      {key:'5-8',title:'5-8 players',sub:'Two groups'},
+      {key:'9-12',title:'9-12 players',sub:'Three groups'},
       {key:'more',title:'More',sub:'More than three groups'},
     ];
     return(
@@ -1653,7 +1653,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
                 <div style={{fontSize:18,color:'#fff',fontWeight:800}}>{o.title}</div>
                 <div style={{fontSize:12,color:'#60b8f0',marginTop:2}}>{o.sub}</div>
               </div>
-              <div style={{fontSize:20,color:'#60b8f0'}}>â€º</div>
+              <div style={{fontSize:20,color:'#60b8f0'}}>&gt;</div>
             </div>
           ))}
         </div>
@@ -1700,7 +1700,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
                   <option value={0.95}>95% comp</option>
                 </select>
               </div>
-              <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>Course rating {selectedCourse.course_rating||'-'} Â· Par {(selectedCourse.holes||[]).reduce((t,h)=>t+(parseInt(h.par)||0),0)||'-'}</div>
+              <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>Course rating {selectedCourse.course_rating||'-'} - Par {(selectedCourse.holes||[]).reduce((t,h)=>t+(parseInt(h.par)||0),0)||'-'}</div>
             </div>
           )}
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',background:'rgba(255,255,255,0.06)',borderRadius:10,marginBottom:16,border:'1px solid rgba(255,255,255,0.12)'}}>
@@ -1727,7 +1727,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
               <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,padding:'10px 12px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:14,color:'#fff',fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||p.name}</div>
-                  <div style={{fontSize:11,color:'#60b8f0'}}>{p.is_casual?'Casual Â· '+(p.playing_handicap||0)+' fixed shots':'EG HCP '+parseFloat(p.handicap_index??p.current_handicap??0).toFixed(1)+' Â· '+(p.playing_handicap||0)+' shots'}</div>
+                  <div style={{fontSize:11,color:'#60b8f0'}}>{p.is_casual?'Casual - '+(p.playing_handicap||0)+' fixed shots':'EG HCP '+parseFloat(p.handicap_index??p.current_handicap??0).toFixed(1)+' - '+(p.playing_handicap||0)+' shots'}</div>
                   <label style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:6,fontSize:11,color:'rgba(255,255,255,0.7)'}}><input type="checkbox" checked={!!p.is_casual} onChange={()=>toggleCasualPlayer(0,p.id)}/> Casual golfer</label>
                 </div>
                 <HandicapPicker value={p.is_casual?(p.fixed_playing_handicap??p.playing_handicap):(p.handicap_index??p.current_handicap)} onChange={v=>updateGroupHandicap(0,p.id,v)} style={{width:76,padding:'4px 8px',fontSize:13}} label={(p.display_name||p.name||'Player')+(p.is_casual?' Playing shots':' EG Handicap')} step={p.is_casual?1:0.1} min={0} max={54} defaultValue={p.is_casual?18:8}/>
@@ -1755,7 +1755,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
                   <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,marginTop:8,padding:'10px 12px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:14,color:'#fff',fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||p.name}</div>
-                      <div style={{fontSize:11,color:'#60b8f0'}}>{p.is_casual?'Casual Â· '+(p.playing_handicap||0)+' fixed shots':'EG HCP '+parseFloat(p.handicap_index??p.current_handicap??0).toFixed(1)+' Â· '+(p.playing_handicap||0)+' shots'}</div>
+                      <div style={{fontSize:11,color:'#60b8f0'}}>{p.is_casual?'Casual - '+(p.playing_handicap||0)+' fixed shots':'EG HCP '+parseFloat(p.handicap_index??p.current_handicap??0).toFixed(1)+' - '+(p.playing_handicap||0)+' shots'}</div>
                       <label style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:6,fontSize:11,color:'rgba(255,255,255,0.7)'}}><input type="checkbox" checked={!!p.is_casual} onChange={()=>toggleCasualPlayer(groupIdx,p.id)}/> Casual golfer</label>
                     </div>
                     <HandicapPicker value={p.is_casual?(p.fixed_playing_handicap??p.playing_handicap):(p.handicap_index??p.current_handicap)} onChange={v=>updateGroupHandicap(groupIdx,p.id,v)} style={{width:76,padding:'4px 8px',fontSize:13}} label={(p.display_name||p.name||'Player')+(p.is_casual?' Playing shots':' EG Handicap')} step={p.is_casual?1:0.1} min={0} max={54} defaultValue={p.is_casual?18:8}/>
@@ -1809,7 +1809,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
                     <CourseBadge course={course} round={rd} size={32}/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:14,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||getCourseDisplayName(course,rd)||'Round'}</div>
-                      <div style={{fontSize:12,color:'#60b8f0'}}>{live?'Continue scoring':'Completed'} Â· {rd.tee||'White'} tee</div>
+                      <div style={{fontSize:12,color:'#60b8f0'}}>{live?'Continue scoring':'Completed'} - {rd.tee||'White'} tee</div>
                     </div>
                     <div style={{fontSize:10,color:live?'#fff':'#60b8f0',background:live?'#ef4444':'rgba(96,184,240,0.12)',borderRadius:20,padding:'4px 8px',fontWeight:700}}>{live?'LIVE':'DONE'}</div>
                   </div>
@@ -2620,7 +2620,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             <div style={{width:10,height:10,borderRadius:'50%',background:groupColour(r.groupNumber||1),flexShrink:0}}></div>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:16,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</div>
-              <div style={{fontSize:11,color:'#90ccf0'}}>Group {groupLetter(r.groupNumber||1)} Â· thru {r.holes}</div>
+              <div style={{fontSize:11,color:'#90ccf0'}}>Group {groupLetter(r.groupNumber||1)} - thru {r.holes}</div>
             </div>
             <div style={{textAlign:'right'}}>
               <div style={{fontSize:28,color:'#fff',fontWeight:900,lineHeight:1}}>{r.total}</div>
@@ -2650,7 +2650,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
                   <div style={{fontSize:18,fontWeight:700,color:rank===0?'#fbbf24':'rgba(255,255,255,0.4)',width:24,textAlign:'center'}}>{rank+1}</div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:14,color:'#fff',fontWeight:600}}>{(p.name||p.display_name||'?').split(' ')[0]}</div>
-                    <div style={{fontSize:11,color:'#60b8f0'}}>{holesPlayed} holes played{lastHole>0?' Â· Hole '+lastHole:''}</div>
+                    <div style={{fontSize:11,color:'#60b8f0'}}>{holesPlayed} holes played{lastHole>0?' - Hole '+lastHole:''}</div>
                   </div>
                   <div style={{textAlign:'right'}}>
                     <div style={{fontSize:28,color:'#fff',fontWeight:700,lineHeight:1}}>{total}</div>
@@ -2979,7 +2979,7 @@ function CoursesTab({courses,sb,flash,load}){
               }
             </div>
             <div style={{fontSize:12,color:'#60b8f0',marginBottom:10}}>
-              {teeEntries.map(([tee,c])=>tee+' tee ('+((c.holes||[]).length)+' holes)').join(' â€¢ ')||'Course'}
+              {teeEntries.map(([tee,c])=>tee+' tee ('+((c.holes||[]).length)+' holes)').join(' / ')||'Course'}
             </div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(95px,1fr))',gap:8}}>
               {teeEntries.map(([tee,c])=>(
@@ -3322,7 +3322,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid rgba(255,255,255,0.08)'}}>
         <div style={{fontSize:12,color:'#fff',fontWeight:800,marginBottom:7}}>Add existing user</div>
         <select style={{...S.inp,fontSize:12,marginBottom:10}} value="" onChange={e=>{const u=availableUsers.find(x=>x.id===e.target.value);if(u)addExistingPlayer(teamKey,u);}}>
-          <option value="">Choose existing user...</option>{availableUsers.filter(u=>!usedUsers.includes(u.id)).map(u=><option key={u.id} value={u.id}>{u.display_name||u.username} Â· hcp {u.handicap||0}</option>)}
+          <option value="">Choose existing user...</option>{availableUsers.filter(u=>!usedUsers.includes(u.id)).map(u=><option key={u.id} value={u.id}>{u.display_name||u.username} - hcp {u.handicap||0}</option>)}
         </select>
         <div style={{fontSize:12,color:'#fff',fontWeight:800,marginBottom:7}}>Add new player</div>
         <input style={{...S.inp,fontSize:12,marginBottom:7}} value={form.name} onChange={e=>setNewPlayer(v=>({...v,[teamKey]:{...v[teamKey],name:e.target.value}}))} placeholder="Player name"/>
@@ -3355,7 +3355,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       </div>
       <div style={{...S.card,marginBottom:14}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}><div style={{fontSize:14,color:'#fff',fontWeight:800}}>Cup Days</div><button onClick={addDay} style={{...S.pri,padding:'6px 10px',fontSize:12}}>Add Day</button></div>
-        {days.length===0?<div style={{fontSize:13,color:'#8ea0ad'}}>No days yet.</div>:days.map(d=>{const released=isDayReleased(d.day_number);const count=dayMatches(d.day_number).length;return <div key={d.id||d.day_number} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,fontSize:13,color:'#60b8f0',padding:'8px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}><span>Day {d.day_number} Â· {count} matches Â· {released?'Released':'Locked'}</span><div style={{display:'flex',gap:6}}><button onClick={()=>setDayReleased(d.day_number,!released)} style={{...(released?S.gho:S.pri),padding:'5px 9px',fontSize:11}}>{released?'Lock':'Release'}</button><button onClick={()=>deleteDay(d)} style={{...S.dan,padding:'5px 9px',fontSize:11}}>Delete</button></div></div>;})}
+        {days.length===0?<div style={{fontSize:13,color:'#8ea0ad'}}>No days yet.</div>:days.map(d=>{const released=isDayReleased(d.day_number);const count=dayMatches(d.day_number).length;return <div key={d.id||d.day_number} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,fontSize:13,color:'#60b8f0',padding:'8px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}><span>Day {d.day_number} - {count} matches - {released?'Released':'Locked'}</span><div style={{display:'flex',gap:6}}><button onClick={()=>setDayReleased(d.day_number,!released)} style={{...(released?S.gho:S.pri),padding:'5px 9px',fontSize:11}}>{released?'Lock':'Release'}</button><button onClick={()=>deleteDay(d)} style={{...S.dan,padding:'5px 9px',fontSize:11}}>Delete</button></div></div>;})}
       </div>
       <div style={{...S.card,marginBottom:14}}>
         <div style={{fontSize:14,color:'#fff',fontWeight:800,marginBottom:10}}>Match Builder</div>
