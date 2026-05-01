@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.05
+// SNYDER LIVE v1.06
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -10,6 +10,12 @@ const{useState,useEffect,useRef}=React;
 const SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 const ADMIN_PW='admin2025';
+// =========================================================
+// App-wide announcement modal
+// Shows a blocking message on app open until the user closes it.
+// =========================================================
+const SHOW_BREAKING_NEWS=true;
+const BREAKING_NEWS_MESSAGE='Do you believe me now?';
 // GolfCourseAPI removed from the live frontend in v45; v65.3 uses safe course presets and badges.
 // Course data should be added manually or imported later through a safer backend/admin workflow.
 // =========================================================
@@ -3613,8 +3619,38 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   </div>;
 }
 
+
+// =========================================================
+// Breaking news modal
+// Full-screen blocking announcement shown before users enter the app
+// =========================================================
+function BreakingNewsModal(){
+  const[open,setOpen]=useState(SHOW_BREAKING_NEWS);
+  if(!open)return null;
+  const overlay={position:'fixed',inset:0,zIndex:100000,background:'rgba(2,8,23,0.88)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',padding:20};
+  const card={width:'100%',maxWidth:420,borderRadius:24,overflow:'hidden',border:'1px solid rgba(248,113,113,0.58)',background:'linear-gradient(160deg,rgba(127,29,29,0.98),rgba(15,23,42,0.98))',boxShadow:'0 28px 90px rgba(0,0,0,0.55)'};
+  const siren={fontSize:30,filter:'drop-shadow(0 0 14px rgba(248,113,113,0.85))'};
+  return ReactDOM.createPortal(
+    <div style={overlay} role="dialog" aria-modal="true" aria-label="Breaking news announcement">
+      <div style={card}>
+        <div style={{background:'linear-gradient(90deg,#dc2626,#991b1b,#dc2626)',padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'center',gap:10,borderBottom:'1px solid rgba(255,255,255,0.16)'}}>
+          <span style={siren}>🚨</span>
+          <div style={{fontSize:15,color:'#fff',fontWeight:950,letterSpacing:'0.16em'}}>BREAKING NEWS</div>
+          <span style={siren}>🚨</span>
+        </div>
+        <div style={{padding:26,textAlign:'center'}}>
+          <div style={{fontSize:30,lineHeight:1.12,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',marginBottom:18,textTransform:'uppercase'}}>{BREAKING_NEWS_MESSAGE}</div>
+          <div style={{fontSize:13,lineHeight:1.45,color:'rgba(255,255,255,0.72)',marginBottom:22}}>You must close this announcement before entering Snyder Live.</div>
+          <button onClick={()=>setOpen(false)} style={{width:'100%',border:'none',borderRadius:16,padding:'15px 18px',background:'linear-gradient(135deg,#ffffff,#e5e7eb)',color:'#7f1d1d',fontSize:16,fontWeight:950,cursor:'pointer',boxShadow:'0 12px 32px rgba(0,0,0,0.26)'}}>Close</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // =========================================================
 // React mount / app bootstrap
 // =========================================================
 const root=ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App/>);
+root.render(<><App/><BreakingNewsModal/></>);
