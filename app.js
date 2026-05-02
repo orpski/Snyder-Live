@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.12
+// SNYDER LIVE v1.13
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -3517,7 +3517,7 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
     })}
   </div>;
 }
-function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,flash,setView,load,setSelectedRound,currentUser,isAdmin,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}){
+function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,flash,setView,load,setSelectedRound,currentUser,isAdmin,cupUsers,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}){
   const[selectedDay,setSelectedDay]=useState(null);
   const cup=(cupEvents||[])[0];
   const teams=cup?getCupTeams(cup,cupTeams):null;
@@ -3630,32 +3630,33 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const seen=new Set();
     return ids.map(id=>findCupPlayer(id)).filter(Boolean).filter(p=>{const key=normaliseId(cupStablePlayerId(p));if(seen.has(key))return false;seen.add(key);return true;});
   }
-  function cupScoreGroupFromPlayers(rd,matchPlayers){
-    const participants=(matchPlayers||[]).map(p=>{
-      const pid=cupStablePlayerId(p);
-      const h=parseFloat(p.handicap??p.playing_handicap??0)||0;
-      const nm=cupDisplayName(p);
-      return{id:pid,name:nm,display_name:nm,current_handicap:h,handicap:h,playing_handicap:h,user_id:p.user_id||null,guest_id:p.user_id?null:(p.guest_id||null),is_host:normaliseId(pid)===normaliseId(currentUser&&currentUser.id)};
+  function cupScoreGroupFromRoundRows(rd,roundRows){
+    const participants=(roundRows||[]).map(rp=>{
+      const pid=rp.user_id||rp.guest_id||rp.id;
+      const h=parseFloat(rp.playing_handicap||0)||0;
+      const nm=rp.display_name||'Player';
+      return{id:pid,name:nm,display_name:nm,current_handicap:h,handicap:h,playing_handicap:h,user_id:rp.user_id||null,guest_id:rp.guest_id||null,is_host:!!rp.is_host};
     });
     const playerIds=participants.map(p=>p.id).filter(Boolean);
     const playingHcps={};participants.forEach(p=>{playingHcps[p.id]=parseFloat(p.playing_handicap||0)||0;});
     return{round_id:rd&&rd.id,group_number:1,player_ids:playerIds,playing_handicaps:playingHcps,participants};
   }
   async function ensureCupRoundRows(rd,matchPlayers){
-    const scoreGroup=cupScoreGroupFromPlayers(rd,matchPlayers);
-    // Cup rounds are one scorecard per Cup group. Always repair the generated rows from the current match setup,
-    // because older generated rounds can have missing names, missing players, or stale player_ids.
+    // Cup rounds are one scorecard per Cup group. Always repair from the current match setup.
+    // Important: if a Cup player is manual/legacy, cup_round_players.user_id must stay null because
+    // Supabase has an FK there. For those players we use the generated cup_round_players.id as the scorecard player id.
     await sb.from('cup_groups').delete().eq('round_id',rd.id);
     await sb.from('cup_round_players').delete().eq('round_id',rd.id);
+    const insertedRows=[];
+    for(const p of (matchPlayers||[])){
+      const payload=cupRoundPlayerPayload(rd,p);
+      const ins=await sb.from('cup_round_players').insert(payload).select().single();
+      if(ins.error)throw ins.error;
+      if(ins.data)insertedRows.push(ins.data);
+    }
+    const scoreGroup=cupScoreGroupFromRoundRows(rd,insertedRows);
     const made=await sb.from('cup_groups').insert({round_id:rd.id,group_number:1,player_ids:scoreGroup.player_ids,playing_handicaps:scoreGroup.playing_handicaps}).select().single();
     if(made.error)throw made.error;
-    for(const p of (matchPlayers||[])){
-      const pid=cupStablePlayerId(p);
-      const nm=cupDisplayName(p);
-      const payload=cupRoundPlayerPayload(rd,p);
-      const ins=await sb.from('cup_round_players').insert(payload);
-      if(ins.error)throw ins.error;
-    }
     return{...made.data,participants:scoreGroup.participants,playing_handicaps:scoreGroup.playing_handicaps,player_ids:scoreGroup.player_ids};
   }
   async function openRoundForScoring(rd,group){
