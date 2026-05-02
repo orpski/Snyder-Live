@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.15
+// SNYDER LIVE v1.16
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -3646,14 +3646,13 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   function cupRoundPlayerPayload(rd,p){
     const pid=cupStablePlayerId(p);
     const nm=cupDisplayName(p);
-    const userId=validCupUserId(p&&p.user_id)?p.user_id:null;
-    // Keep the Cup event player id as guest_id for manual/legacy players.
-    // Scores are saved against this stable id so match results and names keep lining up.
-    const guestId=!userId?(p&&((p.guest_id)||(p.id))||pid):null;
+    // Cup scorecards must not depend on user_id or guest_id foreign keys.
+    // Cup players can be manual entries, legacy rows or linked users from different tables.
+    // We save the display name/handicap here, then use the generated cup_round_players.id as the score id.
     return{
       round_id:rd.id,
-      user_id:userId,
-      guest_id:guestId,
+      user_id:null,
+      guest_id:null,
       display_name:nm,
       playing_handicap:parseFloat((p&&(p.handicap??p.playing_handicap))??0)||0,
       is_host:normaliseId(pid)===normaliseId(currentUser&&currentUser.id)
