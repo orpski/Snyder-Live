@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.42
+// SNYDER LIVE v1.43
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2052,6 +2052,14 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         setAllGroups(normalised);
         setOverallPlayers(people.map(p=>({id:p.id,name:p.display_name||p.name,playing_handicap:p.playing_handicap||0})));
         setOverallScores((scs||[]).filter(r=>!isSnakeScoreRow(r)));
+        const initialSnakes=rowsToSnakeMarks(scs||[]);
+        if(Object.keys(initialSnakes).length>0){
+          setSnakeMarks(prev=>{
+            const merged={...(prev||{}),...initialSnakes};
+            try{localStorage.setItem('snake_marks_'+round.id,JSON.stringify(merged));}catch(e){}
+            return merged;
+          });
+        }
         const userGrp=normalised.find(g=>currentUser&&(g.player_ids||[]).some(id=>normaliseId(id)===normaliseId(currentUser.id)));
         if(userGrp)setActiveGroupId(userGrp.id);
         else if(!group||!group.id&&round._spectator)setActiveGroupId('leaderboard');
@@ -2075,7 +2083,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         if(!m[s.hole_number])m[s.hole_number]={};
         m[s.hole_number][s.player_id]=s.gross_score;
       });
-      const cloudSnakes=rowsToSnakeMarks(snakeRows);
+      const cloudSnakes=rowsToSnakeMarks(rows);
       if(Object.keys(m).length>0){
         setHoleScores(prev=>({...prev,...m}));
         try{localStorage.setItem('scores_'+round.id,JSON.stringify(m));}catch(e){}
@@ -2114,6 +2122,14 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
       })));
       setOverallMode('round');
       setOverallScores((scs||[]).filter(r=>!isSnakeScoreRow(r)));
+      const boardSnakes=rowsToSnakeMarks(scs||[]);
+      if(Object.keys(boardSnakes).length>0){
+        setSnakeMarks(prev=>{
+          const merged={...(prev||{}),...boardSnakes};
+          try{localStorage.setItem('snake_marks_'+round.id,JSON.stringify(merged));}catch(e){}
+          return merged;
+        });
+      }
       if(openModal)setShowOverall(true);
     }catch(e){
       flash('Leaderboard failed: '+(e.message||String(e)),'error');
@@ -2429,6 +2445,20 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
       const h=snakeHolderFromGroupMarks(groups[k],holeNum);
       return h&&normaliseId(h)===id;
     });
+  }
+
+  function scoreRowHasSnake(holeNum,pid){
+    const id=normaliseId(pid);
+    const sources=[overallScores, scores].filter(Array.isArray);
+    for(const list of sources){
+      if((list||[]).some(row=>
+        !isSnakeScoreRow(row) &&
+        Number(row&&row.hole_number)===Number(holeNum) &&
+        normaliseId(row&&row.player_id)===id &&
+        rowHasSnakeFlag(row)
+      ))return true;
+    }
+    return false;
   }
 
   async function saveSnakeMarkToCloud(groupKey,holeNum,pid,checked=true){
@@ -2829,7 +2859,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
                 const g=(holeScores[hd.hole]||{})[p.id];
                 const pts=g===-1?0:getPts(g,hd.hole,p.id);
                 return[
-                  <div key={p.id+'g'} style={{textAlign:'center',fontSize:14,color:g===-1?'rgba(255,255,255,0.3)':g?'#fff':'rgba(255,255,255,0.2)'}}>{(g>0||g===-1)&&isSnakeHolder(hd.hole,p.id)?'🐍 ':''}{ g===-1?'0':g||'.' }</div>,
+                  <div key={p.id+'g'} style={{textAlign:'center',fontSize:14,color:g===-1?'rgba(255,255,255,0.3)':g?'#fff':'rgba(255,255,255,0.2)'}}>{(g>0||g===-1)&&(isSnakeHolder(hd.hole,p.id)||scoreRowHasSnake(hd.hole,p.id))?'🐍 ':''}{ g===-1?'0':g||'.' }</div>,
                   <div key={p.id+'p'} style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
                     {(g>0||g===-1)&&<div style={{background:g===-1?'rgba(40,40,40,0.9)':ptsColor(pts),borderRadius:4,width:28,height:22,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:'#fff'}}>{pts}</div>}
                   </div>
@@ -3188,7 +3218,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
                   const shots=Math.floor(hcp/18)+((hcp%18)>=hd.stroke_index?1:0);
                   const running=getRunning(p.id,hd.hole);
                   const hasScoreEntered=(gross>0||gross===-1);
-                  const hasSnake=hasScoreEntered&&isSnakeHolder(hd.hole,p.id);
+                  const hasSnake=hasScoreEntered&&(isSnakeHolder(hd.hole,p.id)||scoreRowHasSnake(hd.hole,p.id));
                   return(
                     <div key={p.id} onClick={()=>{
                           if(!canEdit)return;
