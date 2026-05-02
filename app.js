@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.27
+// SNYDER LIVE v1.28
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -3640,7 +3640,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       <div style={{fontSize:11,color:'#9fb6c9',marginBottom:8}}>Players and EG handicaps are Cup-specific. Playing shots are calculated from the Cup day course slope/rating when you open the scorecard.</div>
       {rows.length===0?<div style={{fontSize:12,color:'#8ea0ad',padding:'8px 0'}}>No players yet.</div>:rows.map(p=><div key={p.id} style={{borderTop:'1px solid rgba(255,255,255,0.08)',padding:'8px 0'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:6}}><input style={{...S.inp,fontSize:13,padding:'8px 9px',flex:1}} value={p.display_name||''} onChange={e=>updateCupPlayer(p,{display_name:e.target.value})}/><button onClick={()=>removeCupPlayer(p)} style={{...S.dan,padding:'7px 9px',fontSize:11}}>Remove</button></div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center'}}><label style={{fontSize:11,color:'#9fb6c9'}}>EG Handicap</label><HandicapPicker value={p.handicap??0} onChange={v=>updateCupPlayer(p,{handicap:v})} style={{width:76,fontSize:13,padding:'7px 8px'}} label={(p.display_name||'Player')+' EG handicap'}/></div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center'}}><label style={{fontSize:11,color:'#9fb6c9'}}>EG Handicap</label><HandicapPicker value={p.handicap??0} onChange={v=>updateCupPlayer(p,{handicap:v})} style={{width:76,fontSize:13,padding:'7px 8px'}} label={(p.display_name||'Player')+' EG handicap'} step={0.1} min={0} max={54} defaultValue={parseFloat(p.handicap)||18}/></div>
       </div>)}
       <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid rgba(255,255,255,0.08)'}}>
         <div style={{fontSize:12,color:'#fff',fontWeight:800,marginBottom:7}}>Add existing user</div>
@@ -3649,7 +3649,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
         </select>
         <div style={{fontSize:12,color:'#fff',fontWeight:800,marginBottom:7}}>Add new player</div>
         <input style={{...S.inp,fontSize:12,marginBottom:7}} value={form.name} onChange={e=>setNewPlayer(v=>({...v,[teamKey]:{...v[teamKey],name:e.target.value}}))} placeholder="Player name"/>
-        <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:7}}><HandicapPicker value={form.handicap} onChange={hcp=>setNewPlayer(v=>({...v,[teamKey]:{...v[teamKey],handicap:hcp}}))} style={{fontSize:12}} label="Cup player EG handicap"/><button onClick={()=>addManualPlayer(teamKey)} style={{...S.pri,padding:'8px 10px',fontSize:12}}>Add</button></div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:7}}><HandicapPicker value={form.handicap} onChange={hcp=>setNewPlayer(v=>({...v,[teamKey]:{...v[teamKey],handicap:hcp}}))} style={{fontSize:12}} label="Cup player EG handicap" step={0.1} min={0} max={54} defaultValue={18}/><button onClick={()=>addManualPlayer(teamKey)} style={{...S.pri,padding:'8px 10px',fontSize:12}}>Add</button></div>
       </div>
     </div>;
   }
@@ -3899,6 +3899,24 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
       _cupDayGroups: dayGroups
     };
   }
+  function cupPlayerEgHandicap(p){
+    return parseFloat((p&&(p.handicap??p.eg_handicap??p.current_handicap??p.playing_handicap))??0)||0;
+  }
+  function cupPlayerPlayingShotsForCourse(p,course){
+    const eg=cupPlayerEgHandicap(p);
+    return course?calcPlayingHandicap(eg,course,1):Math.round(eg);
+  }
+  function cupDayHandicapCards(){
+    return cupDayNumbers.map(day=>{
+      const course=resolveCupDayCourse(courses,days,cup&&cup.id,day);
+      const courseName=course?(cleanCourseName(course.name)||course.name||'Course selected'):'No course selected';
+      const tee=course&&(course.tee||courseTeeFromName(course.name));
+      const slope=course&&parseFloat(course.slope_rating);
+      const rating=course&&parseFloat(course.course_rating);
+      const rows=[...(playersInCup||[])].sort((a,b)=>String(a.team_key||'').localeCompare(String(b.team_key||''))||String(cupDisplayName(a)).localeCompare(String(cupDisplayName(b))));
+      return {day,course,courseName,tee,slope,rating,rows};
+    });
+  }
   const leading=goldPts>navyPts?'gold':navyPts>goldPts?'navy':'tie';
   function singlesLeaderboard(){
     return (playersInCup||[]).map(p=>{
@@ -4087,6 +4105,18 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
           </div>
           <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'16px 0 8px'}}>OVERALL SINGLES</div>
           <div style={{...S.card,marginBottom:16,padding:0,overflow:'hidden'}}>{singlesLeaderboard().slice(0,8).map((p,i)=><div key={p.id} style={{display:'grid',gridTemplateColumns:'34px 1fr auto auto',gap:8,alignItems:'center',padding:'10px 12px',borderBottom:i<Math.min(8,singlesLeaderboard().length)-1?'1px solid rgba(255,255,255,0.07)':'none'}}><div style={{fontSize:13,color:'#60b8f0',fontWeight:900}}>{i+1}</div><div style={{fontSize:14,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||'Player'}</div><div style={{fontSize:11,color:'#8ea0ad'}}>{p.holes} holes</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{p.total}</div></div>)}</div>
+          <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'16px 0 8px'}}>HANDICAPS</div>
+          <div style={{display:'grid',gap:10,marginBottom:16}}>{cupDayHandicapCards().map(card=><div key={card.day} style={{...S.card,padding:12,background:'linear-gradient(135deg,rgba(15,23,42,0.92),rgba(0,112,187,0.10))'}}>
+            <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'flex-start',marginBottom:8}}>
+              <div><div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {card.day}</div><div style={{fontSize:12,color:'#90ccf0',fontWeight:800}}>{card.courseName}{card.tee?' - '+card.tee+' tee':''}</div></div>
+              <div style={{textAlign:'right',fontSize:10,color:'#8ea0ad',lineHeight:1.35}}>{Number.isFinite(card.slope)?'Slope '+card.slope:''}{Number.isFinite(card.slope)&&Number.isFinite(card.rating)?<br/>:null}{Number.isFinite(card.rating)?'Rating '+card.rating:''}</div>
+            </div>
+            <div style={{display:'grid',gap:6}}>{card.rows.map(p=>{const eg=cupPlayerEgHandicap(p);const shots=cupPlayerPlayingShotsForCourse(p,card.course);return <div key={card.day+'-'+p.id} style={{display:'grid',gridTemplateColumns:'1fr auto auto',gap:8,alignItems:'center',borderTop:'1px solid rgba(255,255,255,0.07)',paddingTop:6}}>
+              <div style={{fontSize:13,color:'#fff',fontWeight:900,textTransform:'uppercase',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cupDisplayName(p)}</div>
+              <div style={{fontSize:11,color:'#8ea0ad',fontWeight:800}}>EG {eg.toFixed(1)}</div>
+              <div style={{minWidth:42,textAlign:'center',borderRadius:999,padding:'4px 8px',background:'rgba(212,175,55,0.16)',border:'1px solid rgba(212,175,55,0.34)',color:'#F5E6A3',fontSize:13,fontWeight:950}}>{shots}</div>
+            </div>;})}</div>
+          </div>)}</div>
           <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>DAYS</div>
           <div style={{display:'grid',gap:10}}>{cupDayNumbers.map(day=>{const released=dayReleased(day);const count=cupDayGroups(day).length;return <button key={day} onClick={()=>setSelectedDay(day)} style={{border:'1px solid rgba(96,184,240,0.26)',borderRadius:14,background:'linear-gradient(135deg,rgba(0,112,187,0.28),rgba(8,30,58,0.92))',padding:'18px 16px',color:'#fff',display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',textAlign:'left'}}><span><span style={{display:'block',fontSize:24,fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {day}</span><span style={{fontSize:12,color:'#90ccf0'}}>{count} groups - {released?'Open for scoring':'Locked'}</span></span><span style={{fontSize:24,color:'#90ccf0'}}>&gt;</span></button>;})}</div>
         </>:<CupDayView day={selectedDay} groups={cupDayGroups(selectedDay)} teams={teams} playersInCup={playersInCup} released={dayReleased(selectedDay)} roundForGroup={roundForGroup} matchResult={matchResult} openCupGroup={openCupGroup} openingGroup={openingGroup} isAdmin={isAdmin}/>}
