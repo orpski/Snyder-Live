@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.13
+// SNYDER LIVE v1.14
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1919,7 +1919,9 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         ]);
         if(!alive)return;
         const people=(rps||[]).map(rp=>({
-          id:rp.user_id||rp.guest_id||rp.id,
+          // Cup scorecards must use the cup_round_players row id as the scoring id.
+          // User/guest ids can be missing or blocked by FK rules for manual Cup players.
+          id:rp.id,
           name:rp.display_name||'Player',
           display_name:rp.display_name||'Player',
           current_handicap:rp.playing_handicap||0,
@@ -1982,7 +1984,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
       if(rpErr)throw rpErr;
       if(scErr)throw scErr;
       setOverallPlayers((rps||[]).map(rp=>({
-        id:rp.user_id||rp.guest_id||rp.id,
+        id:rp.id,
         name:rp.display_name||'Player',
         playing_handicap:rp.playing_handicap||0
       })));
@@ -2028,6 +2030,21 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     })).sort(compareStablefordLeaderboardRows);
   }
 
+  function activeCupLeader(){
+    const rows=(grpPlayers||[]).map(p=>({
+      id:p.id,
+      name:((p.name||p.display_name)||'Player').split(' ')[0],
+      total:getRunning(p.id,holes.length),
+      holes:Object.keys(holeScores||{}).filter(h=>(holeScores[h]||{})[p.id]!==undefined).length
+    })).sort((a,b)=>(b.total||0)-(a.total||0)||(b.holes||0)-(a.holes||0)||String(a.name).localeCompare(String(b.name)));
+    return rows[0]||null;
+  }
+  function cupGroupScoreLabel(){
+    const rows=(grpPlayers||[]).map(p=>({name:((p.name||p.display_name)||'Player').split(' ')[0],total:getRunning(p.id,holes.length)})).sort((a,b)=>(b.total||0)-(a.total||0));
+    if(!rows.length)return 'No scores yet';
+    const top=rows[0];
+    return top.total>0?top.name+' leads on '+top.total+' pts':'Tap to view standings';
+  }
   function getHole(n){return holes.find(h=>h.hole===n)||{hole:n,par:4,stroke_index:n,yards:0};}
   function checkSkipped(targetHole){
     for(let h=1;h<targetHole;h++){
@@ -2586,6 +2603,21 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
             <span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap',textTransform:'capitalize'}}>{round.tee||'White'} tee</span>
             {course.slope_rating&&<span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap'}}>Slope {course.slope_rating}</span>}
             {course.course_rating&&<span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap'}}>Rating {course.course_rating}</span>}
+          </div>
+        )}
+        {round._cupScoring&&activeGroupId!=='leaderboard'&&(
+          <div style={{padding:'8px 12px 6px',background:'rgba(0,0,0,0.18)',borderTop:'1px solid rgba(255,255,255,0.07)'}}>
+            <button onClick={()=>openOverallLeaderboard(true)} style={{width:'100%',border:'1px solid rgba(245,158,11,0.45)',background:'linear-gradient(135deg,rgba(245,158,11,0.22),rgba(0,112,187,0.16))',borderRadius:12,padding:'9px 11px',color:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,textAlign:'left'}}>
+              <div>
+                <div style={{fontSize:12,fontWeight:950,letterSpacing:'0.1em',color:'#fbbf24'}}>TEAM SCORE</div>
+                <div style={{fontSize:10,color:'rgba(255,255,255,0.62)',marginTop:2}}>Tap to view Cup standings</div>
+              </div>
+              <div style={{fontSize:13,fontWeight:900,color:'#fff',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cupGroupScoreLabel()}</div>
+            </button>
+            {(()=>{const l=activeCupLeader();return <div style={{marginTop:6,border:'1px solid rgba(96,184,240,0.28)',background:'rgba(0,112,187,0.16)',borderRadius:999,padding:'7px 10px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+              <span style={{fontSize:10,color:'#90ccf0',fontWeight:950,letterSpacing:'0.1em'}}>SINGLES</span>
+              <span style={{fontSize:12,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l?l.name+' leading - '+l.total+' pts thru '+l.holes:'No singles scores yet'}</span>
+            </div>;})()}
           </div>
         )}
         {allGroups.length>1&&<>
@@ -3632,7 +3664,9 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   }
   function cupScoreGroupFromRoundRows(rd,roundRows){
     const participants=(roundRows||[]).map(rp=>{
-      const pid=rp.user_id||rp.guest_id||rp.id;
+      // Score rows should point at cup_round_players.id, not user_id/guest_id.
+      // This keeps manual Cup players saving correctly and keeps names stable.
+      const pid=rp.id;
       const h=parseFloat(rp.playing_handicap||0)||0;
       const nm=rp.display_name||'Player';
       return{id:pid,name:nm,display_name:nm,current_handicap:h,handicap:h,playing_handicap:h,user_id:rp.user_id||null,guest_id:rp.guest_id||null,is_host:!!rp.is_host};
@@ -3669,8 +3703,8 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     }
     let{data:rps,error:rpsErr}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
     if(rpsErr)throw rpsErr;
-    let po=(rps||[]).map(rp=>({id:rp.user_id||rp.guest_id||rp.id,name:rp.display_name||'Player',display_name:rp.display_name||'Player',current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0,playing_handicap:rp.playing_handicap||0,user_id:rp.user_id,guest_id:rp.guest_id,is_host:rp.is_host}));
-    let hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
+    let po=(rps||[]).map(rp=>({id:rp.id,name:rp.display_name||'Player',display_name:rp.display_name||'Player',current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0,playing_handicap:rp.playing_handicap||0,user_id:rp.user_id,guest_id:rp.guest_id,is_host:rp.is_host}));
+    let hm={};(rps||[]).forEach(rp=>{hm[rp.id]=rp.playing_handicap||0;});
     const{data:rdGroups,error:gErr}=await sb.from('cup_groups').select('*').eq('round_id',rd.id).order('group_number',{ascending:true});
     if(gErr)throw gErr;
     let grp=(rdGroups&&rdGroups[0])||{round_id:rd.id,group_number:1,player_ids:po.map(p=>p.id),playing_handicaps:hm,participants:po};
