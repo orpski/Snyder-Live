@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.11
+// SNYDER LIVE v1.12
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -3602,7 +3602,28 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     return (p&&(p.display_name||p.name||p.username||p.full_name))||'Player';
   }
   function cupStablePlayerId(p){
-    return p&&(p.user_id||p.guest_id||p.id);
+    // For Cup scoring, the safest stable id is the Snyder Cup player row id.
+    // Do not use user_id by default here: cup_round_players.user_id has a DB FK to cup_users,
+    // and some Cup players can be manual/legacy rows where user_id is absent or not valid for that FK.
+    return p&&(p.id||p.guest_id||p.user_id);
+  }
+  function validCupUserId(id){
+    const key=normaliseId(id);
+    return !!key&&(cupUsers||[]).some(u=>normaliseId(u.id)===key);
+  }
+  function cupRoundPlayerPayload(rd,p){
+    const pid=cupStablePlayerId(p);
+    const nm=cupDisplayName(p);
+    const userId=validCupUserId(p&&p.user_id)?p.user_id:null;
+    const guestId=!userId&&(p&&p.guest_id)?p.guest_id:null;
+    return{
+      round_id:rd.id,
+      user_id:userId,
+      guest_id:guestId,
+      display_name:nm,
+      playing_handicap:parseFloat((p&&(p.handicap??p.playing_handicap))??0)||0,
+      is_host:normaliseId(pid)===normaliseId(currentUser&&currentUser.id)
+    };
   }
   function cupPlayersForGroup(group){
     const ids=[...(group&&group.players||[]),...((group&&group.doubles&&group.doubles.gold_player_ids)||[]),...((group&&group.doubles&&group.doubles.navy_player_ids)||[]),...((group&&group.singles||[]).flatMap(m=>[...(m.gold_player_ids||[]),...(m.navy_player_ids||[])]))];
@@ -3631,7 +3652,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     for(const p of (matchPlayers||[])){
       const pid=cupStablePlayerId(p);
       const nm=cupDisplayName(p);
-      const payload={round_id:rd.id,user_id:p.user_id||null,guest_id:p.user_id?null:(p.guest_id||null),display_name:nm,playing_handicap:parseFloat(p.handicap??0)||0,is_host:normaliseId(pid)===normaliseId(currentUser&&currentUser.id)};
+      const payload=cupRoundPlayerPayload(rd,p);
       const ins=await sb.from('cup_round_players').insert(payload);
       if(ins.error)throw ins.error;
     }
