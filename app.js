@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.34
+// SNYDER LIVE v1.35
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1938,6 +1938,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
   const[inputHole,setInputHole]=useState(null);
   const[inputVal,setInputVal]=useState('');
   const[showOverall,setShowOverall]=useState(false);
+  const[snakeMarks,setSnakeMarks]=useState({});
   const[overallPlayers,setOverallPlayers]=useState([]);
   const[overallScores,setOverallScores]=useState([]);
   const[overallMode,setOverallMode]=useState('round');
@@ -1955,6 +1956,10 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         setHoleScores(prev=>({...local,...prev}));
       }
     }catch(e){}
+    try{
+      const snakes=JSON.parse(localStorage.getItem('snake_marks_'+round.id)||'{}');
+      setSnakeMarks(snakes&&typeof snakes==='object'?snakes:{});
+    }catch(e){setSnakeMarks({});}
     // Then load from Supabase (authoritative)
     refreshScoresFromCloud(false);
   },[round&&round.id]);
@@ -2339,6 +2344,38 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
   // Score autosave
   // Persists each hole score locally and remotely
   // ---------------------------------------------------------
+  function snakeGroupKey(){
+    return normaliseId((activeScoreGroup&&activeScoreGroup.id)||activeGroupId||'default');
+  }
+
+  function getSnakeStarter(holeNum){
+    const groupKey=snakeGroupKey();
+    const marks=(snakeMarks&&snakeMarks[groupKey])||{};
+    let holder=null;
+    Object.keys(marks).map(Number).filter(h=>h<=holeNum).sort((a,b)=>a-b).forEach(h=>{
+      if(marks[h])holder=marks[h];
+    });
+    return holder;
+  }
+
+  function isSnakeHolder(holeNum,pid){
+    const holder=getSnakeStarter(holeNum);
+    return holder&&normaliseId(holder)===normaliseId(pid);
+  }
+
+  function setSnakeFromHole(holeNum,pid,checked=true){
+    const groupKey=snakeGroupKey();
+    setSnakeMarks(prev=>{
+      const next={...(prev||{})};
+      const groupMarks={...((next[groupKey])||{})};
+      if(checked)groupMarks[holeNum]=pid;
+      else if(normaliseId(groupMarks[holeNum])===normaliseId(pid))delete groupMarks[holeNum];
+      next[groupKey]=groupMarks;
+      try{localStorage.setItem('snake_marks_'+round.id,JSON.stringify(next));}catch(e){}
+      return next;
+    });
+  }
+
   function saveLocalScore(holeNum,pid,val){
     try{
       const key='scores_'+round.id;
@@ -2565,6 +2602,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
     const dv=parseInt(inputVal)||hd.par;
     const dpts=calcStableford(dv,hd.par,hd.stroke_index,hcp);
     const opts=Array.from({length:10},(_,i)=>Math.max(1,hd.par-2)+i);
+    const snakeChecked=isSnakeHolder(holeNum,pid);
 
     function confirm(){
       setScore(holeNum,pid,dv);setInputHole(null);
@@ -2611,6 +2649,10 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
               );
             })}
           </div>
+          <label style={{display:'flex',alignItems:'center',gap:10,width:'100%',padding:'10px 11px',marginBottom:8,borderRadius:10,border:'1px solid rgba(34,197,94,0.42)',background:snakeChecked?'rgba(34,197,94,0.22)':'rgba(255,255,255,0.06)',color:'#fff',cursor:'pointer',fontSize:13,fontWeight:800}}>
+            <input type='checkbox' checked={!!snakeChecked} onChange={e=>setSnakeFromHole(holeNum,pid,e.target.checked)} style={{width:18,height:18,accentColor:'#22c55e'}}/>
+            <span style={{flex:1}}>🐍 Snake from this hole</span>
+          </label>
           <button onClick={blob} style={{width:'100%',padding:10,marginBottom:8,borderRadius:10,border:'1px solid rgba(255,255,255,0.2)',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:13}}>
             Blob - pickup (0 pts)
           </button>
@@ -2672,7 +2714,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
                 const g=(holeScores[hd.hole]||{})[p.id];
                 const pts=g===-1?0:getPts(g,hd.hole,p.id);
                 return[
-                  <div key={p.id+'g'} style={{textAlign:'center',fontSize:14,color:g===-1?'rgba(255,255,255,0.3)':g?'#fff':'rgba(255,255,255,0.2)'}}>{ g===-1?'0':g||'.' }</div>,
+                  <div key={p.id+'g'} style={{textAlign:'center',fontSize:14,color:g===-1?'rgba(255,255,255,0.3)':g?'#fff':'rgba(255,255,255,0.2)'}}>{isSnakeHolder(hd.hole,p.id)&&g!==undefined?'🐍 ':''}{ g===-1?'0':g||'.' }</div>,
                   <div key={p.id+'p'} style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
                     {(g>0||g===-1)&&<div style={{background:g===-1?'rgba(40,40,40,0.9)':ptsColor(pts),borderRadius:4,width:28,height:22,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:'#fff'}}>{pts}</div>}
                   </div>
@@ -3030,6 +3072,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
                   const hcp=hcpMap[p.id];
                   const shots=Math.floor(hcp/18)+((hcp%18)>=hd.stroke_index?1:0);
                   const running=getRunning(p.id,hd.hole);
+                  const hasSnake=isSnakeHolder(hd.hole,p.id);
                   return(
                     <div key={p.id} onClick={()=>{
                           if(!canEdit)return;
@@ -3041,6 +3084,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
                           setInputHole({holeNum:hd.hole,pid:p.id});
                         }} style={{minHeight:rowH,position:'relative',display:'flex',alignItems:'center',justifyContent:'center',cursor:canEdit?'pointer':'default',background:gross&&gross!==-1?ptsColor(pts):gross===-1?'rgba(20,20,20,0.8)':'rgba(255,255,255,0.04)',borderLeft:'1px solid rgba(255,255,255,0.06)'}}>
                       {shots>0&&<div style={{position:'absolute',top:5,left:6,display:'flex',gap:2}}>{Array.from({length:shots}).map((_,i)=><div key={i} style={{width:6,height:6,borderRadius:'50%',background:'#f59e0b'}}/>)}</div>}
+                      {hasSnake&&<div style={{position:'absolute',bottom:4,left:5,fontSize:17,filter:'drop-shadow(0 1px 2px rgba(0,0,0,0.5))'}}>🐍</div>}
                       {gross>0||gross===-1?(
                         <div>
                           <div style={{fontSize:24,color:'#fff',lineHeight:1,textAlign:'center',fontWeight:800}}>{gross===-1?'0':gross}</div>
