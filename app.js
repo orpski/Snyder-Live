@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.26
+// SNYDER LIVE v1.27
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2851,9 +2851,9 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
               </div>
               <div style={{fontSize:15,fontWeight:950,color:'#fff',maxWidth:185,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cupProjectedScoreLabel()}</div>
             </button>
-            {(()=>{const l=activeCupLeader();return <button onClick={()=>openCupDaySinglesLeaderboard(true)} style={{width:'100%',marginTop:6,border:'1px solid rgba(96,184,240,0.38)',background:'rgba(0,112,187,0.18)',borderRadius:12,padding:'9px 11px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,color:'#fff',textAlign:'left'}}>
-              <span style={{fontSize:12,color:'#90ccf0',fontWeight:950,letterSpacing:'0.1em'}}>SINGLES</span>
-              <span style={{fontSize:13,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l?gameName(l.name)+' LEADING - '+l.total+' PTS THRU '+l.holes:'NO SINGLES SCORES YET'}</span>
+            {(()=>{const l=activeCupLeader();return <button onClick={()=>openCupDaySinglesLeaderboard(true)} style={{width:'100%',marginTop:6,border:'1px solid rgba(248,113,113,0.78)',background:'linear-gradient(135deg,rgba(185,28,28,0.98),rgba(127,29,29,0.94))',boxShadow:'0 10px 24px rgba(185,28,28,0.24)',borderRadius:12,padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,color:'#fff',textAlign:'left'}}>
+              <span style={{fontSize:12,color:'#fff',fontWeight:950,letterSpacing:'0.1em'}}>DAY SINGLES</span>
+              <span style={{fontSize:15,color:'#fff',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l?gameName(l.name)+' - '+l.total+' PTS':'NO SINGLES SCORES YET'}</span>
             </button>;})()}
           </div>
         )}
@@ -3637,19 +3637,19 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     const usedUsers=cupPlayers.filter(p=>p.user_id).map(p=>p.user_id);
     return <div style={{...S.card,...cupTeamStyle(teamKey),padding:12}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><CupTeamBadge teamKey={teamKey} label={team.name}/><div style={{fontSize:20,color:'#fff',fontWeight:900}}>{rows.length}/4</div></div>
-      <div style={{fontSize:11,color:'#9fb6c9',marginBottom:8}}>Players and handicaps are Cup-specific, so you can tweak them without breaking normal rounds.</div>
+      <div style={{fontSize:11,color:'#9fb6c9',marginBottom:8}}>Players and EG handicaps are Cup-specific. Playing shots are calculated from the Cup day course slope/rating when you open the scorecard.</div>
       {rows.length===0?<div style={{fontSize:12,color:'#8ea0ad',padding:'8px 0'}}>No players yet.</div>:rows.map(p=><div key={p.id} style={{borderTop:'1px solid rgba(255,255,255,0.08)',padding:'8px 0'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:6}}><input style={{...S.inp,fontSize:13,padding:'8px 9px',flex:1}} value={p.display_name||''} onChange={e=>updateCupPlayer(p,{display_name:e.target.value})}/><button onClick={()=>removeCupPlayer(p)} style={{...S.dan,padding:'7px 9px',fontSize:11}}>Remove</button></div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center'}}><label style={{fontSize:11,color:'#9fb6c9'}}>Handicap</label><HandicapPicker value={p.handicap??0} onChange={v=>updateCupPlayer(p,{handicap:v})} style={{width:76,fontSize:13,padding:'7px 8px'}} label={(p.display_name||'Player')+' handicap'}/></div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center'}}><label style={{fontSize:11,color:'#9fb6c9'}}>EG Handicap</label><HandicapPicker value={p.handicap??0} onChange={v=>updateCupPlayer(p,{handicap:v})} style={{width:76,fontSize:13,padding:'7px 8px'}} label={(p.display_name||'Player')+' EG handicap'}/></div>
       </div>)}
       <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid rgba(255,255,255,0.08)'}}>
         <div style={{fontSize:12,color:'#fff',fontWeight:800,marginBottom:7}}>Add existing user</div>
         <select style={{...S.inp,fontSize:12,marginBottom:10}} value="" onChange={e=>{const u=availableUsers.find(x=>x.id===e.target.value);if(u)addExistingPlayer(teamKey,u);}}>
-          <option value="">Choose existing user...</option>{availableUsers.filter(u=>!usedUsers.includes(u.id)).map(u=><option key={u.id} value={u.id}>{u.display_name||u.username} - hcp {u.handicap||0}</option>)}
+          <option value="">Choose existing user...</option>{availableUsers.filter(u=>!usedUsers.includes(u.id)).map(u=><option key={u.id} value={u.id}>{u.display_name||u.username} - EG {u.handicap||0}</option>)}
         </select>
         <div style={{fontSize:12,color:'#fff',fontWeight:800,marginBottom:7}}>Add new player</div>
         <input style={{...S.inp,fontSize:12,marginBottom:7}} value={form.name} onChange={e=>setNewPlayer(v=>({...v,[teamKey]:{...v[teamKey],name:e.target.value}}))} placeholder="Player name"/>
-        <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:7}}><HandicapPicker value={form.handicap} onChange={hcp=>setNewPlayer(v=>({...v,[teamKey]:{...v[teamKey],handicap:hcp}}))} style={{fontSize:12}} label="Cup player handicap"/><button onClick={()=>addManualPlayer(teamKey)} style={{...S.pri,padding:'8px 10px',fontSize:12}}>Add</button></div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:7}}><HandicapPicker value={form.handicap} onChange={hcp=>setNewPlayer(v=>({...v,[teamKey]:{...v[teamKey],handicap:hcp}}))} style={{fontSize:12}} label="Cup player EG handicap"/><button onClick={()=>addManualPlayer(teamKey)} style={{...S.pri,padding:'8px 10px',fontSize:12}}>Add</button></div>
       </div>
     </div>;
   }
@@ -3926,18 +3926,22 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const key=normaliseId(id);
     return !!key&&(cupUsers||[]).some(u=>normaliseId(u.id)===key);
   }
-  function cupRoundPlayerPayload(rd,p){
+  function cupRoundPlayerPayload(rd,p,courseForDay){
     const pid=cupStablePlayerId(p);
     const nm=cupDisplayName(p);
+    // Cup player handicap is the England Golf / WHS handicap index.
+    // Playing shots for the scorecard are calculated from that day's course slope/rating.
+    const egHandicap=parseFloat((p&&(p.handicap??p.eg_handicap??p.current_handicap??p.playing_handicap))??0)||0;
+    const playingShots=courseForDay?calcPlayingHandicap(egHandicap,courseForDay,1):Math.round(egHandicap);
     // Cup scorecards must not depend on user_id or guest_id foreign keys.
     // Cup players can be manual entries, legacy rows or linked users from different tables.
-    // We save the display name/handicap here, then use the generated cup_round_players.id as the score id.
+    // We save the display name/playing handicap here, then use the generated cup_round_players.id as the score id.
     return{
       round_id:rd.id,
       user_id:null,
       guest_id:null,
       display_name:nm,
-      playing_handicap:parseFloat((p&&(p.handicap??p.playing_handicap))??0)||0,
+      playing_handicap:playingShots,
       is_host:normaliseId(pid)===normaliseId(currentUser&&currentUser.id)
     };
   }
@@ -3965,7 +3969,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const cupPlayerMap={};participants.forEach(p=>{if(p.cup_player_id)cupPlayerMap[normaliseId(p.cup_player_id)]=p.id;});
     return{round_id:rd&&rd.id,group_number:1,player_ids:playerIds,playing_handicaps:playingHcps,participants,_cupPlayerMap:cupPlayerMap};
   }
-  async function ensureCupRoundRows(rd,matchPlayers){
+  async function ensureCupRoundRows(rd,matchPlayers,courseForDay){
     // Cup rounds are one scorecard per Cup group. Repair rows without wiping existing scores.
     // Older builds deleted cup_scores here, which is why scores disappeared when you left and re-opened.
     const wanted=(matchPlayers||[]).filter(Boolean);
@@ -3986,7 +3990,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
       if(!row){
         row=existing.find(r=>!used.has(r.id));
       }
-      const payload=cupRoundPlayerPayload(rd,p);
+      const payload=cupRoundPlayerPayload(rd,p,courseForDay);
       if(row){
         used.add(row.id);
         const upd=await sb.from('cup_round_players').update(payload).eq('id',row.id).select().single();
@@ -4012,7 +4016,8 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   async function openRoundForScoring(rd,group){
     const fallbackPlayers=cupPlayersForGroup(group);
     if(fallbackPlayers.length){
-      const repaired=await ensureCupRoundRows(rd,fallbackPlayers);
+      const courseForDay=resolveCupDayCourse(courses,days,cup&&cup.id,group&&group.day||rd.day_number||1);
+      const repaired=await ensureCupRoundRows(rd,fallbackPlayers,courseForDay);
       try{sessionStorage.setItem('cupReturnDay',String(group&&group.day||rd.day_number||1));}catch(e){}
       setSelectedRound({...rd,_cupScoring:true,_cupSummary:cupScoreSummary(),_cupGroupData:group,_cupTeams:teams,...cupDayContext(group&&group.day||rd.day_number||1),_group:repaired});
       setView('play');
@@ -4052,7 +4057,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
       let{data:rd,error:roundErr}=await sb.from('cup_rounds').insert(roundPayload).select().single();
       if(roundErr&&String(roundErr.message||'').toLowerCase().includes('course')){roundPayload.course_id=null;const retry=await sb.from('cup_rounds').insert(roundPayload).select().single();rd=retry.data;roundErr=retry.error;}
       if(roundErr)throw roundErr;
-      const grp=await ensureCupRoundRows(rd,matchPlayers);
+      const grp=await ensureCupRoundRows(rd,matchPlayers,course);
       try{sessionStorage.setItem('cupReturnDay',String(day));}catch(e){}
       setSelectedRound({...rd,_cupScoring:true,_cupSummary:cupScoreSummary(),_cupGroupData:group,_cupTeams:teams,...cupDayContext(day),_group:grp});
       setView('play');
