@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.24
+// SNYDER LIVE v1.25
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2053,9 +2053,17 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         const nameKey=String(rp.display_name||'').trim().toLowerCase();
         if(byRoundName[nameKey])rpToCup[normaliseId(rp.id)]=byRoundName[nameKey];
       });
+      // Build the day singles rows through a single keyed map so refresh never double-counts.
+      // The current group exists both in saved cup_scores and local holeScores after autosave;
+      // without this, Group 1 could appear doubled after pressing Refresh.
+      const rowByPlayerHole={};
+      const putRow=(cpId,holeNumber,row)=>{
+        if(!cpId||!holeNumber)return;
+        rowByPlayerHole[normaliseId(cpId)+'-'+Number(holeNumber)]={...row,player_id:cpId,hole_number:Number(holeNumber)};
+      };
       dbScores.forEach(sc=>{
         let cpId=cpByKey[normaliseId(sc.player_id)]||rpToCup[normaliseId(sc.player_id)];
-        if(cpId)rows.push({...sc,player_id:cpId});
+        if(cpId)putRow(cpId,sc.hole_number,sc);
       });
       (grpPlayers||[]).forEach(gp=>{
         const keys=[gp.cup_player_id,gp.id,gp.user_id,gp.guest_id,gp.round_player_id].filter(Boolean).map(normaliseId);
@@ -2064,9 +2072,10 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         if(!cpId)return;
         for(let h=1;h<=holes.length;h++){
           const gross=(holeScores[h]||{})[gp.id];
-          if(gross!==undefined)rows.push({player_id:cpId,hole_number:h,gross_score:gross,stableford_points:getPts(gross,h,gp.id)||0});
+          if(gross!==undefined)putRow(cpId,h,{player_id:cpId,hole_number:h,gross_score:gross,stableford_points:getPts(gross,h,gp.id)||0});
         }
       });
+      rows.push(...Object.values(rowByPlayerHole));
       setOverallMode('cupDay');
       setOverallPlayers(playersForBoard);
       setOverallScores(rows);
