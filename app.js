@@ -3604,9 +3604,12 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
     const res=matchResult(match,round);
     const goldIds=match.gold_player_ids||[];
     const navyIds=match.navy_player_ids||[];
-    return <div style={{border:'1px solid rgba(255,255,255,0.10)',borderRadius:12,background:'rgba(255,255,255,0.045)',padding:10}}>
+    const matchTone=res.winner==='gold'?CUP_THEME.gold:res.winner==='navy'?CUP_THEME.navy:null;
+    const matchBg=matchTone?`linear-gradient(135deg,${matchTone.bg},rgba(255,255,255,0.035))`:'rgba(255,255,255,0.045)';
+    const matchBorder=matchTone?`1px solid ${matchTone.primary}`:'1px solid rgba(255,255,255,0.10)';
+    return <div style={{border:matchBorder,borderRadius:12,background:matchBg,padding:10,boxShadow:matchTone?'0 0 18px rgba(0,0,0,0.16)':'none'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}>
-        <div style={{fontSize:11,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>{label}</div>
+        <div style={{fontSize:11,color:matchTone?matchTone.accent:'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>{label}</div>
       </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}>
         <div style={{display:'grid',gap:5}}>{goldIds.map(id=><div key={id} style={{color:CUP_THEME.gold.accent,fontSize:13,fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
@@ -3616,7 +3619,6 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
             <div style={{fontSize:10,color:'#8ea0ad'}}>{res.holes?('Thru '+res.holes):'Matchplay'}</div>
           </>:<>
             <div style={{fontSize:17,color:'#fff',fontWeight:950}}>{res.gold} - {res.navy}</div>
-            <div style={{fontSize:10,color:'#8ea0ad'}}>{res.label}</div>
           </>}
         </div>
         <div style={{display:'grid',gap:5,textAlign:'right'}}>{navyIds.map(id=><div key={id} style={{color:CUP_THEME.navy.accent,fontSize:13,fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
@@ -3634,10 +3636,10 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
       const locked=!released;
       const opening=normaliseId(openingGroup)===normaliseId(day+'-'+group.idx);
       const disabled=!firstMatch||opening||(locked&&!isAdmin);
-      return <div key={group.idx} style={{border:'1px solid rgba(96,184,240,0.22)',borderRadius:16,background:'linear-gradient(180deg,rgba(0,112,187,0.12),rgba(255,255,255,0.04))',padding:12,marginBottom:14}}>
+      return <div key={group.idx} role="button" tabIndex={disabled?-1:0} onClick={()=>{if(!disabled)openCupGroup(group);}} onKeyDown={(e)=>{if(!disabled&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openCupGroup(group);}}} style={{border:'1px solid rgba(96,184,240,0.22)',borderRadius:16,background:'linear-gradient(180deg,rgba(0,112,187,0.12),rgba(255,255,255,0.04))',padding:12,marginBottom:14,opacity:disabled?0.58:1,cursor:disabled?'default':'pointer'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
-          <div><div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>GROUP {group.idx}</div><div style={{fontSize:11,color:'#8ea0ad'}}>{rd?isCompletedRound(rd)?'Scorecard complete':'Scorecard live':'No scorecard yet'}</div></div>
-          <button onClick={()=>openCupGroup(group)} disabled={disabled} style={{...(locked?S.gho:S.pri),padding:'9px 12px',fontSize:12,opacity:disabled?0.45:1}}>{opening?'Opening...':locked&&!isAdmin?'Locked until Go Live':'Fill in scorecard'}</button>
+          <div><div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>GROUP {group.idx}</div><div style={{fontSize:11,color:'#8ea0ad'}}>{opening?'Opening scorecard...':rd?isCompletedRound(rd)?'Scorecard complete':'Scorecard live':locked&&!isAdmin?'Locked until Go Live':'No scorecard yet'}</div></div>
+          <div style={{fontSize:11,color:disabled?'#8ea0ad':'#90ccf0',fontWeight:900,letterSpacing:'0.08em'}}>{locked&&!isAdmin?'LOCKED':opening?'OPENING':'TAP TO OPEN'}</div>
         </div>
         <div style={{display:'grid',gap:8}}>
           {group.doubles&&<MatchRow match={group.doubles} round={rd} label="DOUBLES MATCH"/>}
