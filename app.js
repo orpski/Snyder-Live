@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.21
+// SNYDER LIVE v1.22
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1644,7 +1644,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   // Scorecard handoff
   // ---------------------------------------------------------
   if(step==='scorecard'&&activeRound&&activeGroup){
-    return <LiveScorecard round={activeRound} group={activeGroup} players={players} courses={courses} sb={sb} flash={flash} load={load} setView={setView} holeScores={holeScores} setHoleScores={setHoleScores} currentUser={currentUser}/>;
+    return <LiveScorecard round={activeRound} group={activeGroup} players={players} courses={courses} scores={scores} sb={sb} flash={flash} load={load} setView={setView} holeScores={holeScores} setHoleScores={setHoleScores} currentUser={currentUser}/>;
   }
 
     // ---------------------------------------------------------
@@ -1858,7 +1858,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
 // Live scorecard
 // Hole entry, running totals, review pages, sharing and finish-round controls
 // =========================================================
-function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeScores,setHoleScores,currentUser}){
+function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView,holeScores,setHoleScores,currentUser}){
   const course=courses.find(co=>co.id===round.course_id)||findCourseForTee(courses,round.course_name,round.tee);
   const holes=course&&course.holes&&course.holes.length>0?course.holes:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1,yards:0}));
   const[allGroups,setAllGroups]=useState(group?[group]:[]);
@@ -3624,26 +3624,25 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
     const res=matchResult(match,round);
     const goldIds=match.gold_player_ids||[];
     const navyIds=match.navy_player_ids||[];
-    const matchTone=res.winner==='gold'?CUP_THEME.gold:res.winner==='navy'?CUP_THEME.navy:null;
+    const isGold=res.winner==='gold';
+    const isNavy=res.winner==='navy';
+    const matchTone=isGold?CUP_THEME.gold:isNavy?CUP_THEME.navy:null;
     const matchBg=matchTone
-      ? (res.winner==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.95),rgba(146,91,10,0.92))':'linear-gradient(135deg,rgba(37,99,235,0.96),rgba(11,31,77,0.95))')
-      : 'linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.025))';
+      ? (isGold?'linear-gradient(135deg,rgba(212,175,55,0.98),rgba(120,74,7,0.96))':'linear-gradient(135deg,rgba(37,99,235,0.98),rgba(8,24,61,0.97))')
+      : 'linear-gradient(135deg,rgba(255,255,255,0.060),rgba(255,255,255,0.025))';
     const matchBorder=matchTone?`2px solid ${matchTone.accent}`:'1px solid rgba(255,255,255,0.10)';
-    return <div style={{border:matchBorder,borderRadius:12,background:matchBg,padding:10,boxShadow:matchTone?'0 12px 30px rgba(0,0,0,0.30), inset 0 0 0 1px rgba(255,255,255,0.15)':'none'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}>
-        <div style={{fontSize:11,color:matchTone?'rgba(255,255,255,0.92)':'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>{label}</div>
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}>
-        <div style={{display:'grid',gap:5}}>{goldIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME.gold.accent,fontSize:13,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
-        <div style={{display:'grid',gap:4,textAlign:'center'}}>
-          {res.isDoubles?<>
-            <div style={{fontSize:17,color:'#fff',fontWeight:950}}>{res.label}</div>
-            <div style={{fontSize:10,color:matchTone?'rgba(255,255,255,0.82)':'#8ea0ad'}}>{res.holes?('Thru '+res.holes):'Matchplay'}</div>
-          </>:<>
-            <div style={{fontSize:17,color:'#fff',fontWeight:950}}>{res.gold} - {res.navy}</div>
-          </>}
-        </div>
-        <div style={{display:'grid',gap:5,textAlign:'right'}}>{navyIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME.navy.accent,fontSize:13,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
+    const outsideText=res.isDoubles?(res.winner==='tie'?'':String(res.label||'').replace(/^.*?\s+(\d+\s+up)$/i,'$1')):(res.winner==='tie'?'':(res.winner==='gold'?String(res.gold):String(res.navy)));
+    const centreText=res.isDoubles?(res.winner==='tie'?'A/S':(res.holes?('Thru '+res.holes):'Matchplay')):(res.winner==='tie'?'A/S':'');
+    const leftOutside=isGold?outsideText:(res.isDoubles?'':String(res.gold||0));
+    const rightOutside=isNavy?outsideText:(res.isDoubles?'':String(res.navy||0));
+    return <div style={{border:matchBorder,borderRadius:12,background:matchBg,padding:10,boxShadow:matchTone?'0 12px 30px rgba(0,0,0,0.34), inset 0 0 0 1px rgba(255,255,255,0.17)':'none'}}>
+      <div style={{fontSize:11,color:matchTone?'rgba(255,255,255,0.92)':'#60b8f0',fontWeight:950,letterSpacing:'0.12em',marginBottom:8}}>{label}</div>
+      <div style={{display:'grid',gridTemplateColumns:'62px 1fr 54px 1fr 62px',gap:7,alignItems:'center'}}>
+        <div style={{fontSize:res.isDoubles?15:20,color:isGold?'#fff':(res.isDoubles?'rgba(255,255,255,0.22)':CUP_THEME.gold.accent),fontWeight:950,textAlign:'left',whiteSpace:'nowrap'}}>{leftOutside}</div>
+        <div style={{display:'grid',gap:5,textAlign:'right',minWidth:0}}>{goldIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME.gold.accent,fontSize:13,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
+        <div style={{textAlign:'center',fontSize:res.isDoubles?11:13,color:matchTone?'rgba(255,255,255,0.84)':'#8ea0ad',fontWeight:900,whiteSpace:'nowrap'}}>{centreText}</div>
+        <div style={{display:'grid',gap:5,textAlign:'left',minWidth:0}}>{navyIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME.navy.accent,fontSize:13,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
+        <div style={{fontSize:res.isDoubles?15:20,color:isNavy?'#fff':(res.isDoubles?'rgba(255,255,255,0.22)':CUP_THEME.navy.accent),fontWeight:950,textAlign:'right',whiteSpace:'nowrap'}}>{rightOutside}</div>
       </div>
     </div>;
   }
