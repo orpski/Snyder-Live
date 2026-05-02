@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.08
+// SNYDER LIVE v1.09
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -113,6 +113,18 @@ function mergePresetCourses(dbCourses){
 }
 function getCourseOptions(courses){const byName=new Map();(courses||[]).forEach(c=>{if(!c)return;const base=cleanCourseName(c.name);if(!base)return;const tee=courseTeeFromName(c.name)||c.tee||'White';if(!byName.has(base))byName.set(base,{name:base,course:c,tees:{}});const item=byName.get(base);item.tees[tee]=c;if(!item.course||tee==='White')item.course=c;});return Array.from(byName.values()).sort((a,b)=>a.name.localeCompare(b.name));}
 function findCourseForTee(courses,baseName,tee){const cleanBase=cleanCourseName(baseName);const option=getCourseOptions(courses).find(o=>o.name===cleanBase);if(!option)return null;return option.tees[tee]||option.course||Object.values(option.tees)[0]||null;}
+function cupDayCourseStorageKey(cupId,day){return 'snyder_cup_day_course_'+String(cupId||'default')+'_'+String(parseInt(day)||1);}
+function saveLocalCupDayCourse(cupId,day,course){try{if(course)localStorage.setItem(cupDayCourseStorageKey(cupId,day),JSON.stringify({course_id:safeCourseIdForDb(course,course.id),course_name:cleanCourseName(course.name)||course.name||'',tee:course.tee||courseTeeFromName(course.name)||'White'}));}catch(e){}}
+function getLocalCupDayCourse(cupId,day){try{return JSON.parse(localStorage.getItem(cupDayCourseStorageKey(cupId,day))||'null');}catch(e){return null;}}
+function resolveCupDayCourse(courses,cupDays,cupId,day){
+  const dayNum=parseInt(day)||1;
+  const row=(cupDays||[]).find(d=>String(d.cup_id||'')===String(cupId||'')&&(parseInt(d.day_number)||1)===dayNum)||{};
+  const stored=getLocalCupDayCourse(cupId,dayNum)||{};
+  const source={...stored,...row};
+  if(source.course_id){const byId=(courses||[]).find(c=>String(c.id)===String(source.course_id));if(byId)return byId;}
+  if(source.course_name){const byName=findCourseForTee(courses,source.course_name,source.tee||'White');if(byName)return byName;}
+  return (courses||[]).find(c=>hasCourseHoles(c))||(courses||[])[0]||null;
+}
 function idMatches(a,b){return a!=null&&b!=null&&String(a)===String(b);}
 function userCanScoreRound(currentUser,group,roundPlayers){
   if(!currentUser)return false;
@@ -1405,7 +1417,7 @@ function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRou
       // Clear so next visit to PlayGolf starts fresh
       setSelectedRound(null);
     }
-  },[]);
+  },[selectedRound]);
 
   function addPersonToGroup(person,groupIdx){
     const flat=groupSetup.flat();
@@ -2847,7 +2859,7 @@ function AdminPanel({courses,rounds,groups,sb,flash,setView,load,cupUsers,guests
       <div style={{padding:16}}>
         {tab==='courses'&&<CoursesTab courses={courses} sb={sb} flash={flash} load={load}/>}
         {tab==='rounds'&&<RoundsTab rounds={rounds} groups={groups} sb={sb} flash={flash} load={load}/>}
-        {tab==='cup'&&<CupAdminTab sb={sb} flash={flash} load={load} cupUsers={cupUsers} cupEvents={cupEvents} cupTeams={cupTeams} cupEventPlayers={cupEventPlayers} cupDays={cupDays} cupMatches={cupMatches}/>}
+        {tab==='cup'&&<CupAdminTab sb={sb} flash={flash} load={load} cupUsers={cupUsers} cupEvents={cupEvents} cupTeams={cupTeams} cupEventPlayers={cupEventPlayers} cupDays={cupDays} cupMatches={cupMatches} courses={courses}/>}
         {tab==='users'&&(
           <div>
             <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.12em',margin:'0 0 8px'}}>REGISTERED USERS</div>
@@ -3214,7 +3226,7 @@ const CUP_THEME={gold:{name:'Gold',primary:'#D4AF37',accent:'#F5E6A3',bg:'rgba(2
 function cupTeamStyle(teamKey,extra={}){const t=CUP_THEME[teamKey]||CUP_THEME.gold;return {border:'1px solid '+t.primary,background:t.bg,...extra};}
 function CupTeamBadge({teamKey,label}){const t=CUP_THEME[teamKey]||CUP_THEME.gold;return <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:10,fontWeight:800,letterSpacing:'0.08em',color:t.accent,textTransform:'uppercase'}}><span style={{width:8,height:8,borderRadius:999,background:t.primary,boxShadow:'0 0 10px '+t.primary}}/> {label||t.name}</span>;}
 function getCupTeams(cup,cupTeams){const rows=(cupTeams||[]).filter(t=>t.cup_id===cup.id);return {gold:rows.find(t=>t.team_key==='gold')||{name:cup.team_a_name||'Gold',team_key:'gold'},navy:rows.find(t=>t.team_key==='navy')||{name:cup.team_b_name||'Navy',team_key:'navy'}};}
-function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}){
+function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,courses}){
   const[name,setName]=useState('Snyder Cup 2026');
   const[goldName,setGoldName]=useState('Gold Team');
   const[navyName,setNavyName]=useState('Navy Team');
@@ -3236,6 +3248,8 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   const matchesByDay=groupCupMatchesByDay(matches,adminDays).filter(group=>group.matches.length);
   const playerKey=p=>p?.id||p?.user_id;
   const availableUsers=(cupUsers||[]);
+  const cupCourseOptions=(courses||[]).filter(c=>hasCourseHoles(c));
+  const selectedCourseForDay=day=>resolveCupDayCourse(courses,days,cup&&cup.id,day);
   async function createCup(){
     try{
       const{data,error}=await sb.from('snyder_cups').insert({name:name.trim()||'Snyder Cup',team_a_name:goldName.trim()||'Gold Team',team_b_name:navyName.trim()||'Navy Team',team_a_colour:'#D4AF37',team_b_colour:'#0B1F4D',status:'setup'}).select().single();
@@ -3282,11 +3296,32 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   }
   function dayMatches(day){return matches.filter(m=>(parseInt(m.day_number)||1)===(parseInt(day)||1));}
   function isDayReleased(day){const rows=dayMatches(day);return rows.length>0&&rows.some(m=>String(m.status||'locked').toLowerCase()==='live'||String(m.status||'').toLowerCase()==='released');}
+  async function setCupDayCourse(day,courseId){
+    if(!cup)return;
+    const dayNum=parseInt(day)||1;
+    const course=(courses||[]).find(c=>String(c.id)===String(courseId));
+    if(!course){flash('Choose a course first','error');return;}
+    saveLocalCupDayCourse(cup.id,dayNum,course);
+    const payload={course_id:safeCourseIdForDb(course,course.id),course_name:cleanCourseName(course.name)||course.name||'',tee:course.tee||courseTeeFromName(course.name)||'White'};
+    const existing=days.find(d=>(parseInt(d.day_number)||1)===dayNum);
+    let result;
+    if(existing&&existing.id){result=await sb.from('snyder_cup_days').update(payload).eq('id',existing.id);}
+    else{result=await sb.from('snyder_cup_days').insert({cup_id:cup.id,day_number:dayNum,...payload});}
+    if(result&&result.error){
+      const basic=existing&&existing.id?null:await sb.from('snyder_cup_days').insert({cup_id:cup.id,day_number:dayNum});
+      if(basic&&basic.error)console.warn('Cup day row save failed',basic.error);
+      flash('Course remembered on this device. Add course fields to snyder_cup_days later for shared setup.');
+    }else{flash('Day '+dayNum+' course saved');}
+    await load();
+  }
   async function setDayReleased(day,released){
     if(!cup)return;
     const dayNum=parseInt(day)||1;
     const rows=dayMatches(dayNum);
     if(rows.length===0){flash('Add matches to Day '+dayNum+' before going live','error');return;}
+    const course=selectedCourseForDay(dayNum);
+    if(!course){flash('Choose the course for Day '+dayNum+' before going live','error');return;}
+    saveLocalCupDayCourse(cup.id,dayNum,course);
     const{error}=await sb.from('snyder_cup_matches').update({status:released?'live':'locked'}).eq('cup_id',cup.id).eq('day_number',dayNum);
     if(error){flash(error.message,'error');return;}
     flash(released?'Day '+dayNum+' is now live for scoring':'Day '+dayNum+' locked');
@@ -3373,7 +3408,15 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       </div>
       <div style={{...S.card,marginBottom:14}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}><div style={{fontSize:14,color:'#fff',fontWeight:800}}>Cup Days</div><button onClick={addDay} style={{...S.pri,padding:'6px 10px',fontSize:12}}>Add Day</button></div>
-        {adminDays.map(d=>{const released=isDayReleased(d.day_number);const count=dayMatches(d.day_number).length;return <div key={d.id||d.day_number} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,fontSize:13,color:'#60b8f0',padding:'8px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}><span>Day {d.day_number} - {count} matches - {released?'LIVE':'Locked'}</span><div style={{display:'flex',gap:6}}><button onClick={()=>setDayReleased(d.day_number,!released)} disabled={!released&&count===0} style={{...(released?S.gho:S.pri),padding:'5px 9px',fontSize:11,opacity:(!released&&count===0)?0.45:1}}>{released?'Lock Day':'Go Live'}</button><button onClick={()=>deleteDay(d)} disabled={count===0&&d._synthetic} style={{...S.dan,padding:'5px 9px',fontSize:11,opacity:(count===0&&d._synthetic)?0.45:1}}>Delete</button></div></div>;})}
+        {adminDays.map(d=>{const released=isDayReleased(d.day_number);const count=dayMatches(d.day_number).length;const dayCourse=selectedCourseForDay(d.day_number);return <div key={d.id||d.day_number} style={{display:'grid',gap:8,fontSize:13,color:'#60b8f0',padding:'10px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}><span>Day {d.day_number} - {count} matches - {released?'LIVE':'Locked'}</span><div style={{display:'flex',gap:6}}><button onClick={()=>setDayReleased(d.day_number,!released)} disabled={!released&&count===0} style={{...(released?S.gho:S.pri),padding:'5px 9px',fontSize:11,opacity:(!released&&count===0)?0.45:1}}>{released?'Lock Day':'Go Live'}</button><button onClick={()=>deleteDay(d)} disabled={count===0&&d._synthetic} style={{...S.dan,padding:'5px 9px',fontSize:11,opacity:(count===0&&d._synthetic)?0.45:1}}>Delete</button></div></div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr',gap:6}}>
+            <label style={{fontSize:10,color:'#8ea0ad',letterSpacing:'0.08em',textTransform:'uppercase'}}>Course for Day {d.day_number}</label>
+            <select style={{...S.inp,fontSize:12}} value={dayCourse?dayCourse.id:''} onChange={e=>setCupDayCourse(d.day_number,e.target.value)}>
+              <option value="">Choose course...</option>{cupCourseOptions.map(c=><option key={c.id} value={c.id}>{cleanCourseName(c.name)} - {c.tee||courseTeeFromName(c.name)||'White'} tee</option>)}
+            </select>
+          </div>
+        </div>;})}
       </div>
       <div style={{...S.card,marginBottom:14}}>
         <div style={{fontSize:14,color:'#fff',fontWeight:800,marginBottom:10}}>Match Builder</div>
@@ -3570,8 +3613,8 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const openingKey=day+'-'+(group&&group.idx||1);
     if(!currentUser){flash('Sign in first to mark a Cup card','error');return;}
     if(!dayReleased(day)&&!isAdmin){flash('This day is locked until admin releases it','error');return;}
-    const course=(courses||[]).find(c=>hasCourseHoles(c))||(courses||[])[0];
-    if(!course){flash('Add a course before scoring Cup matches','error');return;}
+    const course=resolveCupDayCourse(courses,days,cup&&cup.id,day);
+    if(!course){flash('Choose a course for Day '+day+' in Cup Admin before scoring','error');return;}
     if(!group||!firstMatch){flash('Add matches to this group first','error');return;}
     setOpeningGroup(openingKey);
     try{
