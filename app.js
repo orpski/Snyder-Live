@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.30
+// SNYDER LIVE v1.33
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -64,12 +64,40 @@ const TYNEMOUTH_PRESETS=[
     {hole:1,par:5,stroke_index:8,yards:378},{hole:2,par:4,stroke_index:16,yards:306},{hole:3,par:3,stroke_index:10,yards:155},{hole:4,par:4,stroke_index:2,yards:361},{hole:5,par:5,stroke_index:14,yards:401},{hole:6,par:4,stroke_index:4,yards:304},{hole:7,par:3,stroke_index:18,yards:120},{hole:8,par:5,stroke_index:6,yards:459},{hole:9,par:4,stroke_index:12,yards:320},{hole:10,par:4,stroke_index:5,yards:296},{hole:11,par:3,stroke_index:11,yards:156},{hole:12,par:5,stroke_index:3,yards:490},{hole:13,par:4,stroke_index:13,yards:354},{hole:14,par:4,stroke_index:1,yards:346},{hole:15,par:4,stroke_index:15,yards:314},{hole:16,par:4,stroke_index:7,yards:274},{hole:17,par:3,stroke_index:17,yards:118},{hole:18,par:4,stroke_index:9,yards:343}
   ]}
 ];
+
+const QUINTA_DO_LAGO_BADGE='course-quinta-do-lago.png';
+const QUINTA_DO_LAGO_PRESETS=[
+  {name:'Quinta do Lago North Course - White Tee',location:'Algarve, Portugal',image_url:QUINTA_DO_LAGO_BADGE,course_rating:72.8,slope_rating:133,holes:[
+    {hole:1,par:4,stroke_index:15,yards:342},{hole:2,par:3,stroke_index:11,yards:196},{hole:3,par:5,stroke_index:9,yards:523},{hole:4,par:4,stroke_index:1,yards:370},{hole:5,par:4,stroke_index:5,yards:312},{hole:6,par:4,stroke_index:13,yards:334},{hole:7,par:5,stroke_index:7,yards:501},{hole:8,par:3,stroke_index:17,yards:171},{hole:9,par:4,stroke_index:3,yards:369},{hole:10,par:4,stroke_index:12,yards:345},{hole:11,par:5,stroke_index:10,yards:473},{hole:12,par:4,stroke_index:4,yards:372},{hole:13,par:4,stroke_index:6,yards:405},{hole:14,par:3,stroke_index:16,yards:160},{hole:15,par:4,stroke_index:2,yards:376},{hole:16,par:3,stroke_index:18,yards:145},{hole:17,par:4,stroke_index:14,yards:317},{hole:18,par:5,stroke_index:8,yards:445}
+  ]},
+  {name:'Quinta do Lago North Course - Yellow Tee',location:'Algarve, Portugal',image_url:QUINTA_DO_LAGO_BADGE,course_rating:73.1,slope_rating:136,holes:[
+    {hole:1,par:4,stroke_index:15,yards:321},{hole:2,par:3,stroke_index:11,yards:166},{hole:3,par:5,stroke_index:9,yards:500},{hole:4,par:4,stroke_index:1,yards:349},{hole:5,par:4,stroke_index:5,yards:290},{hole:6,par:4,stroke_index:13,yards:300},{hole:7,par:5,stroke_index:7,yards:482},{hole:8,par:3,stroke_index:17,yards:139},{hole:9,par:4,stroke_index:3,yards:341},{hole:10,par:4,stroke_index:12,yards:325},{hole:11,par:5,stroke_index:10,yards:437},{hole:12,par:4,stroke_index:4,yards:340},{hole:13,par:4,stroke_index:6,yards:380},{hole:14,par:3,stroke_index:16,yards:131},{hole:15,par:4,stroke_index:2,yards:350},{hole:16,par:3,stroke_index:18,yards:113},{hole:17,par:4,stroke_index:14,yards:287},{hole:18,par:5,stroke_index:8,yards:410}
+  ]},
+  {name:'Quinta do Lago South Course - White Tee',location:'Algarve, Portugal',image_url:QUINTA_DO_LAGO_BADGE,course_rating:73.6,slope_rating:138,holes:[
+    {hole:1,par:4,stroke_index:13,yards:368},{hole:2,par:5,stroke_index:7,yards:500},{hole:3,par:4,stroke_index:5,yards:387},{hole:4,par:3,stroke_index:17,yards:171},{hole:5,par:5,stroke_index:1,yards:500},{hole:6,par:4,stroke_index:9,yards:348},{hole:7,par:3,stroke_index:15,yards:175},{hole:8,par:4,stroke_index:3,yards:363},{hole:9,par:4,stroke_index:11,yards:355},{hole:10,par:4,stroke_index:6,yards:406},{hole:11,par:3,stroke_index:16,yards:184},{hole:12,par:5,stroke_index:12,yards:460},{hole:13,par:4,stroke_index:18,yards:325},{hole:14,par:4,stroke_index:2,yards:383},{hole:15,par:3,stroke_index:8,yards:196},{hole:16,par:4,stroke_index:14,yards:372},{hole:17,par:5,stroke_index:4,yards:510},{hole:18,par:4,stroke_index:10,yards:413}
+  ]},
+  {name:'Quinta do Lago South Course - Yellow Tee',location:'Algarve, Portugal',image_url:QUINTA_DO_LAGO_BADGE,course_rating:71.0,slope_rating:133,holes:[
+    {hole:1,par:4,stroke_index:13,yards:377},{hole:2,par:5,stroke_index:7,yards:513},{hole:3,par:4,stroke_index:5,yards:382},{hole:4,par:3,stroke_index:17,yards:147},{hole:5,par:5,stroke_index:1,yards:524},{hole:6,par:4,stroke_index:9,yards:344},{hole:7,par:3,stroke_index:15,yards:175},{hole:8,par:4,stroke_index:3,yards:383},{hole:9,par:4,stroke_index:11,yards:350},{hole:10,par:4,stroke_index:6,yards:410},{hole:11,par:3,stroke_index:16,yards:175},{hole:12,par:5,stroke_index:12,yards:465},{hole:13,par:4,stroke_index:18,yards:312},{hole:14,par:4,stroke_index:2,yards:383},{hole:15,par:3,stroke_index:8,yards:175},{hole:16,par:4,stroke_index:14,yards:361},{hole:17,par:5,stroke_index:4,yards:536},{hole:18,par:4,stroke_index:10,yards:405}
+  ]}
+];
+
+const OMBRIA_BADGE='course-ombria.png';
+const OMBRIA_PRESETS=[
+  {name:'Ombria Golf Course - White Tee',location:'Algarve, Portugal',image_url:OMBRIA_BADGE,course_rating:71.0,slope_rating:132,holes:[
+    {hole:1,par:5,stroke_index:5,yards:468},{hole:2,par:5,stroke_index:3,yards:566},{hole:3,par:4,stroke_index:17,yards:377},{hole:4,par:3,stroke_index:13,yards:157},{hole:5,par:3,stroke_index:15,yards:200},{hole:6,par:5,stroke_index:7,yards:487},{hole:7,par:3,stroke_index:9,yards:175},{hole:8,par:4,stroke_index:11,yards:323},{hole:9,par:4,stroke_index:1,yards:423},{hole:10,par:4,stroke_index:4,yards:431},{hole:11,par:3,stroke_index:8,yards:229},{hole:12,par:5,stroke_index:2,yards:548},{hole:13,par:3,stroke_index:14,yards:160},{hole:14,par:4,stroke_index:16,yards:376},{hole:15,par:4,stroke_index:6,yards:348},{hole:16,par:5,stroke_index:10,yards:562},{hole:17,par:3,stroke_index:12,yards:192},{hole:18,par:4,stroke_index:18,yards:323}
+  ]},
+  {name:'Ombria Golf Course - Yellow Tee',location:'Algarve, Portugal',image_url:OMBRIA_BADGE,course_rating:68.6,slope_rating:127,holes:[
+    {hole:1,par:5,stroke_index:5,yards:457},{hole:2,par:5,stroke_index:3,yards:489},{hole:3,par:4,stroke_index:17,yards:343},{hole:4,par:3,stroke_index:13,yards:137},{hole:5,par:3,stroke_index:15,yards:178},{hole:6,par:5,stroke_index:7,yards:463},{hole:7,par:3,stroke_index:9,yards:163},{hole:8,par:4,stroke_index:11,yards:301},{hole:9,par:4,stroke_index:1,yards:397},{hole:10,par:4,stroke_index:4,yards:410},{hole:11,par:3,stroke_index:8,yards:178},{hole:12,par:5,stroke_index:2,yards:493},{hole:13,par:3,stroke_index:14,yards:149},{hole:14,par:4,stroke_index:16,yards:350},{hole:15,par:4,stroke_index:6,yards:325},{hole:16,par:5,stroke_index:10,yards:539},{hole:17,par:3,stroke_index:12,yards:179},{hole:18,par:4,stroke_index:18,yards:300}
+  ]}
+];
+
+
 function cleanCourseName(name){return String(name||'').replace(/\s*-\s*[^-]+?\s*Tee\s*$/i,'').trim();}
 function courseTeeFromName(name){const m=String(name||'').match(/\s*-\s*([^-]+?)\s*Tee\s*$/i);return m?m[1].trim().replace(/\s+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()):'';}
 function getCourseName(course,round){return cleanCourseName((course&&course.name)||(round&&round.course_name)||'');}
 function getCourseDisplayName(course,round){return getCourseName(course,round);}
 function courseKey(course){return cleanCourseName(course&&course.name).toLowerCase()+'|'+(courseTeeFromName(course&&course.name)||course&&course.tee||'White').toLowerCase();}
-function isProtectedCourse(course){const name=cleanCourseName(course&&course.name).toLowerCase();return name==='whitley bay golf club'||name.includes('whitley bay golf club')||name==='tynemouth golf club'||name.includes('tynemouth golf club');}
+function isProtectedCourse(course){const name=cleanCourseName(course&&course.name).toLowerCase();return name==='whitley bay golf club'||name.includes('whitley bay golf club')||name==='tynemouth golf club'||name.includes('tynemouth golf club')||name==='quinta do lago north course'||name.includes('quinta do lago north course')||name==='quinta do lago south course'||name.includes('quinta do lago south course')||name==='ombria golf course'||name.includes('ombria golf course');}
 function presetIdForCourse(preset){return 'preset-'+cleanCourseName(preset.name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'-'+(courseTeeFromName(preset.name)||preset.tee||'white').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
 function isRealDbId(id){return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id||''));}
 function safeCourseIdForDb(course,setupCourseId){const id=(course&&course.id)||setupCourseId||null;return isRealDbId(id)?id:null;}
@@ -90,7 +118,7 @@ function courseSummaryLine(course,round,holes){
 function hasCourseRatingValue(value){return Number.isFinite(parseFloat(value));}
 function hasCourseHoles(course){return Array.isArray(course&&course.holes)&&course.holes.length>0;}
 function mergePresetCourses(dbCourses){
-  const presets=[...WHITLEY_BAY_PRESETS,...TYNEMOUTH_PRESETS].map(preset=>{
+  const presets=[...WHITLEY_BAY_PRESETS,...TYNEMOUTH_PRESETS,...QUINTA_DO_LAGO_PRESETS,...OMBRIA_PRESETS].map(preset=>{
     const tee=courseTeeFromName(preset.name)||preset.tee||'White';
     return {...preset,id:preset.id||presetIdForCourse(preset),tee};
   });
@@ -3797,6 +3825,7 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
 }
 function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,flash,setView,load,setSelectedRound,currentUser,isAdmin,cupUsers,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}){
   const[selectedDay,setSelectedDay]=useState(()=>{try{const d=parseInt(sessionStorage.getItem('cupReturnDay')||'');if(d){sessionStorage.removeItem('cupReturnDay');return d;}}catch(e){}return null;});
+  const[showCupHandicaps,setShowCupHandicaps]=useState(false);
   const cup=(cupEvents||[])[0];
   const teams=cup?getCupTeams(cup,cupTeams):null;
   const playersInCup=(cupEventPlayers||[]).filter(p=>cup&&p.cup_id===cup.id);
@@ -4146,19 +4175,8 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const group=cupDayGroups(day).find(g=>(g.doubles&&match&&g.doubles.id===match.id)||(g.singles||[]).some(s=>match&&s.id===match.id))||{day,idx:1,doubles:match,singles:[],players:[...((match&&match.gold_player_ids)||[]),...((match&&match.navy_player_ids)||[])]};
     await openCupGroup(group);
   }
-  return <div style={{minHeight:'100vh',paddingBottom:80}}>
-    <div style={{background:'linear-gradient(135deg,#0B1F4D,#061222)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}><button onClick={()=>selectedDay?setSelectedDay(null):setView('home')} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button><div style={{display:'flex',alignItems:'center',gap:8,fontSize:16,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}><span style={{color:'#D4AF37'}}>{'\uD83C\uDFC6'}</span><span>SNYDER CUP</span></div><div style={{width:60}}/></div>
-    <div style={{padding:16}}>
-      {!cup?<div style={{...S.card,textAlign:'center',padding:28}}><div style={{fontSize:18,color:'#fff',fontWeight:800,marginBottom:8}}>No Cup set up yet</div><div style={{fontSize:13,color:'#8ea0ad',marginBottom:14}}>Admin can create Gold vs Navy in the Admin Cup tab.</div>{isAdmin&&<button onClick={()=>setView('admin')} style={S.pri}>Open Admin</button>}</div>:<>
-        {!selectedDay?<>
-          <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',margin:'2px 0 14px'}}>{cupTitle}</div>
-          <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>TEAM SCORE</div>
-          <div style={{borderRadius:18,padding:18,marginBottom:14,border:'1px solid rgba(212,175,55,0.28)',background:leading==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.23),rgba(11,31,77,0.45))':leading==='navy'?'linear-gradient(135deg,rgba(11,31,77,0.8),rgba(59,130,246,0.18))':'linear-gradient(135deg,rgba(212,175,55,0.12),rgba(11,31,77,0.45))'}}>
-            <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:12,alignItems:'center'}}><div style={{textAlign:'center'}}><CupTeamBadge teamKey="gold" label={teams.gold.name}/><div style={{fontSize:42,color:CUP_THEME.gold.accent,fontWeight:900}}>{goldPts}</div></div><div style={{fontSize:20,color:'#fff',fontWeight:900}}>v</div><div style={{textAlign:'center'}}><CupTeamBadge teamKey="navy" label={teams.navy.name}/><div style={{fontSize:42,color:CUP_THEME.navy.accent,fontWeight:900}}>{navyPts}</div></div></div>
-          </div>
-          <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'16px 0 8px'}}>OVERALL SINGLES</div>
-          <div style={{...S.card,marginBottom:16,padding:0,overflow:'hidden'}}>{singlesLeaderboard().slice(0,8).map((p,i)=><div key={p.id} style={{display:'grid',gridTemplateColumns:'34px 1fr auto auto',gap:8,alignItems:'center',padding:'10px 12px',borderBottom:i<Math.min(8,singlesLeaderboard().length)-1?'1px solid rgba(255,255,255,0.07)':'none'}}><div style={{fontSize:13,color:'#60b8f0',fontWeight:900}}>{i+1}</div><div style={{fontSize:14,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||'Player'}</div><div style={{fontSize:11,color:'#8ea0ad'}}>{p.holes} holes</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{p.total}</div></div>)}</div>
-          <div style={{border:'1px solid rgba(96,184,240,0.26)',borderRadius:14,background:'linear-gradient(135deg,rgba(0,112,187,0.28),rgba(8,30,58,0.92))',padding:'18px 16px',color:'#fff',margin:'16px 0 10px'}}>
+  const cupHandicapsPanel = (
+    <div style={{border:'1px solid rgba(96,184,240,0.26)',borderRadius:14,background:'linear-gradient(135deg,rgba(0,112,187,0.28),rgba(8,30,58,0.92))',padding:'18px 16px',color:'#fff',margin:'16px 0 10px'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:12}}>
               <span><span style={{display:'block',fontSize:24,fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>HANDICAPS</span><span style={{fontSize:12,color:'#90ccf0'}}>Playing shots by Cup day</span></span>
               <span style={{fontSize:24,color:'#90ccf0'}}>↓</span>
@@ -4182,6 +4200,26 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
               </div>;})}</div>
             </div>)}</div>
           </div>
+  );
+  return <div style={{minHeight:'100vh',paddingBottom:80}}>
+    <div style={{background:'linear-gradient(135deg,#0B1F4D,#061222)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}><button onClick={()=>showCupHandicaps?setShowCupHandicaps(false):(selectedDay?setSelectedDay(null):setView('home'))} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button><div style={{display:'flex',alignItems:'center',gap:8,fontSize:16,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}><span style={{color:'#D4AF37'}}>{'\uD83C\uDFC6'}</span><span>SNYDER CUP</span></div><div style={{width:60}}/></div>
+    <div style={{padding:16}}>
+      {!cup?<div style={{...S.card,textAlign:'center',padding:28}}><div style={{fontSize:18,color:'#fff',fontWeight:800,marginBottom:8}}>No Cup set up yet</div><div style={{fontSize:13,color:'#8ea0ad',marginBottom:14}}>Admin can create Gold vs Navy in the Admin Cup tab.</div>{isAdmin&&<button onClick={()=>setView('admin')} style={S.pri}>Open Admin</button>}</div>:<>
+        {showCupHandicaps?<>
+          <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',margin:'2px 0 14px'}}>HANDICAPS</div>
+          {cupHandicapsPanel}
+        </>:!selectedDay?<>
+          <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',margin:'2px 0 14px'}}>{cupTitle}</div>
+          <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>TEAM SCORE</div>
+          <div style={{borderRadius:18,padding:18,marginBottom:14,border:'1px solid rgba(212,175,55,0.28)',background:leading==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.23),rgba(11,31,77,0.45))':leading==='navy'?'linear-gradient(135deg,rgba(11,31,77,0.8),rgba(59,130,246,0.18))':'linear-gradient(135deg,rgba(212,175,55,0.12),rgba(11,31,77,0.45))'}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:12,alignItems:'center'}}><div style={{textAlign:'center'}}><CupTeamBadge teamKey="gold" label={teams.gold.name}/><div style={{fontSize:42,color:CUP_THEME.gold.accent,fontWeight:900}}>{goldPts}</div></div><div style={{fontSize:20,color:'#fff',fontWeight:900}}>v</div><div style={{textAlign:'center'}}><CupTeamBadge teamKey="navy" label={teams.navy.name}/><div style={{fontSize:42,color:CUP_THEME.navy.accent,fontWeight:900}}>{navyPts}</div></div></div>
+          </div>
+          <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'16px 0 8px'}}>OVERALL SINGLES</div>
+          <div style={{...S.card,marginBottom:16,padding:0,overflow:'hidden'}}>{singlesLeaderboard().slice(0,8).map((p,i)=><div key={p.id} style={{display:'grid',gridTemplateColumns:'34px 1fr auto auto',gap:8,alignItems:'center',padding:'10px 12px',borderBottom:i<Math.min(8,singlesLeaderboard().length)-1?'1px solid rgba(255,255,255,0.07)':'none'}}><div style={{fontSize:13,color:'#60b8f0',fontWeight:900}}>{i+1}</div><div style={{fontSize:14,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||'Player'}</div><div style={{fontSize:11,color:'#8ea0ad'}}>{p.holes} holes</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{p.total}</div></div>)}</div>
+          <button onClick={()=>setShowCupHandicaps(true)} style={{border:'1px solid rgba(96,184,240,0.26)',borderRadius:14,background:'linear-gradient(135deg,rgba(0,112,187,0.28),rgba(8,30,58,0.92))',padding:'18px 16px',color:'#fff',margin:'16px 0 10px',width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',textAlign:'left'}}>
+            <span><span style={{display:'block',fontSize:24,fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>HANDICAPS</span><span style={{fontSize:12,color:'#90ccf0'}}>View Day 1, 2 and 3 playing shots</span></span>
+            <span style={{fontSize:24,color:'#90ccf0'}}>&gt;</span>
+          </button>
           <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>DAYS</div>
           <div style={{display:'grid',gap:10}}>{cupDayNumbers.map(day=>{const released=dayReleased(day);const count=cupDayGroups(day).length;return <button key={day} onClick={()=>setSelectedDay(day)} style={{border:'1px solid rgba(96,184,240,0.26)',borderRadius:14,background:'linear-gradient(135deg,rgba(0,112,187,0.28),rgba(8,30,58,0.92))',padding:'18px 16px',color:'#fff',display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',textAlign:'left'}}><span><span style={{display:'block',fontSize:24,fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {day}</span><span style={{fontSize:12,color:'#90ccf0'}}>{count} groups - {released?'Open for scoring':'Locked'}</span></span><span style={{fontSize:24,color:'#90ccf0'}}>&gt;</span></button>;})}</div>
         </>:<CupDayView day={selectedDay} groups={cupDayGroups(selectedDay)} teams={teams} playersInCup={playersInCup} released={dayReleased(selectedDay)} roundForGroup={roundForGroup} matchResult={matchResult} openCupGroup={openCupGroup} openingGroup={openingGroup} isAdmin={isAdmin}/>}
