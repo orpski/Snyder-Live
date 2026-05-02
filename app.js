@@ -2080,19 +2080,12 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
       let goldHoles=0,navyHoles=0;
       for(let h=1;h<=holes.length;h++){
         const map=holeScores[h]||{};
-        const all=[...goldIds,...navyIds].every(id=>{const pid=participantIdForCupPlayer(id);return pid&&map[pid]!==undefined;});
-        if(!all)continue;
-        const hd=getHole(h);
-        const bestNet=ids=>Math.min(...ids.map(id=>{
-          const pid=participantIdForCupPlayer(id);
-          const gross=map[pid];
-          if(gross===-1)return 99;
-          const hcp=parseFloat(playingHcps[pid]!=null?playingHcps[pid]:(grpPlayers.find(p=>p.id===pid)||{}).current_handicap||0);
-          const shots=Math.floor(hcp/18)+((hcp%18)>=hd.stroke_index?1:0);
-          return (parseInt(gross)||99)-shots;
-        }));
-        const g=bestNet(goldIds), n=bestNet(navyIds);
-        if(g<n)goldHoles++; else if(n<g)navyHoles++;
+        const goldPts=goldIds.map(id=>{const pid=participantIdForCupPlayer(id);return pid&&map[pid]!==undefined?getPts(map[pid],h,pid):null;}).filter(v=>v!==null&&v!==undefined);
+        const navyPts=navyIds.map(id=>{const pid=participantIdForCupPlayer(id);return pid&&map[pid]!==undefined?getPts(map[pid],h,pid):null;}).filter(v=>v!==null&&v!==undefined);
+        if(!goldPts.length||!navyPts.length)continue;
+        const g=Math.max(...goldPts);
+        const n=Math.max(...navyPts);
+        if(g>n)goldHoles++; else if(n>g)navyHoles++;
       }
       return goldHoles>navyHoles?'gold':navyHoles>goldHoles?'navy':'tie';
     }
@@ -3617,7 +3610,15 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
       </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}>
         <div style={{display:'grid',gap:5}}>{goldIds.map(id=><div key={id} style={{color:CUP_THEME.gold.accent,fontSize:13,fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
-        <div style={{display:'grid',gap:4,textAlign:'center'}}><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{res.gold} - {res.navy}</div><div style={{fontSize:10,color:'#8ea0ad'}}>{res.label}</div></div>
+        <div style={{display:'grid',gap:4,textAlign:'center'}}>
+          {res.isDoubles?<>
+            <div style={{fontSize:17,color:'#fff',fontWeight:950}}>{res.label}</div>
+            <div style={{fontSize:10,color:'#8ea0ad'}}>{res.holes?('Thru '+res.holes):'Matchplay'}</div>
+          </>:<>
+            <div style={{fontSize:17,color:'#fff',fontWeight:950}}>{res.gold} - {res.navy}</div>
+            <div style={{fontSize:10,color:'#8ea0ad'}}>{res.label}</div>
+          </>}
+        </div>
         <div style={{display:'grid',gap:5,textAlign:'right'}}>{navyIds.map(id=><div key={id} style={{color:CUP_THEME.navy.accent,fontSize:13,fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
       </div>
     </div>;
@@ -3671,13 +3672,39 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     return (scores||[]).filter(s=>s.round_id===round.id&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+(parseInt(s.stableford_points)||0),0);
   }
   function matchResult(match,round){
-    const gold=(match.gold_player_ids||[]).reduce((t,id)=>t+playerPointsFromRound(round,id),0);
-    const navy=(match.navy_player_ids||[]).reduce((t,id)=>t+playerPointsFromRound(round,id),0);
-    const holes=new Set((scores||[]).filter(s=>round&&s.round_id===round.id).map(s=>s.hole_number)).size;
+    const goldIds=match.gold_player_ids||[];
+    const navyIds=match.navy_player_ids||[];
     const complete=round&&isCompletedRound(round);
-    if(!holes)return{gold,navy,holes,complete:false,label:'Pending',winner:'pending',points:[0,0]};
-    const label=gold===navy?'A/S':gold>navy?'Gold +'+(gold-navy):'Navy +'+(navy-gold);
-    return{gold,navy,holes,complete,label,winner:gold===navy?'tie':gold>navy?'gold':'navy',points:gold===navy?[0.5,0.5]:gold>navy?[1,0]:[0,1]};
+    const isDoubles=String(match.match_type||'').toLowerCase()==='doubles';
+    const roundScores=(scores||[]).filter(s=>round&&s.round_id===round.id);
+    const scoreIdsFor=id=>new Set(cupScoreIds(id));
+    const pointsForHole=(id,h)=>{
+      const ids=scoreIdsFor(id);
+      const row=roundScores.find(s=>ids.has(normaliseId(s.player_id))&&parseInt(s.hole_number)===parseInt(h));
+      return row?parseInt(row.stableford_points)||0:null;
+    };
+    if(isDoubles){
+      let goldHoles=0,navyHoles=0,played=0;
+      for(let h=1;h<=18;h++){
+        const gPts=goldIds.map(id=>pointsForHole(id,h)).filter(v=>v!==null&&v!==undefined);
+        const nPts=navyIds.map(id=>pointsForHole(id,h)).filter(v=>v!==null&&v!==undefined);
+        if(!gPts.length||!nPts.length)continue;
+        played++;
+        const g=Math.max(...gPts);
+        const n=Math.max(...nPts);
+        if(g>n)goldHoles++; else if(n>g)navyHoles++;
+      }
+      const diff=Math.abs(goldHoles-navyHoles);
+      const winner=goldHoles===navyHoles?'tie':goldHoles>navyHoles?'gold':'navy';
+      const label=!played?'A/S':winner==='tie'?'A/S':(winner==='gold'?(teams&&teams.gold&&teams.gold.name||'Gold'):(teams&&teams.navy&&teams.navy.name||'Navy'))+' '+diff+' up';
+      return{gold:goldHoles,navy:navyHoles,holes:played,complete:!!complete,label,winner,points:winner==='tie'?[0.5,0.5]:winner==='gold'?[1,0]:[0,1],isDoubles:true};
+    }
+    const gold=goldIds.reduce((t,id)=>t+playerPointsFromRound(round,id),0);
+    const navy=navyIds.reduce((t,id)=>t+playerPointsFromRound(round,id),0);
+    const holes=new Set(roundScores.map(s=>s.hole_number)).size;
+    const winner=!holes?'tie':gold===navy?'tie':gold>navy?'gold':'navy';
+    const label=!holes?'A/S':winner==='tie'?'A/S':(winner==='gold'?(teams&&teams.gold&&teams.gold.name||'Gold'):(teams&&teams.navy&&teams.navy.name||'Navy'))+' +'+Math.abs(gold-navy)+' pts';
+    return{gold,navy,holes,complete:!!complete,label,winner,points:winner==='tie'?[0.5,0.5]:winner==='gold'?[1,0]:[0,1],isDoubles:false};
   }
   function cupDayGroups(day){
     const dayMatches=matches.filter(m=>(parseInt(m.day_number)||1)===(parseInt(day)||1));
