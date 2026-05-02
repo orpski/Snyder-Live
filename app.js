@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.43
+// SNYDER LIVE v1.44
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1982,9 +1982,25 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
   const[inputVal,setInputVal]=useState('');
   const[showOverall,setShowOverall]=useState(false);
   const[snakeMarks,setSnakeMarks]=useState({});
+  const snakeMarksRef=useRef({});
   const[overallPlayers,setOverallPlayers]=useState([]);
   const[overallScores,setOverallScores]=useState([]);
   const[overallMode,setOverallMode]=useState('round');
+
+  function setSnakeMarksSafe(next){
+    const clean=next&&typeof next==='object'?next:{};
+    snakeMarksRef.current=clean;
+    setSnakeMarks(clean);
+    try{if(round&&round.id)localStorage.setItem('snake_marks_'+round.id,JSON.stringify(clean));}catch(e){}
+  }
+  function mergeSnakeMarksSafe(extra){
+    if(!extra||typeof extra!=='object'||Object.keys(extra).length===0)return;
+    const merged={...(snakeMarksRef.current||{}),...extra};
+    setSnakeMarksSafe(merged);
+  }
+  function currentSnakeMarks(){
+    return snakeMarksRef.current&&typeof snakeMarksRef.current==='object'?snakeMarksRef.current:(snakeMarks||{});
+  }
 
     // ---------------------------------------------------------
   // Score loading / hydration
@@ -2001,8 +2017,8 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
     }catch(e){}
     try{
       const snakes=JSON.parse(localStorage.getItem('snake_marks_'+round.id)||'{}');
-      setSnakeMarks(snakes&&typeof snakes==='object'?snakes:{});
-    }catch(e){setSnakeMarks({});}
+      setSnakeMarksSafe(snakes&&typeof snakes==='object'?snakes:{});
+    }catch(e){setSnakeMarksSafe({});}
     // Then load from Supabase (authoritative)
     refreshScoresFromCloud(false);
   },[round&&round.id]);
@@ -2054,11 +2070,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         setOverallScores((scs||[]).filter(r=>!isSnakeScoreRow(r)));
         const initialSnakes=rowsToSnakeMarks(scs||[]);
         if(Object.keys(initialSnakes).length>0){
-          setSnakeMarks(prev=>{
-            const merged={...(prev||{}),...initialSnakes};
-            try{localStorage.setItem('snake_marks_'+round.id,JSON.stringify(merged));}catch(e){}
-            return merged;
-          });
+          mergeSnakeMarksSafe(initialSnakes);
         }
         const userGrp=normalised.find(g=>currentUser&&(g.player_ids||[]).some(id=>normaliseId(id)===normaliseId(currentUser.id)));
         if(userGrp)setActiveGroupId(userGrp.id);
@@ -2089,11 +2101,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         try{localStorage.setItem('scores_'+round.id,JSON.stringify(m));}catch(e){}
       }
       if(Object.keys(cloudSnakes).length>0){
-        setSnakeMarks(prev=>{
-          const merged={...(prev||{}),...cloudSnakes};
-          try{localStorage.setItem('snake_marks_'+round.id,JSON.stringify(merged));}catch(e){}
-          return merged;
-        });
+        mergeSnakeMarksSafe(cloudSnakes);
       }
       // Keep the top leaderboard button in sync with the same refresh action.
       setOverallScores(scoreRows);
@@ -2124,11 +2132,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
       setOverallScores((scs||[]).filter(r=>!isSnakeScoreRow(r)));
       const boardSnakes=rowsToSnakeMarks(scs||[]);
       if(Object.keys(boardSnakes).length>0){
-        setSnakeMarks(prev=>{
-          const merged={...(prev||{}),...boardSnakes};
-          try{localStorage.setItem('snake_marks_'+round.id,JSON.stringify(merged));}catch(e){}
-          return merged;
-        });
+        mergeSnakeMarksSafe(boardSnakes);
       }
       if(openModal)setShowOverall(true);
     }catch(e){
@@ -2428,7 +2432,8 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
 
   function getSnakeStarter(holeNum){
     const groupKey=snakeGroupKey();
-    const marks=(snakeMarks&&snakeMarks[groupKey])||{};
+    const groups=currentSnakeMarks()||{};
+    const marks=(groups&&groups[groupKey])||{};
     return snakeHolderFromGroupMarks(marks,holeNum);
   }
 
@@ -2440,7 +2445,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
     // Spectator/full-card views can hydrate the same round with a different
     // active group key than the scorer used when saving the snake marker.
     // Fall back by player id across saved snake groups so spectators see it too.
-    const groups=snakeMarks&&typeof snakeMarks==='object'?snakeMarks:{};
+    const groups=currentSnakeMarks()||{};
     return Object.keys(groups).some(k=>{
       const h=snakeHolderFromGroupMarks(groups[k],holeNum);
       return h&&normaliseId(h)===id;
@@ -2507,15 +2512,12 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
 
   function setSnakeFromHole(holeNum,pid,checked=true){
     const groupKey=snakeGroupKey();
-    setSnakeMarks(prev=>{
-      const next={...(prev||{})};
-      const groupMarks={...((next[groupKey])||{})};
-      if(checked)groupMarks[holeNum]=pid;
-      else if(normaliseId(groupMarks[holeNum])===normaliseId(pid))delete groupMarks[holeNum];
-      next[groupKey]=groupMarks;
-      try{localStorage.setItem('snake_marks_'+round.id,JSON.stringify(next));}catch(e){}
-      return next;
-    });
+    const next={...(currentSnakeMarks()||{})};
+    const groupMarks={...((next[groupKey])||{})};
+    if(checked)groupMarks[holeNum]=pid;
+    else if(normaliseId(groupMarks[holeNum])===normaliseId(pid))delete groupMarks[holeNum];
+    next[groupKey]=groupMarks;
+    setSnakeMarksSafe(next);
     saveSnakeMarkToCloud(groupKey,holeNum,pid,checked);
     saveSnakeFlagOnExistingScore(holeNum,pid,checked);
   }
