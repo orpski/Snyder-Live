@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.06
+// SNYDER LIVE v1.07
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -14,8 +14,8 @@ const ADMIN_PW='admin2025';
 // App-wide announcement modal
 // Shows a blocking message on app open until the user closes it.
 // =========================================================
-const SHOW_BREAKING_NEWS=true;
-const BREAKING_NEWS_MESSAGE='Do you believe me now?';
+const SHOW_BREAKING_NEWS=false;
+const BREAKING_NEWS_MESSAGE='';
 // GolfCourseAPI removed from the live frontend in v45; v65.3 uses safe course presets and badges.
 // Course data should be added manually or imported later through a safer backend/admin workflow.
 // =========================================================
