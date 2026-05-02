@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.35
+// SNYDER LIVE v1.36
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2714,7 +2714,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
                 const g=(holeScores[hd.hole]||{})[p.id];
                 const pts=g===-1?0:getPts(g,hd.hole,p.id);
                 return[
-                  <div key={p.id+'g'} style={{textAlign:'center',fontSize:14,color:g===-1?'rgba(255,255,255,0.3)':g?'#fff':'rgba(255,255,255,0.2)'}}>{isSnakeHolder(hd.hole,p.id)&&g!==undefined?'🐍 ':''}{ g===-1?'0':g||'.' }</div>,
+                  <div key={p.id+'g'} style={{textAlign:'center',fontSize:14,color:g===-1?'rgba(255,255,255,0.3)':g?'#fff':'rgba(255,255,255,0.2)'}}>{isSnakeHolder(hd.hole,p.id)&&(g>0||g===-1)?'🐍 ':''}{ g===-1?'0':g||'.' }</div>,
                   <div key={p.id+'p'} style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
                     {(g>0||g===-1)&&<div style={{background:g===-1?'rgba(40,40,40,0.9)':ptsColor(pts),borderRadius:4,width:28,height:22,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:'#fff'}}>{pts}</div>}
                   </div>
@@ -3072,7 +3072,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
                   const hcp=hcpMap[p.id];
                   const shots=Math.floor(hcp/18)+((hcp%18)>=hd.stroke_index?1:0);
                   const running=getRunning(p.id,hd.hole);
-                  const hasSnake=isSnakeHolder(hd.hole,p.id);
+                  const hasSnake=isSnakeHolder(hd.hole,p.id)&&(gross>0||gross===-1);
                   return(
                     <div key={p.id} onClick={()=>{
                           if(!canEdit)return;
