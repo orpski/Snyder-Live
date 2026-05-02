@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.37
+// SNYDER LIVE v1.38
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -3072,7 +3072,8 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
                   const hcp=hcpMap[p.id];
                   const shots=Math.floor(hcp/18)+((hcp%18)>=hd.stroke_index?1:0);
                   const running=getRunning(p.id,hd.hole);
-                  const hasSnake=isSnakeHolder(hd.hole,p.id);
+                  const hasScoreEntered=(gross>0||gross===-1);
+                  const hasSnake=hasScoreEntered&&isSnakeHolder(hd.hole,p.id);
                   return(
                     <div key={p.id} onClick={()=>{
                           if(!canEdit)return;
