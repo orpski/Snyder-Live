@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.44
+// SNYDER LIVE v1.45
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2844,49 +2844,51 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
   // Compact 9-hole scorecard table
   // ---------------------------------------------------------
   function MiniCard({holeList,label}){
-    const cols='40px 28px '+grpPlayers.map(()=>'1fr 36px').join(' ');
-    const hdrs=['H','Par',...grpPlayers.flatMap(p=>[(((p.name||p.display_name)||'?').split(' ')[0]).slice(0,5),'Pts'])];
+    // Compact full-card layout: one column per player so all 4 player totals fit on mobile.
+    const cols='42px 30px '+grpPlayers.map(()=>'minmax(54px,1fr)').join(' ');
+    const hdrs=['H','Par',...grpPlayers.map(p=>(((p.name||p.display_name)||'?').split(' ')[0]).slice(0,6))];
     return(
       <div style={{marginBottom:20}}>
         <div style={{fontSize:11,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:8,padding:'4px 12px',background:'rgba(0,0,0,0.3)'}}>{label}</div>
         <div style={{border:'1px solid rgba(255,255,255,0.1)',borderRadius:10,overflow:'hidden'}}>
-          <div style={{display:'grid',gridTemplateColumns:cols,background:'rgba(59,111,212,0.15)',padding:'6px 8px',gap:4}}>
-            {hdrs.map((h,i)=><div key={i} style={{fontSize:9,color:'#60b8f0',textAlign:'center',textTransform:'uppercase'}}>{h}</div>)}
+          <div style={{display:'grid',gridTemplateColumns:cols,background:'rgba(59,111,212,0.15)',padding:'6px 6px',gap:4}}>
+            {hdrs.map((h,i)=><div key={i} style={{fontSize:9,color:'#60b8f0',textAlign:'center',textTransform:'uppercase',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{h}</div>)}
           </div>
           {holeList.map((hd,i)=>(
-            <div key={hd.hole} style={{display:'grid',gridTemplateColumns:cols,padding:'6px 8px',gap:4,borderBottom:i<holeList.length-1?'1px solid rgba(255,255,255,0.06)':'none',background:i%2===0?'rgba(255,255,255,0.03)':'transparent',alignItems:'center'}}>
+            <div key={hd.hole} style={{display:'grid',gridTemplateColumns:cols,padding:'6px 6px',gap:4,borderBottom:i<holeList.length-1?'1px solid rgba(255,255,255,0.06)':'none',background:i%2===0?'rgba(255,255,255,0.03)':'transparent',alignItems:'center'}}>
               <div style={{textAlign:'center',fontSize:14,color:'#fff'}}>{hd.hole}</div>
               <div style={{textAlign:'center',fontSize:12,color:'#60b8f0'}}>{hd.par}</div>
-              {grpPlayers.flatMap(p=>{
+              {grpPlayers.map(p=>{
                 const g=(holeScores[hd.hole]||{})[p.id];
                 const pts=g===-1?0:getPts(g,hd.hole,p.id);
-                return[
-                  <div key={p.id+'g'} style={{textAlign:'center',fontSize:14,color:g===-1?'rgba(255,255,255,0.3)':g?'#fff':'rgba(255,255,255,0.2)'}}>{(g>0||g===-1)&&(isSnakeHolder(hd.hole,p.id)||scoreRowHasSnake(hd.hole,p.id))?'🐍 ':''}{ g===-1?'0':g||'.' }</div>,
-                  <div key={p.id+'p'} style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    {(g>0||g===-1)&&<div style={{background:g===-1?'rgba(40,40,40,0.9)':ptsColor(pts),borderRadius:4,width:28,height:22,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:'#fff'}}>{pts}</div>}
+                const hasScore=(g>0||g===-1);
+                const hasSnake=hasScore&&(isSnakeHolder(hd.hole,p.id)||scoreRowHasSnake(hd.hole,p.id));
+                return(
+                  <div key={p.id} style={{textAlign:'center',minHeight:30,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,color:g===-1?'rgba(255,255,255,0.35)':g?'#fff':'rgba(255,255,255,0.2)'}}>
+                    <div style={{fontSize:14,fontWeight:800,lineHeight:1.05}}>{hasSnake?'🐍 ':''}{g===-1?'0':g||'.'}</div>
+                    {hasScore&&<div style={{background:g===-1?'rgba(40,40,40,0.9)':ptsColor(pts),borderRadius:4,minWidth:28,height:19,padding:'0 5px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'#fff',fontWeight:800}}>{pts}</div>}
                   </div>
-                ];
+                );
               })}
             </div>
           ))}
-          <div style={{display:'grid',gridTemplateColumns:cols,padding:'8px 8px',gap:4,borderTop:'1px solid rgba(255,255,255,0.16)',background:'rgba(0,112,187,0.14)',alignItems:'center'}}>
-            <div style={{textAlign:'center',fontSize:11,color:'#60b8f0',fontWeight:800}}>{label==='BACK 9'?'Back 9':'Front 9'}</div>
+          <div style={{display:'grid',gridTemplateColumns:cols,padding:'8px 6px',gap:4,borderTop:'1px solid rgba(255,255,255,0.16)',background:'rgba(0,112,187,0.14)',alignItems:'start'}}>
+            <div style={{textAlign:'center',fontSize:10,color:'#60b8f0',fontWeight:800}}>{label==='BACK 9'?'Back 9':'Front 9'}</div>
             <div></div>
-            {grpPlayers.flatMap(p=>{
+            {grpPlayers.map(p=>{
               const nineGross=getGrossTotal(p.id,holeList);
               const nineStableford=getStablefordTotal(p.id,holeList);
               const roundGross=getGrossTotal(p.id,holes);
               const roundStableford=getStablefordTotal(p.id,holes);
-              return [
-                <div key={p.id+'nine-total'} style={{textAlign:'center'}}>
-                  <div style={{fontSize:10,color:'rgba(255,255,255,0.55)',fontWeight:800}}>Gross</div>
-                  <div style={{fontSize:17,color:'#fff',fontWeight:900,lineHeight:1.1}}>{nineGross}</div>
-                  <div style={{fontSize:10,color:'#60b8f0',fontWeight:900,marginTop:4}}>Stableford</div>
-                  <div style={{fontSize:18,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{nineStableford}</div>
-                  {label==='BACK 9'&&<div style={{marginTop:7,paddingTop:7,borderTop:'1px solid rgba(255,255,255,0.12)'}}><div style={{fontSize:10,color:'rgba(255,255,255,0.55)',fontWeight:800}}>Total gross</div><div style={{fontSize:18,color:'#fff',fontWeight:950,lineHeight:1.05}}>{roundGross}</div><div style={{fontSize:10,color:'#60b8f0',fontWeight:900,marginTop:3}}>Total Stableford</div><div style={{fontSize:20,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{roundStableford}</div></div>}
-                </div>,
-                <div key={p.id+'nine-total-spacer'}></div>
-              ];
+              return (
+                <div key={p.id+'nine-total'} style={{textAlign:'center',overflow:'hidden'}}>
+                  <div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:800}}>Gross</div>
+                  <div style={{fontSize:16,color:'#fff',fontWeight:900,lineHeight:1.1}}>{nineGross}</div>
+                  <div style={{fontSize:9,color:'#60b8f0',fontWeight:900,marginTop:3}}>Stableford</div>
+                  <div style={{fontSize:17,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{nineStableford}</div>
+                  {label==='BACK 9'&&<div style={{marginTop:7,paddingTop:7,borderTop:'1px solid rgba(255,255,255,0.12)'}}><div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:800}}>Total gross</div><div style={{fontSize:17,color:'#fff',fontWeight:950,lineHeight:1.05}}>{roundGross}</div><div style={{fontSize:9,color:'#60b8f0',fontWeight:900,marginTop:3}}>Total Stableford</div><div style={{fontSize:18,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{roundStableford}</div></div>}
+                </div>
+              );
             })}
           </div>
         </div>
@@ -2953,7 +2955,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
           <div id="f9-card"><MiniCard holeList={front9} label="FRONT 9"/></div>
           <MiniCard holeList={back9} label="BACK 9"/>
           <div style={{...S.card}}>
-            <div style={{display:'grid',gridTemplateColumns:'80px '+grpPlayers.map(()=>'1fr').join(' '),gap:6,alignItems:'center'}}>
+            <div style={{display:'grid',gridTemplateColumns:'64px '+grpPlayers.map(()=>'minmax(54px,1fr)').join(' '),gap:6,alignItems:'center'}}>
               <div style={{fontSize:11,color:'#60b8f0'}}>Total</div>
               {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:11,color:'#60b8f0'}}>{gameFirstName((p.name||p.display_name)||'?')}</div>)}
               <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:6}}>Gross</div>
