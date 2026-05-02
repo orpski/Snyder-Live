@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.40
+// SNYDER LIVE v1.41
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2383,19 +2383,33 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
     return normaliseId((activeScoreGroup&&activeScoreGroup.id)||activeGroupId||'default');
   }
 
-  function getSnakeStarter(holeNum){
-    const groupKey=snakeGroupKey();
-    const marks=(snakeMarks&&snakeMarks[groupKey])||{};
+  function snakeHolderFromGroupMarks(marks,holeNum){
     let holder=null;
-    Object.keys(marks).map(Number).filter(h=>h<=holeNum).sort((a,b)=>a-b).forEach(h=>{
+    Object.keys(marks||{}).map(Number).filter(h=>h<=holeNum).sort((a,b)=>a-b).forEach(h=>{
       if(marks[h])holder=marks[h];
     });
     return holder;
   }
 
+  function getSnakeStarter(holeNum){
+    const groupKey=snakeGroupKey();
+    const marks=(snakeMarks&&snakeMarks[groupKey])||{};
+    return snakeHolderFromGroupMarks(marks,holeNum);
+  }
+
   function isSnakeHolder(holeNum,pid){
+    const id=normaliseId(pid);
     const holder=getSnakeStarter(holeNum);
-    return holder&&normaliseId(holder)===normaliseId(pid);
+    if(holder&&normaliseId(holder)===id)return true;
+
+    // Spectator/full-card views can hydrate the same round with a different
+    // active group key than the scorer used when saving the snake marker.
+    // Fall back by player id across saved snake groups so spectators see it too.
+    const groups=snakeMarks&&typeof snakeMarks==='object'?snakeMarks:{};
+    return Object.keys(groups).some(k=>{
+      const h=snakeHolderFromGroupMarks(groups[k],holeNum);
+      return h&&normaliseId(h)===id;
+    });
   }
 
   async function saveSnakeMarkToCloud(groupKey,holeNum,pid,checked=true){
