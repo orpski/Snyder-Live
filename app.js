@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.41
+// SNYDER LIVE v1.42
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -815,7 +815,7 @@ function App(){
 
   function rowsToHoleScores(rows){
     const m={};
-    (rows||[]).forEach(s=>{
+    (rows||[]).filter(r=>!isSnakeScoreRow(r)).forEach(s=>{
       if(!m[s.hole_number])m[s.hole_number]={};
       m[s.hole_number][s.player_id]=s.gross_score;
     });
@@ -905,7 +905,7 @@ function App(){
     function addScore(pid,holeNum,pts){
       addLeaderboardScore(totals,holes,holePoints,seen,pid,holeNum,pts);
     }
-    (scores||[]).filter(sc=>sc.round_id===rd.id).forEach(sc=>{
+    (scores||[]).filter(sc=>sc.round_id===rd.id&&!isSnakeScoreRow(sc)).forEach(sc=>{
       addScore(sc.player_id,sc.hole_number,sc.stableford_points);
     });
     // Scores saved in this browser are instant; appData.scores may not have refreshed yet after exiting a round.
@@ -1135,7 +1135,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
       try{local=JSON.parse(localStorage.getItem('scores_'+rd.id)||'{}')||{};}catch(e){local={};}
       const{data:dbScores}=await sb.from('cup_scores').select('*').eq('round_id',rd.id);
       const dbMap={};
-      (dbScores||[]).forEach(s=>{
+      (dbScores||[]).filter(r=>!isSnakeScoreRow(r)).forEach(s=>{
         if(!dbMap[s.hole_number])dbMap[s.hole_number]={};
         dbMap[s.hole_number][s.player_id]=s.gross_score;
       });
@@ -1170,7 +1170,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
     function addScore(pid,holeNum,pts){
       addLeaderboardScore(totals,holes,holePoints,seen,pid,holeNum,pts);
     }
-    [...(scores||[]),...(publicScores||[])].filter(sc=>sc.round_id===rd.id).forEach(sc=>{
+    [...(scores||[]),...(publicScores||[])].filter(sc=>sc.round_id===rd.id&&!isSnakeScoreRow(sc)).forEach(sc=>{
       addScore(sc.player_id,sc.hole_number,sc.stableford_points);
     });
     // Scores saved in this browser are instant; appData.scores may not have refreshed yet after exiting a round.
@@ -1348,6 +1348,16 @@ function groupCountForRange(range){
 function normaliseId(v){return v==null?'':String(v);}
 
 const SNAKE_SCORE_PREFIX='__snake__|';
+const SNAKE_STABLEFORD_OFFSET=1000;
+function stablefordPointsValue(v){
+  const n=parseInt(v)||0;
+  return n>=SNAKE_STABLEFORD_OFFSET?n-SNAKE_STABLEFORD_OFFSET:n;
+}
+function stablefordPointsWithSnake(pts,hasSnake){
+  const base=stablefordPointsValue(pts);
+  return hasSnake?base+SNAKE_STABLEFORD_OFFSET:base;
+}
+function rowHasSnakeFlag(row){return (parseInt(row&&row.stableford_points)||0)>=SNAKE_STABLEFORD_OFFSET;}
 function makeSnakeScorePlayerId(groupKey,pid){return SNAKE_SCORE_PREFIX+encodeURIComponent(normaliseId(groupKey))+'|'+encodeURIComponent(normaliseId(pid));}
 function parseSnakeScorePlayerId(v){
   const txt=String(v||'');
@@ -1361,12 +1371,21 @@ function isSnakeScoreRow(row){return !!parseSnakeScorePlayerId(row&&row.player_i
 function rowsToSnakeMarks(rows){
   const marks={};
   (rows||[]).forEach(row=>{
-    const parsed=parseSnakeScorePlayerId(row&&row.player_id);
-    if(!parsed||!parsed.groupKey||!parsed.pid)return;
-    const hole=parseInt(row.hole_number);
+    const hole=parseInt(row&&row.hole_number);
     if(!hole)return;
-    if(!marks[parsed.groupKey])marks[parsed.groupKey]={};
-    marks[parsed.groupKey][hole]=parsed.pid;
+    const parsed=parseSnakeScorePlayerId(row&&row.player_id);
+    if(parsed&&parsed.groupKey&&parsed.pid){
+      if(!marks[parsed.groupKey])marks[parsed.groupKey]={};
+      marks[parsed.groupKey][hole]=parsed.pid;
+      return;
+    }
+    // New safe storage: actual score rows can carry the snake flag by adding
+    // SNAKE_STABLEFORD_OFFSET to stableford_points. This avoids fake player_id
+    // rows, so spectators can see snakes without breaking scorecard rendering.
+    if(rowHasSnakeFlag(row)&&row&&row.player_id){
+      if(!marks.__score__)marks.__score__={};
+      marks.__score__[hole]=row.player_id;
+    }
   });
   return marks;
 }
@@ -1459,7 +1478,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       try{local=JSON.parse(localStorage.getItem('scores_'+rd.id)||'{}')||{};}catch(e){local={};}
       const{data:dbScores}=await sb.from('cup_scores').select('*').eq('round_id',rd.id);
       const dbMap={};
-      (dbScores||[]).forEach(s=>{
+      (dbScores||[]).filter(r=>!isSnakeScoreRow(r)).forEach(s=>{
         if(!dbMap[s.hole_number])dbMap[s.hole_number]={};
         dbMap[s.hole_number][s.player_id]=s.gross_score;
       });
@@ -1479,7 +1498,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       setHoleScores({});
       sb.from('cup_scores').select('*').eq('round_id',selectedRound.id).then(({data})=>{
         const m={};
-        (data||[]).forEach(s=>{
+        (data||[]).filter(r=>!isSnakeScoreRow(r)).forEach(s=>{
           if(!m[s.hole_number])m[s.hole_number]={};
           m[s.hole_number][s.player_id]=s.gross_score;
         });
@@ -2145,7 +2164,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         if(!cpId||!holeNumber)return;
         rowByPlayerHole[normaliseId(cpId)+'-'+Number(holeNumber)]={...row,player_id:cpId,hole_number:Number(holeNumber)};
       };
-      dbScores.forEach(sc=>{
+      dbScores.filter(sc=>!isSnakeScoreRow(sc)).forEach(sc=>{
         let cpId=cpByKey[normaliseId(sc.player_id)]||rpToCup[normaliseId(sc.player_id)];
         if(cpId)putRow(cpId,sc.hole_number,sc);
       });
@@ -2184,7 +2203,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
       const pid=s.player_id;
       if(!pid)return;
       if(totals[pid]==null)totals[pid]=0;
-      const points=parseInt(s.stableford_points)||0;
+      const points=stablefordPointsValue(s.stableford_points);
       totals[pid]+=points;
       if(!holesPlayed[pid])holesPlayed[pid]=new Set();
       if(s.hole_number){
@@ -2223,10 +2242,10 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
           }
         });
         // Other Cup groups for this day use the latest saved scores already loaded in appData.
-        (scores||[]).forEach(sc=>{
+        (scores||[]).filter(sc=>!isSnakeScoreRow(sc)).forEach(sc=>{
           if(!dayRounds.some(r=>r&&r.id===sc.round_id))return;
           if(round&&sc.round_id===round.id)return; // avoid double counting current live group
-          if(ids.includes(normaliseId(sc.player_id))){total+=parseInt(sc.stableford_points)||0;holesDone.add(sc.round_id+'-'+sc.hole_number);}
+          if(ids.includes(normaliseId(sc.player_id))){total+=stablefordPointsValue(sc.stableford_points);holesDone.add(sc.round_id+'-'+sc.hole_number);}
         });
         return{id:cp.id,name,total,holes:holesDone.size};
       }).sort(compareStablefordLeaderboardRows);
@@ -2286,11 +2305,11 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
   function savedCupPointFor(rd,cupId,holeNum){
     const keys=[cupId].filter(Boolean).map(normaliseId);
     const row=(scores||[]).find(sc=>rd&&sc.round_id===rd.id&&parseInt(sc.hole_number)===parseInt(holeNum)&&keys.includes(normaliseId(sc.player_id)));
-    return row?parseInt(row.stableford_points)||0:null;
+    return row?stablefordPointsValue(row.stableford_points):null;
   }
   function savedStablefordForCupPlayer(rd,cupId){
     if(!rd||!cupId)return 0;
-    return (scores||[]).filter(sc=>sc.round_id===rd.id&&normaliseId(sc.player_id)===normaliseId(cupId)).reduce((t,sc)=>t+(parseInt(sc.stableford_points)||0),0);
+    return (scores||[]).filter(sc=>sc.round_id===rd.id&&!isSnakeScoreRow(sc)&&normaliseId(sc.player_id)===normaliseId(cupId)).reduce((t,sc)=>t+(stablefordPointsValue(sc.stableford_points)),0);
   }
   function savedMatchLeader(match,rd){
     if(!match||!rd)return 'tie';
@@ -2437,6 +2456,25 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
     }
   }
 
+  async function saveSnakeFlagOnExistingScore(holeNum,pid,checked=true){
+    const gross=(holeScores&&holeScores[holeNum]||{})[pid];
+    if(!(gross>0||gross===-1))return;
+    try{
+      const hd=getHole(holeNum);
+      const hcp=parseFloat(playingHcps[pid]!=null?playingHcps[pid]:(grpPlayers.find(p=>p.id===pid)||{}).current_handicap||0);
+      const pts=gross===-1?0:calcStableford(gross,hd.par,hd.stroke_index,hcp)||0;
+      await saveScoreRowToCloud(sb,{
+        round_id:round.id,
+        player_id:pid,
+        hole_number:holeNum,
+        gross_score:gross,
+        stableford_points:stablefordPointsWithSnake(pts,checked),
+        par:hd.par,
+        stroke_index:hd.stroke_index
+      });
+    }catch(e){/* never block the scorecard for a decorative marker */}
+  }
+
   function setSnakeFromHole(holeNum,pid,checked=true){
     const groupKey=snakeGroupKey();
     setSnakeMarks(prev=>{
@@ -2449,6 +2487,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
       return next;
     });
     saveSnakeMarkToCloud(groupKey,holeNum,pid,checked);
+    saveSnakeFlagOnExistingScore(holeNum,pid,checked);
   }
 
   function saveLocalScore(holeNum,pid,val){
@@ -2465,9 +2504,10 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
     const hd=getHole(holeNum);
     const hcp=parseFloat(playingHcps[pid]!=null?playingHcps[pid]:(grpPlayers.find(p=>p.id===pid)||{}).current_handicap||0);
     const pts=gross===-1?0:calcStableford(gross,hd.par,hd.stroke_index,hcp)||0;
+    const flaggedPts=stablefordPointsWithSnake(pts,isSnakeHolder(holeNum,pid));
     return {
       round_id:round.id,player_id:pid,hole_number:holeNum,
-      gross_score:gross,stableford_points:pts,par:hd.par,stroke_index:hd.stroke_index,
+      gross_score:gross,stableford_points:flaggedPts,par:hd.par,stroke_index:hd.stroke_index,
     };
   }
 
@@ -3982,7 +4022,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   function playerPointsFromRound(round,playerId){
     if(!round)return 0;
     const ids=new Set(cupScoreIds(playerId));
-    return (scores||[]).filter(s=>s.round_id===round.id&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+(parseInt(s.stableford_points)||0),0);
+    return (scores||[]).filter(s=>s.round_id===round.id&&!isSnakeScoreRow(s)&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+(stablefordPointsValue(s.stableford_points)),0);
   }
   function matchResult(match,round){
     const goldIds=match.gold_player_ids||[];
@@ -3994,7 +4034,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const pointsForHole=(id,h)=>{
       const ids=scoreIdsFor(id);
       const row=roundScores.find(s=>ids.has(normaliseId(s.player_id))&&parseInt(s.hole_number)===parseInt(h));
-      return row?parseInt(row.stableford_points)||0:null;
+      return row?stablefordPointsValue(row.stableford_points):null;
     };
     if(isDoubles){
       let goldHoles=0,navyHoles=0,played=0;
