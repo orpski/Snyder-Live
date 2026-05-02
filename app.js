@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.38
+// SNYDER LIVE v1.39
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1347,6 +1347,30 @@ function groupCountForRange(range){
 }
 function normaliseId(v){return v==null?'':String(v);}
 
+const SNAKE_SCORE_PREFIX='__snake__|';
+function makeSnakeScorePlayerId(groupKey,pid){return SNAKE_SCORE_PREFIX+encodeURIComponent(normaliseId(groupKey))+'|'+encodeURIComponent(normaliseId(pid));}
+function parseSnakeScorePlayerId(v){
+  const txt=String(v||'');
+  if(!txt.startsWith(SNAKE_SCORE_PREFIX))return null;
+  const parts=txt.split('|');
+  if(parts.length<3)return null;
+  try{return {groupKey:decodeURIComponent(parts[1]||''),pid:decodeURIComponent(parts.slice(2).join('|')||'')};}
+  catch(e){return null;}
+}
+function isSnakeScoreRow(row){return !!parseSnakeScorePlayerId(row&&row.player_id);}
+function rowsToSnakeMarks(rows){
+  const marks={};
+  (rows||[]).forEach(row=>{
+    const parsed=parseSnakeScorePlayerId(row&&row.player_id);
+    if(!parsed||!parsed.groupKey||!parsed.pid)return;
+    const hole=parseInt(row.hole_number);
+    if(!hole)return;
+    if(!marks[parsed.groupKey])marks[parsed.groupKey]={};
+    marks[parsed.groupKey][hole]=parsed.pid;
+  });
+  return marks;
+}
+
 function splitIntoGolfGroups(participants,range){
   const list=[...(participants||[])];
   let groupCount=1;
@@ -2008,7 +2032,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         setAllRoundPlayers(people);
         setAllGroups(normalised);
         setOverallPlayers(people.map(p=>({id:p.id,name:p.display_name||p.name,playing_handicap:p.playing_handicap||0})));
-        setOverallScores(scs||[]);
+        setOverallScores((scs||[]).filter(r=>!isSnakeScoreRow(r)));
         const userGrp=normalised.find(g=>currentUser&&(g.player_ids||[]).some(id=>normaliseId(id)===normaliseId(currentUser.id)));
         if(userGrp)setActiveGroupId(userGrp.id);
         else if(!group||!group.id&&round._spectator)setActiveGroupId('leaderboard');
@@ -2024,17 +2048,28 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
     try{
       const {data,error}=await sb.from('cup_scores').select('*').eq('round_id',round.id);
       if(error)throw error;
+      const rows=(data||[]);
+      const scoreRows=rows.filter(r=>!isSnakeScoreRow(r));
+      const snakeRows=rows.filter(isSnakeScoreRow);
       const m={};
-      (data||[]).forEach(s=>{
+      scoreRows.forEach(s=>{
         if(!m[s.hole_number])m[s.hole_number]={};
         m[s.hole_number][s.player_id]=s.gross_score;
       });
+      const cloudSnakes=rowsToSnakeMarks(snakeRows);
       if(Object.keys(m).length>0){
         setHoleScores(prev=>({...prev,...m}));
         try{localStorage.setItem('scores_'+round.id,JSON.stringify(m));}catch(e){}
       }
+      if(Object.keys(cloudSnakes).length>0){
+        setSnakeMarks(prev=>{
+          const merged={...(prev||{}),...cloudSnakes};
+          try{localStorage.setItem('snake_marks_'+round.id,JSON.stringify(merged));}catch(e){}
+          return merged;
+        });
+      }
       // Keep the top leaderboard button in sync with the same refresh action.
-      setOverallScores(data||[]);
+      setOverallScores(scoreRows);
       const t=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
       setLastRefreshed(t);
       if(showMessage)flash('Scorecard refreshed');
@@ -2059,7 +2094,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         playing_handicap:rp.playing_handicap||0
       })));
       setOverallMode('round');
-      setOverallScores(scs||[]);
+      setOverallScores((scs||[]).filter(r=>!isSnakeScoreRow(r)));
       if(openModal)setShowOverall(true);
     }catch(e){
       flash('Leaderboard failed: '+(e.message||String(e)),'error');
@@ -2092,7 +2127,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         ]);
         if(scErr)throw scErr;
         if(rpErr)throw rpErr;
-        dbScores=scs||[];
+        dbScores=(scs||[]).filter(r=>!isSnakeScoreRow(r));
         dbRoundPlayers=rps||[];
       }
       const rpToCup={};
@@ -2137,7 +2172,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
     const playerMap={};
     (overallPlayers.length?overallPlayers:grpPlayers).forEach(p=>{playerMap[p.id]=p;});
     (allGroups||[]).forEach((g,idx)=>{(g.player_ids||[]).forEach(pid=>{const key=normaliseId(pid); if(playerMap[key])playerMap[key]={...playerMap[key],groupNumber:g.group_number||idx+1};});});
-    const scoreRows=overallScores.length?overallScores:Object.keys(holeScores||{}).flatMap(h=>Object.keys(holeScores[h]||{}).map(pid=>{
+    const scoreRows=(overallScores.length?overallScores.filter(r=>!isSnakeScoreRow(r)):Object.keys(holeScores||{}).flatMap(h=>Object.keys(holeScores[h]||{}).map(pid=>{
       const gross=holeScores[h][pid];
       const hd=getHole(parseInt(h));
       const hcp=parseFloat(playingHcps[pid]||0);
@@ -2363,6 +2398,31 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
     return holder&&normaliseId(holder)===normaliseId(pid);
   }
 
+  async function saveSnakeMarkToCloud(groupKey,holeNum,pid,checked=true){
+    if(!round||!round.id||!groupKey||!holeNum)return;
+    try{
+      const likeKey=SNAKE_SCORE_PREFIX+encodeURIComponent(normaliseId(groupKey))+'|%';
+      await sb.from('cup_scores')
+        .delete()
+        .eq('round_id',round.id)
+        .eq('hole_number',holeNum)
+        .like('player_id',likeKey);
+      if(checked&&pid){
+        await saveScoreRowToCloud(sb,{
+          round_id:round.id,
+          player_id:makeSnakeScorePlayerId(groupKey,pid),
+          hole_number:holeNum,
+          gross_score:1,
+          stableford_points:0,
+          par:4,
+          stroke_index:1
+        });
+      }
+    }catch(e){
+      // Snake is decorative; never block score entry if cloud marker save fails.
+    }
+  }
+
   function setSnakeFromHole(holeNum,pid,checked=true){
     const groupKey=snakeGroupKey();
     setSnakeMarks(prev=>{
@@ -2374,6 +2434,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
       try{localStorage.setItem('snake_marks_'+round.id,JSON.stringify(next));}catch(e){}
       return next;
     });
+    saveSnakeMarkToCloud(groupKey,holeNum,pid,checked);
   }
 
   function saveLocalScore(holeNum,pid,val){
@@ -2714,7 +2775,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
                 const g=(holeScores[hd.hole]||{})[p.id];
                 const pts=g===-1?0:getPts(g,hd.hole,p.id);
                 return[
-                  <div key={p.id+'g'} style={{textAlign:'center',fontSize:14,color:g===-1?'rgba(255,255,255,0.3)':g?'#fff':'rgba(255,255,255,0.2)'}}>{isSnakeHolder(hd.hole,p.id)&&g!==undefined?'🐍 ':''}{ g===-1?'0':g||'.' }</div>,
+                  <div key={p.id+'g'} style={{textAlign:'center',fontSize:14,color:g===-1?'rgba(255,255,255,0.3)':g?'#fff':'rgba(255,255,255,0.2)'}}>{(g>0||g===-1)&&isSnakeHolder(hd.hole,p.id)?'🐍 ':''}{ g===-1?'0':g||'.' }</div>,
                   <div key={p.id+'p'} style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
                     {(g>0||g===-1)&&<div style={{background:g===-1?'rgba(40,40,40,0.9)':ptsColor(pts),borderRadius:4,width:28,height:22,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:'#fff'}}>{pts}</div>}
                   </div>
