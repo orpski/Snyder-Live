@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.14
+// SNYDER LIVE v1.15
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1919,9 +1919,8 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         ]);
         if(!alive)return;
         const people=(rps||[]).map(rp=>({
-          // Cup scorecards must use the cup_round_players row id as the scoring id.
-          // User/guest ids can be missing or blocked by FK rules for manual Cup players.
-          id:rp.id,
+          // Cup scorecards score against the stable Cup player id, not the temporary round-player row id.
+          id:rp.user_id||rp.guest_id||rp.id,
           name:rp.display_name||'Player',
           display_name:rp.display_name||'Player',
           current_handicap:rp.playing_handicap||0,
@@ -1929,6 +1928,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
           playing_handicap:rp.playing_handicap||0,
           user_id:rp.user_id,
           guest_id:rp.guest_id,
+          round_player_id:rp.id,
           is_host:rp.is_host
         }));
         const normalised=(grps&&grps.length?grps:[group]).filter(Boolean).map((g,idx)=>{
@@ -2040,10 +2040,9 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
     return rows[0]||null;
   }
   function cupGroupScoreLabel(){
-    const rows=(grpPlayers||[]).map(p=>({name:((p.name||p.display_name)||'Player').split(' ')[0],total:getRunning(p.id,holes.length)})).sort((a,b)=>(b.total||0)-(a.total||0));
-    if(!rows.length)return 'No scores yet';
-    const top=rows[0];
-    return top.total>0?top.name+' leads on '+top.total+' pts':'Tap to view standings';
+    const summary=round&&round._cupSummary;
+    if(summary)return (summary.goldName||'Gold')+' '+(summary.gold||0)+' - '+(summary.navy||0)+' '+(summary.navyName||'Navy');
+    return 'Overall team score';
   }
   function getHole(n){return holes.find(h=>h.hole===n)||{hole:n,par:4,stroke_index:n,yards:0};}
   function checkSkipped(targetHole){
@@ -3136,6 +3135,7 @@ function RoundsTab({rounds,groups,sb,flash,load}){
     if(!window.confirm('Delete this round?'))return;
     await sb.from('cup_scores').delete().eq('round_id',rd.id);
     await sb.from('cup_groups').delete().eq('round_id',rd.id);
+    await sb.from('cup_scores').delete().eq('round_id',rd.id);
     await sb.from('cup_round_players').delete().eq('round_id',rd.id);
     await sb.from('cup_rounds').delete().eq('id',rd.id);
     await load();flash('Deleted');
@@ -3515,7 +3515,6 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
     return <div style={{border:'1px solid rgba(255,255,255,0.10)',borderRadius:12,background:'rgba(255,255,255,0.045)',padding:10}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}>
         <div style={{fontSize:11,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>{label}</div>
-        <div style={{fontSize:10,color:res.complete?'#34d399':'#fbbf24',border:'1px solid '+(res.complete?'rgba(52,211,153,0.28)':'rgba(251,191,36,0.28)'),borderRadius:999,padding:'3px 8px',fontWeight:900}}>{res.complete?'ACTUAL':'PROJECTED'}</div>
       </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}>
         <div style={{display:'grid',gap:5}}>{goldIds.map(id=><div key={id} style={{color:CUP_THEME.gold.accent,fontSize:13,fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
@@ -3616,6 +3615,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   const navyPts=teamTotals.navy;
   const projectedGold=teamTotals.projectedGold;
   const projectedNavy=teamTotals.projectedNavy;
+  function cupScoreSummary(){return{gold:goldPts,navy:navyPts,goldName:teams&&teams.gold&&teams.gold.name||'Gold',navyName:teams&&teams.navy&&teams.navy.name||'Navy'};}
   const leading=goldPts>navyPts?'gold':navyPts>goldPts?'navy':'tie';
   function singlesLeaderboard(){
     return (playersInCup||[]).map(p=>{
@@ -3647,7 +3647,9 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const pid=cupStablePlayerId(p);
     const nm=cupDisplayName(p);
     const userId=validCupUserId(p&&p.user_id)?p.user_id:null;
-    const guestId=!userId&&(p&&p.guest_id)?p.guest_id:null;
+    // Keep the Cup event player id as guest_id for manual/legacy players.
+    // Scores are saved against this stable id so match results and names keep lining up.
+    const guestId=!userId?(p&&((p.guest_id)||(p.id))||pid):null;
     return{
       round_id:rd.id,
       user_id:userId,
@@ -3664,12 +3666,12 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   }
   function cupScoreGroupFromRoundRows(rd,roundRows){
     const participants=(roundRows||[]).map(rp=>{
-      // Score rows should point at cup_round_players.id, not user_id/guest_id.
-      // This keeps manual Cup players saving correctly and keeps names stable.
-      const pid=rp.id;
+      // Use the stable Cup player id for scoring: valid linked cup user id, then guest/event-player id, then row id.
+      // This keeps score saving, match results and display names all pointing at the same player.
+      const pid=rp.user_id||rp.guest_id||rp.id;
       const h=parseFloat(rp.playing_handicap||0)||0;
       const nm=rp.display_name||'Player';
-      return{id:pid,name:nm,display_name:nm,current_handicap:h,handicap:h,playing_handicap:h,user_id:rp.user_id||null,guest_id:rp.guest_id||null,is_host:!!rp.is_host};
+      return{id:pid,name:nm,display_name:nm,current_handicap:h,handicap:h,playing_handicap:h,user_id:rp.user_id||null,guest_id:rp.guest_id||null,round_player_id:rp.id,is_host:!!rp.is_host};
     });
     const playerIds=participants.map(p=>p.id).filter(Boolean);
     const playingHcps={};participants.forEach(p=>{playingHcps[p.id]=parseFloat(p.playing_handicap||0)||0;});
@@ -3680,6 +3682,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     // Important: if a Cup player is manual/legacy, cup_round_players.user_id must stay null because
     // Supabase has an FK there. For those players we use the generated cup_round_players.id as the scorecard player id.
     await sb.from('cup_groups').delete().eq('round_id',rd.id);
+    await sb.from('cup_scores').delete().eq('round_id',rd.id);
     await sb.from('cup_round_players').delete().eq('round_id',rd.id);
     const insertedRows=[];
     for(const p of (matchPlayers||[])){
@@ -3697,18 +3700,21 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const fallbackPlayers=cupPlayersForGroup(group);
     if(fallbackPlayers.length){
       const repaired=await ensureCupRoundRows(rd,fallbackPlayers);
-      setSelectedRound({...rd,_cupScoring:true,_group:repaired});
+      setSelectedRound({...rd,_cupScoring:true,_cupSummary:cupScoreSummary(),_group:repaired});
       setView('play');
       return;
     }
     let{data:rps,error:rpsErr}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
     if(rpsErr)throw rpsErr;
-    let po=(rps||[]).map(rp=>({id:rp.id,name:rp.display_name||'Player',display_name:rp.display_name||'Player',current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0,playing_handicap:rp.playing_handicap||0,user_id:rp.user_id,guest_id:rp.guest_id,is_host:rp.is_host}));
-    let hm={};(rps||[]).forEach(rp=>{hm[rp.id]=rp.playing_handicap||0;});
+    let po=(rps||[]).map(rp=>{const pid=rp.user_id||rp.guest_id||rp.id;return {id:pid,name:rp.display_name||'Player',display_name:rp.display_name||'Player',current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0,playing_handicap:rp.playing_handicap||0,user_id:rp.user_id,guest_id:rp.guest_id,round_player_id:rp.id,is_host:rp.is_host};});
+    let hm={};(po||[]).forEach(pp=>{hm[pp.id]=pp.playing_handicap||0;});
     const{data:rdGroups,error:gErr}=await sb.from('cup_groups').select('*').eq('round_id',rd.id).order('group_number',{ascending:true});
     if(gErr)throw gErr;
     let grp=(rdGroups&&rdGroups[0])||{round_id:rd.id,group_number:1,player_ids:po.map(p=>p.id),playing_handicaps:hm,participants:po};
-    setSelectedRound({...rd,_cupScoring:true,_group:{...grp,participants:po,playing_handicaps:grp.playing_handicaps||hm}});
+    const validIds=new Set(po.map(p=>normaliseId(p.id)));
+    const groupIds=(grp.player_ids||[]).map(normaliseId);
+    if(!groupIds.length||groupIds.some(id=>!validIds.has(id))){grp={...grp,player_ids:po.map(p=>p.id),playing_handicaps:hm};}
+    setSelectedRound({...rd,_cupScoring:true,_cupSummary:cupScoreSummary(),_group:{...grp,participants:po,playing_handicaps:grp.playing_handicaps||hm}});
     setView('play');
   }
   async function openCupGroup(group){
@@ -3733,7 +3739,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
       if(roundErr&&String(roundErr.message||'').toLowerCase().includes('course')){roundPayload.course_id=null;const retry=await sb.from('cup_rounds').insert(roundPayload).select().single();rd=retry.data;roundErr=retry.error;}
       if(roundErr)throw roundErr;
       const grp=await ensureCupRoundRows(rd,matchPlayers);
-      setSelectedRound({...rd,_cupScoring:true,_group:grp});
+      setSelectedRound({...rd,_cupScoring:true,_cupSummary:cupScoreSummary(),_group:grp});
       setView('play');
       await load();
     }catch(e){
@@ -3757,7 +3763,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
           <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',margin:'2px 0 14px'}}>{cupTitle}</div>
           <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>TEAM SCORE</div>
           <div style={{borderRadius:18,padding:18,marginBottom:14,border:'1px solid rgba(212,175,55,0.28)',background:leading==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.23),rgba(11,31,77,0.45))':leading==='navy'?'linear-gradient(135deg,rgba(11,31,77,0.8),rgba(59,130,246,0.18))':'linear-gradient(135deg,rgba(212,175,55,0.12),rgba(11,31,77,0.45))'}}>
-            <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:12,alignItems:'center'}}><div style={{textAlign:'center'}}><CupTeamBadge teamKey="gold" label={teams.gold.name}/><div style={{fontSize:42,color:CUP_THEME.gold.accent,fontWeight:900}}>{goldPts}</div><div style={{fontSize:11,color:'#f7d66b'}}>Proj {projectedGold}</div></div><div style={{fontSize:20,color:'#fff',fontWeight:900}}>v</div><div style={{textAlign:'center'}}><CupTeamBadge teamKey="navy" label={teams.navy.name}/><div style={{fontSize:42,color:CUP_THEME.navy.accent,fontWeight:900}}>{navyPts}</div><div style={{fontSize:11,color:'#93c5fd'}}>Proj {projectedNavy}</div></div></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:12,alignItems:'center'}}><div style={{textAlign:'center'}}><CupTeamBadge teamKey="gold" label={teams.gold.name}/><div style={{fontSize:42,color:CUP_THEME.gold.accent,fontWeight:900}}>{goldPts}</div></div><div style={{fontSize:20,color:'#fff',fontWeight:900}}>v</div><div style={{textAlign:'center'}}><CupTeamBadge teamKey="navy" label={teams.navy.name}/><div style={{fontSize:42,color:CUP_THEME.navy.accent,fontWeight:900}}>{navyPts}</div></div></div>
           </div>
           <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'16px 0 8px'}}>OVERALL SINGLES</div>
           <div style={{...S.card,marginBottom:16,padding:0,overflow:'hidden'}}>{singlesLeaderboard().slice(0,8).map((p,i)=><div key={p.id} style={{display:'grid',gridTemplateColumns:'34px 1fr auto auto',gap:8,alignItems:'center',padding:'10px 12px',borderBottom:i<Math.min(8,singlesLeaderboard().length)-1?'1px solid rgba(255,255,255,0.07)':'none'}}><div style={{fontSize:13,color:'#60b8f0',fontWeight:900}}>{i+1}</div><div style={{fontSize:14,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||'Player'}</div><div style={{fontSize:11,color:'#8ea0ad'}}>{p.holes} holes</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{p.total}</div></div>)}</div>
