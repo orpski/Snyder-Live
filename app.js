@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.39
+// SNYDER LIVE v1.40
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2177,7 +2177,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
       const hd=getHole(parseInt(h));
       const hcp=parseFloat(playingHcps[pid]||0);
       return {player_id:pid,hole_number:parseInt(h),gross_score:gross,stableford_points:gross===-1?0:calcStableford(gross,hd.par,hd.stroke_index,hcp)||0};
-    }));
+    })));
     const totals={}; const holesPlayed={}; const holePoints={};
     Object.keys(playerMap).forEach(pid=>{totals[pid]=0;holesPlayed[pid]=new Set();});
     scoreRows.forEach(s=>{
