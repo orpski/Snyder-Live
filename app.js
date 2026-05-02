@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.09
+// SNYDER LIVE v1.10
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -3598,13 +3598,50 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const rows=matches.filter(m=>(parseInt(m.day_number)||1)===(parseInt(day)||1));
     return rows.length>0&&rows.some(m=>String(m.status||'locked').toLowerCase()==='live'||String(m.status||'').toLowerCase()==='released');
   };
-  async function openRoundForScoring(rd){
-    const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
-    const po=(rps||[]).map(rp=>({id:rp.user_id||rp.guest_id||rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0,user_id:rp.user_id,guest_id:rp.guest_id,is_host:rp.is_host}));
-    const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
+  function cupPlayersForGroup(group){
+    const ids=[...(group&&group.players||[]),...((group&&group.doubles&&group.doubles.gold_player_ids)||[]),...((group&&group.doubles&&group.doubles.navy_player_ids)||[]),...((group&&group.singles||[]).flatMap(m=>[...(m.gold_player_ids||[]),...(m.navy_player_ids||[])]))];
+    const seen=new Set();
+    return ids.map(id=>findCupPlayer(id)).filter(Boolean).filter(p=>{const key=normaliseId(p.user_id||p.guest_id||p.id);if(seen.has(key))return false;seen.add(key);return true;});
+  }
+  function cupScoreGroupFromPlayers(rd,matchPlayers){
+    const participants=(matchPlayers||[]).map(p=>({id:p.user_id||p.guest_id||p.id,name:p.display_name||'Player',display_name:p.display_name||'Player',current_handicap:parseFloat(p.handicap||0)||0,handicap:parseFloat(p.handicap||0)||0,playing_handicap:parseFloat(p.handicap||0)||0,user_id:p.user_id||null,guest_id:p.guest_id||null,is_host:normaliseId(p.user_id||p.guest_id||p.id)===normaliseId(currentUser&&currentUser.id)}));
+    const playerIds=participants.map(p=>p.id);
+    const playingHcps={};participants.forEach(p=>{playingHcps[p.id]=parseFloat(p.playing_handicap||0)||0;});
+    return{round_id:rd&&rd.id,group_number:1,player_ids:playerIds,playing_handicaps:playingHcps,participants};
+  }
+  async function ensureCupRoundRows(rd,matchPlayers){
+    const scoreGroup=cupScoreGroupFromPlayers(rd,matchPlayers);
+    let createdGroup=null;
     const{data:rdGroups}=await sb.from('cup_groups').select('*').eq('round_id',rd.id).order('group_number',{ascending:true});
-    const grp=(rdGroups&&rdGroups[0])||{round_id:rd.id,group_number:1,player_ids:po.map(p=>p.id),playing_handicaps:hm};
-    setSelectedRound({...rd,_cupScoring:true,_group:{...grp,participants:po,playing_handicaps:hm}});
+    if(rdGroups&&rdGroups[0])createdGroup=rdGroups[0];
+    else{
+      const made=await sb.from('cup_groups').insert({round_id:rd.id,group_number:1,player_ids:scoreGroup.player_ids,playing_handicaps:scoreGroup.playing_handicaps}).select().single();
+      if(made.error)console.warn('Cup group save failed',made.error);else createdGroup=made.data;
+    }
+    for(const p of (matchPlayers||[])){
+      const pid=p.user_id||p.guest_id||p.id;
+      const payload={round_id:rd.id,user_id:p.user_id||null,guest_id:p.user_id?null:(p.guest_id||null),display_name:p.display_name||'Player',playing_handicap:parseFloat(p.handicap||0)||0,is_host:normaliseId(pid)===normaliseId(currentUser&&currentUser.id)};
+      const ins=await sb.from('cup_round_players').insert(payload);
+      if(ins.error&&!String(ins.error.message||'').toLowerCase().includes('duplicate'))console.warn('Cup round player save failed',ins.error);
+    }
+    return{...(createdGroup||scoreGroup),participants:scoreGroup.participants,playing_handicaps:scoreGroup.playing_handicaps,player_ids:scoreGroup.player_ids};
+  }
+  async function openRoundForScoring(rd,group){
+    const fallbackPlayers=cupPlayersForGroup(group);
+    let{data:rps,error:rpsErr}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
+    if(rpsErr)console.warn('Cup round players load failed',rpsErr);
+    let po=(rps||[]).map(rp=>({id:rp.user_id||rp.guest_id||rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0,playing_handicap:rp.playing_handicap||0,user_id:rp.user_id,guest_id:rp.guest_id,is_host:rp.is_host}));
+    let hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
+    const{data:rdGroups}=await sb.from('cup_groups').select('*').eq('round_id',rd.id).order('group_number',{ascending:true});
+    let grp=(rdGroups&&rdGroups[0])||null;
+    if((!grp||po.length===0)&&fallbackPlayers.length){
+      grp=await ensureCupRoundRows(rd,fallbackPlayers);
+      po=grp.participants||[];
+      hm=grp.playing_handicaps||{};
+    }
+    if(!grp)grp={round_id:rd.id,group_number:1,player_ids:po.map(p=>p.id),playing_handicaps:hm,participants:po};
+    if(!po.length&&grp.participants)po=grp.participants;
+    setSelectedRound({...rd,_cupScoring:true,_group:{...grp,participants:po,playing_handicaps:grp.playing_handicaps||hm}});
     setView('play');
   }
   async function openCupGroup(group){
@@ -3620,32 +3657,22 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     try{
       const matchName=cupRoundName(day,group.idx);
       const existing=roundForGroup(day,group.idx);
-      if(existing){await openRoundForScoring(existing);return;}
-      const ids=[...(group.players||[]),...((group.doubles&&group.doubles.gold_player_ids)||[]),...((group.doubles&&group.doubles.navy_player_ids)||[]),...(group.singles||[]).flatMap(m=>[...(m.gold_player_ids||[]),...(m.navy_player_ids||[])])];
-      const seen=new Set();
-      const matchPlayers=ids.map(id=>findCupPlayer(id)).filter(Boolean).filter(p=>{const key=normaliseId(p.user_id||p.guest_id||p.id);if(seen.has(key))return false;seen.add(key);return true;});
+      const matchPlayers=cupPlayersForGroup(group);
       if(matchPlayers.length===0){flash('Add players to this match first','error');return;}
+      if(existing){await openRoundForScoring(existing,group);return;}
       const joinCode=Math.random().toString(36).substring(2,6).toUpperCase();
-      const roundPayload={name:matchName,course_id:safeCourseIdForDb(course,course.id),course_name:cleanCourseName(course.name)||course.name||'',status:'live',tee:course.tee||'White',day_number:day,join_code:joinCode,is_private:false,created_by:currentUser.id};
+      const roundPayload={name:matchName,course_id:safeCourseIdForDb(course,course.id),course_name:cleanCourseName(course.name)||course.name||'',status:'live',tee:course.tee||courseTeeFromName(course.name)||'White',day_number:day,join_code:joinCode,is_private:false,created_by:currentUser.id};
       let{data:rd,error:roundErr}=await sb.from('cup_rounds').insert(roundPayload).select().single();
       if(roundErr&&String(roundErr.message||'').toLowerCase().includes('course')){roundPayload.course_id=null;const retry=await sb.from('cup_rounds').insert(roundPayload).select().single();rd=retry.data;roundErr=retry.error;}
       if(roundErr)throw roundErr;
-      const playerIds=matchPlayers.map(p=>p.user_id||p.guest_id||p.id);
-      const playingHcps={};matchPlayers.forEach(p=>{playingHcps[p.user_id||p.guest_id||p.id]=parseFloat(p.handicap||0)||0;});
-      const scoreGroup={round_id:rd.id,group_number:1,player_ids:playerIds,playing_handicaps:playingHcps,participants:matchPlayers.map(p=>({id:p.user_id||p.guest_id||p.id,name:p.display_name||'Player',display_name:p.display_name||'Player',current_handicap:parseFloat(p.handicap||0)||0,handicap:parseFloat(p.handicap||0)||0,playing_handicap:parseFloat(p.handicap||0)||0,user_id:p.user_id||null,guest_id:p.guest_id||null}))};
-      const{data:createdGroup,error:groupErr}=await sb.from('cup_groups').insert({round_id:rd.id,group_number:1,player_ids:playerIds,playing_handicaps:playingHcps}).select().single();
-      if(groupErr)throw groupErr;
-      for(const p of matchPlayers){
-        const pid=p.user_id||p.guest_id||p.id;
-        const payload={round_id:rd.id,user_id:p.user_id||null,guest_id:p.user_id?null:(p.guest_id||null),display_name:p.display_name||'Player',playing_handicap:parseFloat(p.handicap||0)||0,is_host:normaliseId(pid)===normaliseId(currentUser.id)};
-        const{error:playerErr}=await sb.from('cup_round_players').upsert(payload);
-        if(playerErr)console.warn('Cup round player save failed',playerErr);
-      }
-      setSelectedRound({...rd,_cupScoring:true,_group:{...(createdGroup||scoreGroup),participants:scoreGroup.participants,playing_handicaps:playingHcps}});
+      const grp=await ensureCupRoundRows(rd,matchPlayers);
+      setSelectedRound({...rd,_cupScoring:true,_group:grp});
       setView('play');
       await load();
     }catch(e){
+      console.error('Could not open Cup scorecard',e);
       flash('Could not open Cup scorecard: '+(e&&e.message?e.message:String(e)),'error');
+      alert('Could not open Cup scorecard: '+(e&&e.message?e.message:String(e)));
     }finally{
       setOpeningGroup(null);
     }
