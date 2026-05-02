@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.33
+// SNYDER LIVE v1.34
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -140,16 +140,32 @@ function mergePresetCourses(dbCourses){
   return merged;
 }
 function getCourseOptions(courses){const byName=new Map();(courses||[]).forEach(c=>{if(!c)return;const base=cleanCourseName(c.name);if(!base)return;const tee=courseTeeFromName(c.name)||c.tee||'White';if(!byName.has(base))byName.set(base,{name:base,course:c,tees:{}});const item=byName.get(base);item.tees[tee]=c;if(!item.course||tee==='White')item.course=c;});return Array.from(byName.values()).sort((a,b)=>a.name.localeCompare(b.name));}
-function findCourseForTee(courses,baseName,tee){const cleanBase=cleanCourseName(baseName);const option=getCourseOptions(courses).find(o=>o.name===cleanBase);if(!option)return null;return option.tees[tee]||option.course||Object.values(option.tees)[0]||null;}
+function normaliseTeeName(tee){return String(tee||'').trim().replace(/\s+/g,' ').toLowerCase();}
+function findCourseForTee(courses,baseName,tee){
+  const cleanBase=cleanCourseName(baseName);
+  const wanted=normaliseTeeName(tee||'White');
+  const option=getCourseOptions(courses).find(o=>o.name===cleanBase);
+  if(!option)return null;
+  const exactKey=Object.keys(option.tees||{}).find(k=>normaliseTeeName(k)===wanted);
+  if(exactKey&&option.tees[exactKey])return option.tees[exactKey];
+  const fallbackKey=Object.keys(option.tees||{}).find(k=>normaliseTeeName(k)==='white');
+  return (fallbackKey&&option.tees[fallbackKey])||option.course||Object.values(option.tees||{})[0]||null;
+}
 function cupDayCourseStorageKey(cupId,day){return 'snyder_cup_day_course_'+String(cupId||'default')+'_'+String(parseInt(day)||1);}
-function saveLocalCupDayCourse(cupId,day,course){try{if(course)localStorage.setItem(cupDayCourseStorageKey(cupId,day),JSON.stringify({course_id:safeCourseIdForDb(course,course.id),course_name:cleanCourseName(course.name)||course.name||'',tee:course.tee||courseTeeFromName(course.name)||'White'}));}catch(e){}}
+function saveLocalCupDayCourse(cupId,day,course){try{if(course)localStorage.setItem(cupDayCourseStorageKey(cupId,day),JSON.stringify({course_id:course.id||'',course_db_id:safeCourseIdForDb(course,course.id),course_name:cleanCourseName(course.name)||course.name||'',tee:course.tee||courseTeeFromName(course.name)||'White'}));}catch(e){}}
 function getLocalCupDayCourse(cupId,day){try{return JSON.parse(localStorage.getItem(cupDayCourseStorageKey(cupId,day))||'null');}catch(e){return null;}}
 function resolveCupDayCourse(courses,cupDays,cupId,day){
   const dayNum=parseInt(day)||1;
   const row=(cupDays||[]).find(d=>String(d.cup_id||'')===String(cupId||'')&&(parseInt(d.day_number)||1)===dayNum)||{};
   const stored=getLocalCupDayCourse(cupId,dayNum)||{};
-  const source={...stored,...row};
+  const source={
+    course_id:stored.course_id||row.course_id||'',
+    course_db_id:stored.course_db_id||row.course_id||'',
+    course_name:stored.course_name||row.course_name||'',
+    tee:stored.tee||row.tee||'White'
+  };
   if(source.course_id){const byId=(courses||[]).find(c=>String(c.id)===String(source.course_id));if(byId)return byId;}
+  if(source.course_db_id){const byDbId=(courses||[]).find(c=>String(c.id)===String(source.course_db_id));if(byDbId)return byDbId;}
   if(source.course_name){const byName=findCourseForTee(courses,source.course_name,source.tee||'White');if(byName)return byName;}
   return (courses||[]).find(c=>hasCourseHoles(c))||(courses||[])[0]||null;
 }
@@ -3599,8 +3615,9 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     const dayNum=parseInt(day)||1;
     const course=(courses||[]).find(c=>String(c.id)===String(courseId));
     if(!course){flash('Choose a course first','error');return;}
+    const chosenTee=course.tee||courseTeeFromName(course.name)||'White';
     saveLocalCupDayCourse(cup.id,dayNum,course);
-    const payload={course_id:safeCourseIdForDb(course,course.id),course_name:cleanCourseName(course.name)||course.name||'',tee:course.tee||courseTeeFromName(course.name)||'White'};
+    const payload={course_id:safeCourseIdForDb(course,course.id),course_name:cleanCourseName(course.name)||course.name||'',tee:chosenTee};
     const existing=days.find(d=>(parseInt(d.day_number)||1)===dayNum);
     let result;
     if(existing&&existing.id){result=await sb.from('snyder_cup_days').update(payload).eq('id',existing.id);}
