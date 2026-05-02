@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.16
+// SNYDER LIVE v1.21
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1319,7 +1319,7 @@ function playerRangeLabel(range){
 // Play Golf flow
 // Round setup, player selection, joining live rounds and launch into scorecard
 // =========================================================
-function PlayGolf({players,courses,rounds,groups,sb,flash,setView,setSelectedRound,load,isAdmin,currentUser,cupUsers,guests,selectedRound,holeScores,setHoleScores,promptStartRoundAuth}){
+function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSelectedRound,load,isAdmin,currentUser,cupUsers,guests,selectedRound,holeScores,setHoleScores,promptStartRoundAuth}){
   const[step,setStep]=useState('menu');
   const[activeRound,setActiveRound]=useState(null);
   const[activeGroup,setActiveGroup]=useState(null);
@@ -2044,6 +2044,33 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
   }
 
   function activeCupLeader(){
+    const dayPlayers=(round&&round._cupDayAllPlayers)||[];
+    const dayRounds=(round&&round._cupDayRounds)||[];
+    if(round&&round._cupScoring&&dayPlayers.length){
+      const rows=dayPlayers.map(cp=>{
+        const ids=[cp.id,cp.user_id,cp.guest_id].filter(Boolean).map(normaliseId);
+        const name=((cp.display_name||cp.name||cp.username)||'Player').split(' ')[0];
+        let total=0;
+        const holesDone=new Set();
+        // Current open group uses live local state so the bar moves instantly while scoring.
+        (grpPlayers||[]).forEach(gp=>{
+          const gpKeys=[gp.id,gp.cup_player_id,gp.user_id,gp.guest_id].filter(Boolean).map(normaliseId);
+          if(!gpKeys.some(k=>ids.includes(k)))return;
+          for(let h=1;h<=holes.length;h++){
+            const g=(holeScores[h]||{})[gp.id];
+            if(g!==undefined){total+=getPts(g,h,gp.id)||0;holesDone.add((round&&round.id||'current')+'-'+h);}
+          }
+        });
+        // Other Cup groups for this day use the latest saved scores already loaded in appData.
+        (scores||[]).forEach(sc=>{
+          if(!dayRounds.some(r=>r&&r.id===sc.round_id))return;
+          if(round&&sc.round_id===round.id)return; // avoid double counting current live group
+          if(ids.includes(normaliseId(sc.player_id))){total+=parseInt(sc.stableford_points)||0;holesDone.add(sc.round_id+'-'+sc.hole_number);}
+        });
+        return{id:cp.id,name,total,holes:holesDone.size};
+      }).sort(compareStablefordLeaderboardRows);
+      return rows[0]||null;
+    }
     const rows=(grpPlayers||[]).map(p=>({
       id:p.id,
       name:((p.name||p.display_name)||'Player').split(' ')[0],
@@ -2691,14 +2718,7 @@ function LiveScorecard({round,group,players,courses,sb,flash,load,setView,holeSc
         )}
         {round._cupScoring&&activeGroupId!=='leaderboard'&&(
           <div style={{padding:'8px 12px 6px',background:'rgba(0,0,0,0.18)',borderTop:'1px solid rgba(255,255,255,0.07)'}}>
-            <button onClick={()=>openOverallLeaderboard(true)} style={{width:'100%',border:'1px solid rgba(245,158,11,0.45)',background:'linear-gradient(135deg,rgba(245,158,11,0.18),rgba(0,112,187,0.13))',borderRadius:12,padding:'9px 11px',color:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,textAlign:'left'}}>
-              <div>
-                <div style={{fontSize:12,fontWeight:950,letterSpacing:'0.1em',color:'#fbbf24'}}>TEAM SCORE</div>
-                <div style={{fontSize:10,color:'rgba(255,255,255,0.62)',marginTop:2}}>Actual score after finished rounds</div>
-              </div>
-              <div style={{fontSize:13,fontWeight:900,color:'#fff',maxWidth:170,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cupGroupScoreLabel()}</div>
-            </button>
-            <button onClick={()=>openOverallLeaderboard(true)} style={{marginTop:6,width:'100%',border:'1px solid rgba(96,184,240,0.38)',background:'linear-gradient(135deg,rgba(0,112,187,0.22),rgba(245,158,11,0.12))',borderRadius:12,padding:'9px 11px',color:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,textAlign:'left'}}>
+            <button onClick={()=>openOverallLeaderboard(true)} style={{width:'100%',border:'1px solid rgba(96,184,240,0.38)',background:'linear-gradient(135deg,rgba(0,112,187,0.22),rgba(245,158,11,0.12))',borderRadius:12,padding:'9px 11px',color:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,textAlign:'left'}}>
               <div>
                 <div style={{fontSize:12,fontWeight:950,letterSpacing:'0.1em',color:'#90ccf0'}}>PROJECTED SCORE</div>
                 <div style={{fontSize:10,color:'rgba(255,255,255,0.62)',marginTop:2}}>Live if current matches finished now</div>
@@ -3605,23 +3625,25 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
     const goldIds=match.gold_player_ids||[];
     const navyIds=match.navy_player_ids||[];
     const matchTone=res.winner==='gold'?CUP_THEME.gold:res.winner==='navy'?CUP_THEME.navy:null;
-    const matchBg=matchTone?`linear-gradient(135deg,${matchTone.bg},rgba(255,255,255,0.035))`:'rgba(255,255,255,0.045)';
-    const matchBorder=matchTone?`1px solid ${matchTone.primary}`:'1px solid rgba(255,255,255,0.10)';
-    return <div style={{border:matchBorder,borderRadius:12,background:matchBg,padding:10,boxShadow:matchTone?'0 0 18px rgba(0,0,0,0.16)':'none'}}>
+    const matchBg=matchTone
+      ? (res.winner==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.95),rgba(146,91,10,0.92))':'linear-gradient(135deg,rgba(37,99,235,0.96),rgba(11,31,77,0.95))')
+      : 'linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.025))';
+    const matchBorder=matchTone?`2px solid ${matchTone.accent}`:'1px solid rgba(255,255,255,0.10)';
+    return <div style={{border:matchBorder,borderRadius:12,background:matchBg,padding:10,boxShadow:matchTone?'0 12px 30px rgba(0,0,0,0.30), inset 0 0 0 1px rgba(255,255,255,0.15)':'none'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}>
-        <div style={{fontSize:11,color:matchTone?matchTone.accent:'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>{label}</div>
+        <div style={{fontSize:11,color:matchTone?'rgba(255,255,255,0.92)':'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>{label}</div>
       </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}>
-        <div style={{display:'grid',gap:5}}>{goldIds.map(id=><div key={id} style={{color:CUP_THEME.gold.accent,fontSize:13,fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
+        <div style={{display:'grid',gap:5}}>{goldIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME.gold.accent,fontSize:13,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
         <div style={{display:'grid',gap:4,textAlign:'center'}}>
           {res.isDoubles?<>
             <div style={{fontSize:17,color:'#fff',fontWeight:950}}>{res.label}</div>
-            <div style={{fontSize:10,color:'#8ea0ad'}}>{res.holes?('Thru '+res.holes):'Matchplay'}</div>
+            <div style={{fontSize:10,color:matchTone?'rgba(255,255,255,0.82)':'#8ea0ad'}}>{res.holes?('Thru '+res.holes):'Matchplay'}</div>
           </>:<>
             <div style={{fontSize:17,color:'#fff',fontWeight:950}}>{res.gold} - {res.navy}</div>
           </>}
         </div>
-        <div style={{display:'grid',gap:5,textAlign:'right'}}>{navyIds.map(id=><div key={id} style={{color:CUP_THEME.navy.accent,fontSize:13,fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
+        <div style={{display:'grid',gap:5,textAlign:'right'}}>{navyIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME.navy.accent,fontSize:13,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
       </div>
     </div>;
   }
@@ -3651,7 +3673,7 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
   </div>;
 }
 function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,flash,setView,load,setSelectedRound,currentUser,isAdmin,cupUsers,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}){
-  const[selectedDay,setSelectedDay]=useState(null);
+  const[selectedDay,setSelectedDay]=useState(()=>{try{const d=parseInt(sessionStorage.getItem('cupReturnDay')||'');if(d){sessionStorage.removeItem('cupReturnDay');return d;}}catch(e){}return null;});
   const cup=(cupEvents||[])[0];
   const teams=cup?getCupTeams(cup,cupTeams):null;
   const playersInCup=(cupEventPlayers||[]).filter(p=>cup&&p.cup_id===cup.id);
@@ -3744,6 +3766,13 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   const projectedGold=teamTotals.projectedGold;
   const projectedNavy=teamTotals.projectedNavy;
   function cupScoreSummary(){return{gold:goldPts,navy:navyPts,goldName:teams&&teams.gold&&teams.gold.name||'Gold',navyName:teams&&teams.navy&&teams.navy.name||'Navy'};}
+  function cupDayContext(day){
+    const dayGroups=cupDayGroups(day);
+    return {
+      _cupDayAllPlayers: playersInCup,
+      _cupDayRounds: dayGroups.map(g=>roundForGroup(g.day,g.idx)).filter(Boolean)
+    };
+  }
   const leading=goldPts>navyPts?'gold':navyPts>goldPts?'navy':'tie';
   function singlesLeaderboard(){
     return (playersInCup||[]).map(p=>{
@@ -3858,7 +3887,8 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const fallbackPlayers=cupPlayersForGroup(group);
     if(fallbackPlayers.length){
       const repaired=await ensureCupRoundRows(rd,fallbackPlayers);
-      setSelectedRound({...rd,_cupScoring:true,_cupSummary:cupScoreSummary(),_cupGroupData:group,_cupTeams:teams,_group:repaired});
+      try{sessionStorage.setItem('cupReturnDay',String(group&&group.day||rd.day_number||1));}catch(e){}
+      setSelectedRound({...rd,_cupScoring:true,_cupSummary:cupScoreSummary(),_cupGroupData:group,_cupTeams:teams,...cupDayContext(group&&group.day||rd.day_number||1),_group:repaired});
       setView('play');
       return;
     }
@@ -3871,7 +3901,8 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const validIds=new Set(scoreGroup.participants.map(p=>normaliseId(p.id)));
     const groupIds=(grp.player_ids||[]).map(normaliseId);
     if(!groupIds.length||groupIds.some(id=>!validIds.has(id))){grp={...grp,player_ids:scoreGroup.player_ids,playing_handicaps:scoreGroup.playing_handicaps};}
-    setSelectedRound({...rd,_cupScoring:true,_cupSummary:cupScoreSummary(),_cupGroupData:group,_cupTeams:teams,_group:{...grp,participants:scoreGroup.participants,playing_handicaps:grp.playing_handicaps||scoreGroup.playing_handicaps,_cupPlayerMap:scoreGroup._cupPlayerMap}});
+    try{sessionStorage.setItem('cupReturnDay',String(group&&group.day||rd.day_number||1));}catch(e){}
+    setSelectedRound({...rd,_cupScoring:true,_cupSummary:cupScoreSummary(),_cupGroupData:group,_cupTeams:teams,...cupDayContext(group&&group.day||rd.day_number||1),_group:{...grp,participants:scoreGroup.participants,playing_handicaps:grp.playing_handicaps||scoreGroup.playing_handicaps,_cupPlayerMap:scoreGroup._cupPlayerMap}});
     setView('play');
   }
   async function openCupGroup(group){
@@ -3896,7 +3927,8 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
       if(roundErr&&String(roundErr.message||'').toLowerCase().includes('course')){roundPayload.course_id=null;const retry=await sb.from('cup_rounds').insert(roundPayload).select().single();rd=retry.data;roundErr=retry.error;}
       if(roundErr)throw roundErr;
       const grp=await ensureCupRoundRows(rd,matchPlayers);
-      setSelectedRound({...rd,_cupScoring:true,_cupSummary:cupScoreSummary(),_cupGroupData:group,_cupTeams:teams,_group:grp});
+      try{sessionStorage.setItem('cupReturnDay',String(day));}catch(e){}
+      setSelectedRound({...rd,_cupScoring:true,_cupSummary:cupScoreSummary(),_cupGroupData:group,_cupTeams:teams,...cupDayContext(day),_group:grp});
       setView('play');
       await load();
     }catch(e){
