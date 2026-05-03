@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.45
+// SNYDER LIVE v1.46
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -229,7 +229,7 @@ function addLeaderboardScore(totals,holes,holePoints,seen,pid,holeNum,pts){
   const key=pid+'|'+holeNum;
   if(seen&&seen.has(key))return;
   if(seen)seen.add(key);
-  const points=parseInt(pts)||0;
+  const points=stablefordPointsValue(pts);
   totals[pid]=(totals[pid]||0)+points;
   if(!holes[pid])holes[pid]=new Set();
   holes[pid].add(Number(holeNum));
