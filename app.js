@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.76
+// SNYDER LIVE v1.77
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1440,6 +1440,7 @@ function parseSnakeScorePlayerId(v){
 function isSnakeScoreRow(row){return !!parseSnakeScorePlayerId(row&&row.player_id);}
 
 const FINE_SCORE_PREFIX='__fine__|';
+const FINE_HOLE_BASE=900;
 const CUP_FINE_DEFS=[
   {key:'blob',label:'Blob',emoji:'🐟',amount:2,type:'toggle'},
   {key:'threePutt',label:'3 putt',emoji:'😬',amount:2,type:'toggle'},
@@ -1457,17 +1458,37 @@ function parseFineScorePlayerId(v){
   try{return {pid:decodeURIComponent(parts[1]||''),key:decodeURIComponent(parts.slice(2).join('|')||'')};}
   catch(e){return null;}
 }
-function isFineScoreRow(row){return !!parseFineScorePlayerId(row&&row.player_id);}
-function isMetaScoreRow(row){return isSnakeScoreRow(row)||isFineScoreRow(row);}
 function fineDef(key){return CUP_FINE_DEFS.find(f=>f.key===key)||null;}
+function fineIndexForKey(key){return Math.max(0,CUP_FINE_DEFS.findIndex(f=>f.key===key));}
+function makeFineScoreHoleNumber(h,key){return FINE_HOLE_BASE+(fineIndexForKey(key)*100)+(parseInt(h)||0);}
+function parseFineScoreHoleNumber(v){
+  const n=parseInt(v)||0;
+  if(n<=FINE_HOLE_BASE)return null;
+  const raw=n-FINE_HOLE_BASE;
+  const idx=Math.floor(raw/100);
+  const hole=raw-(idx*100);
+  const def=CUP_FINE_DEFS[idx];
+  if(!def||hole<1||hole>18)return null;
+  return {key:def.key,hole};
+}
+function parseFineScoreRow(row){
+  if(!row)return null;
+  const legacy=parseFineScorePlayerId(row.player_id);
+  if(legacy)return {pid:legacy.pid,key:legacy.key,hole:parseInt(row.hole_number)||0,legacy:true};
+  const parsedHole=parseFineScoreHoleNumber(row.hole_number);
+  if(!parsedHole)return null;
+  return {pid:normaliseId(row.player_id),key:parsedHole.key,hole:parsedHole.hole,legacy:false};
+}
+function isFineScoreRow(row){return !!parseFineScoreRow(row);}
+function isMetaScoreRow(row){return isSnakeScoreRow(row)||isFineScoreRow(row);}
 function fineAmount(key,count){const def=fineDef(key);return def?(parseInt(count)||0)*(def.amount||0):0;}
 
 function cupFineTotalForRound(round,scores){
   if(!round)return 0;
   const roundScores=(scores||[]).filter(sc=>sc&&sc.round_id===round.id);
   const fineRows=roundScores.filter(isFineScoreRow);
-  let total=fineRows.reduce((t,sc)=>{const parsed=parseFineScorePlayerId(sc.player_id);return t+fineAmount(parsed&&parsed.key,parseInt(sc.gross_score)||0);},0);
-  const storedBlobKeys=new Set(fineRows.map(sc=>{const parsed=parseFineScorePlayerId(sc.player_id);return parsed&&parsed.key==='blob'?normaliseId(parsed.pid)+'|'+(parseInt(sc.hole_number)||0):null;}).filter(Boolean));
+  let total=fineRows.reduce((t,sc)=>{const parsed=parseFineScoreRow(sc);return t+fineAmount(parsed&&parsed.key,parseInt(sc.gross_score)||0);},0);
+  const storedBlobKeys=new Set(fineRows.map(sc=>{const parsed=parseFineScoreRow(sc);return parsed&&parsed.key==='blob'?normaliseId(parsed.pid)+'|'+(parseInt(parsed.hole)||0):null;}).filter(Boolean));
   roundScores.filter(sc=>!isMetaScoreRow(sc)&&stablefordPointsValue(sc.stableford_points)===0).forEach(sc=>{
     const key=normaliseId(sc.player_id)+'|'+(parseInt(sc.hole_number)||0);
     if(!storedBlobKeys.has(key))total+=fineAmount('blob',1);
@@ -4297,9 +4318,9 @@ function CupFinesCard({group,day,round,teams,playersInCup,courses,scores,sb,flas
   function readFinesFromScores(){
     const next={};
     (scores||[]).filter(sc=>round&&sc.round_id===round.id&&isFineScoreRow(sc)).forEach(sc=>{
-      const parsed=parseFineScorePlayerId(sc.player_id);
+      const parsed=parseFineScoreRow(sc);
       if(!parsed||!parsed.pid||!parsed.key)return;
-      const h=parseInt(sc.hole_number)||0;
+      const h=parseInt(parsed.hole)||0;
       const count=Math.max(0,parseInt(sc.gross_score)||0);
       if(!h||!count)return;
       if(!next[h])next[h]={};
@@ -4308,7 +4329,7 @@ function CupFinesCard({group,day,round,teams,playersInCup,courses,scores,sb,flas
     });
     return next;
   }
-  const fineRowsSignature=(scores||[]).filter(sc=>round&&sc.round_id===round.id&&isFineScoreRow(sc)).map(sc=>[sc.player_id,sc.hole_number,sc.gross_score].join(':')).join('|');
+  const fineRowsSignature=(scores||[]).filter(sc=>round&&sc.round_id===round.id&&isFineScoreRow(sc)).map(sc=>{const p=parseFineScoreRow(sc);return [p&&p.pid,p&&p.key,p&&p.hole,sc.gross_score].join(':');}).join('|');
   useEffect(()=>{setPlayerFineRows(readFinesFromScores());},[round&&round.id,fineRowsSignature]);
   function hasBlobScore(pid,h){
     const row=normalScores.find(sc=>normaliseId(sc.player_id)===normaliseId(pid)&&parseInt(sc.hole_number)===parseInt(h)&&Number.isFinite(parseInt(sc.gross_score)));
@@ -4331,7 +4352,7 @@ function CupFinesCard({group,day,round,teams,playersInCup,courses,scores,sb,flas
     });
     if(key==='blob')return;
     try{
-      const row={round_id:round.id,player_id:makeFineScorePlayerId(pid,key),hole_number:parseInt(h),gross_score:cleanCount,stableford_points:fineAmount(key,cleanCount),par:0,stroke_index:0};
+      const row={round_id:round.id,player_id:pid,hole_number:makeFineScoreHoleNumber(h,key),gross_score:cleanCount,stableford_points:fineAmount(key,cleanCount),par:0,stroke_index:0};
       const res=await saveScoreRowToCloud(sb,row);
       if(!res||!res.ok)throw new Error((res&&res.error)||'Unknown cloud save error');
       if(load)await load(false);
@@ -4707,12 +4728,12 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const roundScores=(scores||[]).filter(sc=>sc&&sc.round_id===round.id);
     const fineRows=roundScores.filter(isFineScoreRow);
     let total=fineRows.reduce((t,sc)=>{
-      const parsed=parseFineScorePlayerId(sc.player_id);
+      const parsed=parseFineScoreRow(sc);
       return parsed&&ids.has(normaliseId(parsed.pid))?t+fineAmount(parsed.key,parseInt(sc.gross_score)||0):t;
     },0);
     const storedBlobKeys=new Set(fineRows.map(sc=>{
-      const parsed=parseFineScorePlayerId(sc.player_id);
-      return parsed&&parsed.key==='blob'&&ids.has(normaliseId(parsed.pid))?normaliseId(parsed.pid)+'|'+(parseInt(sc.hole_number)||0):null;
+      const parsed=parseFineScoreRow(sc);
+      return parsed&&parsed.key==='blob'&&ids.has(normaliseId(parsed.pid))?normaliseId(parsed.pid)+'|'+(parseInt(parsed.hole)||0):null;
     }).filter(Boolean));
     roundScores.filter(sc=>!isMetaScoreRow(sc)&&ids.has(normaliseId(sc.player_id))&&stablefordPointsValue(sc.stableford_points)===0).forEach(sc=>{
       const h=parseInt(sc.hole_number)||0;
