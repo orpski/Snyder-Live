@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.62
+// SNYDER LIVE v1.63
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -70,7 +70,7 @@ const QUINTA_DO_LAGO_PRESETS=[
   {name:'Quinta do Lago North Course - White Tee',location:'Algarve, Portugal',image_url:QUINTA_DO_LAGO_BADGE,course_rating:72.8,slope_rating:133,holes:[
     {hole:1,par:4,stroke_index:15,yards:342},{hole:2,par:3,stroke_index:11,yards:196},{hole:3,par:5,stroke_index:9,yards:523},{hole:4,par:4,stroke_index:1,yards:370},{hole:5,par:4,stroke_index:5,yards:312},{hole:6,par:4,stroke_index:13,yards:334},{hole:7,par:5,stroke_index:7,yards:501},{hole:8,par:3,stroke_index:17,yards:171},{hole:9,par:4,stroke_index:3,yards:369},{hole:10,par:4,stroke_index:12,yards:345},{hole:11,par:5,stroke_index:10,yards:473},{hole:12,par:4,stroke_index:4,yards:372},{hole:13,par:4,stroke_index:6,yards:405},{hole:14,par:3,stroke_index:16,yards:160},{hole:15,par:4,stroke_index:2,yards:376},{hole:16,par:3,stroke_index:18,yards:145},{hole:17,par:4,stroke_index:14,yards:317},{hole:18,par:5,stroke_index:8,yards:445}
   ]},
-  {name:'Quinta do Lago North Course - Yellow Tee',location:'Algarve, Portugal',image_url:QUINTA_DO_LAGO_BADGE,course_rating:73.1,slope_rating:136,holes:[
+  {name:'Quinta do Lago North Course - Yellow Tee',location:'Algarve, Portugal',image_url:QUINTA_DO_LAGO_BADGE,course_rating:71.8,slope_rating:131,holes:[
     {hole:1,par:4,stroke_index:15,yards:321},{hole:2,par:3,stroke_index:11,yards:166},{hole:3,par:5,stroke_index:9,yards:500},{hole:4,par:4,stroke_index:1,yards:349},{hole:5,par:4,stroke_index:5,yards:290},{hole:6,par:4,stroke_index:13,yards:300},{hole:7,par:5,stroke_index:7,yards:482},{hole:8,par:3,stroke_index:17,yards:139},{hole:9,par:4,stroke_index:3,yards:341},{hole:10,par:4,stroke_index:12,yards:325},{hole:11,par:5,stroke_index:10,yards:437},{hole:12,par:4,stroke_index:4,yards:340},{hole:13,par:4,stroke_index:6,yards:380},{hole:14,par:3,stroke_index:16,yards:131},{hole:15,par:4,stroke_index:2,yards:350},{hole:16,par:3,stroke_index:18,yards:113},{hole:17,par:4,stroke_index:14,yards:287},{hole:18,par:5,stroke_index:8,yards:410}
   ]},
   {name:'Quinta do Lago South Course - White Tee',location:'Algarve, Portugal',image_url:QUINTA_DO_LAGO_BADGE,course_rating:73.6,slope_rating:138,holes:[
@@ -2984,14 +2984,12 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         <div style={{minHeight:48,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start'}}>
           <div style={{fontSize:8,color:'rgba(255,255,255,0.52)',fontWeight:900,textTransform:'uppercase',letterSpacing:'0.04em'}}>Gross</div>
           <div style={{fontFamily:'Barlow Condensed, Inter, sans-serif',fontSize:15,color:'#fff',fontWeight:950,lineHeight:1,whiteSpace:'nowrap'}}>{grossText}</div>
-          <div style={{fontSize:8,color:'#60b8f0',fontWeight:900,textTransform:'uppercase',letterSpacing:'0.03em',marginTop:3}}>Stbfd</div>
-          <div style={{fontSize:17,color:'#60b8f0',fontWeight:950,lineHeight:1}}>{stableford}</div>
+          <div style={{fontSize:17,color:'#60b8f0',fontWeight:950,lineHeight:1}}>{stableford} <span style={{fontSize:10,fontWeight:900}}>pts</span></div>
         </div>
         {totalGrossText&&<div style={{minHeight:60,paddingTop:6,borderTop:'1px solid rgba(255,255,255,0.12)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start'}}>
           <div style={{fontSize:8,color:'rgba(255,255,255,0.52)',fontWeight:900,textTransform:'uppercase',letterSpacing:'0.04em'}}>Total gross</div>
           <div style={{fontFamily:'Barlow Condensed, Inter, sans-serif',fontSize:16,color:'#fff',fontWeight:950,lineHeight:1,whiteSpace:'nowrap'}}>{totalGrossText}</div>
-          <div style={{fontSize:8,color:'#60b8f0',fontWeight:900,textTransform:'uppercase',letterSpacing:'0.03em',marginTop:3}}>Total stbfd</div>
-          <div style={{fontSize:18,color:'#60b8f0',fontWeight:950,lineHeight:1}}>{totalStableford}</div>
+          <div style={{fontSize:18,color:'#60b8f0',fontWeight:950,lineHeight:1}}>{totalStableford} <span style={{fontSize:10,fontWeight:900}}>pts</span></div>
         </div>}
       </div>
     );
@@ -3114,8 +3112,8 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
               {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:11,color:'#60b8f0'}}>{gameFirstName((p.name||p.display_name)||'?')}</div>)}
               <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:6}}>Gross</div>
               {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:4}}><div style={{fontSize:22,color:'#fff'}}>{grossOverParSummaryDisplay(p.id,holes)}</div></div>)}
-              <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',paddingTop:2}}>Stableford</div>
-              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:22,color:'#60b8f0',paddingTop:2}}>{getRunning(p.id,holes.length)}</div>)}
+              <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',paddingTop:2}}>Points</div>
+              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:22,color:'#60b8f0',paddingTop:2}}>{getRunning(p.id,holes.length)} <span style={{fontSize:11,fontWeight:900}}>pts</span></div>)}
             </div>
           </div>
         </div>
@@ -3528,7 +3526,7 @@ function AdminPanel({courses,rounds,groups,sb,flash,setView,load,cupUsers,guests
       <div style={{padding:16}}>
         {tab==='courses'&&<CoursesTab courses={courses} sb={sb} flash={flash} load={load}/>}
         {tab==='rounds'&&<RoundsTab rounds={rounds} groups={groups} sb={sb} flash={flash} load={load}/>}
-        {tab==='cup'&&<CupAdminTab sb={sb} flash={flash} load={load} cupUsers={cupUsers} cupEvents={cupEvents} cupTeams={cupTeams} cupEventPlayers={cupEventPlayers} cupDays={cupDays} cupMatches={cupMatches} courses={courses}/>}
+        {tab==='cup'&&<CupAdminTab sb={sb} flash={flash} load={load} cupUsers={cupUsers} cupEvents={cupEvents} cupTeams={cupTeams} cupEventPlayers={cupEventPlayers} cupDays={cupDays} cupMatches={cupMatches} courses={courses} rounds={rounds}/>}
         {tab==='users'&&(
           <div>
             <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.12em',margin:'0 0 8px'}}>REGISTERED USERS</div>
@@ -3896,7 +3894,7 @@ const CUP_THEME={gold:{name:'Gold',primary:'#D4AF37',accent:'#F5E6A3',bg:'rgba(2
 function cupTeamStyle(teamKey,extra={}){const t=CUP_THEME[teamKey]||CUP_THEME.gold;return {border:'1px solid '+t.primary,background:t.bg,...extra};}
 function CupTeamBadge({teamKey,label}){const t=CUP_THEME[teamKey]||CUP_THEME.gold;return <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:10,fontWeight:800,letterSpacing:'0.08em',color:t.accent,textTransform:'uppercase'}}><span style={{width:8,height:8,borderRadius:999,background:t.primary,boxShadow:'0 0 10px '+t.primary}}/> {label||t.name}</span>;}
 function getCupTeams(cup,cupTeams){const rows=(cupTeams||[]).filter(t=>t.cup_id===cup.id);return {gold:rows.find(t=>t.team_key==='gold')||{name:cup.team_a_name||'Gold',team_key:'gold'},navy:rows.find(t=>t.team_key==='navy')||{name:cup.team_b_name||'Navy',team_key:'navy'}};}
-function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,courses}){
+function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,courses,rounds}){
   const[name,setName]=useState('Snyder Cup 2026');
   const[goldName,setGoldName]=useState('Gold Team');
   const[navyName,setNavyName]=useState('Navy Team');
@@ -3906,6 +3904,8 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   const[goldPick,setGoldPick]=useState([]);
   const[navyPick,setNavyPick]=useState([]);
   const[newPlayer,setNewPlayer]=useState({gold:{name:'',handicap:''},navy:{name:'',handicap:''}});
+  const[courseFixDay,setCourseFixDay]=useState(null);
+  const[courseFixDraft,setCourseFixDraft]=useState(null);
   const cup=(cupEvents||[]).find(c=>c.id===selectedCupId)||(cupEvents||[])[0];
   const teams=cup?getCupTeams(cup,cupTeams):null;
   const cupPlayers=(cup&&cupEventPlayers||[]).filter(p=>p.cup_id===cup.id);
@@ -3985,6 +3985,57 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     }else{flash('Day '+dayNum+' course saved');}
     await load();
   }
+  function openCourseFix(day){
+    const dayNum=parseInt(day)||1;
+    const course=selectedCourseForDay(dayNum);
+    if(!course){flash('Choose a course for Day '+dayNum+' first','error');return;}
+    const holes=(course.holes&&course.holes.length?course.holes:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1,yards:0}))).map((h,i)=>({hole:parseInt(h.hole)||i+1,par:parseInt(h.par)||4,stroke_index:parseInt(h.stroke_index)||i+1,yards:parseInt(h.yards)||0}));
+    setCourseFixDay(dayNum);
+    setCourseFixDraft({id:course.id,name:(cleanCourseName(course.name)||course.name||'Cup Day '+dayNum+' Course')+' - Cup Day '+dayNum+' Custom',tee:course.tee||courseTeeFromName(course.name)||'White',course_rating:course.course_rating||'',slope_rating:course.slope_rating||'',holes});
+  }
+  function updateCourseFixHole(idx,patch){
+    setCourseFixDraft(d=>({...d,holes:(d.holes||[]).map((h,i)=>i===idx?{...h,...patch}:h)}));
+  }
+  async function saveCourseFix(){
+    if(!cup||!courseFixDay||!courseFixDraft)return;
+    const dayNum=parseInt(courseFixDay)||1;
+    const holes=(courseFixDraft.holes||[]).map((h,i)=>({hole:i+1,par:parseInt(h.par)||4,stroke_index:parseInt(h.stroke_index)||i+1,yards:parseInt(h.yards)||0}));
+    const coursePayload={name:courseFixDraft.name||('Cup Day '+dayNum+' Custom Course'),location:'Cup setup',tee:courseFixDraft.tee||'White',course_rating:parseFloat(courseFixDraft.course_rating)||null,slope_rating:parseInt(courseFixDraft.slope_rating)||113,holes};
+    let savedCourse=null;
+    const selected=selectedCourseForDay(dayNum);
+    if(selected&&isRealDbId(selected.id)){
+      const upd=await sb.from('cup_courses').update(coursePayload).eq('id',selected.id).select().single();
+      if(upd.error){flash(upd.error.message,'error');return;}
+      savedCourse=upd.data;
+    }else{
+      const ins=await sb.from('cup_courses').insert(coursePayload).select().single();
+      if(ins.error){flash(ins.error.message,'error');return;}
+      savedCourse=ins.data;
+    }
+    saveLocalCupDayCourse(cup.id,dayNum,savedCourse);
+    const dayPayload={course_id:savedCourse.id,course_name:cleanCourseName(savedCourse.name)||savedCourse.name||'',tee:savedCourse.tee||courseTeeFromName(savedCourse.name)||'White'};
+    const existing=days.find(d=>(parseInt(d.day_number)||1)===dayNum);
+    if(existing&&existing.id)await sb.from('snyder_cup_days').update(dayPayload).eq('id',existing.id);
+    else await sb.from('snyder_cup_days').insert({cup_id:cup.id,day_number:dayNum,...dayPayload});
+    for(let idx=1;idx<=6;idx++){
+      const rd=(rounds||[]).find(r=>r.name===((cup.name||'Snyder Cup 2026')+' Day '+dayNum+' Group '+idx)||r.name==='Synder Cup Day '+dayNum+' Group '+idx);
+      if(!rd)continue;
+      await sb.from('cup_rounds').update({course_id:savedCourse.id,course_name:cleanCourseName(savedCourse.name)||savedCourse.name||'',tee:savedCourse.tee||courseTeeFromName(savedCourse.name)||'White'}).eq('id',rd.id);
+      const {data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
+      const nextHcps={};
+      for(const rp of (rps||[])){
+        const cp=(cupPlayers||[]).find(p=>String(cupDisplayName(p)).trim().toLowerCase()===String(rp.display_name||'').trim().toLowerCase());
+        const shots=cp?cupPlayerPlayingShotsForCourse(cp,savedCourse,dayNum):(parseInt(rp.playing_handicap)||0);
+        nextHcps[(cp&&cupStablePlayerId(cp))||rp.id]=shots;
+        await sb.from('cup_round_players').update({playing_handicap:shots}).eq('id',rp.id);
+      }
+      const {data:grps}=await sb.from('cup_groups').select('*').eq('round_id',rd.id);
+      for(const g of (grps||[]))await sb.from('cup_groups').update({playing_handicaps:nextHcps}).eq('id',g.id);
+    }
+    flash('Day '+dayNum+' course, stroke indexes and playing shots updated');
+    setCourseFixDay(null);setCourseFixDraft(null);await load();
+  }
+
   async function setDayReleased(day,released){
     if(!cup)return;
     const dayNum=parseInt(day)||1;
@@ -4086,9 +4137,21 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
             <select style={{...S.inp,fontSize:12}} value={dayCourse?dayCourse.id:''} onChange={e=>setCupDayCourse(d.day_number,e.target.value)}>
               <option value="">Choose course...</option>{cupCourseOptions.map(c=><option key={c.id} value={c.id}>{cleanCourseName(c.name)} - {c.tee||courseTeeFromName(c.name)||'White'} tee</option>)}
             </select>
+            {dayCourse&&<div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center'}}><div style={{fontSize:11,color:'#8ea0ad'}}>Rating {dayCourse.course_rating||'-'} · Slope {dayCourse.slope_rating||'-'}</div><button onClick={()=>openCourseFix(d.day_number)} style={{...S.gho,padding:'6px 10px',fontSize:11}}>Fix card / shots</button></div>}
           </div>
         </div>;})}
       </div>
+      {courseFixDraft&&<div style={{...S.card,marginBottom:14,border:'1px solid rgba(212,175,55,0.34)',background:'linear-gradient(135deg,rgba(212,175,55,0.10),rgba(15,23,42,0.92))'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><div><div style={{fontSize:14,color:'#fff',fontWeight:950}}>Day {courseFixDay} course fail-safe</div><div style={{fontSize:11,color:'#8ea0ad'}}>Use this if the card is wrong on the day. It updates the Cup day course, stroke indexes and recalculates playing shots.</div></div><button onClick={()=>{setCourseFixDay(null);setCourseFixDraft(null);}} style={{...S.gho,padding:'5px 9px',fontSize:11}}>Close</button></div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 70px 70px',gap:7,marginBottom:8}}>
+          <input style={{...S.inp,fontSize:12}} value={courseFixDraft.name||''} onChange={e=>setCourseFixDraft(d=>({...d,name:e.target.value}))} placeholder="Course name"/>
+          <input style={{...S.inp,fontSize:12,textAlign:'center'}} value={courseFixDraft.course_rating||''} onChange={e=>setCourseFixDraft(d=>({...d,course_rating:e.target.value}))} placeholder="Rating"/>
+          <input style={{...S.inp,fontSize:12,textAlign:'center'}} value={courseFixDraft.slope_rating||''} onChange={e=>setCourseFixDraft(d=>({...d,slope_rating:e.target.value}))} placeholder="Slope"/>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'32px 1fr 1fr 1fr',gap:4,fontSize:10,color:'#8ea0ad',fontWeight:950,letterSpacing:'0.06em',marginBottom:4}}><div>H</div><div>PAR</div><div>SI</div><div>YDS</div></div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,maxHeight:320,overflowY:'auto',paddingRight:2}}>{(courseFixDraft.holes||[]).map((h,i)=><div key={i} style={{display:'grid',gridTemplateColumns:'26px 1fr 1fr 1fr',gap:4,alignItems:'center'}}><div style={{fontSize:11,color:'#60b8f0',fontWeight:950}}>{i+1}</div><input type="number" value={h.par} onChange={e=>updateCourseFixHole(i,{par:e.target.value})} style={{...S.inp,padding:'4px 3px',fontSize:11,textAlign:'center'}}/><input type="number" value={h.stroke_index} onChange={e=>updateCourseFixHole(i,{stroke_index:e.target.value})} style={{...S.inp,padding:'4px 3px',fontSize:11,textAlign:'center'}}/><input type="number" value={h.yards} onChange={e=>updateCourseFixHole(i,{yards:e.target.value})} style={{...S.inp,padding:'4px 3px',fontSize:11,textAlign:'center'}}/></div>)}</div>
+        <button onClick={saveCourseFix} style={{...S.pri,width:'100%',marginTop:10}}>Save day card + recalc shots</button>
+      </div>}
       <div style={{...S.card,marginBottom:14}}>
         <div style={{fontSize:14,color:'#fff',fontWeight:800,marginBottom:10}}>Match Builder</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}><select style={S.inp} value={matchDay} onChange={e=>setMatchDay(e.target.value)}>{adminDays.map(d=><option key={d.id||d.day_number} value={d.day_number}>Day {d.day_number}</option>)}</select><select style={S.inp} value={matchType} onChange={e=>{setMatchType(e.target.value);setGoldPick([]);setNavyPick([]);}}><option value="doubles">Doubles</option><option value="singles">Singles</option></select></div>
