@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.56
+// SNYDER LIVE v1.57
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1282,7 +1282,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
         <button onClick={()=>setView('home')} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button>
         <div style={{fontSize:16,color:'#fff'}}>Live Scoring</div>
       </div>
-      <div style={{padding:16}}>
+      <div style={{padding:10}}>
         {liveRounds.length===0
           ?<div style={{...S.card,textAlign:'center',padding:40}}>
             <div style={{fontSize:16,color:'#fff',marginBottom:8}}>No live rounds</div>
@@ -4039,7 +4039,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       <button onClick={createCup} style={{...S.pri,width:'100%',background:'linear-gradient(135deg,#D4AF37,#0B1F4D)'}}>Create Gold vs Navy Cup</button>
     </div>}
     {cup&&<div>
-      <div style={{...S.card,marginBottom:14}}>
+      <div style={{...S.card,marginBottom:10,padding:10}}>
         <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>CUP OVERVIEW</div>
         <select style={{...S.inp,marginBottom:8}} value={cup.id} onChange={e=>setSelectedCupId(e.target.value)}>{(cupEvents||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:7,textAlign:'center'}}><div style={{...S.card,padding:8}}><div style={{fontSize:18,color:'#fff',fontWeight:900}}>{cupPlayers.length}</div><div style={{fontSize:10,color:'#8ea0ad'}}>Players</div></div><div style={{...S.card,padding:8}}><div style={{fontSize:18,color:'#fff',fontWeight:900}}>{days.length}</div><div style={{fontSize:10,color:'#8ea0ad'}}>Days</div></div><div style={{...S.card,padding:8}}><div style={{fontSize:18,color:'#fff',fontWeight:900}}>{matches.length}</div><div style={{fontSize:10,color:'#8ea0ad'}}>Matches</div></div></div>
@@ -4241,33 +4241,33 @@ function CupFinesCard({group,day,round,teams,playersInCup,scores,sb,flash,load,o
       <div style={{width:60}}/>
     </div>
     <div style={{padding:16}}>
-      <div style={{borderRadius:20,padding:16,marginBottom:14,border:'1px solid rgba(212,175,55,0.30)',background:'linear-gradient(135deg,rgba(212,175,55,0.16),rgba(8,30,58,0.94))'}}>
-        <div style={{fontSize:28,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {day} · GROUP {group.idx}</div>
-        <div style={{fontSize:12,color:'#90ccf0',fontWeight:800}}>Separate from scoring — perfect for the fines captain 💸</div>
-        <div style={{marginTop:12,display:'grid',gridTemplateColumns:'1fr auto',alignItems:'center',gap:10}}><div style={{fontSize:12,color:'#8ea0ad',fontWeight:900}}>Group total</div><div style={{fontSize:30,color:'#F5E6A3',fontWeight:950}}>£{dayTotal()}</div></div>
+      <div style={{borderRadius:16,padding:12,marginBottom:10,border:'1px solid rgba(212,175,55,0.30)',background:'linear-gradient(135deg,rgba(212,175,55,0.16),rgba(8,30,58,0.94))'}}>
+        <div style={{fontSize:22,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {day} · GROUP {group.idx}</div>
+        <div style={{fontSize:11,color:'#90ccf0',fontWeight:800}}>Separate from scoring — fines captain mode 💸</div>
+        <div style={{marginTop:8,display:'grid',gridTemplateColumns:'1fr auto',alignItems:'center',gap:8}}><div style={{fontSize:11,color:'#8ea0ad',fontWeight:900}}>Group total</div><div style={{fontSize:24,color:'#F5E6A3',fontWeight:950}}>£{dayTotal()}</div></div>
       </div>
       <div style={{...S.card,marginBottom:14}}>
-        <div style={{fontSize:13,color:'#fff',fontWeight:950,marginBottom:10}}>Fines leaderboard</div>
-        <div style={{display:'grid',gap:8}}>{playerIds.slice().sort((a,b)=>playerTotal(b)-playerTotal(a)).map(pid=><div key={pid} style={{display:'grid',gridTemplateColumns:'1fr auto',gap:10,alignItems:'center',padding:'9px 10px',borderRadius:12,background:'rgba(255,255,255,0.055)',border:'1px solid rgba(255,255,255,0.08)'}}><div style={{fontSize:14,color:'#fff',fontWeight:900}}>{playerName(pid)}</div><div style={{fontSize:18,color:'#F5E6A3',fontWeight:950}}>£{playerTotal(pid)}</div></div>)}</div>
+        <div style={{fontSize:12,color:'#fff',fontWeight:950,marginBottom:7}}>Fines leaderboard</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:6}}>{playerIds.slice().sort((a,b)=>playerTotal(b)-playerTotal(a)).map(pid=><div key={pid} style={{display:'grid',gridTemplateColumns:'1fr auto',gap:6,alignItems:'center',padding:'6px 7px',borderRadius:10,background:'rgba(255,255,255,0.055)',border:'1px solid rgba(255,255,255,0.08)'}}><div style={{fontSize:12,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(pid)}</div><div style={{fontSize:15,color:'#F5E6A3',fontWeight:950}}>£{playerTotal(pid)}</div></div>)}</div>
       </div>
-      <div style={{fontSize:12,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em',margin:'16px 0 8px'}}>HOLE-BY-HOLE FINES</div>
-      <div style={{display:'grid',gap:12}}>{Array.from({length:18},(_,i)=>i+1).map(h=>{
+      <div style={{fontSize:11,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em',margin:'10px 0 6px'}}>HOLE-BY-HOLE FINES</div>
+      <div style={{display:'grid',gap:8}}>{Array.from({length:18},(_,i)=>i+1).map(h=>{
         const holeTotal=playerIds.reduce((t,pid)=>t+playerHoleFine(pid,h),0);
-        return <div key={h} style={{border:'1px solid rgba(96,184,240,0.18)',borderRadius:16,background:'rgba(255,255,255,0.045)',padding:12}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>HOLE {h}</div><div style={{fontSize:15,color:holeTotal?'#F5E6A3':'#8ea0ad',fontWeight:950}}>£{holeTotal}</div></div>
-          <div style={{display:'grid',gap:9}}>{playerIds.map(pid=>{
+        return <div key={h} style={{border:'1px solid rgba(96,184,240,0.18)',borderRadius:13,background:'rgba(255,255,255,0.045)',padding:8}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><div style={{fontSize:15,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>HOLE {h}</div><div style={{fontSize:14,color:holeTotal?'#F5E6A3':'#8ea0ad',fontWeight:950}}>£{holeTotal}</div></div>
+          <div style={{display:'grid',gap:6}}>{playerIds.map(pid=>{
             const playerFine=playerHoleFine(pid,h);
-            return <div key={pid} style={{border:'1px solid rgba(255,255,255,0.08)',borderRadius:13,padding:10,background:playerFine?'rgba(212,175,55,0.10)':'rgba(0,0,0,0.12)'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><div style={{fontSize:14,color:'#fff',fontWeight:950}}>{playerName(pid)}</div><div style={{fontSize:14,color:playerFine?'#F5E6A3':'#8ea0ad',fontWeight:950}}>£{playerFine}</div></div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:7}}>{CUP_FINE_DEFS.map(def=>{
+            return <div key={pid} style={{border:'1px solid rgba(255,255,255,0.08)',borderRadius:10,padding:6,background:playerFine?'rgba(212,175,55,0.10)':'rgba(0,0,0,0.12)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}><div style={{fontSize:12,color:'#fff',fontWeight:950}}>{playerName(pid)}</div><div style={{fontSize:12,color:playerFine?'#F5E6A3':'#8ea0ad',fontWeight:950}}>£{playerFine}</div></div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(6,minmax(0,1fr))',gap:4}}>{CUP_FINE_DEFS.map(def=>{
                 const autoBlob=def.key==='blob'&&hasBlobScore(pid,h);
                 const count=effectiveCount(pid,h,def.key);
                 const active=count>0;
-                if(def.type==='counter')return <div key={def.key} style={{border:'1px solid '+(active?'rgba(212,175,55,0.50)':'rgba(255,255,255,0.10)'),borderRadius:12,padding:7,background:active?'rgba(212,175,55,0.14)':'rgba(255,255,255,0.05)',textAlign:'center'}}>
-                  <div style={{fontSize:18}}>{def.emoji}</div><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>{def.label}</div>
-                  <div style={{display:'flex',gap:5,alignItems:'center',justifyContent:'center',marginTop:5}}><button onClick={()=>saveFine(pid,h,def.key,Math.max(0,storedCount(pid,h,def.key)-1))} style={{...S.gho,padding:'2px 7px',fontSize:13}}>-</button><div style={{fontSize:16,color:'#fff',fontWeight:950,minWidth:18}}>{count}</div><button onClick={()=>saveFine(pid,h,def.key,storedCount(pid,h,def.key)+1)} style={{...S.gho,padding:'2px 7px',fontSize:13}}>+</button></div>
+                if(def.type==='counter')return <div key={def.key} style={{border:'1px solid '+(active?'rgba(212,175,55,0.50)':'rgba(255,255,255,0.10)'),borderRadius:9,padding:4,background:active?'rgba(212,175,55,0.14)':'rgba(255,255,255,0.05)',textAlign:'center'}}>
+                  <div style={{fontSize:14,lineHeight:1}}>{def.emoji}</div><div style={{fontSize:8,color:'#8ea0ad',fontWeight:900,lineHeight:1.05}}>{def.label}</div>
+                  <div style={{display:'flex',gap:2,alignItems:'center',justifyContent:'center',marginTop:3}}><button onClick={()=>saveFine(pid,h,def.key,Math.max(0,storedCount(pid,h,def.key)-1))} style={{...S.gho,padding:'1px 5px',fontSize:11,minHeight:20}}>-</button><div style={{fontSize:12,color:'#fff',fontWeight:950,minWidth:12}}>{count}</div><button onClick={()=>saveFine(pid,h,def.key,storedCount(pid,h,def.key)+1)} style={{...S.gho,padding:'1px 5px',fontSize:11,minHeight:20}}>+</button></div>
                 </div>;
-                return <button key={def.key} onClick={()=>toggleFine(pid,h,def.key)} disabled={autoBlob} title={autoBlob?'Auto from blob score':''} style={{border:'1px solid '+(active?'rgba(212,175,55,0.55)':'rgba(255,255,255,0.10)'),borderRadius:12,padding:'8px 5px',background:active?'rgba(212,175,55,0.16)':'rgba(255,255,255,0.05)',color:active?'#F5E6A3':'#fff',fontSize:11,fontWeight:950,cursor:autoBlob?'default':'pointer'}}><div style={{fontSize:18}}>{def.emoji}</div><div>{def.label}</div>{autoBlob&&<div style={{fontSize:8,color:'#90ccf0'}}>AUTO</div>}</button>;
+                return <button key={def.key} onClick={()=>toggleFine(pid,h,def.key)} disabled={autoBlob} title={autoBlob?'Auto from blob score':''} style={{border:'1px solid '+(active?'rgba(212,175,55,0.55)':'rgba(255,255,255,0.10)'),borderRadius:9,padding:'5px 2px',minHeight:48,background:active?'rgba(212,175,55,0.16)':'rgba(255,255,255,0.05)',color:active?'#F5E6A3':'#fff',fontSize:8,fontWeight:950,cursor:autoBlob?'default':'pointer',lineHeight:1.05}}><div style={{fontSize:14,lineHeight:1}}>{def.emoji}</div><div>{def.label}</div>{autoBlob&&<div style={{fontSize:7,color:'#90ccf0'}}>AUTO</div>}</button>;
               })}</div>
             </div>;
           })}</div>
