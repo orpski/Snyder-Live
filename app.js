@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.63
+// SNYDER LIVE v1.64
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1571,7 +1571,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
     if(!selectedCourse)return;
     const next=groupSetup.map(g=>g.map(p=>withPlayingHandicap(p,selectedCourse,setup.allowance)));
     syncGroups(next);
-  },[setup.course_id,setup.allowance]);
+  },[setup.course_id,setup.tee,setup.allowance]);
   async function continueRound(rd){
     const rdGroups=groups.filter(g=>g.round_id===rd.id);
     const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
@@ -3966,6 +3966,27 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   }
   function dayMatches(day){return matches.filter(m=>(parseInt(m.day_number)||1)===(parseInt(day)||1));}
   function isDayReleased(day){const rows=dayMatches(day);return rows.length>0&&rows.some(m=>String(m.status||'locked').toLowerCase()==='live'||String(m.status||'').toLowerCase()==='released');}
+  async function recalcCupDayRoundsForCourse(dayNum,course){
+    if(!cup||!course)return;
+    const cupTitleLocal=cup.name||'Snyder Cup 2026';
+    const courseName=cleanCourseName(course.name)||course.name||'';
+    const tee=course.tee||courseTeeFromName(course.name)||'White';
+    for(let idx=1;idx<=6;idx++){
+      const rd=(rounds||[]).find(r=>r.name===((cupTitleLocal)+' Day '+dayNum+' Group '+idx)||r.name==='Synder Cup Day '+dayNum+' Group '+idx);
+      if(!rd)continue;
+      await sb.from('cup_rounds').update({course_id:safeCourseIdForDb(course,course.id),course_name:courseName,tee}).eq('id',rd.id);
+      const {data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
+      const nextHcps={};
+      for(const rp of (rps||[])){
+        const cp=(cupPlayers||[]).find(p=>String(cupDisplayName(p)).trim().toLowerCase()===String(rp.display_name||'').trim().toLowerCase());
+        const shots=cp?cupPlayerPlayingShotsForCourse(cp,course,dayNum):(parseInt(rp.playing_handicap)||0);
+        nextHcps[(cp&&cupStablePlayerId(cp))||rp.id]=shots;
+        await sb.from('cup_round_players').update({playing_handicap:shots}).eq('id',rp.id);
+      }
+      const {data:grps}=await sb.from('cup_groups').select('*').eq('round_id',rd.id);
+      for(const g of (grps||[]))await sb.from('cup_groups').update({playing_handicaps:nextHcps}).eq('id',g.id);
+    }
+  }
   async function setCupDayCourse(day,courseId){
     if(!cup)return;
     const dayNum=parseInt(day)||1;
@@ -3982,7 +4003,10 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       const basic=existing&&existing.id?null:await sb.from('snyder_cup_days').insert({cup_id:cup.id,day_number:dayNum});
       if(basic&&basic.error)console.warn('Cup day row save failed',basic.error);
       flash('Course remembered on this device. Add course fields to snyder_cup_days later for shared setup.');
-    }else{flash('Day '+dayNum+' course saved');}
+    }else{
+      await recalcCupDayRoundsForCourse(dayNum,course);
+      flash('Day '+dayNum+' course, tee and shots updated');
+    }
     await load();
   }
   function openCourseFix(day){
@@ -4017,21 +4041,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     const existing=days.find(d=>(parseInt(d.day_number)||1)===dayNum);
     if(existing&&existing.id)await sb.from('snyder_cup_days').update(dayPayload).eq('id',existing.id);
     else await sb.from('snyder_cup_days').insert({cup_id:cup.id,day_number:dayNum,...dayPayload});
-    for(let idx=1;idx<=6;idx++){
-      const rd=(rounds||[]).find(r=>r.name===((cup.name||'Snyder Cup 2026')+' Day '+dayNum+' Group '+idx)||r.name==='Synder Cup Day '+dayNum+' Group '+idx);
-      if(!rd)continue;
-      await sb.from('cup_rounds').update({course_id:savedCourse.id,course_name:cleanCourseName(savedCourse.name)||savedCourse.name||'',tee:savedCourse.tee||courseTeeFromName(savedCourse.name)||'White'}).eq('id',rd.id);
-      const {data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
-      const nextHcps={};
-      for(const rp of (rps||[])){
-        const cp=(cupPlayers||[]).find(p=>String(cupDisplayName(p)).trim().toLowerCase()===String(rp.display_name||'').trim().toLowerCase());
-        const shots=cp?cupPlayerPlayingShotsForCourse(cp,savedCourse,dayNum):(parseInt(rp.playing_handicap)||0);
-        nextHcps[(cp&&cupStablePlayerId(cp))||rp.id]=shots;
-        await sb.from('cup_round_players').update({playing_handicap:shots}).eq('id',rp.id);
-      }
-      const {data:grps}=await sb.from('cup_groups').select('*').eq('round_id',rd.id);
-      for(const g of (grps||[]))await sb.from('cup_groups').update({playing_handicaps:nextHcps}).eq('id',g.id);
-    }
+    await recalcCupDayRoundsForCourse(dayNum,savedCourse);
     flash('Day '+dayNum+' course, stroke indexes and playing shots updated');
     setCourseFixDay(null);setCourseFixDraft(null);await load();
   }
