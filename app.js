@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.52
+// SNYDER LIVE v1.53
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -236,6 +236,19 @@ function grossDisplay(gross){
   if(n===-1)return '0';
   if(n<-1)return Math.abs(n)+'*';
   return String(n);
+}
+function grossTotalDisplay(total,hasGiven){
+  const n=parseInt(total);
+  if(!Number.isFinite(n))return '-';
+  return String(n)+(hasGiven?'*':'');
+}
+function overParDisplay(gross,par){
+  const g=parseInt(gross);
+  const p=parseInt(par);
+  if(!Number.isFinite(g)||!Number.isFinite(p)||g<=0||p<=0)return '-';
+  const diff=g-p;
+  if(diff===0)return 'E';
+  return (diff>0?'+':'')+diff;
 }
 function pickupGrossForNoStableford(par,si,hcp){
   const shots=Math.floor((parseFloat(hcp)||0)/18)+((((parseFloat(hcp)||0)%18)>=si)?1:0);
@@ -2897,6 +2910,18 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
     });
     return{eagles,birdies,pars,bogeys,doubles,blobs};
   }
+  function hasGivenGrossInList(pid,holeList){
+    return (holeList||[]).some(hd=>isGivenGross((holeScores[hd.hole]||{})[pid]));
+  }
+  function enteredParTotal(pid,holeList){
+    return (holeList||[]).reduce((t,hd)=>hasEnteredGross((holeScores[hd.hole]||{})[pid])?t+(parseInt(hd.par)||0):t,0);
+  }
+  function grossSummaryDisplay(pid,holeList){
+    return grossTotalDisplay(getGrossTotal(pid,holeList),hasGivenGrossInList(pid,holeList));
+  }
+  function overParSummaryDisplay(pid,holeList){
+    return overParDisplay(getGrossTotal(pid,holeList),enteredParTotal(pid,holeList));
+  }
 
     // ---------------------------------------------------------
   // Compact 9-hole scorecard table
@@ -2941,10 +2966,11 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
               return (
                 <div key={p.id+'nine-total'} style={{textAlign:'center',overflow:'hidden'}}>
                   <div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:800}}>Gross</div>
-                  <div style={{fontSize:16,color:'#fff',fontWeight:900,lineHeight:1.1}}>{nineGross}</div>
+                  <div style={{fontSize:16,color:'#fff',fontWeight:900,lineHeight:1.1}}>{grossSummaryDisplay(p.id,holeList)}</div>
+                  <div style={{fontSize:9,color:'#fbbf24',fontWeight:900,marginTop:2}}>vs par {overParSummaryDisplay(p.id,holeList)}</div>
                   <div style={{fontSize:9,color:'#60b8f0',fontWeight:900,marginTop:3}}>Stableford</div>
                   <div style={{fontSize:17,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{nineStableford}</div>
-                  {label==='BACK 9'&&<div style={{marginTop:7,paddingTop:7,borderTop:'1px solid rgba(255,255,255,0.12)'}}><div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:800}}>Total gross</div><div style={{fontSize:17,color:'#fff',fontWeight:950,lineHeight:1.05}}>{roundGross}</div><div style={{fontSize:9,color:'#60b8f0',fontWeight:900,marginTop:3}}>Total Stableford</div><div style={{fontSize:18,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{roundStableford}</div></div>}
+                  {label==='BACK 9'&&<div style={{marginTop:7,paddingTop:7,borderTop:'1px solid rgba(255,255,255,0.12)'}}><div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:800}}>Total gross</div><div style={{fontSize:17,color:'#fff',fontWeight:950,lineHeight:1.05}}>{grossSummaryDisplay(p.id,holes)}</div><div style={{fontSize:9,color:'#fbbf24',fontWeight:900,marginTop:2}}>vs par {overParSummaryDisplay(p.id,holes)}</div><div style={{fontSize:9,color:'#60b8f0',fontWeight:900,marginTop:3}}>Total Stableford</div><div style={{fontSize:18,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{roundStableford}</div></div>}
                 </div>
               );
             })}
@@ -3017,7 +3043,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
               <div style={{fontSize:11,color:'#60b8f0'}}>Total</div>
               {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:11,color:'#60b8f0'}}>{gameFirstName((p.name||p.display_name)||'?')}</div>)}
               <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:6}}>Gross</div>
-              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:22,color:'#fff',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:4}}>{getGrossTotal(p.id,holes)}</div>)}
+              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:4}}><div style={{fontSize:22,color:'#fff'}}>{grossSummaryDisplay(p.id,holes)}</div><div style={{fontSize:10,color:'#fbbf24',fontWeight:900}}>vs par {overParSummaryDisplay(p.id,holes)}</div></div>)}
               <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',paddingTop:2}}>Stableford</div>
               {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:22,color:'#60b8f0',paddingTop:2}}>{getRunning(p.id,holes.length)}</div>)}
             </div>
@@ -3325,12 +3351,14 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
               const nine=sec===0?front9:back9;
               return <div key={p.id} style={{borderLeft:'1px solid rgba(255,255,255,0.08)',padding:'7px 6px',textAlign:'center'}}>
                 <div style={{fontSize:10,color:'rgba(255,255,255,0.5)',fontWeight:800}}>Gross</div>
-                <div style={{fontSize:18,color:'#fff',fontWeight:900,lineHeight:1.1}}>{getGrossTotal(p.id,nine)}</div>
+                <div style={{fontSize:18,color:'#fff',fontWeight:900,lineHeight:1.1}}>{grossSummaryDisplay(p.id,nine)}</div>
+                <div style={{fontSize:10,color:'#fbbf24',fontWeight:900,marginTop:2}}>vs par {overParSummaryDisplay(p.id,nine)}</div>
                 <div style={{fontSize:10,color:'#60b8f0',fontWeight:900,marginTop:4}}>Stableford</div>
                 <div style={{fontSize:20,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{getStablefordTotal(p.id,nine)}</div>
                 {sec===1&&<div style={{marginTop:7,paddingTop:7,borderTop:'1px solid rgba(255,255,255,0.12)'}}>
                   <div style={{fontSize:10,color:'rgba(255,255,255,0.5)',fontWeight:800}}>Total gross</div>
-                  <div style={{fontSize:19,color:'#fff',fontWeight:950,lineHeight:1.05}}>{getGrossTotal(p.id,holes)}</div>
+                  <div style={{fontSize:19,color:'#fff',fontWeight:950,lineHeight:1.05}}>{grossSummaryDisplay(p.id,holes)}</div>
+                  <div style={{fontSize:10,color:'#fbbf24',fontWeight:900,marginTop:2}}>vs par {overParSummaryDisplay(p.id,holes)}</div>
                   <div style={{fontSize:10,color:'#60b8f0',fontWeight:900,marginTop:4}}>Total Stableford</div>
                   <div style={{fontSize:21,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{getStablefordTotal(p.id,holes)}</div>
                 </div>}
@@ -4385,6 +4413,8 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const courseName=course?(cleanCourseName(course.name)||course.name||'Course'):'Course';
     const tee=course&&(course.tee||courseTeeFromName(course.name));
     const sumRange=(from,to,field)=>{let total=0;for(let h=from;h<=to;h++){const r=byHole[h];if(!r)continue;if(field==='gross'){total+=grossScoreValue(r.gross_score);}else total+=stablefordPointsValue(r.stableford_points);}return total;};
+    const hasGivenRange=(from,to)=>{for(let h=from;h<=to;h++){const r=byHole[h];if(r&&isGivenGross(r.gross_score))return true;}return false;};
+    const parRange=(from,to)=>{let total=0;for(let h=from;h<=to;h++){const r=byHole[h];if(!r)continue;const hd=courseHoles.find(x=>parseInt(x.hole)===h);total+=parseInt(hd&&hd.par)||0;}return total;};
     const holes=Object.keys(byHole).map(Number).filter(Boolean).sort((a,b)=>a-b);
     return {
       day,
@@ -4397,6 +4427,12 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
       frontGross:sumRange(1,9,'gross'),
       backGross:sumRange(10,18,'gross'),
       totalGross:sumRange(1,18,'gross'),
+      frontGrossDisplay:grossTotalDisplay(sumRange(1,9,'gross'),hasGivenRange(1,9)),
+      backGrossDisplay:grossTotalDisplay(sumRange(10,18,'gross'),hasGivenRange(10,18)),
+      totalGrossDisplay:grossTotalDisplay(sumRange(1,18,'gross'),hasGivenRange(1,18)),
+      frontOverPar:overParDisplay(sumRange(1,9,'gross'),parRange(1,9)),
+      backOverPar:overParDisplay(sumRange(10,18,'gross'),parRange(10,18)),
+      totalOverPar:overParDisplay(sumRange(1,18,'gross'),parRange(1,18)),
       frontStableford:sumRange(1,9,'stableford'),
       backStableford:sumRange(10,18,'stableford'),
       totalStableford:sumRange(1,18,'stableford'),
@@ -4618,7 +4654,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
               <div style={{fontSize:16,color:'#fff',fontWeight:950,textAlign:'center'}}>{row?stablefordPointsValue(row.stableford_points):'-'}</div>
             </div>)}
             <div style={{display:'grid',gridTemplateColumns:'40px 40px 42px 56px 1fr 1fr',gap:6,padding:'10px',borderTop:'1px solid rgba(96,184,240,0.24)',background:'rgba(96,184,240,0.10)',alignItems:'center'}}>
-              <div style={{fontSize:12,color:'#60b8f0',fontWeight:950}}>TOT</div><div style={{fontSize:13,color:'#fff',fontWeight:950,textAlign:'center'}}>{totalPar||'-'}</div><div></div><div style={{fontSize:12,color:'#8ea0ad',fontWeight:900,textAlign:'center'}}>{totalYards||'-'}</div><div style={{fontSize:17,color:'#fff',fontWeight:950,textAlign:'center'}}>{d.totalGross}</div><div style={{fontSize:17,color:'#fff',fontWeight:950,textAlign:'center'}}>{d.totalStableford}</div>
+              <div style={{fontSize:12,color:'#60b8f0',fontWeight:950}}>TOT</div><div style={{fontSize:13,color:'#fff',fontWeight:950,textAlign:'center'}}>{totalPar||'-'}</div><div></div><div style={{fontSize:12,color:'#8ea0ad',fontWeight:900,textAlign:'center'}}>{totalYards||'-'}</div><div style={{textAlign:'center'}}><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{d.totalGrossDisplay||d.totalGross}</div><div style={{fontSize:10,color:'#fbbf24',fontWeight:900}}>vs par {d.totalOverPar||'-'}</div></div><div style={{fontSize:17,color:'#fff',fontWeight:950,textAlign:'center'}}>{d.totalStableford}</div>
             </div>
           </div>
         </>;})():selectedCupPlayerSummary?(()=>{const p=selectedCupPlayerSummary;const daysForPlayer=cupPlayerAllDaySummaries(p);return <>
@@ -4627,9 +4663,9 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
           <div style={{display:'grid',gap:10}}>{daysForPlayer.length?daysForPlayer.map(d=><button key={d.day} onClick={()=>openCupPlayerDetail(d)} style={{...S.card,width:'100%',textAlign:'left',cursor:'pointer',background:'linear-gradient(135deg,rgba(0,112,187,0.18),rgba(15,23,42,0.92))'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><div style={{fontSize:20,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {d.day}</div><div style={{fontSize:11,color:d.finished?'#f8fafc':'#90ccf0',fontWeight:950}}>{d.finished?'FINISHED':'THRU '+d.holes}</div></div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
-              <div style={{border:'1px solid rgba(255,255,255,0.08)',borderRadius:12,padding:8,textAlign:'center'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>FRONT 9</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{d.frontGross}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.frontStableford} pts</div></div>
-              <div style={{border:'1px solid rgba(255,255,255,0.08)',borderRadius:12,padding:8,textAlign:'center'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>BACK 9</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{d.backGross}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.backStableford} pts</div></div>
-              <div style={{border:'1px solid rgba(96,184,240,0.20)',borderRadius:12,padding:8,textAlign:'center',background:'rgba(96,184,240,0.08)'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>TOTAL</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{d.totalGross}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.totalStableford} pts</div></div>
+              <div style={{border:'1px solid rgba(255,255,255,0.08)',borderRadius:12,padding:8,textAlign:'center'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>FRONT 9</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{d.frontGrossDisplay||d.frontGross}</div><div style={{fontSize:10,color:'#fbbf24',fontWeight:900}}>vs par {d.frontOverPar||'-'}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.frontStableford} pts</div></div>
+              <div style={{border:'1px solid rgba(255,255,255,0.08)',borderRadius:12,padding:8,textAlign:'center'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>BACK 9</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{d.backGrossDisplay||d.backGross}</div><div style={{fontSize:10,color:'#fbbf24',fontWeight:900}}>vs par {d.backOverPar||'-'}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.backStableford} pts</div></div>
+              <div style={{border:'1px solid rgba(96,184,240,0.20)',borderRadius:12,padding:8,textAlign:'center',background:'rgba(96,184,240,0.08)'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>TOTAL</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{d.totalGrossDisplay||d.totalGross}</div><div style={{fontSize:10,color:'#fbbf24',fontWeight:900}}>vs par {d.totalOverPar||'-'}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.totalStableford} pts</div></div>
             </div>
           </button>):<div style={{...S.card,color:'#8ea0ad',textAlign:'center'}}>No finished Cup scores found for this player yet.</div>}</div>
         </>;})():showCupHandicaps?<>
@@ -4653,7 +4689,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
             <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,textAlign:'center',letterSpacing:'0.08em',marginTop:8}}>TAP FOR RESULTS SUMMARY</div>
           </button>
           <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'16px 0 8px'}}>OVERALL SINGLES</div>
-          <div style={{...S.card,marginBottom:16,padding:0,overflow:'hidden'}}>{singlesLeaderboard().slice(0,8).map((p,i)=><button key={p.id} onClick={()=>openCupPlayerSummary(p)} style={{width:'100%',border:'none',display:'grid',gridTemplateColumns:'34px 1fr auto auto',gap:8,alignItems:'center',padding:'10px 12px',borderBottom:i<Math.min(8,singlesLeaderboard().length)-1?'1px solid rgba(255,255,255,0.07)':'none',background:'transparent',textAlign:'left',cursor:'pointer'}}><div style={{fontSize:13,color:'#60b8f0',fontWeight:900}}>{i+1}</div><div style={{fontSize:14,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textDecoration:'underline',textUnderlineOffset:3}}>{p.display_name||'Player'}</div><div style={{fontSize:11,color:'#8ea0ad'}}>{p.holes} holes</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{p.total}</div></button>)}</div>
+          <div style={{...S.card,marginBottom:16,padding:8,overflow:'hidden',display:'grid',gap:8}}>{singlesLeaderboard().slice(0,8).map((p,i)=><button key={p.id} onClick={()=>openCupPlayerSummary(p)} style={{width:'100%',border:'1px solid rgba(96,184,240,0.22)',display:'grid',gridTemplateColumns:'34px 1fr auto auto',gap:8,alignItems:'center',padding:'12px 12px',borderRadius:12,background:i===0?'linear-gradient(135deg,rgba(212,175,55,0.18),rgba(255,255,255,0.05))':'rgba(255,255,255,0.055)',textAlign:'left',cursor:'pointer',boxShadow:'0 6px 14px rgba(0,0,0,0.12)'}}><div style={{fontSize:13,color:'#60b8f0',fontWeight:900}}>{i+1}</div><div style={{fontSize:14,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||'Player'}</div><div style={{fontSize:11,color:'#8ea0ad',fontWeight:800}}>{p.holes} holes</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{p.total}</div></button>)}</div>
           <button onClick={openCupHandicaps} style={{border:'1px solid rgba(96,184,240,0.26)',borderRadius:14,background:'linear-gradient(135deg,rgba(0,112,187,0.28),rgba(8,30,58,0.92))',padding:'18px 16px',color:'#fff',margin:'16px 0 10px',width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',textAlign:'left'}}>
             <span><span style={{display:'block',fontSize:24,fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>HANDICAPS</span><span style={{fontSize:12,color:'#90ccf0'}}>View Day 1, 2 and 3 playing shots</span></span>
             <span style={{fontSize:24,color:'#90ccf0'}}>&gt;</span>
