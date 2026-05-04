@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.58
+// SNYDER LIVE v1.61
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -4190,12 +4190,15 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
   </div>;
 }
 
-function CupFinesCard({group,day,round,teams,playersInCup,scores,sb,flash,load,onClose}){
+function CupFinesCard({group,day,round,teams,playersInCup,courses,scores,sb,flash,load,onClose}){
   const[playerFineRows,setPlayerFineRows]=useState({});
   const savingRef=useRef(false);
   const findPlayer=id=>(playersInCup||[]).find(p=>p.id===id||p.user_id===id||p.guest_id===id)||null;
   const playerIds=Array.from(new Set([...(group&&group.players||[]),...((group&&group.doubles&&group.doubles.gold_player_ids)||[]),...((group&&group.doubles&&group.doubles.navy_player_ids)||[]),...((group&&group.singles||[]).flatMap(m=>[...(m.gold_player_ids||[]),...(m.navy_player_ids||[])]))].filter(Boolean)));
   const normalScores=(scores||[]).filter(sc=>round&&sc.round_id===round.id&&!isMetaScoreRow(sc));
+  const course=(courses||[]).find(c=>round&&normaliseId(c.id)===normaliseId(round.course_id))||null;
+  const courseHoles=(course&&Array.isArray(course.holes)&&course.holes.length)?course.holes:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1,yards:0}));
+  function holeInfo(h){return courseHoles.find(x=>parseInt(x.hole)===parseInt(h))||{hole:h,par:4,stroke_index:h,yards:0};}
   function playerName(id){const p=findPlayer(id);return gameFirstName(p&&p.display_name||p&&p.name||'Player');}
   function readFinesFromScores(){
     const next={};
@@ -4231,7 +4234,7 @@ function CupFinesCard({group,day,round,teams,playersInCup,scores,sb,flash,load,o
       if(cleanCount)next[h][pid][key]=cleanCount; else delete next[h][pid][key];
       return next;
     });
-    if(key==='blob'&&hasBlobScore(pid,h))return;
+    if(key==='blob')return;
     if(savingRef.current)return;
     savingRef.current=true;
     try{
@@ -4243,7 +4246,7 @@ function CupFinesCard({group,day,round,teams,playersInCup,scores,sb,flash,load,o
     finally{savingRef.current=false;}
   }
   function toggleFine(pid,h,key){
-    if(key==='blob'&&hasBlobScore(pid,h))return;
+    if(key==='blob')return;
     const cur=storedCount(pid,h,key);
     saveFine(pid,h,key,cur?0:1);
   }
@@ -4251,14 +4254,13 @@ function CupFinesCard({group,day,round,teams,playersInCup,scores,sb,flash,load,o
   return <div style={{minHeight:'100vh',paddingBottom:80}}>
     <div style={{background:'linear-gradient(135deg,#0B1F4D,#061222)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
       <button onClick={onClose} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button>
-      <div style={{fontSize:16,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}>FINES CARD</div>
+      <div style={{fontSize:16,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}>$ FINES CARD</div>
       <div style={{width:60}}/>
     </div>
     <div style={{padding:16}}>
       <div style={{borderRadius:16,padding:12,marginBottom:10,border:'1px solid rgba(212,175,55,0.30)',background:'linear-gradient(135deg,rgba(212,175,55,0.16),rgba(8,30,58,0.94))'}}>
         <div style={{fontSize:22,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {day} · GROUP {group.idx}</div>
-        <div style={{fontSize:11,color:'#90ccf0',fontWeight:800}}>Separate from scoring — fines captain mode 💸</div>
-        <div style={{marginTop:8,display:'grid',gridTemplateColumns:'1fr auto',alignItems:'center',gap:8}}><div style={{fontSize:11,color:'#8ea0ad',fontWeight:900}}>Group total</div><div style={{fontSize:24,color:'#F5E6A3',fontWeight:950}}>£{dayTotal()}</div></div>
+        <div style={{marginTop:8,display:'grid',gridTemplateColumns:'auto 1fr auto',alignItems:'center',gap:8}}><div style={{fontSize:24,color:'#F5E6A3',fontWeight:950,lineHeight:1}}>$</div><div style={{fontSize:11,color:'#8ea0ad',fontWeight:900}}>Group total</div><div style={{fontSize:24,color:'#F5E6A3',fontWeight:950}}>£{dayTotal()}</div></div>
       </div>
       <div style={{...S.card,marginBottom:14}}>
         <div style={{fontSize:12,color:'#fff',fontWeight:950,marginBottom:7}}>Fines leaderboard</div>
@@ -4267,8 +4269,9 @@ function CupFinesCard({group,day,round,teams,playersInCup,scores,sb,flash,load,o
       <div style={{fontSize:11,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em',margin:'10px 0 6px'}}>HOLE-BY-HOLE FINES</div>
       <div style={{display:'grid',gap:8}}>{Array.from({length:18},(_,i)=>i+1).map(h=>{
         const holeTotal=playerIds.reduce((t,pid)=>t+playerHoleFine(pid,h),0);
+        const hd=holeInfo(h);
         return <div key={h} style={{border:'1px solid rgba(96,184,240,0.18)',borderRadius:13,background:'rgba(255,255,255,0.045)',padding:8}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><div style={{fontSize:15,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>HOLE {h}</div><div style={{fontSize:14,color:holeTotal?'#F5E6A3':'#8ea0ad',fontWeight:950}}>£{holeTotal}</div></div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,gap:8}}><div style={{display:'flex',alignItems:'baseline',gap:6,minWidth:0}}><span style={{fontSize:10,color:'#60b8f0',fontWeight:950,letterSpacing:'0.16em'}}>HOLE</span><span style={{fontSize:28,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",lineHeight:0.85,letterSpacing:'0.04em'}}>{h}</span><span style={{fontSize:11,color:'#8ea0ad',fontWeight:950,letterSpacing:'0.08em'}}>· PAR {hd.par||'-'}</span></div><div style={{fontSize:14,color:holeTotal?'#F5E6A3':'#8ea0ad',fontWeight:950}}>£{holeTotal}</div></div>
           <div style={{display:'grid',gap:6}}>{playerIds.map(pid=>{
             const playerFine=playerHoleFine(pid,h);
             return <div key={pid} style={{border:'1px solid rgba(255,255,255,0.08)',borderRadius:10,padding:6,background:playerFine?'rgba(212,175,55,0.10)':'rgba(0,0,0,0.12)'}}>
@@ -4281,7 +4284,8 @@ function CupFinesCard({group,day,round,teams,playersInCup,scores,sb,flash,load,o
                   <div style={{fontSize:14,lineHeight:1}}>{def.emoji}</div><div style={{fontSize:8,color:'#8ea0ad',fontWeight:900,lineHeight:1.05}}>{def.label}</div>
                   <div style={{display:'flex',gap:2,alignItems:'center',justifyContent:'center',marginTop:3}}><button onClick={()=>saveFine(pid,h,def.key,Math.max(0,storedCount(pid,h,def.key)-1))} style={{...S.gho,padding:'1px 5px',fontSize:11,minHeight:20}}>-</button><div style={{fontSize:12,color:'#fff',fontWeight:950,minWidth:12}}>{count}</div><button onClick={()=>saveFine(pid,h,def.key,storedCount(pid,h,def.key)+1)} style={{...S.gho,padding:'1px 5px',fontSize:11,minHeight:20}}>+</button></div>
                 </div>;
-                return <button key={def.key} onClick={()=>toggleFine(pid,h,def.key)} disabled={autoBlob} title={autoBlob?'Auto from blob score':''} style={{border:'1px solid '+(active?'rgba(212,175,55,0.55)':'rgba(255,255,255,0.10)'),borderRadius:9,padding:'5px 2px',minHeight:48,background:active?'rgba(212,175,55,0.16)':'rgba(255,255,255,0.05)',color:active?'#F5E6A3':'#fff',fontSize:8,fontWeight:950,cursor:autoBlob?'default':'pointer',lineHeight:1.05}}><div style={{fontSize:14,lineHeight:1}}>{def.emoji}</div><div>{def.label}</div>{autoBlob&&<div style={{fontSize:7,color:'#90ccf0'}}>AUTO</div>}</button>;
+                const blobLocked=def.key==='blob';
+                return <button key={def.key} onClick={()=>toggleFine(pid,h,def.key)} disabled={blobLocked} title={blobLocked?'Blob fines are automatic from scoring':''} style={{border:'1px solid '+(active?'rgba(212,175,55,0.55)':'rgba(255,255,255,0.10)'),borderRadius:9,padding:'5px 2px',minHeight:48,background:active?'rgba(212,175,55,0.16)':'rgba(255,255,255,0.05)',color:active?'#F5E6A3':(blobLocked?'rgba(255,255,255,0.55)':'#fff'),fontSize:8,fontWeight:950,cursor:blobLocked?'default':'pointer',lineHeight:1.05}}><div style={{fontSize:14,lineHeight:1}}>{def.emoji}</div><div>{def.label}</div>{blobLocked&&<div style={{fontSize:7,color:autoBlob?'#90ccf0':'#8ea0ad'}}>{autoBlob?'AUTO':'AUTO ONLY'}</div>}</button>;
               })}</div>
             </div>;
           })}</div>
@@ -4799,7 +4803,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   );
   if(activeFinesGroup){
     const rd=roundForGroup(activeFinesGroup.day,activeFinesGroup.idx);
-    return <CupFinesCard group={activeFinesGroup} day={activeFinesGroup.day} round={rd} teams={teams} playersInCup={playersInCup} scores={scores} sb={sb} flash={flash} load={load} onClose={goBackOnePage}/>;
+    return <CupFinesCard group={activeFinesGroup} day={activeFinesGroup.day} round={rd} teams={teams} playersInCup={playersInCup} courses={courses} scores={scores} sb={sb} flash={flash} load={load} onClose={goBackOnePage}/>;
   }
   return <div style={{minHeight:'100vh',paddingBottom:80}}>
     <div style={{background:'linear-gradient(135deg,#0B1F4D,#061222)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}><button onClick={goBackOnePage} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button><div style={{display:'flex',alignItems:'center',gap:8,fontSize:16,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}><span style={{color:'#D4AF37'}}>{'\uD83C\uDFC6'}</span><span>SNYDER CUP</span></div><div style={{width:60}}/></div>
