@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.67
+// SNYDER LIVE v1.68
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -5007,7 +5007,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
               <div style={{border:'1px solid rgba(96,184,240,0.20)',borderRadius:12,padding:8,textAlign:'center',background:'rgba(96,184,240,0.08)'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>TOTAL</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{grossTotalWithOverParText(d.totalGrossDisplay||d.totalGross,d.totalOverPar)}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.totalStableford} pts</div></div>
             </div>
           </button>):<div style={{...S.card,color:'#8ea0ad',textAlign:'center'}}>No finished Cup scores found for this player yet.</div>}</div>
-        </>:showCupFinesSummary?(()=>{const rows=cupFinesSummaryRows();return <>
+        </>;})():showCupFinesSummary?(()=>{const rows=cupFinesSummaryRows();return <>
           <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',margin:'2px 0 8px'}}>FINES SUMMARY</div>
           <div style={{fontSize:12,color:'#8ea0ad',marginBottom:12}}>Every player's fines by Cup day, plus the running total.</div>
           <div style={{border:'1px solid rgba(212,175,55,0.30)',borderRadius:16,background:'linear-gradient(135deg,rgba(212,175,55,0.14),rgba(15,23,42,0.90))',padding:14,marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}><div><div style={{fontSize:11,color:'#F5E6A3',fontWeight:950,letterSpacing:'0.13em'}}>TOTAL FINES POT</div><div style={{fontSize:11,color:'#90ccf0',fontWeight:800}}>All days and groups</div></div><div style={{fontSize:32,color:'#fff',fontWeight:950}}>£{cupFineGrandTotal}</div></div>
