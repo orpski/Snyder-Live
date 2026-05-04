@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.66
+// SNYDER LIVE v1.67
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -4490,7 +4490,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const direct=parseInt(round.day_number);
     if(direct)return direct;
     const m=String(round.name||'').match(/Day\s+(\d+)/i);
-    return m?parseInt(m[1])||1:1;
+    return m?(parseInt(m[1])||1):1;
   }
   function cupAdjustedStablefordForScore(row,p,day,course){
     if(!row||!p)return 0;
@@ -4507,9 +4507,12 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   function playerAdjustedSinglesPointsFromRound(round,p,day){
     if(!round||!p)return 0;
     const ids=new Set(cupScoreIds(cupStablePlayerId(p)));
-    ids.add(normaliseId(p.id));ids.add(normaliseId(p.user_id));ids.add(normaliseId(p.guest_id));
-    const course=(courses.find(co=>co.id===round.course_id)||findCourseForTee(courses,round.course_name,round.tee)||resolveCupDayCourse(courses,days,cup&&cup.id,day)||null);
-    return (scores||[]).filter(s=>s.round_id===round.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+cupAdjustedStablefordForScore(s,p,day,course),0);
+    ids.add(normaliseId(p.id));
+    ids.add(normaliseId(p.user_id));
+    ids.add(normaliseId(p.guest_id));
+    const dayNumber=parseInt(day)||cupDayFromRound(round)||1;
+    const course=(courses.find(co=>co.id===round.course_id)||findCourseForTee(courses,round.course_name,round.tee)||resolveCupDayCourse(courses,days,cup&&cup.id,dayNumber)||null);
+    return (scores||[]).filter(s=>s.round_id===round.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+cupAdjustedStablefordForScore(s,p,dayNumber,course),0);
   }
   function matchResult(match,round){
     const goldIds=match.gold_player_ids||[];
@@ -4715,7 +4718,9 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     return (playersInCup||[]).map(p=>{
       const total=cupDayNumbers.reduce((sum,day)=>sum+cupRoundsForDay(day).reduce((t,r)=>t+playerAdjustedSinglesPointsFromRound(r,p,day),0),0);
       const ids=new Set(cupScoreIds(cupStablePlayerId(p)));
-      ids.add(normaliseId(p.id));ids.add(normaliseId(p.user_id));ids.add(normaliseId(p.guest_id));
+      ids.add(normaliseId(p.id));
+      ids.add(normaliseId(p.user_id));
+      ids.add(normaliseId(p.guest_id));
       const holes=new Set((scores||[]).filter(s=>!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id))&&((rounds||[]).find(r=>r.id===s.round_id&&String(r.name||'').includes('Cup')))).map(s=>s.round_id+'-'+s.hole_number)).size;
       return{...p,total,holes};
     }).sort((a,b)=>(b.total||0)-(a.total||0)||String(cupDisplayName(a)).localeCompare(String(cupDisplayName(b))));
@@ -4740,7 +4745,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const courseHoles=(course&&Array.isArray(course.holes))?course.holes:[];
     const courseName=course?(cleanCourseName(course.name)||course.name||'Course'):'Course';
     const tee=course&&(course.tee||courseTeeFromName(course.name));
-    const sumRange=(from,to,field)=>{let total=0;for(let h=from;h<=to;h++){const r=byHole[h];if(!r)continue;if(field==='gross'){total+=grossScoreValue(r.gross_score);}else total+=cupAdjustedStablefordForScore(r,p,day,course);}return total;};
+    const sumRange=(from,to,field)=>{let total=0;for(let h=from;h<=to;h++){const r=byHole[h];if(!r)continue;if(field==='gross'){total+=grossScoreValue(r.gross_score);}else total+=stablefordPointsValue(r.stableford_points);}return total;};
     const hasGivenRange=(from,to)=>{for(let h=from;h<=to;h++){const r=byHole[h];if(r&&isGivenGross(r.gross_score))return true;}return false;};
     const parRange=(from,to)=>{let total=0;for(let h=from;h<=to;h++){const r=byHole[h];if(!r)continue;const hd=courseHoles.find(x=>parseInt(x.hole)===h);total+=parseInt(hd&&hd.par)||0;}return total;};
     const holes=Object.keys(byHole).map(Number).filter(Boolean).sort((a,b)=>a-b);
@@ -4793,8 +4798,8 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     // Cup player handicap is the England Golf / WHS handicap index.
     // Playing shots for the scorecard are calculated from that day's course slope/rating.
     const egHandicap=parseFloat((p&&(p.handicap??p.eg_handicap??p.current_handicap??p.playing_handicap))??0)||0;
-    // Team scorecards must use the full course playing handicap.
-    // Cup singles adjustments are applied only to the Overall Singles leaderboard/summaries.
+    // Team scorecards always use the full course playing handicap.
+    // Singles-only shot adjustments are applied only in Overall Singles totals/summaries.
     const playingShots=cupPlayerBasePlayingShotsForCourse(p,courseForDay);
     // Cup scorecards must not depend on user_id or guest_id foreign keys.
     // Cup players can be manual entries, legacy rows or linked users from different tables.
@@ -4985,7 +4990,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
               <div style={{fontSize:13,color:'#d4af37',fontWeight:900,textAlign:'center'}}>{hd.stroke_index||'-'}</div>
               <div style={{fontSize:12,color:'#8ea0ad',fontWeight:800,textAlign:'center'}}>{hd.yards||'-'}</div>
               <div style={{fontSize:16,color:'#fff',fontWeight:950,textAlign:'center'}}>{row?grossDisplay(row.gross_score):'-'}</div>
-              <div style={{fontSize:16,color:'#fff',fontWeight:950,textAlign:'center'}}>{row?cupAdjustedStablefordForScore(row,p,d.day,d.course):'-'}</div>
+              <div style={{fontSize:16,color:'#fff',fontWeight:950,textAlign:'center'}}>{row?stablefordPointsValue(row.stableford_points):'-'}</div>
             </div>)}
             <div style={{display:'grid',gridTemplateColumns:'40px 40px 42px 56px 1fr 1fr',gap:6,padding:'10px',borderTop:'1px solid rgba(96,184,240,0.24)',background:'rgba(96,184,240,0.10)',alignItems:'center'}}>
               <div style={{fontSize:12,color:'#60b8f0',fontWeight:950}}>TOT</div><div style={{fontSize:13,color:'#fff',fontWeight:950,textAlign:'center'}}>{totalPar||'-'}</div><div></div><div style={{fontSize:12,color:'#8ea0ad',fontWeight:900,textAlign:'center'}}>{totalYards||'-'}</div><div style={{textAlign:'center'}}><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{grossTotalWithOverParText(d.totalGrossDisplay||d.totalGross,d.totalOverPar)}</div></div><div style={{fontSize:17,color:'#fff',fontWeight:950,textAlign:'center'}}>{d.totalStableford}</div>
@@ -5023,14 +5028,26 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
           <div style={{borderRadius:18,padding:18,marginBottom:14,border:'1px solid rgba(212,175,55,0.28)',background:leading==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.23),rgba(11,31,77,0.45))':leading==='navy'?'linear-gradient(135deg,rgba(11,31,77,0.8),rgba(59,130,246,0.18))':'linear-gradient(135deg,rgba(212,175,55,0.12),rgba(11,31,77,0.45))'}}>
             <div style={{display:'grid',gridTemplateColumns:'72px 1fr 72px',gap:10,alignItems:'center'}}><div style={{fontSize:44,color:CUP_THEME.gold.accent,fontWeight:950,textAlign:'left'}}>{goldPts}</div><div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}><CupTeamBadge teamKey="gold" label={teams.gold.name}/><div style={{fontSize:18,color:'#fff',fontWeight:950}}>v</div><CupTeamBadge teamKey="navy" label={teams.navy.name}/></div><div style={{fontSize:44,color:CUP_THEME.navy.accent,fontWeight:950,textAlign:'right'}}>{navyPts}</div></div>
           </div>
-          <div style={{display:'grid',gap:14}}>{cupDayNumbers.map(day=>{const dayRows=cupResultsSummaryRows().filter(r=>parseInt(r.day)===parseInt(day));if(!dayRows.length)return null;return <div key={day} style={{display:'grid',gap:8}}>
-            <div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.10em'}}>DAY {day}</div>
-            {dayRows.map((row,i)=>{const res=row.result||{};const winner=res.winner;const tone=winner==='gold'?CUP_THEME.gold:winner==='navy'?CUP_THEME.navy:null;const resultText=row.finished?('FINISHED · '+(res.label||'A/S')):(res.label||'A/S');const scoreLine=row.type==='Singles'?(res.gold+' pts  v  '+res.navy+' pts'):((res.gold||0)+' holes  v  '+(res.navy||0)+' holes');return <div key={day+'-'+i} style={{border:'1px solid '+(tone?tone.accent:'rgba(255,255,255,0.10)'),borderRadius:14,background:tone?(winner==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.42),rgba(212,175,55,0.18))':'linear-gradient(135deg,rgba(37,99,235,0.46),rgba(11,31,77,0.92))'):'rgba(255,255,255,0.04)',padding:12}}>
-              <div style={{display:'flex',justifyContent:'space-between',gap:8,marginBottom:8}}><div style={{fontSize:11,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>{row.type.toUpperCase()}</div><div style={{fontSize:11,color:row.finished?'#f8fafc':'#8ea0ad',fontWeight:950}}>{resultText}</div></div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}><div style={{fontSize:13,color:CUP_THEME.gold.accent,fontWeight:950,textAlign:'right',overflow:'hidden',textOverflow:'ellipsis'}}>{row.goldNames||teams.gold.name}</div><div style={{fontSize:12,color:'#fff',fontWeight:950}}>v</div><div style={{fontSize:13,color:CUP_THEME.navy.accent,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis'}}>{row.navyNames||teams.navy.name}</div></div>
-              <div style={{fontSize:12,color:'#fff',fontWeight:950,textAlign:'center',marginTop:7}}>{scoreLine}</div>
-            </div>;})}
-          </div>;})}</div>
+          <div style={{display:'grid',gap:14}}>{cupDayNumbers.map(day=>{
+            const dayRows=cupResultsSummaryRows().filter(r=>parseInt(r.day)===parseInt(day));
+            if(!dayRows.length)return null;
+            return <div key={'summary-day-'+day} style={{display:'grid',gap:8}}>
+              <div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.10em'}}>DAY {day}</div>
+              {dayRows.map((row,i)=>{
+                const res=row.result||{};
+                const winner=res.winner;
+                const tone=winner==='gold'?CUP_THEME.gold:winner==='navy'?CUP_THEME.navy:null;
+                const resultText=row.finished?('FINISHED · '+(res.label||'A/S')):(res.label||'A/S');
+                const scoreLine=row.type==='Singles'?((res.gold||0)+' pts  v  '+(res.navy||0)+' pts'):((res.gold||0)+' holes  v  '+(res.navy||0)+' holes');
+                const bg=tone?(winner==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.44),rgba(212,175,55,0.18))':'linear-gradient(135deg,rgba(37,99,235,0.48),rgba(11,31,77,0.92))'):'rgba(255,255,255,0.04)';
+                return <div key={'summary-row-'+day+'-'+i} style={{border:'1px solid '+(tone?tone.accent:'rgba(255,255,255,0.10)'),borderRadius:14,background:bg,padding:12}}>
+                  <div style={{display:'flex',justifyContent:'space-between',gap:8,marginBottom:8}}><div style={{fontSize:11,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>{row.type.toUpperCase()}</div><div style={{fontSize:11,color:row.finished?'#f8fafc':'#8ea0ad',fontWeight:950}}>{resultText}</div></div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}><div style={{fontSize:13,color:CUP_THEME.gold.accent,fontWeight:950,textAlign:'right',overflow:'hidden',textOverflow:'ellipsis'}}>{row.goldNames||teams.gold.name}</div><div style={{fontSize:12,color:'#fff',fontWeight:950}}>v</div><div style={{fontSize:13,color:CUP_THEME.navy.accent,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis'}}>{row.navyNames||teams.navy.name}</div></div>
+                  <div style={{fontSize:12,color:'#fff',fontWeight:950,textAlign:'center',marginTop:7}}>{scoreLine}</div>
+                </div>;
+              })}
+            </div>;
+          })}</div>
         </>:!selectedDay?<>
           <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',margin:'2px 0 14px'}}>{cupTitle}</div>
           <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>TEAM SCORE</div>
