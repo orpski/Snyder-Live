@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.49
+// SNYDER LIVE v1.51
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -4064,26 +4064,39 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   const[selectedDay,setSelectedDay]=useState(()=>{try{const d=parseInt(sessionStorage.getItem('cupReturnDay')||'');if(d){sessionStorage.removeItem('cupReturnDay');return d;}}catch(e){}return null;});
   const[showCupHandicaps,setShowCupHandicaps]=useState(false);
   const[showCupSummary,setShowCupSummary]=useState(false);
+  const[selectedCupPlayerSummary,setSelectedCupPlayerSummary]=useState(null);
+  const[selectedCupPlayerDetail,setSelectedCupPlayerDetail]=useState(null);
   useEffect(()=>{
     function handleCupBack(){
+      if(selectedCupPlayerDetail){setSelectedCupPlayerDetail(null);return;}
+      if(selectedCupPlayerSummary){setSelectedCupPlayerSummary(null);return;}
       if(selectedDay){setSelectedDay(null);return;}
       if(showCupSummary){setShowCupSummary(false);return;}
       if(showCupHandicaps){setShowCupHandicaps(false);return;}
     }
     window.addEventListener('popstate',handleCupBack);
     return()=>window.removeEventListener('popstate',handleCupBack);
-  },[selectedDay,showCupSummary,showCupHandicaps]);
+  },[selectedDay,showCupSummary,showCupHandicaps,selectedCupPlayerSummary,selectedCupPlayerDetail]);
   function openCupDay(day){
     try{window.history.pushState({view:'tournaments',cupDay:day},'',null);}catch(e){}
+    setSelectedCupPlayerDetail(null);
+    setSelectedCupPlayerSummary(null);
     setShowCupSummary(false);
     setShowCupHandicaps(false);
     setSelectedDay(day);
   }
   function openCupSummary(){
     try{window.history.pushState({view:'tournaments',cupSummary:true},'',null);}catch(e){}
+    setSelectedCupPlayerDetail(null);
+    setSelectedCupPlayerSummary(null);
     setSelectedDay(null);
     setShowCupHandicaps(false);
     setShowCupSummary(true);
+  }
+  function openCupPlayerSummary(p){
+    try{window.history.pushState({view:'tournaments',cupPlayer:p&&p.id},'',null);}catch(e){}
+    setSelectedCupPlayerDetail(null);
+    setSelectedCupPlayerSummary(p||null);
   }
   const cup=(cupEvents||[])[0];
   const teams=cup?getCupTeams(cup,cupTeams):null;
@@ -4282,6 +4295,40 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
       return{...p,total,holes};
     }).sort((a,b)=>(b.total||0)-(a.total||0)||String(a.display_name||'').localeCompare(String(b.display_name||'')));
   }
+  function cupRoundsForDay(day){
+    return cupDayGroups(day).map(g=>roundForGroup(g.day,g.idx)).filter(Boolean);
+  }
+  function cupPlayerScoreRowsForRound(rd,p){
+    if(!rd||!p)return[];
+    const ids=new Set(cupScoreIds(cupStablePlayerId(p)));
+    ids.add(normaliseId(p.id));
+    ids.add(normaliseId(p.user_id));
+    ids.add(normaliseId(p.guest_id));
+    return (scores||[]).filter(s=>rd&&s.round_id===rd.id&&!isSnakeScoreRow(s)&&ids.has(normaliseId(s.player_id)));
+  }
+  function cupPlayerDayScoreSummary(p,day){
+    const dayRounds=cupRoundsForDay(day);
+    const rows=dayRounds.flatMap(rd=>cupPlayerScoreRowsForRound(rd,p));
+    const byHole={};
+    rows.forEach(s=>{const h=parseInt(s.hole_number);if(h)byHole[h]=s;});
+    const sumRange=(from,to,field)=>{let total=0;for(let h=from;h<=to;h++){const r=byHole[h];if(!r)continue;if(field==='gross'){const g=parseInt(r.gross_score);if(g>0)total+=g;}else total+=stablefordPointsValue(r.stableford_points);}return total;};
+    const holes=Object.keys(byHole).map(Number).filter(Boolean).sort((a,b)=>a-b);
+    return {
+      day,
+      finished:cupRoundsForDay(day).some(isCompletedRound),
+      holes:holes.length,
+      frontGross:sumRange(1,9,'gross'),
+      backGross:sumRange(10,18,'gross'),
+      totalGross:sumRange(1,18,'gross'),
+      frontStableford:sumRange(1,9,'stableford'),
+      backStableford:sumRange(10,18,'stableford'),
+      totalStableford:sumRange(1,18,'stableford'),
+      byHole
+    };
+  }
+  function cupPlayerAllDaySummaries(p){
+    return cupDayNumbers.map(day=>cupPlayerDayScoreSummary(p,day)).filter(d=>d.holes>0||d.finished);
+  }
   const dayReleased=day=>{
     const rows=matches.filter(m=>(parseInt(m.day_number)||1)===(parseInt(day)||1));
     return rows.length>0&&rows.some(m=>String(m.status||'locked').toLowerCase()==='live'||String(m.status||'').toLowerCase()==='released');
@@ -4475,10 +4522,34 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
           </div>
   );
   return <div style={{minHeight:'100vh',paddingBottom:80}}>
-    <div style={{background:'linear-gradient(135deg,#0B1F4D,#061222)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}><button onClick={()=>showCupHandicaps?setShowCupHandicaps(false):(showCupSummary?setShowCupSummary(false):(selectedDay?setSelectedDay(null):setView('home')))} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button><div style={{display:'flex',alignItems:'center',gap:8,fontSize:16,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}><span style={{color:'#D4AF37'}}>{'\uD83C\uDFC6'}</span><span>SNYDER CUP</span></div><div style={{width:60}}/></div>
+    <div style={{background:'linear-gradient(135deg,#0B1F4D,#061222)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}><button onClick={()=>selectedCupPlayerDetail?setSelectedCupPlayerDetail(null):(selectedCupPlayerSummary?setSelectedCupPlayerSummary(null):(showCupHandicaps?setShowCupHandicaps(false):(showCupSummary?setShowCupSummary(false):(selectedDay?setSelectedDay(null):setView('home')))))} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button><div style={{display:'flex',alignItems:'center',gap:8,fontSize:16,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}><span style={{color:'#D4AF37'}}>{'\uD83C\uDFC6'}</span><span>SNYDER CUP</span></div><div style={{width:60}}/></div>
     <div style={{padding:16}}>
       {!cup?<div style={{...S.card,textAlign:'center',padding:28}}><div style={{fontSize:18,color:'#fff',fontWeight:800,marginBottom:8}}>No Cup set up yet</div><div style={{fontSize:13,color:'#8ea0ad',marginBottom:14}}>Admin can create Gold vs Navy in the Admin Cup tab.</div>{isAdmin&&<button onClick={()=>setView('admin')} style={S.pri}>Open Admin</button>}</div>:<>
-        {showCupHandicaps?<>
+        {selectedCupPlayerDetail?(()=>{const p=selectedCupPlayerSummary;const d=selectedCupPlayerDetail;const rows=Array.from({length:18},(_,i)=>i+1).map(h=>({hole:h,row:d.byHole[h]}));return <>
+          <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',margin:'2px 0 8px'}}>{cupDisplayName(p)} · DAY {d.day}</div>
+          <div style={{fontSize:12,color:'#8ea0ad',marginBottom:12}}>Hole-by-hole score summary.</div>
+          <div style={{...S.card,padding:0,overflow:'hidden'}}>
+            <div style={{display:'grid',gridTemplateColumns:'52px 1fr 1fr',gap:8,padding:'9px 12px',borderBottom:'1px solid rgba(255,255,255,0.08)',color:'#8ea0ad',fontSize:10,fontWeight:950,letterSpacing:'0.08em'}}>
+              <div>HOLE</div><div style={{textAlign:'center'}}>GROSS</div><div style={{textAlign:'center'}}>STABLEFORD</div>
+            </div>
+            {rows.map(({hole,row})=><div key={hole} style={{display:'grid',gridTemplateColumns:'52px 1fr 1fr',gap:8,padding:'9px 12px',borderBottom:hole<18?'1px solid rgba(255,255,255,0.06)':'none',alignItems:'center'}}>
+              <div style={{fontSize:14,color:'#60b8f0',fontWeight:950}}>H{hole}</div>
+              <div style={{fontSize:16,color:'#fff',fontWeight:900,textAlign:'center'}}>{row?(parseInt(row.gross_score)>0?parseInt(row.gross_score):0):'-'}</div>
+              <div style={{fontSize:16,color:'#fff',fontWeight:900,textAlign:'center'}}>{row?stablefordPointsValue(row.stableford_points):'-'}</div>
+            </div>)}
+          </div>
+        </>;})():selectedCupPlayerSummary?(()=>{const p=selectedCupPlayerSummary;const daysForPlayer=cupPlayerAllDaySummaries(p);return <>
+          <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',margin:'2px 0 8px'}}>{cupDisplayName(p)}</div>
+          <div style={{fontSize:12,color:'#8ea0ad',marginBottom:12}}>Scores so far. Tap a day to see every hole.</div>
+          <div style={{display:'grid',gap:10}}>{daysForPlayer.length?daysForPlayer.map(d=><button key={d.day} onClick={()=>setSelectedCupPlayerDetail(d)} style={{...S.card,width:'100%',textAlign:'left',cursor:'pointer',background:'linear-gradient(135deg,rgba(0,112,187,0.18),rgba(15,23,42,0.92))'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><div style={{fontSize:20,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {d.day}</div><div style={{fontSize:11,color:d.finished?'#f8fafc':'#90ccf0',fontWeight:950}}>{d.finished?'FINISHED':'THRU '+d.holes}</div></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+              <div style={{border:'1px solid rgba(255,255,255,0.08)',borderRadius:12,padding:8,textAlign:'center'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>FRONT 9</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{d.frontGross}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.frontStableford} pts</div></div>
+              <div style={{border:'1px solid rgba(255,255,255,0.08)',borderRadius:12,padding:8,textAlign:'center'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>BACK 9</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{d.backGross}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.backStableford} pts</div></div>
+              <div style={{border:'1px solid rgba(96,184,240,0.20)',borderRadius:12,padding:8,textAlign:'center',background:'rgba(96,184,240,0.08)'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>TOTAL</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{d.totalGross}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.totalStableford} pts</div></div>
+            </div>
+          </button>):<div style={{...S.card,color:'#8ea0ad',textAlign:'center'}}>No finished Cup scores found for this player yet.</div>}</div>
+        </>;})():showCupHandicaps?<>
           <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',margin:'2px 0 14px'}}>HANDICAPS</div>
           {cupHandicapsPanel}
         </>:showCupSummary?<>
@@ -4487,7 +4558,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
           <div style={{borderRadius:18,padding:18,marginBottom:14,border:'1px solid rgba(212,175,55,0.28)',background:leading==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.23),rgba(11,31,77,0.45))':leading==='navy'?'linear-gradient(135deg,rgba(11,31,77,0.8),rgba(59,130,246,0.18))':'linear-gradient(135deg,rgba(212,175,55,0.12),rgba(11,31,77,0.45))'}}>
             <div style={{display:'grid',gridTemplateColumns:'72px 1fr 72px',gap:10,alignItems:'center'}}><div style={{fontSize:44,color:CUP_THEME.gold.accent,fontWeight:950,textAlign:'left'}}>{goldPts}</div><div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}><CupTeamBadge teamKey="gold" label={teams.gold.name}/><div style={{fontSize:18,color:'#fff',fontWeight:950}}>v</div><CupTeamBadge teamKey="navy" label={teams.navy.name}/></div><div style={{fontSize:44,color:CUP_THEME.navy.accent,fontWeight:950,textAlign:'right'}}>{navyPts}</div></div>
           </div>
-          <div style={{display:'grid',gap:10}}>{cupResultsSummaryRows().map((row,i)=>{const res=row.result||{};const winner=res.winner;const tone=winner==='gold'?CUP_THEME.gold:winner==='navy'?CUP_THEME.navy:null;const resultText=row.finished?'FINISHED':(res.label||'A/S');return <div key={i} style={{border:'1px solid '+(tone?tone.accent:'rgba(255,255,255,0.10)'),borderRadius:14,background:tone?(winner==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.24),rgba(15,23,42,0.88))':'linear-gradient(135deg,rgba(37,99,235,0.24),rgba(15,23,42,0.88))'):'rgba(255,255,255,0.04)',padding:12}}>
+          <div style={{display:'grid',gap:10}}>{cupResultsSummaryRows().map((row,i)=>{const res=row.result||{};const winner=res.winner;const tone=winner==='gold'?CUP_THEME.gold:winner==='navy'?CUP_THEME.navy:null;const resultText=row.finished?('FINISHED · '+(res.label||'A/S')):(res.label||'A/S');return <div key={i} style={{border:'1px solid '+(tone?tone.accent:'rgba(255,255,255,0.10)'),borderRadius:14,background:tone?(winner==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.24),rgba(15,23,42,0.88))':'linear-gradient(135deg,rgba(37,99,235,0.24),rgba(15,23,42,0.88))'):'rgba(255,255,255,0.04)',padding:12}}>
             <div style={{display:'flex',justifyContent:'space-between',gap:8,marginBottom:8}}><div style={{fontSize:11,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>DAY {row.day} · GROUP {row.group} · {row.type.toUpperCase()}</div><div style={{fontSize:11,color:row.finished?'#f8fafc':'#8ea0ad',fontWeight:950}}>{resultText}</div></div>
             <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}><div style={{fontSize:13,color:CUP_THEME.gold.accent,fontWeight:950,textAlign:'right',overflow:'hidden',textOverflow:'ellipsis'}}>{row.goldNames||teams.gold.name}</div><div style={{fontSize:12,color:'#fff',fontWeight:950}}>v</div><div style={{fontSize:13,color:CUP_THEME.navy.accent,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis'}}>{row.navyNames||teams.navy.name}</div></div>
           </div>;})}</div>
@@ -4499,7 +4570,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
             <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,textAlign:'center',letterSpacing:'0.08em',marginTop:8}}>TAP FOR RESULTS SUMMARY</div>
           </button>
           <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'16px 0 8px'}}>OVERALL SINGLES</div>
-          <div style={{...S.card,marginBottom:16,padding:0,overflow:'hidden'}}>{singlesLeaderboard().slice(0,8).map((p,i)=><div key={p.id} style={{display:'grid',gridTemplateColumns:'34px 1fr auto auto',gap:8,alignItems:'center',padding:'10px 12px',borderBottom:i<Math.min(8,singlesLeaderboard().length)-1?'1px solid rgba(255,255,255,0.07)':'none'}}><div style={{fontSize:13,color:'#60b8f0',fontWeight:900}}>{i+1}</div><div style={{fontSize:14,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||'Player'}</div><div style={{fontSize:11,color:'#8ea0ad'}}>{p.holes} holes</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{p.total}</div></div>)}</div>
+          <div style={{...S.card,marginBottom:16,padding:0,overflow:'hidden'}}>{singlesLeaderboard().slice(0,8).map((p,i)=><button key={p.id} onClick={()=>openCupPlayerSummary(p)} style={{width:'100%',border:'none',display:'grid',gridTemplateColumns:'34px 1fr auto auto',gap:8,alignItems:'center',padding:'10px 12px',borderBottom:i<Math.min(8,singlesLeaderboard().length)-1?'1px solid rgba(255,255,255,0.07)':'none',background:'transparent',textAlign:'left',cursor:'pointer'}}><div style={{fontSize:13,color:'#60b8f0',fontWeight:900}}>{i+1}</div><div style={{fontSize:14,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textDecoration:'underline',textUnderlineOffset:3}}>{p.display_name||'Player'}</div><div style={{fontSize:11,color:'#8ea0ad'}}>{p.holes} holes</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{p.total}</div></button>)}</div>
           <button onClick={()=>setShowCupHandicaps(true)} style={{border:'1px solid rgba(96,184,240,0.26)',borderRadius:14,background:'linear-gradient(135deg,rgba(0,112,187,0.28),rgba(8,30,58,0.92))',padding:'18px 16px',color:'#fff',margin:'16px 0 10px',width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',textAlign:'left'}}>
             <span><span style={{display:'block',fontSize:24,fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>HANDICAPS</span><span style={{fontSize:12,color:'#90ccf0'}}>View Day 1, 2 and 3 playing shots</span></span>
             <span style={{fontSize:24,color:'#90ccf0'}}>&gt;</span>
