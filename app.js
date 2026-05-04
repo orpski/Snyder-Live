@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.75
+// SNYDER LIVE v1.76
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -4287,7 +4287,6 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
 
 function CupFinesCard({group,day,round,teams,playersInCup,courses,scores,sb,flash,load,onClose}){
   const[playerFineRows,setPlayerFineRows]=useState({});
-  const savingRef=useRef(false);
   const findPlayer=id=>(playersInCup||[]).find(p=>p.id===id||p.user_id===id||p.guest_id===id)||null;
   const playerIds=Array.from(new Set([...(group&&group.players||[]),...((group&&group.doubles&&group.doubles.gold_player_ids)||[]),...((group&&group.doubles&&group.doubles.navy_player_ids)||[]),...((group&&group.singles||[]).flatMap(m=>[...(m.gold_player_ids||[]),...(m.navy_player_ids||[])]))].filter(Boolean)));
   const normalScores=(scores||[]).filter(sc=>round&&sc.round_id===round.id&&!isMetaScoreRow(sc));
@@ -4309,7 +4308,8 @@ function CupFinesCard({group,day,round,teams,playersInCup,courses,scores,sb,flas
     });
     return next;
   }
-  useEffect(()=>{setPlayerFineRows(readFinesFromScores());},[round&&round.id,scores&&scores.length]);
+  const fineRowsSignature=(scores||[]).filter(sc=>round&&sc.round_id===round.id&&isFineScoreRow(sc)).map(sc=>[sc.player_id,sc.hole_number,sc.gross_score].join(':')).join('|');
+  useEffect(()=>{setPlayerFineRows(readFinesFromScores());},[round&&round.id,fineRowsSignature]);
   function hasBlobScore(pid,h){
     const row=normalScores.find(sc=>normaliseId(sc.player_id)===normaliseId(pid)&&parseInt(sc.hole_number)===parseInt(h)&&Number.isFinite(parseInt(sc.gross_score)));
     return !!row&&stablefordPointsValue(row.stableford_points)===0;
@@ -4330,15 +4330,12 @@ function CupFinesCard({group,day,round,teams,playersInCup,courses,scores,sb,flas
       return next;
     });
     if(key==='blob')return;
-    if(savingRef.current)return;
-    savingRef.current=true;
     try{
       const row={round_id:round.id,player_id:makeFineScorePlayerId(pid,key),hole_number:parseInt(h),gross_score:cleanCount,stableford_points:fineAmount(key,cleanCount),par:0,stroke_index:0};
-      const res=await sb.from('cup_scores').upsert(row,{onConflict:'round_id,player_id,hole_number'});
-      if(res.error)throw res.error;
+      const res=await saveScoreRowToCloud(sb,row);
+      if(!res||!res.ok)throw new Error((res&&res.error)||'Unknown cloud save error');
       if(load)await load(false);
     }catch(e){flash&&flash('Fines save failed: '+(e&&e.message?e.message:String(e)));}
-    finally{savingRef.current=false;}
   }
   function toggleFine(pid,h,key){
     if(key==='blob')return;
