@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.57
+// SNYDER LIVE v1.58
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1461,6 +1461,19 @@ function isFineScoreRow(row){return !!parseFineScorePlayerId(row&&row.player_id)
 function isMetaScoreRow(row){return isSnakeScoreRow(row)||isFineScoreRow(row);}
 function fineDef(key){return CUP_FINE_DEFS.find(f=>f.key===key)||null;}
 function fineAmount(key,count){const def=fineDef(key);return def?(parseInt(count)||0)*(def.amount||0):0;}
+
+function cupFineTotalForRound(round,scores){
+  if(!round)return 0;
+  const roundScores=(scores||[]).filter(sc=>sc&&sc.round_id===round.id);
+  const fineRows=roundScores.filter(isFineScoreRow);
+  let total=fineRows.reduce((t,sc)=>{const parsed=parseFineScorePlayerId(sc.player_id);return t+fineAmount(parsed&&parsed.key,parseInt(sc.gross_score)||0);},0);
+  const storedBlobKeys=new Set(fineRows.map(sc=>{const parsed=parseFineScorePlayerId(sc.player_id);return parsed&&parsed.key==='blob'?normaliseId(parsed.pid)+'|'+(parseInt(sc.hole_number)||0):null;}).filter(Boolean));
+  roundScores.filter(sc=>!isMetaScoreRow(sc)&&stablefordPointsValue(sc.stableford_points)===0).forEach(sc=>{
+    const key=normaliseId(sc.player_id)+'|'+(parseInt(sc.hole_number)||0);
+    if(!storedBlobKeys.has(key))total+=fineAmount('blob',1);
+  });
+  return total;
+}
 function rowsToSnakeMarks(rows){
   const marks={};
   (rows||[]).forEach(row=>{
@@ -4116,7 +4129,7 @@ function CupMatchCard({match,cupPlayers,teams,editable,onRemove,onDelete,onOpen,
     </div>
   </div>;
 }
-function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchResult,openCupGroup,openingGroup,isAdmin,openFinesGroup}){
+function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchResult,openCupGroup,openingGroup,isAdmin,openFinesGroup,scores}){
   const findPlayer=id=>(playersInCup||[]).find(p=>p.id===id||p.user_id===id)||null;
   const dayFinished=groups.length>0&&groups.every(g=>{const rd=roundForGroup(g.day,g.idx);return rd&&isCompletedRound(rd);});
   function playerName(id){const p=findPlayer(id);return gameName(p&&p.display_name||'Player');}
@@ -4154,6 +4167,7 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
     </div>
     {groups.length===0?<div style={{...S.card,color:'#8ea0ad',fontSize:13}}>No matches have been added for Day {day} yet.</div>:groups.map(group=>{
       const rd=roundForGroup(group.day,group.idx);
+      const finesTotal=cupFineTotalForRound(rd,scores);
       const firstMatch=group.doubles||group.singles[0];
       const locked=!released;
       const opening=normaliseId(openingGroup)===normaliseId(day+'-'+group.idx);
@@ -4163,7 +4177,7 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
           <div><div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>GROUP {group.idx}</div><div style={{fontSize:11,color:finished?'#f8fafc':'#8ea0ad',fontWeight:finished?900:500}}>{opening?'Opening scorecard...':rd?finished?'FINISHED':'Scorecard live':locked&&!isAdmin?'Locked until Go Live':'No scorecard yet'}</div></div>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <button onClick={(e)=>{e.stopPropagation(); if(rd&&openFinesGroup)openFinesGroup(group);}} disabled={!rd} style={{border:'1px solid rgba(212,175,55,0.38)',borderRadius:999,padding:'7px 10px',background:rd?'rgba(212,175,55,0.16)':'rgba(255,255,255,0.05)',color:rd?'#F5E6A3':'#8ea0ad',fontSize:11,fontWeight:950,cursor:rd?'pointer':'default',whiteSpace:'nowrap'}}>FINES 💸</button>
+            <button onClick={(e)=>{e.stopPropagation(); if(rd&&openFinesGroup)openFinesGroup(group);}} disabled={!rd} style={{border:'1px solid rgba(212,175,55,0.38)',borderRadius:999,padding:'7px 10px',background:rd?'rgba(212,175,55,0.16)':'rgba(255,255,255,0.05)',color:rd?'#F5E6A3':'#8ea0ad',fontSize:11,fontWeight:950,cursor:rd?'pointer':'default',whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:7}}><span>FINES 💸</span><span style={{fontSize:12,color:rd?'#fff':'#8ea0ad',fontWeight:950}}>£{finesTotal}</span></button>
             <div style={{fontSize:11,color:finished?'#f8fafc':(disabled?'#8ea0ad':'#90ccf0'),fontWeight:900,letterSpacing:'0.08em'}}>{locked&&!isAdmin?'LOCKED':opening?'OPENING':finished?'VIEW FINISHED':'TAP TO OPEN'}</div>
           </div>
         </div>
@@ -4283,8 +4297,10 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   const[showCupSummary,setShowCupSummary]=useState(false);
   const[selectedCupPlayerSummary,setSelectedCupPlayerSummary]=useState(null);
   const[selectedCupPlayerDetail,setSelectedCupPlayerDetail]=useState(null);
+  const[activeFinesGroup,setActiveFinesGroup]=useState(null);
   useEffect(()=>{
     function handleCupBack(){
+      if(activeFinesGroup){setActiveFinesGroup(null);return;}
       if(selectedCupPlayerDetail){setSelectedCupPlayerDetail(null);return;}
       if(selectedCupPlayerSummary){setSelectedCupPlayerSummary(null);return;}
       if(selectedDay){setSelectedDay(null);return;}
@@ -4293,7 +4309,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     }
     window.addEventListener('popstate',handleCupBack);
     return()=>window.removeEventListener('popstate',handleCupBack);
-  },[selectedDay,showCupSummary,showCupHandicaps,selectedCupPlayerSummary,selectedCupPlayerDetail]);
+  },[selectedDay,showCupSummary,showCupHandicaps,selectedCupPlayerSummary,selectedCupPlayerDetail,activeFinesGroup]);
   function openCupDay(day){
     try{window.history.pushState({view:'tournaments',cupDay:day},'',null);}catch(e){}
     setSelectedCupPlayerDetail(null);
@@ -4301,6 +4317,10 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     setShowCupSummary(false);
     setShowCupHandicaps(false);
     setSelectedDay(day);
+  }
+  function openCupFinesGroup(group){
+    try{window.history.pushState({view:'tournaments',cupFines:true,cupDay:group&&group.day,cupGroup:group&&group.idx},'',null);}catch(e){}
+    setActiveFinesGroup(group||null);
   }
   function openCupSummary(){
     try{window.history.pushState({view:'tournaments',cupSummary:true},'',null);}catch(e){}
@@ -4329,6 +4349,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   }
   function goBackOnePage(){
     if(window.history&&window.history.length>1)window.history.back();
+    else if(activeFinesGroup)setActiveFinesGroup(null);
     else if(selectedCupPlayerDetail)setSelectedCupPlayerDetail(null);
     else if(selectedCupPlayerSummary)setSelectedCupPlayerSummary(null);
     else if(showCupHandicaps)setShowCupHandicaps(false);
@@ -4344,7 +4365,6 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   const cupDayNumbers=Array.from(new Set([1,2,3,...days.map(d=>parseInt(d.day_number)||1),...matches.map(m=>parseInt(m.day_number)||1)])).filter(Boolean).sort((a,b)=>a-b);
   const matchesByDay=groupCupMatchesByDay(matches,cupDayNumbers.map(day_number=>({day_number})));
   const[openingGroup,setOpeningGroup]=useState(null);
-  const[activeFinesGroup,setActiveFinesGroup]=useState(null);
   const cupTitle=(cup&&cup.name)||'Snyder Cup 2026';
   const cupRoundName=(day,idx)=>cupTitle+' Day '+day+' Group '+idx;
   const roundForGroup=(day,idx)=>(rounds||[]).find(r=>r.name===cupRoundName(day,idx)||r.name==='Synder Cup Day '+day+' Group '+idx);
@@ -4525,6 +4545,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     });
   }
   const leading=goldPts>navyPts?'gold':navyPts>goldPts?'navy':'tie';
+  const cupFineGrandTotal=(rounds||[]).filter(r=>r&&((String(r.name||'').startsWith(cupTitle+' Day '))||String(r.name||'').startsWith('Synder Cup Day '))).reduce((t,r)=>t+cupFineTotalForRound(r,scores),0);
   function singlesLeaderboard(){
     return (playersInCup||[]).map(p=>{
       const id=p.user_id||p.id;
@@ -4778,7 +4799,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   );
   if(activeFinesGroup){
     const rd=roundForGroup(activeFinesGroup.day,activeFinesGroup.idx);
-    return <CupFinesCard group={activeFinesGroup} day={activeFinesGroup.day} round={rd} teams={teams} playersInCup={playersInCup} scores={scores} sb={sb} flash={flash} load={load} onClose={()=>setActiveFinesGroup(null)}/>;
+    return <CupFinesCard group={activeFinesGroup} day={activeFinesGroup.day} round={rd} teams={teams} playersInCup={playersInCup} scores={scores} sb={sb} flash={flash} load={load} onClose={goBackOnePage}/>;
   }
   return <div style={{minHeight:'100vh',paddingBottom:80}}>
     <div style={{background:'linear-gradient(135deg,#0B1F4D,#061222)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}><button onClick={goBackOnePage} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button><div style={{display:'flex',alignItems:'center',gap:8,fontSize:16,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}><span style={{color:'#D4AF37'}}>{'\uD83C\uDFC6'}</span><span>SNYDER CUP</span></div><div style={{width:60}}/></div>
@@ -4834,6 +4855,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
             <div style={{display:'grid',gridTemplateColumns:'72px 1fr 72px',gap:10,alignItems:'center'}}><div style={{fontSize:44,color:CUP_THEME.gold.accent,fontWeight:950,textAlign:'left'}}>{goldPts}</div><div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}><CupTeamBadge teamKey="gold" label={teams.gold.name}/><div style={{fontSize:18,color:'#fff',fontWeight:950,textAlign:'center'}}>v</div><CupTeamBadge teamKey="navy" label={teams.navy.name}/></div><div style={{fontSize:44,color:CUP_THEME.navy.accent,fontWeight:950,textAlign:'right'}}>{navyPts}</div></div>
             <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,textAlign:'center',letterSpacing:'0.08em',marginTop:8}}>TAP FOR RESULTS SUMMARY</div>
           </button>
+          <div style={{border:'1px solid rgba(212,175,55,0.28)',borderRadius:14,background:'rgba(212,175,55,0.10)',padding:'12px 14px',margin:'0 0 16px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}><div><div style={{fontSize:11,color:'#F5E6A3',fontWeight:950,letterSpacing:'0.13em'}}>FINES TOTAL</div><div style={{fontSize:11,color:'#90ccf0',fontWeight:800}}>All Cup groups so far</div></div><div style={{fontSize:28,color:'#fff',fontWeight:950}}>£{cupFineGrandTotal}</div></div>
           <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'16px 0 8px'}}>OVERALL SINGLES</div>
           <div style={{...S.card,marginBottom:16,padding:8,overflow:'hidden',display:'grid',gap:8}}>{singlesLeaderboard().slice(0,8).map((p,i)=><button key={p.id} onClick={()=>openCupPlayerSummary(p)} style={{width:'100%',border:'1px solid rgba(96,184,240,0.22)',display:'grid',gridTemplateColumns:'34px 1fr auto auto',gap:8,alignItems:'center',padding:'12px 12px',borderRadius:12,background:i===0?'linear-gradient(135deg,rgba(212,175,55,0.18),rgba(255,255,255,0.05))':'rgba(255,255,255,0.055)',textAlign:'left',cursor:'pointer',boxShadow:'0 6px 14px rgba(0,0,0,0.12)'}}><div style={{fontSize:13,color:'#60b8f0',fontWeight:900}}>{i+1}</div><div style={{fontSize:14,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||'Player'}</div><div style={{fontSize:11,color:'#8ea0ad',fontWeight:800}}>{p.holes} holes</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{p.total}</div></button>)}</div>
           <button onClick={openCupHandicaps} style={{border:'1px solid rgba(96,184,240,0.26)',borderRadius:14,background:'linear-gradient(135deg,rgba(0,112,187,0.28),rgba(8,30,58,0.92))',padding:'18px 16px',color:'#fff',margin:'16px 0 10px',width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',textAlign:'left'}}>
@@ -4842,7 +4864,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
           </button>
           <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>DAYS</div>
           <div style={{display:'grid',gap:10}}>{cupDayNumbers.map(day=>{const released=dayReleased(day);const count=cupDayGroups(day).length;return <button key={day} onClick={()=>openCupDay(day)} style={{border:'1px solid rgba(96,184,240,0.26)',borderRadius:14,background:'linear-gradient(135deg,rgba(0,112,187,0.28),rgba(8,30,58,0.92))',padding:'18px 16px',color:'#fff',display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',textAlign:'left'}}><span><span style={{display:'block',fontSize:24,fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {day}</span><span style={{fontSize:12,color:'#90ccf0'}}>{count} groups - {released?'Open for scoring':'Locked'}</span></span><span style={{fontSize:24,color:'#90ccf0'}}>&gt;</span></button>;})}</div>
-        </>:<CupDayView day={selectedDay} groups={cupDayGroups(selectedDay)} teams={teams} playersInCup={playersInCup} released={dayReleased(selectedDay)} roundForGroup={roundForGroup} matchResult={matchResult} openCupGroup={openCupGroup} openingGroup={openingGroup} isAdmin={isAdmin} openFinesGroup={setActiveFinesGroup}/>}
+        </>:<CupDayView day={selectedDay} groups={cupDayGroups(selectedDay)} teams={teams} playersInCup={playersInCup} released={dayReleased(selectedDay)} roundForGroup={roundForGroup} matchResult={matchResult} openCupGroup={openCupGroup} openingGroup={openingGroup} isAdmin={isAdmin} openFinesGroup={openCupFinesGroup} scores={scores}/>}
       </>}
     </div>
   </div>;
