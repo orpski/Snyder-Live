@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.85
+// SNYDER LIVE v1.86
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -785,7 +785,8 @@ function App(){
   const[currentUser,setCurrentUser]=useState(null);
   const[showAuth,setShowAuth]=useState(false);
   const[authPrompt,setAuthPrompt]=useState(null);
-  const[appData,setAppData]=useState({players:[],courses:[],rounds:[],groups:[],competitions:[],scores:[],cupUsers:[],guests:[],cupEvents:[],cupTeams:[],cupEventPlayers:[],cupDays:[],cupMatches:[],cupRoundPlayers:[]});
+  const[appData,setAppData]=useState({players:[],courses:[],rounds:[],groups:[],competitions:[],scores:[],cupUsers:[],guests:[],cupEvents:[],cupTeams:[],cupEventPlayers:[],cupDays:[],cupMatches:[]});
+  const[allRoundPlayers,setAllRoundPlayers]=useState([]);
   const[selectedRound,setSelectedRound]=useState(null);
   const[selectedComp,setSelectedComp]=useState(null);
   const[holeScores,setHoleScores]=useState({});
@@ -862,7 +863,7 @@ function App(){
   // Data loading / Supabase reads
   // ---------------------------------------------------------
   async function loadAll(){
-    const[players,courses,rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,cupRoundPlayers]=await Promise.all([
+    const[players,courses,rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches]=await Promise.all([
       sb.from('cup_players').select('*').then(r=>r.data||[]),
       sb.from('cup_courses').select('*').then(r=>r.data||[]),
       sb.from('cup_rounds').select('*').order('created_at',{ascending:false}).then(r=>r.data||[]),
@@ -876,13 +877,20 @@ function App(){
       sb.from('snyder_cup_players').select('*').then(r=>r.data||[]).catch(()=>[]),
       sb.from('snyder_cup_days').select('*').then(r=>r.data||[]).catch(()=>[]),
       sb.from('snyder_cup_matches').select('*').then(r=>r.data||[]).catch(()=>[]),
-      sb.from('cup_round_players').select('*').then(r=>r.data||[]).catch(()=>[]),
     ]);
-    setAppData({players,courses:mergePresetCourses(courses),rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,cupRoundPlayers});
+    setAppData({players,courses:mergePresetCourses(courses),rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches});
   }
 
-  const{players,courses,rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,cupRoundPlayers}=appData;
+  const{players,courses,rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}=appData;
   const activeComp=competitions.find(c=>c.status==='active')||competitions[0];
+
+  useEffect(()=>{
+    let alive=true;
+    sb.from('cup_round_players').select('*').then(r=>{
+      if(alive)setAllRoundPlayers(Array.isArray(r&&r.data)?r.data:[]);
+    }).catch(()=>{if(alive)setAllRoundPlayers([]);});
+    return()=>{alive=false;};
+  },[]);
 
   function rowsToHoleScores(rows){
     const m={};
@@ -4531,22 +4539,29 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const p=findCupPlayer(id);
     return [id,p&&p.id,p&&p.user_id,p&&p.guest_id,p&&p.round_player_id,p&&p.cup_player_id].filter(Boolean).map(normaliseId);
   }
-  function cupScoreIdsForRound(round,pOrId){
-    const p=(typeof pOrId==='object'&&pOrId)?pOrId:findCupPlayer(pOrId);
-    const ids=new Set(cupScoreIds(pOrId));
-    if(p){[p.id,p.user_id,p.guest_id,p.round_player_id,p.cup_player_id].filter(Boolean).forEach(id=>ids.add(normaliseId(id)));}
-    const targetName=String(cupDisplayName(p)||cupDisplayName(findCupPlayer(pOrId))||'').trim().toLowerCase();
+  function cupScoreIdsForRound(round,p){
+    const ids=new Set();
+    const add=id=>{const key=normaliseId(id);if(key)ids.add(key);};
+    if(p){
+      add(p.id);add(p.user_id);add(p.guest_id);add(p.round_player_id);add(p.cup_player_id);
+      cupScoreIds(cupStablePlayerId(p)).forEach(add);
+    }
+    const targetName=String(cupDisplayName(p)||'').trim().toLowerCase();
     if(round&&targetName){
-      (cupRoundPlayers||[]).filter(rp=>rp&&rp.round_id===round.id).forEach(rp=>{
-        const rpName=String(rp.display_name||'').trim().toLowerCase();
-        if(rpName&&rpName===targetName)ids.add(normaliseId(rp.id));
+      (allRoundPlayers||[]).forEach(rp=>{
+        if(!rp||rp.round_id!==round.id)return;
+        const rpName=String(rp.display_name||rp.name||'').trim().toLowerCase();
+        if(rpName&&rpName===targetName){
+          add(rp.id);add(rp.user_id);add(rp.guest_id);add(rp.cup_player_id);
+        }
       });
     }
-    return [...ids].filter(Boolean);
+    return [...ids];
   }
   function playerPointsFromRound(round,playerId){
     if(!round)return 0;
-    const ids=new Set(cupScoreIdsForRound(round,playerId));
+    const p=findCupPlayer(playerId);
+    const ids=new Set(cupScoreIdsForRound(round,p||{id:playerId}));
     return (scores||[]).filter(s=>s.round_id===round.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+(stablefordPointsValue(s.stableford_points)),0);
   }
   function cupDayFromRound(round){
