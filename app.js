@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.83
+// SNYDER LIVE v1.84
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -785,7 +785,7 @@ function App(){
   const[currentUser,setCurrentUser]=useState(null);
   const[showAuth,setShowAuth]=useState(false);
   const[authPrompt,setAuthPrompt]=useState(null);
-  const[appData,setAppData]=useState({players:[],courses:[],rounds:[],groups:[],competitions:[],scores:[],cupUsers:[],guests:[],cupEvents:[],cupTeams:[],cupEventPlayers:[],cupDays:[],cupMatches:[],cupRoundPlayers:[]});
+  const[appData,setAppData]=useState({players:[],courses:[],rounds:[],groups:[],competitions:[],scores:[],cupUsers:[],guests:[],cupEvents:[],cupTeams:[],cupEventPlayers:[],cupDays:[],cupMatches:[]});
   const[selectedRound,setSelectedRound]=useState(null);
   const[selectedComp,setSelectedComp]=useState(null);
   const[holeScores,setHoleScores]=useState({});
@@ -862,7 +862,7 @@ function App(){
   // Data loading / Supabase reads
   // ---------------------------------------------------------
   async function loadAll(){
-    const[players,courses,rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,cupRoundPlayers]=await Promise.all([
+    const[players,courses,rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches]=await Promise.all([
       sb.from('cup_players').select('*').then(r=>r.data||[]),
       sb.from('cup_courses').select('*').then(r=>r.data||[]),
       sb.from('cup_rounds').select('*').order('created_at',{ascending:false}).then(r=>r.data||[]),
@@ -876,12 +876,11 @@ function App(){
       sb.from('snyder_cup_players').select('*').then(r=>r.data||[]).catch(()=>[]),
       sb.from('snyder_cup_days').select('*').then(r=>r.data||[]).catch(()=>[]),
       sb.from('snyder_cup_matches').select('*').then(r=>r.data||[]).catch(()=>[]),
-      sb.from('cup_round_players').select('*').then(r=>r.data||[]).catch(()=>[]),
     ]);
-    setAppData({players,courses:mergePresetCourses(courses),rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,cupRoundPlayers});
+    setAppData({players,courses:mergePresetCourses(courses),rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches});
   }
 
-  const{players,courses,rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,cupRoundPlayers}=appData;
+  const{players,courses,rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}=appData;
   const activeComp=competitions.find(c=>c.status==='active')||competitions[0];
 
   function rowsToHoleScores(rows){
@@ -4531,24 +4530,9 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const p=findCupPlayer(id);
     return [id,p&&p.id,p&&p.user_id,p&&p.guest_id].filter(Boolean).map(normaliseId);
   }
-  function cupRoundScoreIdsForPlayer(round,pOrId){
-    const ids=new Set();
-    const p=typeof pOrId==='object'?pOrId:findCupPlayer(pOrId);
-    cupScoreIds(typeof pOrId==='object'?cupStablePlayerId(pOrId):pOrId).forEach(id=>ids.add(id));
-    if(p){
-      [p.id,p.user_id,p.guest_id,p.cup_player_id,p.round_player_id].filter(Boolean).forEach(id=>ids.add(normaliseId(id)));
-      const wantedName=String(cupDisplayName(p)).trim().toLowerCase();
-      (cupRoundPlayers||[]).filter(rp=>round&&rp.round_id===round.id).forEach(rp=>{
-        const rpName=String(rp.display_name||'').trim().toLowerCase();
-        const direct=[rp.id,rp.user_id,rp.guest_id].filter(Boolean).map(normaliseId).some(id=>ids.has(id));
-        if(direct||rpName&&wantedName&&rpName===wantedName)ids.add(normaliseId(rp.id));
-      });
-    }
-    return ids;
-  }
   function playerPointsFromRound(round,playerId){
     if(!round)return 0;
-    const ids=cupRoundScoreIdsForPlayer(round,playerId);
+    const ids=new Set(cupScoreIds(playerId));
     return (scores||[]).filter(s=>s.round_id===round.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+(stablefordPointsValue(s.stableford_points)),0);
   }
   function cupDayFromRound(round){
@@ -4589,11 +4573,16 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     return calcStableford(gross,par,si,hcp)||0;
   }
   function playerAdjustedSinglesPointsFromRound(round,p,day){
-    // Overall Singles must mirror the actual finished scorecard rows.
-    // Cup scores may be saved against cup_round_players.id, while Cup summaries know
-    // players by Snyder Cup player id/name. Resolve all possible ids for this round.
+    // Overall Singles must add up the same points the finished scorecard shows.
+    // The day-of +/- singles adjustment is handled when the round players/shots are set up;
+    // do not re-score from gross here, otherwise the home summary can drift from the card.
     if(!round||!p)return 0;
-    const ids=cupRoundScoreIdsForPlayer(round,p);
+    const ids=new Set(cupScoreIds(cupStablePlayerId(p)));
+    ids.add(normaliseId(p.id));
+    ids.add(normaliseId(p.user_id));
+    ids.add(normaliseId(p.guest_id));
+    ids.add(normaliseId(p.cup_player_id));
+    ids.add(normaliseId(p.round_player_id));
     return (scores||[])
       .filter(s=>s&&s.round_id===round.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id)))
       .reduce((t,s)=>t+stablefordPointsValue(s.stableford_points),0);
@@ -4833,7 +4822,10 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   }
   function cupPlayerScoreRowsForRound(rd,p){
     if(!rd||!p)return[];
-    const ids=cupRoundScoreIdsForPlayer(rd,p);
+    const ids=new Set(cupScoreIds(cupStablePlayerId(p)));
+    ids.add(normaliseId(p.id));
+    ids.add(normaliseId(p.user_id));
+    ids.add(normaliseId(p.guest_id));
     return (scores||[]).filter(s=>rd&&s.round_id===rd.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id)));
   }
   function cupPlayerDayScoreSummary(p,day){
