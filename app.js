@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.79
+// SNYDER LIVE v1.80
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2999,17 +2999,32 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
     // ---------------------------------------------------------
   // Compact 9-hole scorecard table
   // ---------------------------------------------------------
+  function splitGrossOverParText(text){
+    const s=String(text??'-').trim();
+    const m=s.match(/^(.+?)\s*(\([^)]+\))$/);
+    return m?{gross:m[1],over:m[2]}:{gross:s,over:''};
+  }
+  function GrossScoreStack({text,size=16,overSize=13,color='#fff'}){
+    const parts=splitGrossOverParText(text);
+    return (
+      <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:size>=20?48:34,lineHeight:1,whiteSpace:'nowrap'}}>
+        <div style={{fontFamily:'Barlow Condensed, Inter, sans-serif',fontSize:size,color,fontWeight:950,lineHeight:1,whiteSpace:'nowrap'}}>{parts.gross}</div>
+        <div style={{fontFamily:'Barlow Condensed, Inter, sans-serif',fontSize:overSize,color:parts.over?color:'transparent',fontWeight:950,lineHeight:1.05,minHeight:overSize}}>{parts.over||'()'}</div>
+      </div>
+    );
+  }
+
   function ScoreSummaryBlock({grossText,stableford,totalGrossText,totalStableford}){
     return (
-      <div style={{textAlign:'center',overflow:'hidden',display:'flex',flexDirection:'column',alignItems:'stretch',justifyContent:'flex-start',gap:4,minHeight:totalGrossText?118:58}}>
-        <div style={{minHeight:48,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start'}}>
+      <div style={{textAlign:'center',overflow:'hidden',display:'flex',flexDirection:'column',alignItems:'stretch',justifyContent:'stretch',gap:4,minHeight:totalGrossText?124:64}}>
+        <div style={{minHeight:58,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start'}}>
           <div style={{fontSize:8,color:'rgba(255,255,255,0.52)',fontWeight:900,textTransform:'uppercase',letterSpacing:'0.04em'}}>Gross</div>
-          <div style={{fontFamily:'Barlow Condensed, Inter, sans-serif',fontSize:15,color:'#fff',fontWeight:950,lineHeight:1,whiteSpace:'nowrap'}}>{grossText}</div>
+          <GrossScoreStack text={grossText} size={15} overSize={11}/>
           <div style={{fontSize:17,color:'#60b8f0',fontWeight:950,lineHeight:1}}>{stableford} <span style={{fontSize:10,fontWeight:900}}>pts</span></div>
         </div>
-        {totalGrossText&&<div style={{minHeight:60,paddingTop:6,borderTop:'1px solid rgba(255,255,255,0.12)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start'}}>
+        {totalGrossText&&<div style={{minHeight:64,paddingTop:6,borderTop:'1px solid rgba(255,255,255,0.12)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start'}}>
           <div style={{fontSize:8,color:'rgba(255,255,255,0.52)',fontWeight:900,textTransform:'uppercase',letterSpacing:'0.04em'}}>Total gross</div>
-          <div style={{fontFamily:'Barlow Condensed, Inter, sans-serif',fontSize:16,color:'#fff',fontWeight:950,lineHeight:1,whiteSpace:'nowrap'}}>{totalGrossText}</div>
+          <GrossScoreStack text={totalGrossText} size={16} overSize={12}/>
           <div style={{fontSize:18,color:'#60b8f0',fontWeight:950,lineHeight:1}}>{totalStableford} <span style={{fontSize:10,fontWeight:900}}>pts</span></div>
         </div>}
       </div>
@@ -3045,7 +3060,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
               })}
             </div>
           ))}
-          <div style={{display:'grid',gridTemplateColumns:cols,padding:'8px 6px',gap:4,borderTop:'1px solid rgba(255,255,255,0.16)',background:'rgba(0,112,187,0.14)',alignItems:'start'}}>
+          <div style={{display:'grid',gridTemplateColumns:cols,padding:'8px 6px',gap:4,borderTop:'1px solid rgba(255,255,255,0.16)',background:'rgba(0,112,187,0.14)',alignItems:'stretch'}}>
             <div style={{textAlign:'center',fontSize:10,color:'#60b8f0',fontWeight:800}}>{label==='BACK 9'?'Back 9':'Front 9'}</div>
             <div></div>
             {grpPlayers.map(p=>{
@@ -3132,9 +3147,9 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
               <div style={{fontSize:11,color:'#60b8f0'}}>Total</div>
               {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:11,color:'#60b8f0'}}>{gameFirstName((p.name||p.display_name)||'?')}</div>)}
               <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:6}}>Gross</div>
-              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:4}}><div style={{fontSize:22,color:'#fff'}}>{grossOverParSummaryDisplay(p.id,holes)}</div></div>)}
+              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:4,minHeight:54,display:'flex',alignItems:'center',justifyContent:'center'}}><GrossScoreStack text={grossOverParSummaryDisplay(p.id,holes)} size={20} overSize={15}/></div>)}
               <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',paddingTop:2}}>Points</div>
-              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:22,color:'#60b8f0',paddingTop:2}}>{getRunning(p.id,holes.length)} <span style={{fontSize:11,fontWeight:900}}>pts</span></div>)}
+              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:22,color:'#60b8f0',paddingTop:2,minHeight:38,display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>{getRunning(p.id,holes.length)} <span style={{fontSize:11,fontWeight:900,marginLeft:3}}>pts</span></div>)}
             </div>
           </div>
         </div>
@@ -4727,7 +4742,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     });
   }
   const leading=goldPts>navyPts?'gold':navyPts>goldPts?'navy':'tie';
-  const summaryScoreBg=leading==='gold'?'linear-gradient(105deg,rgba(212,175,55,0.98) 0%,rgba(212,175,55,0.90) 34%,rgba(124,91,25,0.88) 55%,rgba(37,99,235,0.80) 100%)':leading==='navy'?'linear-gradient(105deg,rgba(37,99,235,0.98) 0%,rgba(11,31,77,0.94) 40%,rgba(90,84,58,0.88) 62%,rgba(212,175,55,0.82) 100%)':'linear-gradient(105deg,rgba(212,175,55,0.72),rgba(37,99,235,0.72))';
+  const summaryScoreBg=leading==='gold'?'linear-gradient(90deg,rgba(212,175,55,0.98) 0%,rgba(212,175,55,0.90) 34%,rgba(95,82,46,0.78) 62%,rgba(37,99,235,0.58) 100%)':leading==='navy'?'linear-gradient(90deg,rgba(212,175,55,0.58) 0%,rgba(95,82,46,0.74) 38%,rgba(37,99,235,0.90) 66%,rgba(37,99,235,0.98) 100%)':'linear-gradient(90deg,rgba(212,175,55,0.78),rgba(37,99,235,0.78))';
   const cupScoreBannerBg=summaryScoreBg;
   const cupFineGrandTotal=(rounds||[]).filter(r=>r&&((String(r.name||'').startsWith(cupTitle+' Day '))||String(r.name||'').startsWith('Synder Cup Day '))).reduce((t,r)=>t+cupFineTotalForRound(r,scores),0);
   function cupFineTotalForRoundAndPlayer(round,p){
