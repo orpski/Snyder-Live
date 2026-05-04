@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.74
+// SNYDER LIVE v1.75
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -4614,7 +4614,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
         const isDoubles=String(match.match_type||'').toLowerCase()==='doubles';
         const goldNames=(match.gold_player_ids||[]).map(id=>cupDisplayName(findCupPlayer(id))).filter(Boolean).join(' / ');
         const navyNames=(match.navy_player_ids||[]).map(id=>cupDisplayName(findCupPlayer(id))).filter(Boolean).join(' / ');
-        rows.push({day:dayGroup.day,group:group.idx,type:isDoubles?'Doubles':'Singles',goldNames,navyNames,result:res,round:rd,finished:rd&&isCompletedRound(rd)});
+        rows.push({day:dayGroup.day,group:group.idx,groupData:group,match,type:isDoubles?'Doubles':'Singles',goldNames,navyNames,result:res,round:rd,finished:rd&&isCompletedRound(rd)});
       });
     }));
     return rows.sort((a,b)=>a.day-b.day||a.group-b.group||String(a.type).localeCompare(String(b.type)));
@@ -4963,6 +4963,23 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const group=cupDayGroups(day).find(g=>(g.doubles&&match&&g.doubles.id===match.id)||(g.singles||[]).some(s=>match&&s.id===match.id))||{day,idx:1,doubles:match,singles:[],players:[...((match&&match.gold_player_ids)||[]),...((match&&match.navy_player_ids)||[])]};
     await openCupGroup(group);
   }
+  async function openCupResultRow(row){
+    if(!row)return;
+    const group=row.groupData||cupDayGroups(row.day).find(g=>parseInt(g.idx)===parseInt(row.group));
+    try{
+      if(row.round){
+        try{sessionStorage.setItem('cupReturnDay',String(row.day||row.round.day_number||1));}catch(e){}
+        await openRoundForScoring(row.round,group);
+        return;
+      }
+      if(group){await openCupGroup(group);return;}
+      if(row.match){await openCupMatch(row.match);return;}
+      flash('Could not find that Cup scorecard','error');
+    }catch(e){
+      console.error('Could not open result scorecard',e);
+      flash('Could not open scorecard: '+(e&&e.message?e.message:String(e)),'error');
+    }
+  }
   const cupHandicapsPanel = (
     <div style={{border:'1px solid rgba(96,184,240,0.26)',borderRadius:14,background:'linear-gradient(135deg,rgba(0,112,187,0.28),rgba(8,30,58,0.92))',padding:'18px 16px',color:'#fff',margin:'16px 0 10px'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:12}}>
@@ -5063,14 +5080,14 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
                 const goldScore=isSingles?((res.gold||0)+' pts'):'';
                 const navyScore=isSingles?((res.navy||0)+' pts'):'';
                 const bg=filled?(winner==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.96),rgba(120,74,7,0.94))':'linear-gradient(135deg,rgba(37,99,235,0.96),rgba(8,24,61,0.97))'):'rgba(255,255,255,0.04)';
-                return <div key={'summary-row-'+day+'-'+i} style={{border:'1px solid '+(tone?tone.accent:'rgba(255,255,255,0.10)'),borderRadius:14,background:bg,padding:12,boxShadow:filled?'0 10px 22px rgba(0,0,0,0.26)':'none'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',gap:8,marginBottom:6}}><div style={{fontSize:11,color:filled?'rgba(255,255,255,0.92)':'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>{row.type.toUpperCase()}</div><div style={{fontSize:11,color:filled?'rgba(255,255,255,0.84)':'#8ea0ad',fontWeight:950}}>{row.finished?'FINISHED':''}</div></div>
+                return <button key={'summary-row-'+day+'-'+i} onClick={()=>openCupResultRow(row)} style={{width:'100%',border:'1px solid '+(tone?tone.accent:'rgba(255,255,255,0.10)'),borderRadius:14,background:bg,padding:12,boxShadow:filled?'0 10px 22px rgba(0,0,0,0.26)':'none',cursor:'pointer',textAlign:'initial',color:'inherit'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',gap:8,marginBottom:6}}><div style={{fontSize:11,color:filled?'rgba(255,255,255,0.92)':'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>{row.type.toUpperCase()}</div><div style={{fontSize:11,color:filled?'rgba(255,255,255,0.84)':'#8ea0ad',fontWeight:950}}>{row.finished?'FINISHED':'TAP TO OPEN'}</div></div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 54px 1fr',gap:8,alignItems:'center'}}>
                     <div style={{display:'grid',gap:4,textAlign:'right',minWidth:0}}><div style={{fontSize:18,color:filled?'#fff':CUP_THEME.gold.accent,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{row.goldNames||teams.gold.name}</div>{goldScore&&<div style={{fontSize:16,color:filled?'#fff':CUP_THEME.gold.accent,fontWeight:950}}>{goldScore}</div>}</div>
                     <div style={{display:'grid',gap:2,justifyItems:'center',alignItems:'center'}}>{resultText&&<div style={{fontSize:22,lineHeight:1,color:'#fff',fontWeight:950,textAlign:'center'}}>{resultText}</div>}<div style={{fontSize:18,lineHeight:1,color:'#fff',fontWeight:950}}>v</div></div>
                     <div style={{display:'grid',gap:4,textAlign:'left',minWidth:0}}><div style={{fontSize:18,color:filled?'#fff':CUP_THEME.navy.accent,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{row.navyNames||teams.navy.name}</div>{navyScore&&<div style={{fontSize:16,color:filled?'#fff':CUP_THEME.navy.accent,fontWeight:950}}>{navyScore}</div>}</div>
                   </div>
-                </div>;
+                </button>;
               })}
             </div>;
           })}</div>
