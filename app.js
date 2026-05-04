@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.81
+// SNYDER LIVE v1.82
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -4573,6 +4573,9 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     return calcStableford(gross,par,si,hcp)||0;
   }
   function playerAdjustedSinglesPointsFromRound(round,p,day){
+    // Overall Singles must add up the same points the finished scorecard shows.
+    // The day-of +/- singles adjustment is handled when the round players/shots are set up;
+    // do not re-score from gross here, otherwise the home summary can drift from the card.
     if(!round||!p)return 0;
     const ids=new Set(cupScoreIds(cupStablePlayerId(p)));
     ids.add(normaliseId(p.id));
@@ -4580,11 +4583,9 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     ids.add(normaliseId(p.guest_id));
     ids.add(normaliseId(p.cup_player_id));
     ids.add(normaliseId(p.round_player_id));
-    const dayNumber=parseInt(day)||cupDayFromRound(round)||1;
-    const course=(courses.find(co=>co.id===round.course_id)||findCourseForTee(courses,round.course_name,round.tee)||resolveCupDayCourse(courses,days,cup&&cup.id,dayNumber)||null);
-    const baseShots=cupRoundBasePlayingShots(round,p,course);
-    const singlesShots=Math.max(0,(parseFloat(baseShots)||0)+cupPlayerAdjustmentForDay(p,dayNumber));
-    return (scores||[]).filter(s=>s.round_id===round.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+cupAdjustedStablefordForScore(s,p,dayNumber,course,singlesShots),0);
+    return (scores||[])
+      .filter(s=>s&&s.round_id===round.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id)))
+      .reduce((t,s)=>t+stablefordPointsValue(s.stableford_points),0);
   }
   function formatMatchplayShortLabel(winner,diff,remaining){
     const d=Math.abs(parseInt(diff)||0);
