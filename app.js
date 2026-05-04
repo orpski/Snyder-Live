@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.48
+// SNYDER LIVE v1.49
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -4024,20 +4024,20 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
     const centreText=finished?'F':(res.isDoubles?(res.winner==='tie'?'A/S':(res.holes?('THRU '+res.holes):'MATCHPLAY')):(res.winner==='tie'?'A/S':'')).toUpperCase();
     const leftOutside=(isGold?outsideText:(res.isDoubles?'':String(res.gold||0))).toUpperCase();
     const rightOutside=(isNavy?outsideText:(res.isDoubles?'':String(res.navy||0))).toUpperCase();
-    return <div style={{border:finished?'2px solid rgba(52,211,153,0.88)':matchBorder,borderRadius:12,background:finished?'linear-gradient(135deg,rgba(6,95,70,0.92),rgba(15,23,42,0.96))':matchBg,padding:10,boxShadow:finished?'0 12px 30px rgba(0,0,0,0.34), inset 0 0 0 1px rgba(255,255,255,0.16)':(matchTone?'0 12px 30px rgba(0,0,0,0.34), inset 0 0 0 1px rgba(255,255,255,0.17)':'none')}}>
-      {finished&&<div style={{fontSize:10,color:'#bbf7d0',fontWeight:950,letterSpacing:'0.16em',textAlign:'center',marginBottom:7}}>FINISHED</div>}
+    return <div style={{border:matchBorder,borderRadius:12,background:matchBg,padding:10,boxShadow:matchTone?'0 12px 30px rgba(0,0,0,0.34), inset 0 0 0 1px rgba(255,255,255,0.17)':(finished?'0 10px 24px rgba(0,0,0,0.24)':'none')}}>
+      {finished&&<div style={{fontSize:10,color:matchTone?'#fff':'#f8fafc',fontWeight:950,letterSpacing:'0.16em',textAlign:'center',marginBottom:7}}>FINISHED</div>}
       <div style={{display:'grid',gridTemplateColumns:'62px 1fr 54px 1fr 62px',gap:7,alignItems:'center'}}>
-        <div style={{fontSize:res.isDoubles?15:20,color:finished?'#fff':(isGold?'#fff':(res.isDoubles?'rgba(255,255,255,0.22)':CUP_THEME.gold.accent)),fontWeight:950,textAlign:'left',whiteSpace:'nowrap'}}>{leftOutside}</div>
-        <div style={{display:'grid',gap:5,textAlign:'right',minWidth:0}}>{goldIds.map(id=><div key={id} style={{color:finished||matchTone?'#fff':CUP_THEME.gold.accent,fontSize:13,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
-        <div style={{textAlign:'center',fontSize:finished?24:(res.isDoubles?11:13),color:finished?'#bbf7d0':(matchTone?'rgba(255,255,255,0.84)':'#8ea0ad'),fontWeight:950,whiteSpace:'nowrap',lineHeight:1}}>{centreText}</div>
-        <div style={{display:'grid',gap:5,textAlign:'left',minWidth:0}}>{navyIds.map(id=><div key={id} style={{color:finished||matchTone?'#fff':CUP_THEME.navy.accent,fontSize:13,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
-        <div style={{fontSize:res.isDoubles?15:20,color:finished?'#fff':(isNavy?'#fff':(res.isDoubles?'rgba(255,255,255,0.22)':CUP_THEME.navy.accent)),fontWeight:950,textAlign:'right',whiteSpace:'nowrap'}}>{rightOutside}</div>
+        <div style={{fontSize:res.isDoubles?15:20,color:isGold?'#fff':(res.isDoubles?'rgba(255,255,255,0.22)':CUP_THEME.gold.accent),fontWeight:950,textAlign:'left',whiteSpace:'nowrap'}}>{leftOutside}</div>
+        <div style={{display:'grid',gap:5,textAlign:'right',minWidth:0}}>{goldIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME.gold.accent,fontSize:13,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
+        <div style={{textAlign:'center',fontSize:finished?24:(res.isDoubles?11:13),color:finished?(matchTone?'#fff':'#f8fafc'):(matchTone?'rgba(255,255,255,0.84)':'#8ea0ad'),fontWeight:950,whiteSpace:'nowrap',lineHeight:1}}>{centreText}</div>
+        <div style={{display:'grid',gap:5,textAlign:'left',minWidth:0}}>{navyIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME.navy.accent,fontSize:13,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
+        <div style={{fontSize:res.isDoubles?15:20,color:isNavy?'#fff':(res.isDoubles?'rgba(255,255,255,0.22)':CUP_THEME.navy.accent),fontWeight:950,textAlign:'right',whiteSpace:'nowrap'}}>{rightOutside}</div>
       </div>
     </div>;
   }
   return <div>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:14}}>
-      <div><div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {day}</div><div style={{fontSize:12,color:dayFinished?'#bbf7d0':(released?'#34d399':'#fbbf24'),fontWeight:900}}>{dayFinished?'FINISHED':(released?'Open for scoring':'Locked by admin')}</div></div>
+      <div><div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {day}</div><div style={{fontSize:12,color:dayFinished?'#f8fafc':(released?'#34d399':'#fbbf24'),fontWeight:900}}>{dayFinished?'FINISHED':(released?'Open for scoring':'Locked by admin')}</div></div>
       <div style={{fontSize:12,color:'#90ccf0',fontWeight:900}}>{groups.length} groups</div>
     </div>
     {groups.length===0?<div style={{...S.card,color:'#8ea0ad',fontSize:13}}>No matches have been added for Day {day} yet.</div>:groups.map(group=>{
@@ -4047,10 +4047,10 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
       const opening=normaliseId(openingGroup)===normaliseId(day+'-'+group.idx);
       const disabled=!firstMatch||opening||(locked&&!isAdmin);
       const finished=rd&&isCompletedRound(rd);
-      return <div key={group.idx} role="button" tabIndex={disabled?-1:0} onClick={()=>{if(!disabled)openCupGroup(group);}} onKeyDown={(e)=>{if(!disabled&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openCupGroup(group);}}} style={{border:finished?'1px solid rgba(52,211,153,0.55)':'1px solid rgba(96,184,240,0.22)',borderRadius:16,background:finished?'linear-gradient(180deg,rgba(6,95,70,0.26),rgba(255,255,255,0.04))':'linear-gradient(180deg,rgba(0,112,187,0.12),rgba(255,255,255,0.04))',padding:12,marginBottom:14,opacity:disabled?0.58:1,cursor:disabled?'default':'pointer'}}>
+      return <div key={group.idx} role="button" tabIndex={disabled?-1:0} onClick={()=>{if(!disabled)openCupGroup(group);}} onKeyDown={(e)=>{if(!disabled&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openCupGroup(group);}}} style={{border:finished?'1px solid rgba(248,250,252,0.34)':'1px solid rgba(96,184,240,0.22)',borderRadius:16,background:'linear-gradient(180deg,rgba(0,112,187,0.12),rgba(255,255,255,0.04))',padding:12,marginBottom:14,opacity:disabled?0.58:1,cursor:disabled?'default':'pointer'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
-          <div><div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>GROUP {group.idx}</div><div style={{fontSize:11,color:finished?'#bbf7d0':'#8ea0ad',fontWeight:finished?900:500}}>{opening?'Opening scorecard...':rd?finished?'FINISHED':'Scorecard live':locked&&!isAdmin?'Locked until Go Live':'No scorecard yet'}</div></div>
-          <div style={{fontSize:11,color:finished?'#bbf7d0':(disabled?'#8ea0ad':'#90ccf0'),fontWeight:900,letterSpacing:'0.08em'}}>{locked&&!isAdmin?'LOCKED':opening?'OPENING':finished?'VIEW FINISHED':'TAP TO OPEN'}</div>
+          <div><div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>GROUP {group.idx}</div><div style={{fontSize:11,color:finished?'#f8fafc':'#8ea0ad',fontWeight:finished?900:500}}>{opening?'Opening scorecard...':rd?finished?'FINISHED':'Scorecard live':locked&&!isAdmin?'Locked until Go Live':'No scorecard yet'}</div></div>
+          <div style={{fontSize:11,color:finished?'#f8fafc':(disabled?'#8ea0ad':'#90ccf0'),fontWeight:900,letterSpacing:'0.08em'}}>{locked&&!isAdmin?'LOCKED':opening?'OPENING':finished?'VIEW FINISHED':'TAP TO OPEN'}</div>
         </div>
         <div style={{display:'grid',gap:8}}>
           {group.doubles&&<><div style={{fontSize:11,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em',margin:'2px 0 -2px'}}>DOUBLES MATCH</div><MatchRow match={group.doubles} round={rd} label="DOUBLES MATCH"/></>}
