@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.84
+// SNYDER LIVE v1.85
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -785,7 +785,7 @@ function App(){
   const[currentUser,setCurrentUser]=useState(null);
   const[showAuth,setShowAuth]=useState(false);
   const[authPrompt,setAuthPrompt]=useState(null);
-  const[appData,setAppData]=useState({players:[],courses:[],rounds:[],groups:[],competitions:[],scores:[],cupUsers:[],guests:[],cupEvents:[],cupTeams:[],cupEventPlayers:[],cupDays:[],cupMatches:[]});
+  const[appData,setAppData]=useState({players:[],courses:[],rounds:[],groups:[],competitions:[],scores:[],cupUsers:[],guests:[],cupEvents:[],cupTeams:[],cupEventPlayers:[],cupDays:[],cupMatches:[],cupRoundPlayers:[]});
   const[selectedRound,setSelectedRound]=useState(null);
   const[selectedComp,setSelectedComp]=useState(null);
   const[holeScores,setHoleScores]=useState({});
@@ -862,7 +862,7 @@ function App(){
   // Data loading / Supabase reads
   // ---------------------------------------------------------
   async function loadAll(){
-    const[players,courses,rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches]=await Promise.all([
+    const[players,courses,rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,cupRoundPlayers]=await Promise.all([
       sb.from('cup_players').select('*').then(r=>r.data||[]),
       sb.from('cup_courses').select('*').then(r=>r.data||[]),
       sb.from('cup_rounds').select('*').order('created_at',{ascending:false}).then(r=>r.data||[]),
@@ -876,11 +876,12 @@ function App(){
       sb.from('snyder_cup_players').select('*').then(r=>r.data||[]).catch(()=>[]),
       sb.from('snyder_cup_days').select('*').then(r=>r.data||[]).catch(()=>[]),
       sb.from('snyder_cup_matches').select('*').then(r=>r.data||[]).catch(()=>[]),
+      sb.from('cup_round_players').select('*').then(r=>r.data||[]).catch(()=>[]),
     ]);
-    setAppData({players,courses:mergePresetCourses(courses),rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches});
+    setAppData({players,courses:mergePresetCourses(courses),rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,cupRoundPlayers});
   }
 
-  const{players,courses,rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}=appData;
+  const{players,courses,rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,cupRoundPlayers}=appData;
   const activeComp=competitions.find(c=>c.status==='active')||competitions[0];
 
   function rowsToHoleScores(rows){
@@ -4528,11 +4529,24 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   const findCupPlayer=id=>(playersInCup||[]).find(p=>p.id===id||p.user_id===id||p.guest_id===id)||null;
   function cupScoreIds(id){
     const p=findCupPlayer(id);
-    return [id,p&&p.id,p&&p.user_id,p&&p.guest_id].filter(Boolean).map(normaliseId);
+    return [id,p&&p.id,p&&p.user_id,p&&p.guest_id,p&&p.round_player_id,p&&p.cup_player_id].filter(Boolean).map(normaliseId);
+  }
+  function cupScoreIdsForRound(round,pOrId){
+    const p=(typeof pOrId==='object'&&pOrId)?pOrId:findCupPlayer(pOrId);
+    const ids=new Set(cupScoreIds(pOrId));
+    if(p){[p.id,p.user_id,p.guest_id,p.round_player_id,p.cup_player_id].filter(Boolean).forEach(id=>ids.add(normaliseId(id)));}
+    const targetName=String(cupDisplayName(p)||cupDisplayName(findCupPlayer(pOrId))||'').trim().toLowerCase();
+    if(round&&targetName){
+      (cupRoundPlayers||[]).filter(rp=>rp&&rp.round_id===round.id).forEach(rp=>{
+        const rpName=String(rp.display_name||'').trim().toLowerCase();
+        if(rpName&&rpName===targetName)ids.add(normaliseId(rp.id));
+      });
+    }
+    return [...ids].filter(Boolean);
   }
   function playerPointsFromRound(round,playerId){
     if(!round)return 0;
-    const ids=new Set(cupScoreIds(playerId));
+    const ids=new Set(cupScoreIdsForRound(round,playerId));
     return (scores||[]).filter(s=>s.round_id===round.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+(stablefordPointsValue(s.stableford_points)),0);
   }
   function cupDayFromRound(round){
@@ -4577,12 +4591,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     // The day-of +/- singles adjustment is handled when the round players/shots are set up;
     // do not re-score from gross here, otherwise the home summary can drift from the card.
     if(!round||!p)return 0;
-    const ids=new Set(cupScoreIds(cupStablePlayerId(p)));
-    ids.add(normaliseId(p.id));
-    ids.add(normaliseId(p.user_id));
-    ids.add(normaliseId(p.guest_id));
-    ids.add(normaliseId(p.cup_player_id));
-    ids.add(normaliseId(p.round_player_id));
+    const ids=new Set(cupScoreIdsForRound(round,p));
     return (scores||[])
       .filter(s=>s&&s.round_id===round.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id)))
       .reduce((t,s)=>t+stablefordPointsValue(s.stableford_points),0);
@@ -4822,10 +4831,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   }
   function cupPlayerScoreRowsForRound(rd,p){
     if(!rd||!p)return[];
-    const ids=new Set(cupScoreIds(cupStablePlayerId(p)));
-    ids.add(normaliseId(p.id));
-    ids.add(normaliseId(p.user_id));
-    ids.add(normaliseId(p.guest_id));
+    const ids=new Set(cupScoreIdsForRound(rd,p));
     return (scores||[]).filter(s=>rd&&s.round_id===rd.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id)));
   }
   function cupPlayerDayScoreSummary(p,day){
