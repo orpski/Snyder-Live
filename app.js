@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.69
+// SNYDER LIVE v1.70
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -4514,6 +4514,13 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const course=(courses.find(co=>co.id===round.course_id)||findCourseForTee(courses,round.course_name,round.tee)||resolveCupDayCourse(courses,days,cup&&cup.id,dayNumber)||null);
     return (scores||[]).filter(s=>s.round_id===round.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+cupAdjustedStablefordForScore(s,p,dayNumber,course),0);
   }
+  function formatMatchplayShortLabel(winner,diff,remaining){
+    const d=Math.abs(parseInt(diff)||0);
+    const r=Math.max(0,parseInt(remaining)||0);
+    if(!d)return 'A/S';
+    if(r>0)return d+'&'+r;
+    return d+' UP';
+  }
   function matchResult(match,round){
     const goldIds=match.gold_player_ids||[];
     const navyIds=match.navy_player_ids||[];
@@ -4527,7 +4534,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
       return row?stablefordPointsValue(row.stableford_points):null;
     };
     if(isDoubles){
-      let goldHoles=0,navyHoles=0,played=0;
+      let goldHoles=0,navyHoles=0,played=0,closedDiff=0,closedRemaining=0;
       for(let h=1;h<=18;h++){
         const gPts=goldIds.map(id=>pointsForHole(id,h)).filter(v=>v!==null&&v!==undefined);
         const nPts=navyIds.map(id=>pointsForHole(id,h)).filter(v=>v!==null&&v!==undefined);
@@ -4536,11 +4543,15 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
         const g=Math.max(...gPts);
         const n=Math.max(...nPts);
         if(g>n)goldHoles++; else if(n>g)navyHoles++;
+        const runningDiff=Math.abs(goldHoles-navyHoles);
+        const runningRemaining=Math.max(0,18-played);
+        if(!closedDiff&&runningDiff>runningRemaining){closedDiff=runningDiff;closedRemaining=runningRemaining;}
       }
       const diff=Math.abs(goldHoles-navyHoles);
       const winner=goldHoles===navyHoles?'tie':goldHoles>navyHoles?'gold':'navy';
-      const label=!played?'A/S':winner==='tie'?'A/S':(winner==='gold'?(teams&&teams.gold&&teams.gold.name||'Gold'):(teams&&teams.navy&&teams.navy.name||'Navy'))+' '+diff+' up';
-      return{gold:goldHoles,navy:navyHoles,holes:played,complete:!!complete,label,winner,points:winner==='tie'?[0.5,0.5]:winner==='gold'?[1,0]:[0,1],isDoubles:true};
+      const shortLabel=!played?'A/S':winner==='tie'?'A/S':formatMatchplayShortLabel(winner,closedDiff||diff,closedDiff?closedRemaining:0);
+      const label=!played?'A/S':winner==='tie'?'A/S':(winner==='gold'?(teams&&teams.gold&&teams.gold.name||'Gold'):(teams&&teams.navy&&teams.navy.name||'Navy'))+' '+shortLabel;
+      return{gold:goldHoles,navy:navyHoles,holes:played,complete:!!complete,label,shortLabel,winner,points:winner==='tie'?[0.5,0.5]:winner==='gold'?[1,0]:[0,1],isDoubles:true};
     }
     const gold=goldIds.reduce((t,id)=>t+playerPointsFromRound(round,id),0);
     const navy=navyIds.reduce((t,id)=>t+playerPointsFromRound(round,id),0);
@@ -4680,6 +4691,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     });
   }
   const leading=goldPts>navyPts?'gold':navyPts>goldPts?'navy':'tie';
+  const summaryScoreBg=leading==='gold'?'linear-gradient(90deg,rgba(212,175,55,0.34) 0%,rgba(212,175,55,0.20) 42%,rgba(59,130,246,0.22) 100%)':leading==='navy'?'linear-gradient(90deg,rgba(59,130,246,0.34) 0%,rgba(59,130,246,0.20) 42%,rgba(212,175,55,0.22) 100%)':'linear-gradient(90deg,rgba(212,175,55,0.20),rgba(59,130,246,0.20))';
   const cupFineGrandTotal=(rounds||[]).filter(r=>r&&((String(r.name||'').startsWith(cupTitle+' Day '))||String(r.name||'').startsWith('Synder Cup Day '))).reduce((t,r)=>t+cupFineTotalForRound(r,scores),0);
   function cupFineTotalForRoundAndPlayer(round,p){
     if(!round||!p)return 0;
@@ -5025,7 +5037,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
         </>:showCupSummary?<>
           <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',margin:'2px 0 8px'}}>RESULTS SO FAR</div>
           <div style={{fontSize:12,color:'#8ea0ad',marginBottom:12}}>Tap Back to return to the main Snyder Cup page.</div>
-          <div style={{borderRadius:18,padding:18,marginBottom:14,border:'1px solid rgba(212,175,55,0.28)',background:leading==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.23),rgba(11,31,77,0.45))':leading==='navy'?'linear-gradient(135deg,rgba(11,31,77,0.8),rgba(59,130,246,0.18))':'linear-gradient(135deg,rgba(212,175,55,0.12),rgba(11,31,77,0.45))'}}>
+          <div style={{borderRadius:18,padding:18,marginBottom:14,border:'1px solid rgba(255,255,255,0.18)',background:summaryScoreBg,boxShadow:'0 14px 34px rgba(0,0,0,0.24)'}}>
             <div style={{display:'grid',gridTemplateColumns:'72px 1fr 72px',gap:10,alignItems:'center'}}><div style={{fontSize:44,color:CUP_THEME.gold.accent,fontWeight:950,textAlign:'left'}}>{goldPts}</div><div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}><CupTeamBadge teamKey="gold" label={teams.gold.name}/><div style={{fontSize:18,color:'#fff',fontWeight:950}}>v</div><CupTeamBadge teamKey="navy" label={teams.navy.name}/></div><div style={{fontSize:44,color:CUP_THEME.navy.accent,fontWeight:950,textAlign:'right'}}>{navyPts}</div></div>
           </div>
           <div style={{display:'grid',gap:14}}>{cupDayNumbers.map(day=>{
@@ -5038,17 +5050,17 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
                 const winner=res.winner;
                 const tone=winner==='gold'?CUP_THEME.gold:winner==='navy'?CUP_THEME.navy:null;
                 const filled=!!tone&&res.holes>0;
-                const resultText=row.finished?('FINISHED · '+(res.label||'A/S')):(res.label||'A/S');
                 const isSingles=row.type==='Singles';
+                const resultText=isSingles?((res.winner&&res.winner!=='tie')?('+'+Math.abs((res.gold||0)-(res.navy||0))+' pts'):'A/S'):(res.shortLabel||res.label||'A/S');
                 const goldScore=isSingles?((res.gold||0)+' pts'):((res.gold||0)+' holes');
                 const navyScore=isSingles?((res.navy||0)+' pts'):((res.navy||0)+' holes');
                 const bg=filled?(winner==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.96),rgba(120,74,7,0.94))':'linear-gradient(135deg,rgba(37,99,235,0.96),rgba(8,24,61,0.97))'):'rgba(255,255,255,0.04)';
                 return <div key={'summary-row-'+day+'-'+i} style={{border:'1px solid '+(tone?tone.accent:'rgba(255,255,255,0.10)'),borderRadius:14,background:bg,padding:12,boxShadow:filled?'0 10px 22px rgba(0,0,0,0.26)':'none'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',gap:8,marginBottom:8}}><div style={{fontSize:11,color:filled?'rgba(255,255,255,0.92)':'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>{row.type.toUpperCase()}</div><div style={{fontSize:11,color:filled?'#fff':(row.finished?'#f8fafc':'#8ea0ad'),fontWeight:950}}>{resultText}</div></div>
-                  <div style={{display:'grid',gridTemplateColumns:'58px 1fr auto 1fr 58px',gap:8,alignItems:'center'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',gap:8,marginBottom:6}}><div style={{fontSize:11,color:filled?'rgba(255,255,255,0.92)':'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>{row.type.toUpperCase()}</div><div style={{fontSize:11,color:filled?'rgba(255,255,255,0.84)':'#8ea0ad',fontWeight:950}}>{row.finished?'FINISHED':''}</div></div>
+                  <div style={{display:'grid',gridTemplateColumns:'58px 1fr 54px 1fr 58px',gap:8,alignItems:'center'}}>
                     <div style={{fontSize:13,color:filled?'#fff':CUP_THEME.gold.accent,fontWeight:950,textAlign:'left'}}>{goldScore}</div>
                     <div style={{fontSize:13,color:filled?'#fff':CUP_THEME.gold.accent,fontWeight:950,textAlign:'right',overflow:'hidden',textOverflow:'ellipsis'}}>{row.goldNames||teams.gold.name}</div>
-                    <div style={{fontSize:12,color:'#fff',fontWeight:950}}>v</div>
+                    <div style={{display:'grid',gap:2,justifyItems:'center',alignItems:'center'}}><div style={{fontSize:15,lineHeight:1,color:'#fff',fontWeight:950,textAlign:'center'}}>{resultText}</div><div style={{fontSize:12,lineHeight:1,color:'#fff',fontWeight:950}}>v</div></div>
                     <div style={{fontSize:13,color:filled?'#fff':CUP_THEME.navy.accent,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis'}}>{row.navyNames||teams.navy.name}</div>
                     <div style={{fontSize:13,color:filled?'#fff':CUP_THEME.navy.accent,fontWeight:950,textAlign:'right'}}>{navyScore}</div>
                   </div>
