@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.68
+// SNYDER LIVE v1.69
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -5037,13 +5037,21 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
                 const res=row.result||{};
                 const winner=res.winner;
                 const tone=winner==='gold'?CUP_THEME.gold:winner==='navy'?CUP_THEME.navy:null;
+                const filled=!!tone&&res.holes>0;
                 const resultText=row.finished?('FINISHED · '+(res.label||'A/S')):(res.label||'A/S');
-                const scoreLine=row.type==='Singles'?((res.gold||0)+' pts  v  '+(res.navy||0)+' pts'):((res.gold||0)+' holes  v  '+(res.navy||0)+' holes');
-                const bg=tone?(winner==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.44),rgba(212,175,55,0.18))':'linear-gradient(135deg,rgba(37,99,235,0.48),rgba(11,31,77,0.92))'):'rgba(255,255,255,0.04)';
-                return <div key={'summary-row-'+day+'-'+i} style={{border:'1px solid '+(tone?tone.accent:'rgba(255,255,255,0.10)'),borderRadius:14,background:bg,padding:12}}>
-                  <div style={{display:'flex',justifyContent:'space-between',gap:8,marginBottom:8}}><div style={{fontSize:11,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>{row.type.toUpperCase()}</div><div style={{fontSize:11,color:row.finished?'#f8fafc':'#8ea0ad',fontWeight:950}}>{resultText}</div></div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}><div style={{fontSize:13,color:CUP_THEME.gold.accent,fontWeight:950,textAlign:'right',overflow:'hidden',textOverflow:'ellipsis'}}>{row.goldNames||teams.gold.name}</div><div style={{fontSize:12,color:'#fff',fontWeight:950}}>v</div><div style={{fontSize:13,color:CUP_THEME.navy.accent,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis'}}>{row.navyNames||teams.navy.name}</div></div>
-                  <div style={{fontSize:12,color:'#fff',fontWeight:950,textAlign:'center',marginTop:7}}>{scoreLine}</div>
+                const isSingles=row.type==='Singles';
+                const goldScore=isSingles?((res.gold||0)+' pts'):((res.gold||0)+' holes');
+                const navyScore=isSingles?((res.navy||0)+' pts'):((res.navy||0)+' holes');
+                const bg=filled?(winner==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.96),rgba(120,74,7,0.94))':'linear-gradient(135deg,rgba(37,99,235,0.96),rgba(8,24,61,0.97))'):'rgba(255,255,255,0.04)';
+                return <div key={'summary-row-'+day+'-'+i} style={{border:'1px solid '+(tone?tone.accent:'rgba(255,255,255,0.10)'),borderRadius:14,background:bg,padding:12,boxShadow:filled?'0 10px 22px rgba(0,0,0,0.26)':'none'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',gap:8,marginBottom:8}}><div style={{fontSize:11,color:filled?'rgba(255,255,255,0.92)':'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>{row.type.toUpperCase()}</div><div style={{fontSize:11,color:filled?'#fff':(row.finished?'#f8fafc':'#8ea0ad'),fontWeight:950}}>{resultText}</div></div>
+                  <div style={{display:'grid',gridTemplateColumns:'58px 1fr auto 1fr 58px',gap:8,alignItems:'center'}}>
+                    <div style={{fontSize:13,color:filled?'#fff':CUP_THEME.gold.accent,fontWeight:950,textAlign:'left'}}>{goldScore}</div>
+                    <div style={{fontSize:13,color:filled?'#fff':CUP_THEME.gold.accent,fontWeight:950,textAlign:'right',overflow:'hidden',textOverflow:'ellipsis'}}>{row.goldNames||teams.gold.name}</div>
+                    <div style={{fontSize:12,color:'#fff',fontWeight:950}}>v</div>
+                    <div style={{fontSize:13,color:filled?'#fff':CUP_THEME.navy.accent,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis'}}>{row.navyNames||teams.navy.name}</div>
+                    <div style={{fontSize:13,color:filled?'#fff':CUP_THEME.navy.accent,fontWeight:950,textAlign:'right'}}>{navyScore}</div>
+                  </div>
                 </div>;
               })}
             </div>;
