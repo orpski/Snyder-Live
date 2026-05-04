@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.80
+// SNYDER LIVE v1.81
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -4542,7 +4542,24 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const m=String(round.name||'').match(/Day\s+(\d+)/i);
     return m?(parseInt(m[1])||1):1;
   }
-  function cupAdjustedStablefordForScore(row,p,day,course){
+  function cupRoundBasePlayingShots(round,p,course){
+    if(!round||!p)return cupPlayerBasePlayingShotsForCourse(p,course);
+    const ids=new Set(cupScoreIds(cupStablePlayerId(p)));
+    ids.add(normaliseId(p.id));
+    ids.add(normaliseId(p.user_id));
+    ids.add(normaliseId(p.guest_id));
+    ids.add(normaliseId(p.cup_player_id));
+    ids.add(normaliseId(p.round_player_id));
+    const rdGroup=(groups||[]).find(g=>g&&g.round_id===round.id);
+    const hmap=(rdGroup&&rdGroup.playing_handicaps)||{};
+    for(const id of ids){
+      if(id&&hmap[id]!=null&&hmap[id]!==''&&!Number.isNaN(parseFloat(hmap[id])))return parseFloat(hmap[id])||0;
+    }
+    if(p.playing_handicap!=null&&p.playing_handicap!==''&&!Number.isNaN(parseFloat(p.playing_handicap)))return parseFloat(p.playing_handicap)||0;
+    if(p.current_handicap!=null&&p.current_handicap!==''&&!Number.isNaN(parseFloat(p.current_handicap)))return parseFloat(p.current_handicap)||0;
+    return cupPlayerBasePlayingShotsForCourse(p,course);
+  }
+  function cupAdjustedStablefordForScore(row,p,day,course,singlesPlayingShots){
     if(!row||!p)return 0;
     const gross=grossScoreValue(row.gross_score);
     if(gross<=0||isGivenGross(row.gross_score))return 0;
@@ -4552,7 +4569,8 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const par=parseInt(hd.par)||parseInt(row.par)||0;
     const si=parseInt(hd.stroke_index)||parseInt(row.stroke_index)||hole||18;
     if(!par)return stablefordPointsValue(row.stableford_points);
-    return calcStableford(gross,par,si,cupPlayerPlayingShotsForCourse(p,course,day))||0;
+    const hcp=Number.isFinite(parseFloat(singlesPlayingShots))?parseFloat(singlesPlayingShots):cupPlayerPlayingShotsForCourse(p,course,day);
+    return calcStableford(gross,par,si,hcp)||0;
   }
   function playerAdjustedSinglesPointsFromRound(round,p,day){
     if(!round||!p)return 0;
@@ -4560,9 +4578,13 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     ids.add(normaliseId(p.id));
     ids.add(normaliseId(p.user_id));
     ids.add(normaliseId(p.guest_id));
+    ids.add(normaliseId(p.cup_player_id));
+    ids.add(normaliseId(p.round_player_id));
     const dayNumber=parseInt(day)||cupDayFromRound(round)||1;
     const course=(courses.find(co=>co.id===round.course_id)||findCourseForTee(courses,round.course_name,round.tee)||resolveCupDayCourse(courses,days,cup&&cup.id,dayNumber)||null);
-    return (scores||[]).filter(s=>s.round_id===round.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+cupAdjustedStablefordForScore(s,p,dayNumber,course),0);
+    const baseShots=cupRoundBasePlayingShots(round,p,course);
+    const singlesShots=Math.max(0,(parseFloat(baseShots)||0)+cupPlayerAdjustmentForDay(p,dayNumber));
+    return (scores||[]).filter(s=>s.round_id===round.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+cupAdjustedStablefordForScore(s,p,dayNumber,course,singlesShots),0);
   }
   function formatMatchplayShortLabel(winner,diff,remaining){
     const d=Math.abs(parseInt(diff)||0);
