@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.71
+// SNYDER LIVE v1.72
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -3249,7 +3249,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
               );})()}
             </button>
             {(()=>{const l=activeCupLeader();return <button onClick={()=>openCupDaySinglesLeaderboard(true)} style={{width:'100%',marginTop:6,border:'1px solid rgba(248,113,113,0.78)',background:'linear-gradient(135deg,rgba(185,28,28,0.98),rgba(127,29,29,0.94))',boxShadow:'0 10px 24px rgba(185,28,28,0.24)',borderRadius:12,padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,color:'#fff',textAlign:'left'}}>
-              <span style={{fontSize:12,color:'#fff',fontWeight:950,letterSpacing:'0.1em'}}>DAY SINGLES</span>
+              <span style={{fontSize:12,color:'#fff',fontWeight:950,letterSpacing:'0.1em'}}>{'DAY '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)+' SINGLES'}</span>
               <span style={{fontSize:15,color:'#fff',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l?gameName(l.name)+' - '+l.total+' PTS':'NO SINGLES SCORES YET'}</span>
             </button>;})()}
           </div>
@@ -4234,20 +4234,23 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
       : 'linear-gradient(135deg,rgba(255,255,255,0.060),rgba(255,255,255,0.025))';
     const matchBorder=matchTone?`2px solid ${matchTone.accent}`:'1px solid rgba(255,255,255,0.10)';
     const winnerTeamName=res.winner==='gold'?(teams&&teams.gold&&teams.gold.name||'Team Gold'):res.winner==='navy'?(teams&&teams.navy&&teams.navy.name||'Team Navy'):'';
-    const finishedScoreLine=finished?(res.winner==='tie'?'A/S':(winnerTeamName+' '+(res.isDoubles?(res.shortLabel||''):(res.winner==='gold'?(res.gold||0)+'-'+(res.navy||0):(res.navy||0)+'-'+(res.gold||0))))):'';
+    const finishedScoreLine=finished&&res.isDoubles?(res.winner==='tie'?'A/S':(winnerTeamName+' '+(res.shortLabel||''))):'';
     const centreText=finished?'F':(res.isDoubles?(res.winner==='tie'?'A/S':(res.holes?('THRU '+res.holes):'MATCHPLAY')):(res.winner==='tie'?'A/S':'')).toUpperCase();
     const leftOutside=res.isDoubles?'':String(res.gold||0).toUpperCase();
     const rightOutside=res.isDoubles?'':String(res.navy||0).toUpperCase();
+    const scoreColWidth=res.isDoubles?38:62;
+    const centreColWidth=res.isDoubles?96:54;
+    const playerFontSize=res.isDoubles?14:13;
     return <div style={{border:matchBorder,borderRadius:12,background:matchBg,padding:10,boxShadow:matchTone?'0 12px 30px rgba(0,0,0,0.34), inset 0 0 0 1px rgba(255,255,255,0.17)':(finished?'0 10px 24px rgba(0,0,0,0.24)':'none')}}>
       {finished&&<div style={{fontSize:10,color:matchTone?'#fff':'#f8fafc',fontWeight:950,letterSpacing:'0.16em',textAlign:'center',marginBottom:7}}>FINISHED</div>}
-      <div style={{display:'grid',gridTemplateColumns:'62px 1fr 54px 1fr 62px',gap:7,alignItems:'center'}}>
+      <div style={{display:'grid',gridTemplateColumns:`${scoreColWidth}px minmax(0,1fr) ${centreColWidth}px minmax(0,1fr) ${scoreColWidth}px`,gap:6,alignItems:'center'}}>
         <div style={{fontSize:res.isDoubles?15:20,color:isGold?'#fff':(res.isDoubles?'rgba(255,255,255,0.22)':CUP_THEME.gold.accent),fontWeight:950,textAlign:'left',whiteSpace:'nowrap'}}>{leftOutside}</div>
-        <div style={{display:'grid',gap:5,textAlign:'right',minWidth:0}}>{goldIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME.gold.accent,fontSize:13,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
-        <div style={{textAlign:'center',display:'grid',gap:3,justifyItems:'center',alignItems:'center',minWidth:54}}>
-          {finishedScoreLine&&<div style={{fontSize:10,color:matchTone?'#fff':'#f8fafc',fontWeight:950,letterSpacing:'0.06em',whiteSpace:'nowrap',textTransform:'uppercase'}}>{finishedScoreLine}</div>}
+        <div style={{display:'grid',gap:5,textAlign:'right',minWidth:0}}>{goldIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME.gold.accent,fontSize:playerFontSize,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
+        <div style={{textAlign:'center',display:'grid',gap:3,justifyItems:'center',alignItems:'center',minWidth:centreColWidth}}>
+          {finishedScoreLine&&<div style={{fontSize:playerFontSize,color:matchTone?'#fff':'#f8fafc',fontWeight:950,letterSpacing:'0.02em',whiteSpace:'nowrap',textTransform:'uppercase',lineHeight:1.05}}>{finishedScoreLine}</div>}
           <div style={{fontSize:finished?24:(res.isDoubles?11:13),color:finished?(matchTone?'#fff':'#f8fafc'):(matchTone?'rgba(255,255,255,0.84)':'#8ea0ad'),fontWeight:950,whiteSpace:'nowrap',lineHeight:1}}>{centreText}</div>
         </div>
-        <div style={{display:'grid',gap:5,textAlign:'left',minWidth:0}}>{navyIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME.navy.accent,fontSize:13,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
+        <div style={{display:'grid',gap:5,textAlign:'left',minWidth:0}}>{navyIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME.navy.accent,fontSize:playerFontSize,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
         <div style={{fontSize:res.isDoubles?15:20,color:isNavy?'#fff':(res.isDoubles?'rgba(255,255,255,0.22)':CUP_THEME.navy.accent),fontWeight:950,textAlign:'right',whiteSpace:'nowrap'}}>{rightOutside}</div>
       </div>
     </div>;
