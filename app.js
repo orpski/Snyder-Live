@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.46
+// SNYDER LIVE v1.47
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1986,6 +1986,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
   const[overallPlayers,setOverallPlayers]=useState([]);
   const[overallScores,setOverallScores]=useState([]);
   const[overallMode,setOverallMode]=useState('round');
+  const[overallRefreshNote,setOverallRefreshNote]=useState('');
 
   function setSnakeMarksSafe(next){
     const clean=next&&typeof next==='object'?next:{};
@@ -2130,6 +2131,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
       })));
       setOverallMode('round');
       setOverallScores((scs||[]).filter(r=>!isSnakeScoreRow(r)));
+      setOverallRefreshNote('Refreshed '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
       const boardSnakes=rowsToSnakeMarks(scs||[]);
       if(Object.keys(boardSnakes).length>0){
         mergeSnakeMarksSafe(boardSnakes);
@@ -2202,6 +2204,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
       setOverallMode('cupDay');
       setOverallPlayers(playersForBoard);
       setOverallScores(rows);
+      setOverallRefreshNote('Refreshed '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
       if(openModal)setShowOverall(true);
     }catch(e){
       flash('Singles leaderboard failed: '+(e.message||String(e)),'error');
@@ -3084,7 +3087,17 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
                 <div style={{fontSize:12,fontWeight:950,letterSpacing:'0.1em',color:'#fff'}}>PROJECTED SCORE</div>
                 <div style={{fontSize:10,color:'rgba(255,255,255,0.78)',marginTop:2}}>Live if current matches finished now</div>
               </div>
-              <div style={{fontSize:15,fontWeight:950,color:'#fff',maxWidth:185,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cupProjectedScoreLabel()}</div>
+              {(()=>{const s=liveCupProjectedScore()||{gold:3,navy:3,goldName:'Gold',navyName:'Navy'};return (
+                <div style={{minWidth:190,flex:1,display:'grid',gridTemplateColumns:'44px minmax(0,1fr) 44px',alignItems:'center',gap:8}}>
+                  <div style={{fontSize:26,fontWeight:950,color:'#fff',textAlign:'left',lineHeight:1}}>{fmtCupPoint(s.gold)}</div>
+                  <div style={{minWidth:0,textAlign:'center',lineHeight:1.05}}>
+                    <div style={{fontSize:12,fontWeight:950,color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textTransform:'uppercase'}}>{s.goldName||'Gold'}</div>
+                    <div style={{fontSize:10,fontWeight:900,color:'rgba(255,255,255,0.72)',letterSpacing:'0.12em',margin:'2px 0'}}>v</div>
+                    <div style={{fontSize:12,fontWeight:950,color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textTransform:'uppercase'}}>{s.navyName||'Navy'}</div>
+                  </div>
+                  <div style={{fontSize:26,fontWeight:950,color:'#fff',textAlign:'right',lineHeight:1}}>{fmtCupPoint(s.navy)}</div>
+                </div>
+              );})()}
             </button>
             {(()=>{const l=activeCupLeader();return <button onClick={()=>openCupDaySinglesLeaderboard(true)} style={{width:'100%',marginTop:6,border:'1px solid rgba(248,113,113,0.78)',background:'linear-gradient(135deg,rgba(185,28,28,0.98),rgba(127,29,29,0.94))',boxShadow:'0 10px 24px rgba(185,28,28,0.24)',borderRadius:12,padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,color:'#fff',textAlign:'left'}}>
               <span style={{fontSize:12,color:'#fff',fontWeight:950,letterSpacing:'0.1em'}}>DAY SINGLES</span>
@@ -3135,7 +3148,8 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
           <div style={{fontSize:22,color:'#fff',fontWeight:900}}>Live Leaderboard</div>
           <div style={{fontSize:12,color:'#90ccf0',marginTop:3}}>All groups in this round</div>
         </div>
-        <button onClick={()=>overallMode==='cupDay'?openCupDaySinglesLeaderboard(false):openOverallLeaderboard(false)} style={{...S.pri,width:'100%',marginBottom:12,fontSize:13}}>Refresh leaderboard</button>
+        <button onClick={async()=>{setOverallRefreshNote('Refreshing...'); overallMode==='cupDay'?await openCupDaySinglesLeaderboard(false):await openOverallLeaderboard(false);}} style={{...S.pri,width:'100%',marginBottom:6,fontSize:13}}>Refresh leaderboard</button>
+        {overallRefreshNote&&<div style={{fontSize:11,color:'#90ccf0',textAlign:'center',marginBottom:12}}>{overallRefreshNote}</div>}
         {overallLeaderboardRows().map((r,idx)=>(
           <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'12px',background:idx===0?'rgba(184,134,11,0.15)':'rgba(255,255,255,0.06)',border:'1px solid '+(idx===0?'rgba(184,134,11,0.3)':'rgba(255,255,255,0.08)'),borderRadius:14,marginBottom:8}}>
             <div style={{width:30,textAlign:'center',fontSize:19,color:idx===0?'#fbbf24':'rgba(255,255,255,0.55)',fontWeight:900}}>{idx+1}</div>
@@ -3310,7 +3324,8 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
               </div>
               <button onClick={()=>setShowOverall(false)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Close</button>
             </div>
-            <button onClick={()=>overallMode==='cupDay'?openCupDaySinglesLeaderboard(false):openOverallLeaderboard(false)} style={{...S.pri,width:'100%',marginBottom:12,fontSize:13}}>Refresh leaderboard</button>
+            <button onClick={async()=>{setOverallRefreshNote('Refreshing...'); overallMode==='cupDay'?await openCupDaySinglesLeaderboard(false):await openOverallLeaderboard(false);}} style={{...S.pri,width:'100%',marginBottom:6,fontSize:13}}>Refresh leaderboard</button>
+        {overallRefreshNote&&<div style={{fontSize:11,color:'#90ccf0',textAlign:'center',marginBottom:12}}>{overallRefreshNote}</div>}
             {overallLeaderboardRows().map((r,idx)=>(
               <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:idx===0?'rgba(184,134,11,0.15)':'rgba(255,255,255,0.06)',border:'1px solid '+(idx===0?'rgba(184,134,11,0.3)':'rgba(255,255,255,0.08)'),borderRadius:12,marginBottom:8}}>
                 <div style={{width:28,textAlign:'center',fontSize:18,color:idx===0?'#fbbf24':'rgba(255,255,255,0.48)',fontWeight:900}}>{idx+1}</div>
