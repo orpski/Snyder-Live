@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.70
+// SNYDER LIVE v1.71
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -3464,8 +3464,8 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
           <div style={{width:'100%',maxWidth:520,maxHeight:'82vh',overflowY:'auto',background:'#0d2548',borderTop:'1px solid rgba(255,255,255,0.16)',borderRadius:'18px 18px 0 0',padding:16}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
               <div>
-                <div style={{fontSize:18,color:'#fff',fontWeight:800}}>{overallMode==='cupDay'?'Day Singles Leaderboard':'Overall Leaderboard'}</div>
-                <div style={{fontSize:12,color:'#60b8f0'}}>{overallMode==='cupDay'?'All singles scores for this Cup day':'All groups in this round'}</div>
+                <div style={{fontSize:18,color:'#fff',fontWeight:800}}>{overallMode==='cupDay'?('Day '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)+' Singles Leaderboard'):'Overall Leaderboard'}</div>
+                <div style={{fontSize:12,color:'#60b8f0'}}>{overallMode==='cupDay'?('All singles scores for Day '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)):'All groups in this round'}</div>
               </div>
               <button onClick={()=>setShowOverall(false)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Close</button>
             </div>
@@ -4233,16 +4233,20 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
       ? (isGold?'linear-gradient(135deg,rgba(212,175,55,0.98),rgba(120,74,7,0.96))':'linear-gradient(135deg,rgba(37,99,235,0.98),rgba(8,24,61,0.97))')
       : 'linear-gradient(135deg,rgba(255,255,255,0.060),rgba(255,255,255,0.025))';
     const matchBorder=matchTone?`2px solid ${matchTone.accent}`:'1px solid rgba(255,255,255,0.10)';
-    const outsideText=(res.isDoubles?(res.winner==='tie'?'':String(res.label||'').replace(/^.*?\s+(\d+\s+up)$/i,'$1')):(res.winner==='tie'?'':(res.winner==='gold'?String(res.gold):String(res.navy)))).toUpperCase();
+    const winnerTeamName=res.winner==='gold'?(teams&&teams.gold&&teams.gold.name||'Team Gold'):res.winner==='navy'?(teams&&teams.navy&&teams.navy.name||'Team Navy'):'';
+    const finishedScoreLine=finished?(res.winner==='tie'?'A/S':(winnerTeamName+' '+(res.isDoubles?(res.shortLabel||''):(res.winner==='gold'?(res.gold||0)+'-'+(res.navy||0):(res.navy||0)+'-'+(res.gold||0))))):'';
     const centreText=finished?'F':(res.isDoubles?(res.winner==='tie'?'A/S':(res.holes?('THRU '+res.holes):'MATCHPLAY')):(res.winner==='tie'?'A/S':'')).toUpperCase();
-    const leftOutside=(isGold?outsideText:(res.isDoubles?'':String(res.gold||0))).toUpperCase();
-    const rightOutside=(isNavy?outsideText:(res.isDoubles?'':String(res.navy||0))).toUpperCase();
+    const leftOutside=res.isDoubles?'':String(res.gold||0).toUpperCase();
+    const rightOutside=res.isDoubles?'':String(res.navy||0).toUpperCase();
     return <div style={{border:matchBorder,borderRadius:12,background:matchBg,padding:10,boxShadow:matchTone?'0 12px 30px rgba(0,0,0,0.34), inset 0 0 0 1px rgba(255,255,255,0.17)':(finished?'0 10px 24px rgba(0,0,0,0.24)':'none')}}>
       {finished&&<div style={{fontSize:10,color:matchTone?'#fff':'#f8fafc',fontWeight:950,letterSpacing:'0.16em',textAlign:'center',marginBottom:7}}>FINISHED</div>}
       <div style={{display:'grid',gridTemplateColumns:'62px 1fr 54px 1fr 62px',gap:7,alignItems:'center'}}>
         <div style={{fontSize:res.isDoubles?15:20,color:isGold?'#fff':(res.isDoubles?'rgba(255,255,255,0.22)':CUP_THEME.gold.accent),fontWeight:950,textAlign:'left',whiteSpace:'nowrap'}}>{leftOutside}</div>
         <div style={{display:'grid',gap:5,textAlign:'right',minWidth:0}}>{goldIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME.gold.accent,fontSize:13,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
-        <div style={{textAlign:'center',fontSize:finished?24:(res.isDoubles?11:13),color:finished?(matchTone?'#fff':'#f8fafc'):(matchTone?'rgba(255,255,255,0.84)':'#8ea0ad'),fontWeight:950,whiteSpace:'nowrap',lineHeight:1}}>{centreText}</div>
+        <div style={{textAlign:'center',display:'grid',gap:3,justifyItems:'center',alignItems:'center',minWidth:54}}>
+          {finishedScoreLine&&<div style={{fontSize:10,color:matchTone?'#fff':'#f8fafc',fontWeight:950,letterSpacing:'0.06em',whiteSpace:'nowrap',textTransform:'uppercase'}}>{finishedScoreLine}</div>}
+          <div style={{fontSize:finished?24:(res.isDoubles?11:13),color:finished?(matchTone?'#fff':'#f8fafc'):(matchTone?'rgba(255,255,255,0.84)':'#8ea0ad'),fontWeight:950,whiteSpace:'nowrap',lineHeight:1}}>{centreText}</div>
+        </div>
         <div style={{display:'grid',gap:5,textAlign:'left',minWidth:0}}>{navyIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME.navy.accent,fontSize:13,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
         <div style={{fontSize:res.isDoubles?15:20,color:isNavy?'#fff':(res.isDoubles?'rgba(255,255,255,0.22)':CUP_THEME.navy.accent),fontWeight:950,textAlign:'right',whiteSpace:'nowrap'}}>{rightOutside}</div>
       </div>
@@ -4615,6 +4619,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   function cupDayContext(day){
     const dayGroups=cupDayGroups(day);
     return {
+      _cupDayNumber: day,
       _cupDayAllPlayers: playersInCup,
       _cupDayRounds: dayGroups.map(g=>roundForGroup(g.day,g.idx)).filter(Boolean),
       _cupDayGroups: dayGroups
@@ -4997,7 +5002,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
               <div>HOLE</div><div style={{textAlign:'center'}}>PAR</div><div style={{textAlign:'center'}}>SI</div><div style={{textAlign:'center'}}>YDS</div><div style={{textAlign:'center'}}>GROSS</div><div style={{textAlign:'center'}}>PTS</div>
             </div>
             {rows.map(({hole,hd,row})=><div key={hole} style={{display:'grid',gridTemplateColumns:'40px 40px 42px 56px 1fr 1fr',gap:6,padding:'9px 10px',borderBottom:hole<18?'1px solid rgba(255,255,255,0.06)':'none',alignItems:'center',background:hole%2===0?'rgba(255,255,255,0.025)':'transparent'}}>
-              <div style={{fontSize:14,color:'#60b8f0',fontWeight:950}}>H{hole}</div>
+              <div style={{fontSize:14,color:'#60b8f0',fontWeight:950}}>{hole}</div>
               <div style={{fontSize:13,color:'#fff',fontWeight:800,textAlign:'center'}}>{hd.par||'-'}</div>
               <div style={{fontSize:13,color:'#d4af37',fontWeight:900,textAlign:'center'}}>{hd.stroke_index||'-'}</div>
               <div style={{fontSize:12,color:'#8ea0ad',fontWeight:800,textAlign:'center'}}>{hd.yards||'-'}</div>
@@ -5051,18 +5056,16 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
                 const tone=winner==='gold'?CUP_THEME.gold:winner==='navy'?CUP_THEME.navy:null;
                 const filled=!!tone&&res.holes>0;
                 const isSingles=row.type==='Singles';
-                const resultText=isSingles?((res.winner&&res.winner!=='tie')?('+'+Math.abs((res.gold||0)-(res.navy||0))+' pts'):'A/S'):(res.shortLabel||res.label||'A/S');
-                const goldScore=isSingles?((res.gold||0)+' pts'):((res.gold||0)+' holes');
-                const navyScore=isSingles?((res.navy||0)+' pts'):((res.navy||0)+' holes');
+                const resultText=isSingles?'':(res.shortLabel||res.label||'A/S');
+                const goldScore=isSingles?((res.gold||0)+' pts'):'';
+                const navyScore=isSingles?((res.navy||0)+' pts'):'';
                 const bg=filled?(winner==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.96),rgba(120,74,7,0.94))':'linear-gradient(135deg,rgba(37,99,235,0.96),rgba(8,24,61,0.97))'):'rgba(255,255,255,0.04)';
                 return <div key={'summary-row-'+day+'-'+i} style={{border:'1px solid '+(tone?tone.accent:'rgba(255,255,255,0.10)'),borderRadius:14,background:bg,padding:12,boxShadow:filled?'0 10px 22px rgba(0,0,0,0.26)':'none'}}>
                   <div style={{display:'flex',justifyContent:'space-between',gap:8,marginBottom:6}}><div style={{fontSize:11,color:filled?'rgba(255,255,255,0.92)':'#60b8f0',fontWeight:950,letterSpacing:'0.12em'}}>{row.type.toUpperCase()}</div><div style={{fontSize:11,color:filled?'rgba(255,255,255,0.84)':'#8ea0ad',fontWeight:950}}>{row.finished?'FINISHED':''}</div></div>
-                  <div style={{display:'grid',gridTemplateColumns:'58px 1fr 54px 1fr 58px',gap:8,alignItems:'center'}}>
-                    <div style={{fontSize:13,color:filled?'#fff':CUP_THEME.gold.accent,fontWeight:950,textAlign:'left'}}>{goldScore}</div>
-                    <div style={{fontSize:13,color:filled?'#fff':CUP_THEME.gold.accent,fontWeight:950,textAlign:'right',overflow:'hidden',textOverflow:'ellipsis'}}>{row.goldNames||teams.gold.name}</div>
-                    <div style={{display:'grid',gap:2,justifyItems:'center',alignItems:'center'}}><div style={{fontSize:15,lineHeight:1,color:'#fff',fontWeight:950,textAlign:'center'}}>{resultText}</div><div style={{fontSize:12,lineHeight:1,color:'#fff',fontWeight:950}}>v</div></div>
-                    <div style={{fontSize:13,color:filled?'#fff':CUP_THEME.navy.accent,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis'}}>{row.navyNames||teams.navy.name}</div>
-                    <div style={{fontSize:13,color:filled?'#fff':CUP_THEME.navy.accent,fontWeight:950,textAlign:'right'}}>{navyScore}</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 54px 1fr',gap:8,alignItems:'center'}}>
+                    <div style={{display:'grid',gap:4,textAlign:'right',minWidth:0}}><div style={{fontSize:18,color:filled?'#fff':CUP_THEME.gold.accent,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{row.goldNames||teams.gold.name}</div>{goldScore&&<div style={{fontSize:16,color:filled?'#fff':CUP_THEME.gold.accent,fontWeight:950}}>{goldScore}</div>}</div>
+                    <div style={{display:'grid',gap:2,justifyItems:'center',alignItems:'center'}}>{resultText&&<div style={{fontSize:22,lineHeight:1,color:'#fff',fontWeight:950,textAlign:'center'}}>{resultText}</div>}<div style={{fontSize:18,lineHeight:1,color:'#fff',fontWeight:950}}>v</div></div>
+                    <div style={{display:'grid',gap:4,textAlign:'left',minWidth:0}}><div style={{fontSize:18,color:filled?'#fff':CUP_THEME.navy.accent,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{row.navyNames||teams.navy.name}</div>{navyScore&&<div style={{fontSize:16,color:filled?'#fff':CUP_THEME.navy.accent,fontWeight:950}}>{navyScore}</div>}</div>
                   </div>
                 </div>;
               })}
@@ -5077,7 +5080,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
           </button>
           <button onClick={openCupFinesSummary} style={{width:'100%',border:'1px solid rgba(212,175,55,0.28)',borderRadius:14,background:'rgba(212,175,55,0.10)',padding:'12px 14px',margin:'0 0 16px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,cursor:'pointer',textAlign:'left'}}><div><div style={{fontSize:11,color:'#F5E6A3',fontWeight:950,letterSpacing:'0.13em'}}>FINES TOTAL</div><div style={{fontSize:11,color:'#90ccf0',fontWeight:800}}>Tap for player-by-day fines table</div></div><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{fontSize:28,color:'#fff',fontWeight:950}}>£{cupFineGrandTotal}</div><div style={{fontSize:20,color:'#F5E6A3',fontWeight:950}}>&gt;</div></div></button>
           <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'16px 0 8px'}}>OVERALL SINGLES</div>
-          <div style={{...S.card,marginBottom:16,padding:8,overflow:'hidden',display:'grid',gap:8}}>{singlesLeaderboard().slice(0,8).map((p,i)=><button key={p.id} onClick={()=>openCupPlayerSummary(p)} style={{width:'100%',border:'1px solid rgba(96,184,240,0.22)',display:'grid',gridTemplateColumns:'34px 1fr auto auto',gap:8,alignItems:'center',padding:'12px 12px',borderRadius:12,background:i===0?'linear-gradient(135deg,rgba(212,175,55,0.18),rgba(255,255,255,0.05))':'rgba(255,255,255,0.055)',textAlign:'left',cursor:'pointer',boxShadow:'0 6px 14px rgba(0,0,0,0.12)'}}><div style={{fontSize:13,color:'#60b8f0',fontWeight:900}}>{i+1}</div><div style={{fontSize:14,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||'Player'}</div><div style={{fontSize:11,color:'#8ea0ad',fontWeight:800}}>{p.holes} holes</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{p.total}</div></button>)}</div>
+          <div style={{...S.card,marginBottom:16,padding:8,overflow:'hidden',display:'grid',gap:8}}>{singlesLeaderboard().slice(0,8).map((p,i)=>{const prize=i===0?'🏆':i===1?'🥈':i===2?'🥉':'';const prizeBg=i===0?'linear-gradient(135deg,rgba(212,175,55,0.32),rgba(120,74,7,0.38))':i===1?'linear-gradient(135deg,rgba(203,213,225,0.22),rgba(71,85,105,0.28))':i===2?'linear-gradient(135deg,rgba(180,83,9,0.24),rgba(92,45,10,0.28))':'rgba(255,255,255,0.055)';const prizeBorder=i<3?'rgba(212,175,55,0.42)':'rgba(96,184,240,0.22)';return <button key={p.id} onClick={()=>openCupPlayerSummary(p)} style={{width:'100%',border:'1px solid '+prizeBorder,display:'grid',gridTemplateColumns:'38px 1fr auto auto',gap:8,alignItems:'center',padding:'12px 12px',borderRadius:12,background:prizeBg,textAlign:'left',cursor:'pointer',boxShadow:i<3?'0 10px 22px rgba(0,0,0,0.20)':'0 6px 14px rgba(0,0,0,0.12)'}}><div style={{fontSize:16,color:i<3?'#F5E6A3':'#60b8f0',fontWeight:950,textAlign:'center'}}>{prize||i+1}</div><div style={{fontSize:14,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||'Player'}</div><div style={{fontSize:11,color:i<3?'#F5E6A3':'#8ea0ad',fontWeight:900}}>{p.holes} holes</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{p.total}</div></button>;})}</div>
           <button onClick={openCupHandicaps} style={{border:'1px solid rgba(96,184,240,0.26)',borderRadius:14,background:'linear-gradient(135deg,rgba(0,112,187,0.28),rgba(8,30,58,0.92))',padding:'18px 16px',color:'#fff',margin:'16px 0 10px',width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',textAlign:'left'}}>
             <span><span style={{display:'block',fontSize:24,fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>HANDICAPS</span><span style={{fontSize:12,color:'#90ccf0'}}>View Day 1, 2 and 3 playing shots</span></span>
             <span style={{fontSize:24,color:'#90ccf0'}}>&gt;</span>
