@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.55
+// SNYDER LIVE v1.56
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2064,9 +2064,12 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
   // Do not let any logged-in Cup user edit every Cup group.
   const playerIds=(activeScoreGroup&&activeScoreGroup.player_ids)||grpPlayers.map(p=>p.id);
   const currentUserKey=currentUser&&normaliseId(currentUser.id);
+  const currentUserNameKey=currentUser&&String(currentUser.display_name||currentUser.name||currentUser.username||'').trim().toLowerCase();
+  const currentUserFirstNameKey=currentUserNameKey&&currentUserNameKey.split(/\s+/)[0];
   const currentUserIsAssignedToGroup=!!currentUserKey&&(
     playerIds.some(id=>normaliseId(id)===currentUserKey)||
-    grpPlayers.some(p=>[p.id,p.user_id,p.guest_id,p.cup_player_id,p.round_player_id].filter(Boolean).some(id=>normaliseId(id)===currentUserKey))
+    grpPlayers.some(p=>[p.id,p.user_id,p.guest_id,p.cup_player_id,p.round_player_id].filter(Boolean).some(id=>normaliseId(id)===currentUserKey))||
+    (round._cupScoring&&!!currentUserNameKey&&grpPlayers.some(p=>{const nm=String(p.display_name||p.name||'').trim().toLowerCase();return nm===currentUserNameKey||(currentUserFirstNameKey&&nm.split(/\s+/)[0]===currentUserFirstNameKey);}))
   );
   const canEdit=activeGroupId!=='leaderboard'&&!round._spectator&&isLiveRound(round)&&currentUserIsAssignedToGroup;
 
@@ -4159,7 +4162,10 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
       return <div key={group.idx} role="button" tabIndex={disabled?-1:0} onClick={()=>{if(!disabled)openCupGroup(group);}} onKeyDown={(e)=>{if(!disabled&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openCupGroup(group);}}} style={{border:finished?'1px solid rgba(248,250,252,0.34)':'1px solid rgba(96,184,240,0.22)',borderRadius:16,background:'linear-gradient(180deg,rgba(0,112,187,0.12),rgba(255,255,255,0.04))',padding:12,marginBottom:14,opacity:disabled?0.58:1,cursor:disabled?'default':'pointer'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
           <div><div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>GROUP {group.idx}</div><div style={{fontSize:11,color:finished?'#f8fafc':'#8ea0ad',fontWeight:finished?900:500}}>{opening?'Opening scorecard...':rd?finished?'FINISHED':'Scorecard live':locked&&!isAdmin?'Locked until Go Live':'No scorecard yet'}</div></div>
-          <div style={{fontSize:11,color:finished?'#f8fafc':(disabled?'#8ea0ad':'#90ccf0'),fontWeight:900,letterSpacing:'0.08em'}}>{locked&&!isAdmin?'LOCKED':opening?'OPENING':finished?'VIEW FINISHED':'TAP TO OPEN'}</div>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <button onClick={(e)=>{e.stopPropagation(); if(rd&&openFinesGroup)openFinesGroup(group);}} disabled={!rd} style={{border:'1px solid rgba(212,175,55,0.38)',borderRadius:999,padding:'7px 10px',background:rd?'rgba(212,175,55,0.16)':'rgba(255,255,255,0.05)',color:rd?'#F5E6A3':'#8ea0ad',fontSize:11,fontWeight:950,cursor:rd?'pointer':'default',whiteSpace:'nowrap'}}>FINES 💸</button>
+            <div style={{fontSize:11,color:finished?'#f8fafc':(disabled?'#8ea0ad':'#90ccf0'),fontWeight:900,letterSpacing:'0.08em'}}>{locked&&!isAdmin?'LOCKED':opening?'OPENING':finished?'VIEW FINISHED':'TAP TO OPEN'}</div>
+          </div>
         </div>
         <div style={{display:'grid',gap:8}}>
           {group.doubles&&<><div style={{fontSize:11,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em',margin:'2px 0 -2px'}}>DOUBLES MATCH</div><MatchRow match={group.doubles} round={rd} label="DOUBLES MATCH"/></>}
@@ -4631,7 +4637,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
       const pid=stableCupId||rp.id;
       const h=parseFloat(rp.playing_handicap||0)||0;
       const nm=rp.display_name||cupDisplayName(original)||'Player';
-      return{id:pid,name:nm,display_name:nm,current_handicap:h,handicap:h,playing_handicap:h,user_id:rp.user_id||null,guest_id:rp.guest_id||null,round_player_id:rp.id,cup_player_id:stableCupId||null,is_host:!!rp.is_host};
+      return{id:pid,name:nm,display_name:nm,current_handicap:h,handicap:h,playing_handicap:h,user_id:(original&&original.user_id)||rp.user_id||null,guest_id:(original&&original.guest_id)||rp.guest_id||null,round_player_id:rp.id,cup_player_id:stableCupId||null,is_host:!!rp.is_host};
     });
     const playerIds=participants.map(p=>p.id).filter(Boolean);
     const playingHcps={};participants.forEach(p=>{playingHcps[p.id]=parseFloat(p.playing_handicap||0)||0;});
