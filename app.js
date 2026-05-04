@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.86
+// SNYDER LIVE v1.87
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -786,7 +786,6 @@ function App(){
   const[showAuth,setShowAuth]=useState(false);
   const[authPrompt,setAuthPrompt]=useState(null);
   const[appData,setAppData]=useState({players:[],courses:[],rounds:[],groups:[],competitions:[],scores:[],cupUsers:[],guests:[],cupEvents:[],cupTeams:[],cupEventPlayers:[],cupDays:[],cupMatches:[]});
-  const[allRoundPlayers,setAllRoundPlayers]=useState([]);
   const[selectedRound,setSelectedRound]=useState(null);
   const[selectedComp,setSelectedComp]=useState(null);
   const[holeScores,setHoleScores]=useState({});
@@ -883,14 +882,6 @@ function App(){
 
   const{players,courses,rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}=appData;
   const activeComp=competitions.find(c=>c.status==='active')||competitions[0];
-
-  useEffect(()=>{
-    let alive=true;
-    sb.from('cup_round_players').select('*').then(r=>{
-      if(alive)setAllRoundPlayers(Array.isArray(r&&r.data)?r.data:[]);
-    }).catch(()=>{if(alive)setAllRoundPlayers([]);});
-    return()=>{alive=false;};
-  },[]);
 
   function rowsToHoleScores(rows){
     const m={};
@@ -4440,6 +4431,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   const[selectedCupPlayerSummary,setSelectedCupPlayerSummary]=useState(null);
   const[selectedCupPlayerDetail,setSelectedCupPlayerDetail]=useState(null);
   const[activeFinesGroup,setActiveFinesGroup]=useState(null);
+  const[cupRoundPlayers,setCupRoundPlayers]=useState([]);
   useEffect(()=>{
     function handleCupBack(){
       if(activeFinesGroup){setActiveFinesGroup(null);return;}
@@ -4534,6 +4526,17 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   const cupTitle=(cup&&cup.name)||'Snyder Cup 2026';
   const cupRoundName=(day,idx)=>cupTitle+' Day '+day+' Group '+idx;
   const roundForGroup=(day,idx)=>(rounds||[]).find(r=>r.name===cupRoundName(day,idx)||r.name==='Synder Cup Day '+day+' Group '+idx);
+  useEffect(()=>{
+    let alive=true;
+    const cupRoundIds=(rounds||[]).filter(r=>r&&((String(r.name||'').startsWith(cupTitle+' Day '))||String(r.name||'').startsWith('Synder Cup Day '))).map(r=>r.id).filter(Boolean);
+    if(!cupRoundIds.length){setCupRoundPlayers([]);return()=>{alive=false;};}
+    sb.from('cup_round_players').select('*').in('round_id',cupRoundIds).then(({data,error})=>{
+      if(!alive)return;
+      if(error){console.warn('Cup round players load failed',error);setCupRoundPlayers([]);return;}
+      setCupRoundPlayers(data||[]);
+    });
+    return()=>{alive=false;};
+  },[cup&&cup.id,rounds&&rounds.length,cupTitle]);
   const findCupPlayer=id=>(playersInCup||[]).find(p=>p.id===id||p.user_id===id||p.guest_id===id)||null;
   function cupScoreIds(id){
     const p=findCupPlayer(id);
@@ -4548,11 +4551,11 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     }
     const targetName=String(cupDisplayName(p)||'').trim().toLowerCase();
     if(round&&targetName){
-      (allRoundPlayers||[]).forEach(rp=>{
+      (cupRoundPlayers||[]).forEach(rp=>{
         if(!rp||rp.round_id!==round.id)return;
         const rpName=String(rp.display_name||rp.name||'').trim().toLowerCase();
         if(rpName&&rpName===targetName){
-          add(rp.id);add(rp.user_id);add(rp.guest_id);add(rp.cup_player_id);
+          add(rp.id);add(rp.user_id);add(rp.guest_id);add(rp.cup_player_id);add(rp.round_player_id);
         }
       });
     }
@@ -4624,7 +4627,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const complete=round&&isCompletedRound(round);
     const isDoubles=String(match.match_type||'').toLowerCase()==='doubles';
     const roundScores=(scores||[]).filter(s=>round&&s.round_id===round.id);
-    const scoreIdsFor=id=>new Set(cupScoreIds(id));
+    const scoreIdsFor=id=>new Set(cupScoreIdsForRound(round,findCupPlayer(id)||{id}));
     const pointsForHole=(id,h)=>{
       const ids=scoreIdsFor(id);
       const row=roundScores.find(s=>ids.has(normaliseId(s.player_id))&&parseInt(s.hole_number)===parseInt(h));
@@ -4828,13 +4831,13 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   function singlesLeaderboard(){
     return (playersInCup||[]).map(p=>{
       const dayScores=cupDayNumbers.map(day=>{
-        const dayRounds=cupRoundsForDay(day);
-        const points=dayRounds.reduce((t,r)=>t+playerAdjustedSinglesPointsFromRound(r,p,day),0);
-        const holesForDay=dayRounds.reduce((t,r)=>t+cupPlayerScoreRowsForRound(r,p).filter(s=>{
+        const finishedDayRounds=cupRoundsForDay(day).filter(isCompletedRound);
+        const points=finishedDayRounds.reduce((t,r)=>t+playerAdjustedSinglesPointsFromRound(r,p,day),0);
+        const holesForDay=finishedDayRounds.reduce((t,r)=>t+cupPlayerScoreRowsForRound(r,p).filter(s=>{
           const h=parseInt(s&&s.hole_number);
           return h>=1&&h<=18;
         }).length,0);
-        return{day,points,holes:holesForDay};
+        return{day,points,holes:holesForDay,finished:finishedDayRounds.length>0};
       });
       const total=dayScores.reduce((sum,d)=>sum+(parseInt(d.points)||0),0);
       const holes=dayScores.reduce((sum,d)=>sum+(parseInt(d.holes)||0),0);
