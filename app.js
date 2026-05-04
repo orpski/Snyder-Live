@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.53
+// SNYDER LIVE v1.55
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -241,6 +241,16 @@ function grossTotalDisplay(total,hasGiven){
   const n=parseInt(total);
   if(!Number.isFinite(n))return '-';
   return String(n)+(hasGiven?'*':'');
+}
+function grossWithOverParDisplay(total,hasGiven,par){
+  const grossText=grossTotalDisplay(total,hasGiven);
+  const overText=overParDisplay(total,par);
+  return grossTotalWithOverParText(grossText,overText);
+}
+function grossTotalWithOverParText(grossText,overText){
+  if(!grossText||grossText==='-')return '-';
+  if(!overText||overText==='-')return grossText;
+  return `${grossText} (${overText})`;
 }
 function overParDisplay(gross,par){
   const g=parseInt(gross);
@@ -875,7 +885,7 @@ function App(){
 
   function rowsToHoleScores(rows){
     const m={};
-    (rows||[]).filter(r=>!isSnakeScoreRow(r)).forEach(s=>{
+    (rows||[]).filter(r=>!isMetaScoreRow(r)).forEach(s=>{
       if(!m[s.hole_number])m[s.hole_number]={};
       m[s.hole_number][s.player_id]=s.gross_score;
     });
@@ -965,7 +975,7 @@ function App(){
     function addScore(pid,holeNum,pts){
       addLeaderboardScore(totals,holes,holePoints,seen,pid,holeNum,pts);
     }
-    (scores||[]).filter(sc=>sc.round_id===rd.id&&!isSnakeScoreRow(sc)).forEach(sc=>{
+    (scores||[]).filter(sc=>sc.round_id===rd.id&&!isMetaScoreRow(sc)).forEach(sc=>{
       addScore(sc.player_id,sc.hole_number,sc.stableford_points);
     });
     // Scores saved in this browser are instant; appData.scores may not have refreshed yet after exiting a round.
@@ -1195,7 +1205,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
       try{local=JSON.parse(localStorage.getItem('scores_'+rd.id)||'{}')||{};}catch(e){local={};}
       const{data:dbScores}=await sb.from('cup_scores').select('*').eq('round_id',rd.id);
       const dbMap={};
-      (dbScores||[]).filter(r=>!isSnakeScoreRow(r)).forEach(s=>{
+      (dbScores||[]).filter(r=>!isMetaScoreRow(r)).forEach(s=>{
         if(!dbMap[s.hole_number])dbMap[s.hole_number]={};
         dbMap[s.hole_number][s.player_id]=s.gross_score;
       });
@@ -1230,7 +1240,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
     function addScore(pid,holeNum,pts){
       addLeaderboardScore(totals,holes,holePoints,seen,pid,holeNum,pts);
     }
-    [...(scores||[]),...(publicScores||[])].filter(sc=>sc.round_id===rd.id&&!isSnakeScoreRow(sc)).forEach(sc=>{
+    [...(scores||[]),...(publicScores||[])].filter(sc=>sc.round_id===rd.id&&!isMetaScoreRow(sc)).forEach(sc=>{
       addScore(sc.player_id,sc.hole_number,sc.stableford_points);
     });
     // Scores saved in this browser are instant; appData.scores may not have refreshed yet after exiting a round.
@@ -1428,6 +1438,29 @@ function parseSnakeScorePlayerId(v){
   catch(e){return null;}
 }
 function isSnakeScoreRow(row){return !!parseSnakeScorePlayerId(row&&row.player_id);}
+
+const FINE_SCORE_PREFIX='__fine__|';
+const CUP_FINE_DEFS=[
+  {key:'blob',label:'Blob',emoji:'🐟',amount:2,type:'toggle'},
+  {key:'threePutt',label:'3 putt',emoji:'😬',amount:2,type:'toggle'},
+  {key:'fourPutt',label:'4 putt',emoji:'💀',amount:5,type:'toggle'},
+  {key:'water',label:'Water',emoji:'🌊',amount:3,type:'toggle'},
+  {key:'bunker',label:'Bunker',emoji:'🏖️',amount:2,type:'counter'},
+  {key:'dnf',label:'DNF',emoji:'🚫',amount:5,type:'toggle'}
+];
+function makeFineScorePlayerId(pid,key){return FINE_SCORE_PREFIX+encodeURIComponent(normaliseId(pid))+'|'+encodeURIComponent(normaliseId(key));}
+function parseFineScorePlayerId(v){
+  const txt=String(v||'');
+  if(!txt.startsWith(FINE_SCORE_PREFIX))return null;
+  const parts=txt.split('|');
+  if(parts.length<3)return null;
+  try{return {pid:decodeURIComponent(parts[1]||''),key:decodeURIComponent(parts.slice(2).join('|')||'')};}
+  catch(e){return null;}
+}
+function isFineScoreRow(row){return !!parseFineScorePlayerId(row&&row.player_id);}
+function isMetaScoreRow(row){return isSnakeScoreRow(row)||isFineScoreRow(row);}
+function fineDef(key){return CUP_FINE_DEFS.find(f=>f.key===key)||null;}
+function fineAmount(key,count){const def=fineDef(key);return def?(parseInt(count)||0)*(def.amount||0):0;}
 function rowsToSnakeMarks(rows){
   const marks={};
   (rows||[]).forEach(row=>{
@@ -1538,7 +1571,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       try{local=JSON.parse(localStorage.getItem('scores_'+rd.id)||'{}')||{};}catch(e){local={};}
       const{data:dbScores}=await sb.from('cup_scores').select('*').eq('round_id',rd.id);
       const dbMap={};
-      (dbScores||[]).filter(r=>!isSnakeScoreRow(r)).forEach(s=>{
+      (dbScores||[]).filter(r=>!isMetaScoreRow(r)).forEach(s=>{
         if(!dbMap[s.hole_number])dbMap[s.hole_number]={};
         dbMap[s.hole_number][s.player_id]=s.gross_score;
       });
@@ -1558,7 +1591,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       setHoleScores({});
       sb.from('cup_scores').select('*').eq('round_id',selectedRound.id).then(({data})=>{
         const m={};
-        (data||[]).filter(r=>!isSnakeScoreRow(r)).forEach(s=>{
+        (data||[]).filter(r=>!isMetaScoreRow(r)).forEach(s=>{
           if(!m[s.hole_number])m[s.hole_number]={};
           m[s.hole_number][s.player_id]=s.gross_score;
         });
@@ -2135,7 +2168,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         setAllRoundPlayers(people);
         setAllGroups(normalised);
         setOverallPlayers(people.map(p=>({id:p.id,name:p.display_name||p.name,playing_handicap:p.playing_handicap||0})));
-        setOverallScores((scs||[]).filter(r=>!isSnakeScoreRow(r)));
+        setOverallScores((scs||[]).filter(r=>!isMetaScoreRow(r)));
         const initialSnakes=rowsToSnakeMarks(scs||[]);
         if(Object.keys(initialSnakes).length>0){
           mergeSnakeMarksSafe(initialSnakes);
@@ -2156,7 +2189,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
       const {data,error}=await sb.from('cup_scores').select('*').eq('round_id',round.id);
       if(error)throw error;
       const rows=(data||[]);
-      const scoreRows=rows.filter(r=>!isSnakeScoreRow(r));
+      const scoreRows=rows.filter(r=>!isMetaScoreRow(r));
       const snakeRows=rows.filter(isSnakeScoreRow);
       const m={};
       scoreRows.forEach(s=>{
@@ -2197,7 +2230,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         playing_handicap:rp.playing_handicap||0
       })));
       setOverallMode('round');
-      setOverallScores((scs||[]).filter(r=>!isSnakeScoreRow(r)));
+      setOverallScores((scs||[]).filter(r=>!isMetaScoreRow(r)));
       setOverallRefreshNote('Refreshed '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
       const boardSnakes=rowsToSnakeMarks(scs||[]);
       if(Object.keys(boardSnakes).length>0){
@@ -2235,7 +2268,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         ]);
         if(scErr)throw scErr;
         if(rpErr)throw rpErr;
-        dbScores=(scs||[]).filter(r=>!isSnakeScoreRow(r));
+        dbScores=(scs||[]).filter(r=>!isMetaScoreRow(r));
         dbRoundPlayers=rps||[];
       }
       const rpToCup={};
@@ -2253,7 +2286,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         if(!cpId||!holeNumber)return;
         rowByPlayerHole[normaliseId(cpId)+'-'+Number(holeNumber)]={...row,player_id:cpId,hole_number:Number(holeNumber)};
       };
-      dbScores.filter(sc=>!isSnakeScoreRow(sc)).forEach(sc=>{
+      dbScores.filter(sc=>!isMetaScoreRow(sc)).forEach(sc=>{
         let cpId=cpByKey[normaliseId(sc.player_id)]||rpToCup[normaliseId(sc.player_id)];
         if(cpId)putRow(cpId,sc.hole_number,sc);
       });
@@ -2281,7 +2314,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
     const playerMap={};
     (overallPlayers.length?overallPlayers:grpPlayers).forEach(p=>{playerMap[p.id]=p;});
     (allGroups||[]).forEach((g,idx)=>{(g.player_ids||[]).forEach(pid=>{const key=normaliseId(pid); if(playerMap[key])playerMap[key]={...playerMap[key],groupNumber:g.group_number||idx+1};});});
-    const scoreRows=(overallScores.length?overallScores.filter(r=>!isSnakeScoreRow(r)):Object.keys(holeScores||{}).flatMap(h=>Object.keys(holeScores[h]||{}).map(pid=>{
+    const scoreRows=(overallScores.length?overallScores.filter(r=>!isMetaScoreRow(r)):Object.keys(holeScores||{}).flatMap(h=>Object.keys(holeScores[h]||{}).map(pid=>{
       const gross=holeScores[h][pid];
       const hd=getHole(parseInt(h));
       const hcp=parseFloat(playingHcps[pid]||0);
@@ -2332,7 +2365,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
           }
         });
         // Other Cup groups for this day use the latest saved scores already loaded in appData.
-        (scores||[]).filter(sc=>!isSnakeScoreRow(sc)).forEach(sc=>{
+        (scores||[]).filter(sc=>!isMetaScoreRow(sc)).forEach(sc=>{
           if(!dayRounds.some(r=>r&&r.id===sc.round_id))return;
           if(round&&sc.round_id===round.id)return; // avoid double counting current live group
           if(ids.includes(normaliseId(sc.player_id))){total+=stablefordPointsValue(sc.stableford_points);holesDone.add(sc.round_id+'-'+sc.hole_number);}
@@ -2399,7 +2432,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
   }
   function savedStablefordForCupPlayer(rd,cupId){
     if(!rd||!cupId)return 0;
-    return (scores||[]).filter(sc=>sc.round_id===rd.id&&!isSnakeScoreRow(sc)&&normaliseId(sc.player_id)===normaliseId(cupId)).reduce((t,sc)=>t+(stablefordPointsValue(sc.stableford_points)),0);
+    return (scores||[]).filter(sc=>sc.round_id===rd.id&&!isMetaScoreRow(sc)&&normaliseId(sc.player_id)===normaliseId(cupId)).reduce((t,sc)=>t+(stablefordPointsValue(sc.stableford_points)),0);
   }
   function savedMatchLeader(match,rd){
     if(!match||!rd)return 'tie';
@@ -2527,7 +2560,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
     const sources=[overallScores, scores].filter(Array.isArray);
     for(const list of sources){
       if((list||[]).some(row=>
-        !isSnakeScoreRow(row) &&
+        !isMetaScoreRow(row) &&
         Number(row&&row.hole_number)===Number(holeNum) &&
         normaliseId(row&&row.player_id)===id &&
         rowHasSnakeFlag(row)
@@ -2919,6 +2952,9 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
   function grossSummaryDisplay(pid,holeList){
     return grossTotalDisplay(getGrossTotal(pid,holeList),hasGivenGrossInList(pid,holeList));
   }
+  function grossOverParSummaryDisplay(pid,holeList){
+    return grossWithOverParDisplay(getGrossTotal(pid,holeList),hasGivenGrossInList(pid,holeList),enteredParTotal(pid,holeList));
+  }
   function overParSummaryDisplay(pid,holeList){
     return overParDisplay(getGrossTotal(pid,holeList),enteredParTotal(pid,holeList));
   }
@@ -2966,11 +3002,10 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
               return (
                 <div key={p.id+'nine-total'} style={{textAlign:'center',overflow:'hidden'}}>
                   <div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:800}}>Gross</div>
-                  <div style={{fontSize:16,color:'#fff',fontWeight:900,lineHeight:1.1}}>{grossSummaryDisplay(p.id,holeList)}</div>
-                  <div style={{fontSize:9,color:'#fbbf24',fontWeight:900,marginTop:2}}>vs par {overParSummaryDisplay(p.id,holeList)}</div>
+                  <div style={{fontSize:16,color:'#fff',fontWeight:900,lineHeight:1.1}}>{grossOverParSummaryDisplay(p.id,holeList)}</div>
                   <div style={{fontSize:9,color:'#60b8f0',fontWeight:900,marginTop:3}}>Stableford</div>
                   <div style={{fontSize:17,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{nineStableford}</div>
-                  {label==='BACK 9'&&<div style={{marginTop:7,paddingTop:7,borderTop:'1px solid rgba(255,255,255,0.12)'}}><div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:800}}>Total gross</div><div style={{fontSize:17,color:'#fff',fontWeight:950,lineHeight:1.05}}>{grossSummaryDisplay(p.id,holes)}</div><div style={{fontSize:9,color:'#fbbf24',fontWeight:900,marginTop:2}}>vs par {overParSummaryDisplay(p.id,holes)}</div><div style={{fontSize:9,color:'#60b8f0',fontWeight:900,marginTop:3}}>Total Stableford</div><div style={{fontSize:18,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{roundStableford}</div></div>}
+                  {label==='BACK 9'&&<div style={{marginTop:7,paddingTop:7,borderTop:'1px solid rgba(255,255,255,0.12)'}}><div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:800}}>Total gross</div><div style={{fontSize:17,color:'#fff',fontWeight:950,lineHeight:1.05}}>{grossOverParSummaryDisplay(p.id,holes)}</div><div style={{fontSize:9,color:'#60b8f0',fontWeight:900,marginTop:3}}>Total Stableford</div><div style={{fontSize:18,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{roundStableford}</div></div>}
                 </div>
               );
             })}
@@ -3043,7 +3078,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
               <div style={{fontSize:11,color:'#60b8f0'}}>Total</div>
               {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:11,color:'#60b8f0'}}>{gameFirstName((p.name||p.display_name)||'?')}</div>)}
               <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:6}}>Gross</div>
-              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:4}}><div style={{fontSize:22,color:'#fff'}}>{grossSummaryDisplay(p.id,holes)}</div><div style={{fontSize:10,color:'#fbbf24',fontWeight:900}}>vs par {overParSummaryDisplay(p.id,holes)}</div></div>)}
+              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:4}}><div style={{fontSize:22,color:'#fff'}}>{grossOverParSummaryDisplay(p.id,holes)}</div></div>)}
               <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',paddingTop:2}}>Stableford</div>
               {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:22,color:'#60b8f0',paddingTop:2}}>{getRunning(p.id,holes.length)}</div>)}
             </div>
@@ -3351,14 +3386,12 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
               const nine=sec===0?front9:back9;
               return <div key={p.id} style={{borderLeft:'1px solid rgba(255,255,255,0.08)',padding:'7px 6px',textAlign:'center'}}>
                 <div style={{fontSize:10,color:'rgba(255,255,255,0.5)',fontWeight:800}}>Gross</div>
-                <div style={{fontSize:18,color:'#fff',fontWeight:900,lineHeight:1.1}}>{grossSummaryDisplay(p.id,nine)}</div>
-                <div style={{fontSize:10,color:'#fbbf24',fontWeight:900,marginTop:2}}>vs par {overParSummaryDisplay(p.id,nine)}</div>
+                <div style={{fontSize:18,color:'#fff',fontWeight:900,lineHeight:1.1}}>{grossOverParSummaryDisplay(p.id,nine)}</div>
                 <div style={{fontSize:10,color:'#60b8f0',fontWeight:900,marginTop:4}}>Stableford</div>
                 <div style={{fontSize:20,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{getStablefordTotal(p.id,nine)}</div>
                 {sec===1&&<div style={{marginTop:7,paddingTop:7,borderTop:'1px solid rgba(255,255,255,0.12)'}}>
                   <div style={{fontSize:10,color:'rgba(255,255,255,0.5)',fontWeight:800}}>Total gross</div>
-                  <div style={{fontSize:19,color:'#fff',fontWeight:950,lineHeight:1.05}}>{grossSummaryDisplay(p.id,holes)}</div>
-                  <div style={{fontSize:10,color:'#fbbf24',fontWeight:900,marginTop:2}}>vs par {overParSummaryDisplay(p.id,holes)}</div>
+                  <div style={{fontSize:19,color:'#fff',fontWeight:950,lineHeight:1.05}}>{grossOverParSummaryDisplay(p.id,holes)}</div>
                   <div style={{fontSize:10,color:'#60b8f0',fontWeight:900,marginTop:4}}>Total Stableford</div>
                   <div style={{fontSize:21,color:'#60b8f0',fontWeight:950,lineHeight:1.05}}>{getStablefordTotal(p.id,holes)}</div>
                 </div>}
@@ -4080,7 +4113,7 @@ function CupMatchCard({match,cupPlayers,teams,editable,onRemove,onDelete,onOpen,
     </div>
   </div>;
 }
-function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchResult,openCupGroup,openingGroup,isAdmin}){
+function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchResult,openCupGroup,openingGroup,isAdmin,openFinesGroup}){
   const findPlayer=id=>(playersInCup||[]).find(p=>p.id===id||p.user_id===id)||null;
   const dayFinished=groups.length>0&&groups.every(g=>{const rd=roundForGroup(g.day,g.idx);return rd&&isCompletedRound(rd);});
   function playerName(id){const p=findPlayer(id);return gameName(p&&p.display_name||'Player');}
@@ -4136,6 +4169,108 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
     })}
   </div>;
 }
+
+function CupFinesCard({group,day,round,teams,playersInCup,scores,sb,flash,load,onClose}){
+  const[playerFineRows,setPlayerFineRows]=useState({});
+  const savingRef=useRef(false);
+  const findPlayer=id=>(playersInCup||[]).find(p=>p.id===id||p.user_id===id||p.guest_id===id)||null;
+  const playerIds=Array.from(new Set([...(group&&group.players||[]),...((group&&group.doubles&&group.doubles.gold_player_ids)||[]),...((group&&group.doubles&&group.doubles.navy_player_ids)||[]),...((group&&group.singles||[]).flatMap(m=>[...(m.gold_player_ids||[]),...(m.navy_player_ids||[])]))].filter(Boolean)));
+  const normalScores=(scores||[]).filter(sc=>round&&sc.round_id===round.id&&!isMetaScoreRow(sc));
+  function playerName(id){const p=findPlayer(id);return gameFirstName(p&&p.display_name||p&&p.name||'Player');}
+  function readFinesFromScores(){
+    const next={};
+    (scores||[]).filter(sc=>round&&sc.round_id===round.id&&isFineScoreRow(sc)).forEach(sc=>{
+      const parsed=parseFineScorePlayerId(sc.player_id);
+      if(!parsed||!parsed.pid||!parsed.key)return;
+      const h=parseInt(sc.hole_number)||0;
+      const count=Math.max(0,parseInt(sc.gross_score)||0);
+      if(!h||!count)return;
+      if(!next[h])next[h]={};
+      if(!next[h][parsed.pid])next[h][parsed.pid]={};
+      next[h][parsed.pid][parsed.key]=count;
+    });
+    return next;
+  }
+  useEffect(()=>{setPlayerFineRows(readFinesFromScores());},[round&&round.id,scores&&scores.length]);
+  function hasBlobScore(pid,h){
+    const row=normalScores.find(sc=>normaliseId(sc.player_id)===normaliseId(pid)&&parseInt(sc.hole_number)===parseInt(h)&&Number.isFinite(parseInt(sc.gross_score)));
+    return !!row&&stablefordPointsValue(row.stableford_points)===0;
+  }
+  function storedCount(pid,h,key){return parseInt(playerFineRows&&playerFineRows[h]&&playerFineRows[h][pid]&&playerFineRows[h][pid][key])||0;}
+  function effectiveCount(pid,h,key){return key==='blob'&&hasBlobScore(pid,h)?1:storedCount(pid,h,key);}
+  function playerHoleFine(pid,h){return CUP_FINE_DEFS.reduce((t,d)=>t+fineAmount(d.key,effectiveCount(pid,h,d.key)),0);}
+  function playerTotal(pid){let total=0;for(let h=1;h<=18;h++)total+=playerHoleFine(pid,h);return total;}
+  function dayTotal(){return playerIds.reduce((t,pid)=>t+playerTotal(pid),0);}
+  async function saveFine(pid,h,key,count){
+    if(!round){flash&&flash('No scorecard found for this group yet');return;}
+    const cleanCount=Math.max(0,parseInt(count)||0);
+    setPlayerFineRows(prev=>{
+      const next={...(prev||{})};
+      next[h]={...(next[h]||{})};
+      next[h][pid]={...(next[h][pid]||{})};
+      if(cleanCount)next[h][pid][key]=cleanCount; else delete next[h][pid][key];
+      return next;
+    });
+    if(key==='blob'&&hasBlobScore(pid,h))return;
+    if(savingRef.current)return;
+    savingRef.current=true;
+    try{
+      const row={round_id:round.id,player_id:makeFineScorePlayerId(pid,key),hole_number:parseInt(h),gross_score:cleanCount,stableford_points:fineAmount(key,cleanCount),par:0,stroke_index:0};
+      const res=await sb.from('cup_scores').upsert(row,{onConflict:'round_id,player_id,hole_number'});
+      if(res.error)throw res.error;
+      if(load)await load(false);
+    }catch(e){flash&&flash('Fines save failed: '+(e&&e.message?e.message:String(e)));}
+    finally{savingRef.current=false;}
+  }
+  function toggleFine(pid,h,key){
+    if(key==='blob'&&hasBlobScore(pid,h))return;
+    const cur=storedCount(pid,h,key);
+    saveFine(pid,h,key,cur?0:1);
+  }
+  if(!group)return null;
+  return <div style={{minHeight:'100vh',paddingBottom:80}}>
+    <div style={{background:'linear-gradient(135deg,#0B1F4D,#061222)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
+      <button onClick={onClose} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button>
+      <div style={{fontSize:16,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}>FINES CARD</div>
+      <div style={{width:60}}/>
+    </div>
+    <div style={{padding:16}}>
+      <div style={{borderRadius:20,padding:16,marginBottom:14,border:'1px solid rgba(212,175,55,0.30)',background:'linear-gradient(135deg,rgba(212,175,55,0.16),rgba(8,30,58,0.94))'}}>
+        <div style={{fontSize:28,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {day} · GROUP {group.idx}</div>
+        <div style={{fontSize:12,color:'#90ccf0',fontWeight:800}}>Separate from scoring — perfect for the fines captain 💸</div>
+        <div style={{marginTop:12,display:'grid',gridTemplateColumns:'1fr auto',alignItems:'center',gap:10}}><div style={{fontSize:12,color:'#8ea0ad',fontWeight:900}}>Group total</div><div style={{fontSize:30,color:'#F5E6A3',fontWeight:950}}>£{dayTotal()}</div></div>
+      </div>
+      <div style={{...S.card,marginBottom:14}}>
+        <div style={{fontSize:13,color:'#fff',fontWeight:950,marginBottom:10}}>Fines leaderboard</div>
+        <div style={{display:'grid',gap:8}}>{playerIds.slice().sort((a,b)=>playerTotal(b)-playerTotal(a)).map(pid=><div key={pid} style={{display:'grid',gridTemplateColumns:'1fr auto',gap:10,alignItems:'center',padding:'9px 10px',borderRadius:12,background:'rgba(255,255,255,0.055)',border:'1px solid rgba(255,255,255,0.08)'}}><div style={{fontSize:14,color:'#fff',fontWeight:900}}>{playerName(pid)}</div><div style={{fontSize:18,color:'#F5E6A3',fontWeight:950}}>£{playerTotal(pid)}</div></div>)}</div>
+      </div>
+      <div style={{fontSize:12,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em',margin:'16px 0 8px'}}>HOLE-BY-HOLE FINES</div>
+      <div style={{display:'grid',gap:12}}>{Array.from({length:18},(_,i)=>i+1).map(h=>{
+        const holeTotal=playerIds.reduce((t,pid)=>t+playerHoleFine(pid,h),0);
+        return <div key={h} style={{border:'1px solid rgba(96,184,240,0.18)',borderRadius:16,background:'rgba(255,255,255,0.045)',padding:12}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>HOLE {h}</div><div style={{fontSize:15,color:holeTotal?'#F5E6A3':'#8ea0ad',fontWeight:950}}>£{holeTotal}</div></div>
+          <div style={{display:'grid',gap:9}}>{playerIds.map(pid=>{
+            const playerFine=playerHoleFine(pid,h);
+            return <div key={pid} style={{border:'1px solid rgba(255,255,255,0.08)',borderRadius:13,padding:10,background:playerFine?'rgba(212,175,55,0.10)':'rgba(0,0,0,0.12)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><div style={{fontSize:14,color:'#fff',fontWeight:950}}>{playerName(pid)}</div><div style={{fontSize:14,color:playerFine?'#F5E6A3':'#8ea0ad',fontWeight:950}}>£{playerFine}</div></div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:7}}>{CUP_FINE_DEFS.map(def=>{
+                const autoBlob=def.key==='blob'&&hasBlobScore(pid,h);
+                const count=effectiveCount(pid,h,def.key);
+                const active=count>0;
+                if(def.type==='counter')return <div key={def.key} style={{border:'1px solid '+(active?'rgba(212,175,55,0.50)':'rgba(255,255,255,0.10)'),borderRadius:12,padding:7,background:active?'rgba(212,175,55,0.14)':'rgba(255,255,255,0.05)',textAlign:'center'}}>
+                  <div style={{fontSize:18}}>{def.emoji}</div><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>{def.label}</div>
+                  <div style={{display:'flex',gap:5,alignItems:'center',justifyContent:'center',marginTop:5}}><button onClick={()=>saveFine(pid,h,def.key,Math.max(0,storedCount(pid,h,def.key)-1))} style={{...S.gho,padding:'2px 7px',fontSize:13}}>-</button><div style={{fontSize:16,color:'#fff',fontWeight:950,minWidth:18}}>{count}</div><button onClick={()=>saveFine(pid,h,def.key,storedCount(pid,h,def.key)+1)} style={{...S.gho,padding:'2px 7px',fontSize:13}}>+</button></div>
+                </div>;
+                return <button key={def.key} onClick={()=>toggleFine(pid,h,def.key)} disabled={autoBlob} title={autoBlob?'Auto from blob score':''} style={{border:'1px solid '+(active?'rgba(212,175,55,0.55)':'rgba(255,255,255,0.10)'),borderRadius:12,padding:'8px 5px',background:active?'rgba(212,175,55,0.16)':'rgba(255,255,255,0.05)',color:active?'#F5E6A3':'#fff',fontSize:11,fontWeight:950,cursor:autoBlob?'default':'pointer'}}><div style={{fontSize:18}}>{def.emoji}</div><div>{def.label}</div>{autoBlob&&<div style={{fontSize:8,color:'#90ccf0'}}>AUTO</div>}</button>;
+              })}</div>
+            </div>;
+          })}</div>
+        </div>;
+      })}</div>
+    </div>
+  </div>;
+}
+
 function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,flash,setView,load,setSelectedRound,currentUser,isAdmin,cupUsers,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}){
   const[selectedDay,setSelectedDay]=useState(()=>{try{const d=parseInt(sessionStorage.getItem('cupReturnDay')||'');if(d){sessionStorage.removeItem('cupReturnDay');return d;}}catch(e){}return null;});
   const[showCupHandicaps,setShowCupHandicaps]=useState(false);
@@ -4203,6 +4338,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   const cupDayNumbers=Array.from(new Set([1,2,3,...days.map(d=>parseInt(d.day_number)||1),...matches.map(m=>parseInt(m.day_number)||1)])).filter(Boolean).sort((a,b)=>a-b);
   const matchesByDay=groupCupMatchesByDay(matches,cupDayNumbers.map(day_number=>({day_number})));
   const[openingGroup,setOpeningGroup]=useState(null);
+  const[activeFinesGroup,setActiveFinesGroup]=useState(null);
   const cupTitle=(cup&&cup.name)||'Snyder Cup 2026';
   const cupRoundName=(day,idx)=>cupTitle+' Day '+day+' Group '+idx;
   const roundForGroup=(day,idx)=>(rounds||[]).find(r=>r.name===cupRoundName(day,idx)||r.name==='Synder Cup Day '+day+' Group '+idx);
@@ -4214,7 +4350,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   function playerPointsFromRound(round,playerId){
     if(!round)return 0;
     const ids=new Set(cupScoreIds(playerId));
-    return (scores||[]).filter(s=>s.round_id===round.id&&!isSnakeScoreRow(s)&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+(stablefordPointsValue(s.stableford_points)),0);
+    return (scores||[]).filter(s=>s.round_id===round.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+(stablefordPointsValue(s.stableford_points)),0);
   }
   function matchResult(match,round){
     const goldIds=match.gold_player_ids||[];
@@ -4401,7 +4537,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     ids.add(normaliseId(p.id));
     ids.add(normaliseId(p.user_id));
     ids.add(normaliseId(p.guest_id));
-    return (scores||[]).filter(s=>rd&&s.round_id===rd.id&&!isSnakeScoreRow(s)&&ids.has(normaliseId(s.player_id)));
+    return (scores||[]).filter(s=>rd&&s.round_id===rd.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id)));
   }
   function cupPlayerDayScoreSummary(p,day){
     const dayRounds=cupRoundsForDay(day);
@@ -4634,6 +4770,10 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
             </div>)}</div>
           </div>
   );
+  if(activeFinesGroup){
+    const rd=roundForGroup(activeFinesGroup.day,activeFinesGroup.idx);
+    return <CupFinesCard group={activeFinesGroup} day={activeFinesGroup.day} round={rd} teams={teams} playersInCup={playersInCup} scores={scores} sb={sb} flash={flash} load={load} onClose={()=>setActiveFinesGroup(null)}/>;
+  }
   return <div style={{minHeight:'100vh',paddingBottom:80}}>
     <div style={{background:'linear-gradient(135deg,#0B1F4D,#061222)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}><button onClick={goBackOnePage} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button><div style={{display:'flex',alignItems:'center',gap:8,fontSize:16,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}><span style={{color:'#D4AF37'}}>{'\uD83C\uDFC6'}</span><span>SNYDER CUP</span></div><div style={{width:60}}/></div>
     <div style={{padding:16}}>
@@ -4654,7 +4794,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
               <div style={{fontSize:16,color:'#fff',fontWeight:950,textAlign:'center'}}>{row?stablefordPointsValue(row.stableford_points):'-'}</div>
             </div>)}
             <div style={{display:'grid',gridTemplateColumns:'40px 40px 42px 56px 1fr 1fr',gap:6,padding:'10px',borderTop:'1px solid rgba(96,184,240,0.24)',background:'rgba(96,184,240,0.10)',alignItems:'center'}}>
-              <div style={{fontSize:12,color:'#60b8f0',fontWeight:950}}>TOT</div><div style={{fontSize:13,color:'#fff',fontWeight:950,textAlign:'center'}}>{totalPar||'-'}</div><div></div><div style={{fontSize:12,color:'#8ea0ad',fontWeight:900,textAlign:'center'}}>{totalYards||'-'}</div><div style={{textAlign:'center'}}><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{d.totalGrossDisplay||d.totalGross}</div><div style={{fontSize:10,color:'#fbbf24',fontWeight:900}}>vs par {d.totalOverPar||'-'}</div></div><div style={{fontSize:17,color:'#fff',fontWeight:950,textAlign:'center'}}>{d.totalStableford}</div>
+              <div style={{fontSize:12,color:'#60b8f0',fontWeight:950}}>TOT</div><div style={{fontSize:13,color:'#fff',fontWeight:950,textAlign:'center'}}>{totalPar||'-'}</div><div></div><div style={{fontSize:12,color:'#8ea0ad',fontWeight:900,textAlign:'center'}}>{totalYards||'-'}</div><div style={{textAlign:'center'}}><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{grossTotalWithOverParText(d.totalGrossDisplay||d.totalGross,d.totalOverPar)}</div></div><div style={{fontSize:17,color:'#fff',fontWeight:950,textAlign:'center'}}>{d.totalStableford}</div>
             </div>
           </div>
         </>;})():selectedCupPlayerSummary?(()=>{const p=selectedCupPlayerSummary;const daysForPlayer=cupPlayerAllDaySummaries(p);return <>
@@ -4663,9 +4803,9 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
           <div style={{display:'grid',gap:10}}>{daysForPlayer.length?daysForPlayer.map(d=><button key={d.day} onClick={()=>openCupPlayerDetail(d)} style={{...S.card,width:'100%',textAlign:'left',cursor:'pointer',background:'linear-gradient(135deg,rgba(0,112,187,0.18),rgba(15,23,42,0.92))'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><div style={{fontSize:20,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {d.day}</div><div style={{fontSize:11,color:d.finished?'#f8fafc':'#90ccf0',fontWeight:950}}>{d.finished?'FINISHED':'THRU '+d.holes}</div></div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
-              <div style={{border:'1px solid rgba(255,255,255,0.08)',borderRadius:12,padding:8,textAlign:'center'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>FRONT 9</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{d.frontGrossDisplay||d.frontGross}</div><div style={{fontSize:10,color:'#fbbf24',fontWeight:900}}>vs par {d.frontOverPar||'-'}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.frontStableford} pts</div></div>
-              <div style={{border:'1px solid rgba(255,255,255,0.08)',borderRadius:12,padding:8,textAlign:'center'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>BACK 9</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{d.backGrossDisplay||d.backGross}</div><div style={{fontSize:10,color:'#fbbf24',fontWeight:900}}>vs par {d.backOverPar||'-'}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.backStableford} pts</div></div>
-              <div style={{border:'1px solid rgba(96,184,240,0.20)',borderRadius:12,padding:8,textAlign:'center',background:'rgba(96,184,240,0.08)'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>TOTAL</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{d.totalGrossDisplay||d.totalGross}</div><div style={{fontSize:10,color:'#fbbf24',fontWeight:900}}>vs par {d.totalOverPar||'-'}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.totalStableford} pts</div></div>
+              <div style={{border:'1px solid rgba(255,255,255,0.08)',borderRadius:12,padding:8,textAlign:'center'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>FRONT 9</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{grossTotalWithOverParText(d.frontGrossDisplay||d.frontGross,d.frontOverPar)}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.frontStableford} pts</div></div>
+              <div style={{border:'1px solid rgba(255,255,255,0.08)',borderRadius:12,padding:8,textAlign:'center'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>BACK 9</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{grossTotalWithOverParText(d.backGrossDisplay||d.backGross,d.backOverPar)}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.backStableford} pts</div></div>
+              <div style={{border:'1px solid rgba(96,184,240,0.20)',borderRadius:12,padding:8,textAlign:'center',background:'rgba(96,184,240,0.08)'}}><div style={{fontSize:10,color:'#8ea0ad',fontWeight:900}}>TOTAL</div><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{grossTotalWithOverParText(d.totalGrossDisplay||d.totalGross,d.totalOverPar)}</div><div style={{fontSize:12,color:'#60b8f0',fontWeight:900}}>{d.totalStableford} pts</div></div>
             </div>
           </button>):<div style={{...S.card,color:'#8ea0ad',textAlign:'center'}}>No finished Cup scores found for this player yet.</div>}</div>
         </>;})():showCupHandicaps?<>
@@ -4696,7 +4836,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
           </button>
           <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>DAYS</div>
           <div style={{display:'grid',gap:10}}>{cupDayNumbers.map(day=>{const released=dayReleased(day);const count=cupDayGroups(day).length;return <button key={day} onClick={()=>openCupDay(day)} style={{border:'1px solid rgba(96,184,240,0.26)',borderRadius:14,background:'linear-gradient(135deg,rgba(0,112,187,0.28),rgba(8,30,58,0.92))',padding:'18px 16px',color:'#fff',display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',textAlign:'left'}}><span><span style={{display:'block',fontSize:24,fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {day}</span><span style={{fontSize:12,color:'#90ccf0'}}>{count} groups - {released?'Open for scoring':'Locked'}</span></span><span style={{fontSize:24,color:'#90ccf0'}}>&gt;</span></button>;})}</div>
-        </>:<CupDayView day={selectedDay} groups={cupDayGroups(selectedDay)} teams={teams} playersInCup={playersInCup} released={dayReleased(selectedDay)} roundForGroup={roundForGroup} matchResult={matchResult} openCupGroup={openCupGroup} openingGroup={openingGroup} isAdmin={isAdmin}/>}
+        </>:<CupDayView day={selectedDay} groups={cupDayGroups(selectedDay)} teams={teams} playersInCup={playersInCup} released={dayReleased(selectedDay)} roundForGroup={roundForGroup} matchResult={matchResult} openCupGroup={openCupGroup} openingGroup={openingGroup} isAdmin={isAdmin} openFinesGroup={setActiveFinesGroup}/>}
       </>}
     </div>
   </div>;
