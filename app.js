@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.88
+// SNYDER LIVE v1.89
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2620,6 +2620,21 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       navyName:(summary&&summary.navyName)||(teamNames.navy&&teamNames.navy.name)||'Navy'
     };
   }
+  function cupIfItStaysScore(){
+    const actual=actualCupTeamScore();
+    const projected=liveCupProjectedScore();
+    if(!projected)return actual;
+    return {
+      gold:(parseFloat(actual.gold)||0)+(parseFloat(projected.gold)||0),
+      navy:(parseFloat(actual.navy)||0)+(parseFloat(projected.navy)||0),
+      goldName:actual.goldName||projected.goldName||'Gold',
+      navyName:actual.navyName||projected.navyName||'Navy',
+      actualGold:parseFloat(actual.gold)||0,
+      actualNavy:parseFloat(actual.navy)||0,
+      projectedGold:parseFloat(projected.gold)||0,
+      projectedNavy:parseFloat(projected.navy)||0
+    };
+  }
   function fmtCupPoint(v){
     const n=parseFloat(v)||0;
     return Number.isInteger(n)?String(n):String(n).replace(/\.0$/,'');
@@ -3600,15 +3615,15 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
               <div>
                 <div style={{fontSize:18,color:'#fff',fontWeight:800}}>{overallMode==='cupOverall'?'Overall Cup':(overallMode==='cupDay'?('Day '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)+' Singles Leaderboard'):'Overall Leaderboard')}</div>
-                <div style={{fontSize:12,color:'#60b8f0'}}>{overallMode==='cupOverall'?'Live team score + overall singles':(overallMode==='cupDay'?('All singles scores for Day '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)):'All groups in this round')}</div>
+                <div style={{fontSize:12,color:'#60b8f0'}}>{overallMode==='cupOverall'?'If it stays like this + overall singles':(overallMode==='cupDay'?('All singles scores for Day '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)):'All groups in this round')}</div>
               </div>
               <button onClick={()=>setShowOverall(false)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Close</button>
             </div>
             <button onClick={async()=>{setOverallRefreshNote('Refreshing...'); overallMode==='cupOverall'?await openCupOverallSummary(false):(overallMode==='cupDay'?await openCupDaySinglesLeaderboard(false):await openOverallLeaderboard(false));}} style={{...S.pri,width:'100%',marginBottom:6,fontSize:13}}>Refresh leaderboard</button>
         {overallRefreshNote&&<div style={{fontSize:11,color:'#90ccf0',textAlign:'center',marginBottom:12}}>{overallRefreshNote}</div>}
-            {overallMode==='cupOverall'&&(()=>{const s=liveCupProjectedScore()||actualCupTeamScore();const rows=cupOverallSinglesRows();return <>
+            {overallMode==='cupOverall'&&(()=>{const s=cupIfItStaysScore();const rows=cupOverallSinglesRows();return <>
               <div style={{border:'1px solid rgba(255,255,255,0.22)',background:cupProjectedBg(),borderRadius:16,padding:'12px 14px',marginBottom:12,boxShadow:'0 10px 24px rgba(0,0,0,0.25)'}}>
-                <div style={{fontSize:11,fontWeight:950,letterSpacing:'0.12em',color:'rgba(255,255,255,0.86)',textTransform:'uppercase',marginBottom:8}}>Overall team score</div>
+                <div style={{fontSize:11,fontWeight:950,letterSpacing:'0.12em',color:'rgba(255,255,255,0.86)',textTransform:'uppercase',marginBottom:8}}>If it stays like this...</div>
                 <div style={{display:'grid',gridTemplateColumns:'58px minmax(0,1fr) 58px',alignItems:'center',gap:10}}>
                   <div style={{fontSize:32,fontWeight:950,color:'#fff',lineHeight:1}}>{fmtCupPoint(s.gold)}</div>
                   <div style={{textAlign:'center',minWidth:0}}>
@@ -3618,7 +3633,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
                   </div>
                   <div style={{fontSize:32,fontWeight:950,color:'#fff',lineHeight:1,textAlign:'right'}}>{fmtCupPoint(s.navy)}</div>
                 </div>
-                <div style={{fontSize:10,color:'rgba(255,255,255,0.78)',marginTop:8,textAlign:'center'}}>Updates as scorecards are entered</div>
+                <div style={{fontSize:10,color:'rgba(255,255,255,0.78)',marginTop:8,textAlign:'center'}}>Overall total + today's projected team score</div>
               </div>
               <div style={{fontSize:12,fontWeight:950,color:'#fbbf24',letterSpacing:'0.08em',textTransform:'uppercase',margin:'4px 0 8px'}}>Overall singles</div>
               {rows.map((r,idx)=>(
