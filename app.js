@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.87
+// SNYDER LIVE v1.88
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1865,7 +1865,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   // Scorecard handoff
   // ---------------------------------------------------------
   if(step==='scorecard'&&activeRound&&activeGroup){
-    return <LiveScorecard round={activeRound} group={activeGroup} players={players} courses={courses} scores={scores} sb={sb} flash={flash} load={load} setView={setView} holeScores={holeScores} setHoleScores={setHoleScores} currentUser={currentUser}/>;
+    return <LiveScorecard round={activeRound} group={activeGroup} players={players} courses={courses} rounds={rounds} scores={scores} sb={sb} flash={flash} load={load} setView={setView} holeScores={holeScores} setHoleScores={setHoleScores} currentUser={currentUser}/>;
   }
 
     // ---------------------------------------------------------
@@ -2079,7 +2079,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
 // Live scorecard
 // Hole entry, running totals, review pages, sharing and finish-round controls
 // =========================================================
-function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView,holeScores,setHoleScores,currentUser}){
+function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,setView,holeScores,setHoleScores,currentUser}){
   const course=courses.find(co=>co.id===round.course_id)||findCourseForTee(courses,round.course_name,round.tee);
   const holes=course&&course.holes&&course.holes.length>0?course.holes:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1,yards:0}));
   const[allGroups,setAllGroups]=useState(group?[group]:[]);
@@ -2124,6 +2124,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
   const[overallScores,setOverallScores]=useState([]);
   const[overallMode,setOverallMode]=useState('round');
   const[overallRefreshNote,setOverallRefreshNote]=useState('');
+  const[cupOverallRoundPlayers,setCupOverallRoundPlayers]=useState([]);
 
   function setSnakeMarksSafe(next){
     const clean=next&&typeof next==='object'?next:{};
@@ -2280,6 +2281,104 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
   }
   function cupPlayerDisplayName(cp){
     return (cp&&(cp.display_name||cp.name||cp.username||cp.full_name))||'Player';
+  }
+
+  function cupOverallBaseName(){
+    const name=String((round&&round.name)||'');
+    const m=name.match(/^(.*?)(?:\s+Day\s+\d+)/i);
+    return (m&&m[1]&&m[1].trim())||'Synder Cup';
+  }
+  function cupOverallRounds(){
+    const base=cupOverallBaseName();
+    const list=(rounds||[]).filter(r=>{
+      const n=String((r&&r.name)||'');
+      return n.startsWith(base+' Day ')||n.startsWith('Synder Cup Day ');
+    });
+    if(!list.some(r=>r&&round&&r.id===round.id))list.push(round);
+    const seen=new Set();
+    return list.filter(r=>r&&r.id&&!seen.has(r.id)&&seen.add(r.id));
+  }
+  function cupOverallPlayerKeys(cp){
+    return [cp&&cp.id,cp&&cp.user_id,cp&&cp.guest_id,cp&&cp.round_player_id,cp&&cp.cup_player_id].filter(Boolean).map(normaliseId);
+  }
+  function cupOverallPlayerIdForScoreRow(row){
+    if(!row)return null;
+    const rowPid=normaliseId(row.player_id);
+    const dayPlayers=(round&&round._cupDayAllPlayers)||[];
+    for(const cp of dayPlayers){
+      if(cupOverallPlayerKeys(cp).includes(rowPid))return cp.id;
+    }
+    const rps=cupOverallRoundPlayers||[];
+    const rp=(rps||[]).find(x=>x&&normaliseId(x.id)===rowPid&&(!row.round_id||x.round_id===row.round_id));
+    if(rp){
+      const rpName=String(rp.display_name||rp.name||'').trim().toLowerCase();
+      const byName=dayPlayers.find(cp=>String(cupPlayerDisplayName(cp)).trim().toLowerCase()===rpName);
+      if(byName)return byName.id;
+    }
+    const live=(grpPlayers||[]).find(gp=>[gp.id,gp.user_id,gp.guest_id,gp.round_player_id,gp.cup_player_id].filter(Boolean).map(normaliseId).includes(rowPid));
+    if(live){
+      const liveName=String(live.display_name||live.name||'').trim().toLowerCase();
+      const byName=dayPlayers.find(cp=>String(cupPlayerDisplayName(cp)).trim().toLowerCase()===liveName);
+      if(byName)return byName.id;
+    }
+    return null;
+  }
+  function cupOverallSinglesRows(){
+    const dayPlayers=(round&&round._cupDayAllPlayers)||[];
+    const rowsByCup={};
+    dayPlayers.forEach(cp=>{rowsByCup[cp.id]={id:cp.id,name:cupPlayerDisplayName(cp),total:0,holes:0,_holes:new Set()};});
+    const roundIdSet=new Set(cupOverallRounds().map(r=>r&&r.id).filter(Boolean));
+    const put=(sc,sourceRoundId)=>{
+      if(!sc||isMetaScoreRow(sc))return;
+      const h=parseInt(sc.hole_number)||0;
+      if(h<1||h>18)return;
+      const cpId=cupOverallPlayerIdForScoreRow({...sc,round_id:sourceRoundId||sc.round_id});
+      if(!cpId||!rowsByCup[cpId])return;
+      const key=(sourceRoundId||sc.round_id||'live')+'_'+h;
+      if(rowsByCup[cpId]._holes.has(key))return;
+      rowsByCup[cpId]._holes.add(key);
+      rowsByCup[cpId].holes+=1;
+      rowsByCup[cpId].total+=stablefordPointsValue(sc.stableford_points);
+    };
+    (overallScores&&overallScores.length?overallScores:scores||[]).forEach(sc=>{
+      if(sc&&roundIdSet.has(sc.round_id)&&(!round||sc.round_id!==round.id))put(sc,sc.round_id);
+    });
+    if(round&&round.id){
+      (grpPlayers||[]).forEach(gp=>{
+        for(let h=1;h<=holes.length;h++){
+          const gross=(holeScores[h]||{})[gp.id];
+          if(gross===undefined)continue;
+          put({round_id:round.id,player_id:gp.id,hole_number:h,gross_score:gross,stableford_points:getPts(gross,h,gp.id)||0},round.id);
+        }
+      });
+    }
+    return Object.values(rowsByCup).map(r=>({...r,_holes:undefined})).sort(compareStablefordLeaderboardRows);
+  }
+  async function openCupOverallSummary(openModal=true){
+    try{
+      const cupRounds=cupOverallRounds();
+      const ids=cupRounds.map(r=>r&&r.id).filter(Boolean);
+      let scs=[];
+      let rps=[];
+      if(ids.length){
+        const [{data:scoreData,error:scoreErr},{data:rpData,error:rpErr}]=await Promise.all([
+          sb.from('cup_scores').select('*').in('round_id',ids),
+          sb.from('cup_round_players').select('*').in('round_id',ids)
+        ]);
+        if(scoreErr)throw scoreErr;
+        if(rpErr)throw rpErr;
+        scs=(scoreData||[]).filter(r=>!isMetaScoreRow(r));
+        rps=rpData||[];
+      }
+      setCupOverallRoundPlayers(rps);
+      setOverallPlayers(((round&&round._cupDayAllPlayers)||[]).map(cp=>({id:cp.id,name:cupPlayerDisplayName(cp),playing_handicap:cp.handicap||0})));
+      setOverallScores(scs);
+      setOverallMode('cupOverall');
+      setOverallRefreshNote('Refreshed '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
+      if(openModal)setShowOverall(true);
+    }catch(e){
+      flash('Overall failed: '+(e.message||String(e)),'error');
+    }
   }
   async function openCupDaySinglesLeaderboard(openModal=true){
     try{
@@ -3248,7 +3347,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
             <div style={{fontSize:13,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{getCourseDisplayName(course,round)||'Scorecard'}</div>
             <div style={{fontSize:10,color:'#60b8f0'}}>Round start: {roundStartText}</div>
           </div>
-          <button onClick={openOverallLeaderboard} style={{background:'rgba(255,255,255,0.08)',border:'1px solid rgba(96,184,240,0.28)',color:'#90ccf0',borderRadius:8,padding:'6px 9px',fontSize:11,fontWeight:700,cursor:'pointer',flexShrink:0}}>Overall</button>
+          <button onClick={()=>round._cupScoring?openCupOverallSummary(true):openOverallLeaderboard(true)} style={{background:round._cupScoring?'linear-gradient(135deg,rgba(212,175,55,0.95),rgba(37,99,235,0.92))':'rgba(255,255,255,0.08)',border:round._cupScoring?'1px solid rgba(255,255,255,0.35)':'1px solid rgba(96,184,240,0.28)',color:'#fff',borderRadius:10,padding:'8px 11px',fontSize:12,fontWeight:950,cursor:'pointer',flexShrink:0,boxShadow:round._cupScoring?'0 8px 18px rgba(0,0,0,0.26)':'none',letterSpacing:'0.04em'}}>Overall</button>
           {round.join_code&&<button onClick={()=>{
             const url='https://snyder-live.vercel.app?watch='+round.join_code;
             if(navigator.share){navigator.share({title:'Watch live - '+( course&&course.name||''),url});}
@@ -3267,7 +3366,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
         )}
         {round._cupScoring&&activeGroupId!=='leaderboard'&&(
           <div style={{padding:'8px 12px 6px',background:'rgba(0,0,0,0.18)',borderTop:'1px solid rgba(255,255,255,0.07)'}}>
-            <button onClick={()=>openOverallLeaderboard(true)} style={{width:'100%',border:'1px solid rgba(255,255,255,0.26)',background:cupProjectedBg(),boxShadow:cupProjectedLeader()==='tie'?'none':'0 10px 24px rgba(0,0,0,0.28)',borderRadius:12,padding:'10px 12px',color:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,textAlign:'left'}}>
+            <button onClick={()=>openCupOverallSummary(true)} style={{width:'100%',border:'1px solid rgba(255,255,255,0.26)',background:cupProjectedBg(),boxShadow:cupProjectedLeader()==='tie'?'none':'0 10px 24px rgba(0,0,0,0.28)',borderRadius:12,padding:'10px 12px',color:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,textAlign:'left'}}>
               <div>
                 <div style={{fontSize:12,fontWeight:950,letterSpacing:'0.1em',color:'#fff'}}>PROJECTED SCORE</div>
                 <div style={{fontSize:10,color:'rgba(255,255,255,0.78)',marginTop:2}}>Live if current matches finished now</div>
@@ -3333,7 +3432,7 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
           <div style={{fontSize:22,color:'#fff',fontWeight:900}}>Live Leaderboard</div>
           <div style={{fontSize:12,color:'#90ccf0',marginTop:3}}>All groups in this round</div>
         </div>
-        <button onClick={async()=>{setOverallRefreshNote('Refreshing...'); overallMode==='cupDay'?await openCupDaySinglesLeaderboard(false):await openOverallLeaderboard(false);}} style={{...S.pri,width:'100%',marginBottom:6,fontSize:13}}>Refresh leaderboard</button>
+        <button onClick={async()=>{setOverallRefreshNote('Refreshing...'); overallMode==='cupOverall'?await openCupOverallSummary(false):(overallMode==='cupDay'?await openCupDaySinglesLeaderboard(false):await openOverallLeaderboard(false));}} style={{...S.pri,width:'100%',marginBottom:6,fontSize:13}}>Refresh leaderboard</button>
         {overallRefreshNote&&<div style={{fontSize:11,color:'#90ccf0',textAlign:'center',marginBottom:12}}>{overallRefreshNote}</div>}
         {overallLeaderboardRows().map((r,idx)=>(
           <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'12px',background:idx===0?'rgba(184,134,11,0.15)':'rgba(255,255,255,0.06)',border:'1px solid '+(idx===0?'rgba(184,134,11,0.3)':'rgba(255,255,255,0.08)'),borderRadius:14,marginBottom:8}}>
@@ -3500,14 +3599,43 @@ function LiveScorecard({round,group,players,courses,scores,sb,flash,load,setView
           <div style={{width:'100%',maxWidth:520,maxHeight:'82vh',overflowY:'auto',background:'#0d2548',borderTop:'1px solid rgba(255,255,255,0.16)',borderRadius:'18px 18px 0 0',padding:16}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
               <div>
-                <div style={{fontSize:18,color:'#fff',fontWeight:800}}>{overallMode==='cupDay'?('Day '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)+' Singles Leaderboard'):'Overall Leaderboard'}</div>
-                <div style={{fontSize:12,color:'#60b8f0'}}>{overallMode==='cupDay'?('All singles scores for Day '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)):'All groups in this round'}</div>
+                <div style={{fontSize:18,color:'#fff',fontWeight:800}}>{overallMode==='cupOverall'?'Overall Cup':(overallMode==='cupDay'?('Day '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)+' Singles Leaderboard'):'Overall Leaderboard')}</div>
+                <div style={{fontSize:12,color:'#60b8f0'}}>{overallMode==='cupOverall'?'Live team score + overall singles':(overallMode==='cupDay'?('All singles scores for Day '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)):'All groups in this round')}</div>
               </div>
               <button onClick={()=>setShowOverall(false)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Close</button>
             </div>
-            <button onClick={async()=>{setOverallRefreshNote('Refreshing...'); overallMode==='cupDay'?await openCupDaySinglesLeaderboard(false):await openOverallLeaderboard(false);}} style={{...S.pri,width:'100%',marginBottom:6,fontSize:13}}>Refresh leaderboard</button>
+            <button onClick={async()=>{setOverallRefreshNote('Refreshing...'); overallMode==='cupOverall'?await openCupOverallSummary(false):(overallMode==='cupDay'?await openCupDaySinglesLeaderboard(false):await openOverallLeaderboard(false));}} style={{...S.pri,width:'100%',marginBottom:6,fontSize:13}}>Refresh leaderboard</button>
         {overallRefreshNote&&<div style={{fontSize:11,color:'#90ccf0',textAlign:'center',marginBottom:12}}>{overallRefreshNote}</div>}
-            {overallLeaderboardRows().map((r,idx)=>(
+            {overallMode==='cupOverall'&&(()=>{const s=liveCupProjectedScore()||actualCupTeamScore();const rows=cupOverallSinglesRows();return <>
+              <div style={{border:'1px solid rgba(255,255,255,0.22)',background:cupProjectedBg(),borderRadius:16,padding:'12px 14px',marginBottom:12,boxShadow:'0 10px 24px rgba(0,0,0,0.25)'}}>
+                <div style={{fontSize:11,fontWeight:950,letterSpacing:'0.12em',color:'rgba(255,255,255,0.86)',textTransform:'uppercase',marginBottom:8}}>Overall team score</div>
+                <div style={{display:'grid',gridTemplateColumns:'58px minmax(0,1fr) 58px',alignItems:'center',gap:10}}>
+                  <div style={{fontSize:32,fontWeight:950,color:'#fff',lineHeight:1}}>{fmtCupPoint(s.gold)}</div>
+                  <div style={{textAlign:'center',minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:950,color:'#fff',textTransform:'uppercase',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.goldName||'Gold'}</div>
+                    <div style={{fontSize:11,fontWeight:900,color:'rgba(255,255,255,0.72)',letterSpacing:'0.12em',margin:'3px 0'}}>v</div>
+                    <div style={{fontSize:13,fontWeight:950,color:'#fff',textTransform:'uppercase',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.navyName||'Navy'}</div>
+                  </div>
+                  <div style={{fontSize:32,fontWeight:950,color:'#fff',lineHeight:1,textAlign:'right'}}>{fmtCupPoint(s.navy)}</div>
+                </div>
+                <div style={{fontSize:10,color:'rgba(255,255,255,0.78)',marginTop:8,textAlign:'center'}}>Updates as scorecards are entered</div>
+              </div>
+              <div style={{fontSize:12,fontWeight:950,color:'#fbbf24',letterSpacing:'0.08em',textTransform:'uppercase',margin:'4px 0 8px'}}>Overall singles</div>
+              {rows.map((r,idx)=>(
+                <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:idx===0?'linear-gradient(135deg,rgba(251,191,36,0.26),rgba(255,255,255,0.07))':idx===1?'linear-gradient(135deg,rgba(203,213,225,0.20),rgba(255,255,255,0.06))':idx===2?'linear-gradient(135deg,rgba(180,83,9,0.22),rgba(255,255,255,0.06))':'rgba(255,255,255,0.06)',border:'1px solid '+(idx<3?'rgba(251,191,36,0.24)':'rgba(255,255,255,0.08)'),borderRadius:12,marginBottom:8}}>
+                  <div style={{width:28,textAlign:'center',fontSize:18,color:idx===0?'#fbbf24':idx===1?'#cbd5e1':idx===2?'#fb923c':'rgba(255,255,255,0.48)',fontWeight:950}}>{idx+1}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:15,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{gameName(r.name)}</div>
+                    <div style={{fontSize:11,color:'#90ccf0'}}>Thru {r.holes}</div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:28,color:'#fff',fontWeight:950,lineHeight:1}}>{r.total}</div>
+                    <div style={{fontSize:9,color:'#60b8f0',letterSpacing:'0.12em'}}>PTS</div>
+                  </div>
+                </div>
+              ))}
+            </>})()}
+            {overallMode!=='cupOverall'&&overallLeaderboardRows().map((r,idx)=>(
               <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:idx===0?'rgba(184,134,11,0.15)':'rgba(255,255,255,0.06)',border:'1px solid '+(idx===0?'rgba(184,134,11,0.3)':'rgba(255,255,255,0.08)'),borderRadius:12,marginBottom:8}}>
                 <div style={{width:28,textAlign:'center',fontSize:18,color:idx===0?'#fbbf24':'rgba(255,255,255,0.48)',fontWeight:900}}>{idx+1}</div>
                 <div style={{flex:1,minWidth:0}}>
