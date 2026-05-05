@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.92
+// SNYDER LIVE v1.93
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1028,6 +1028,11 @@ function App(){
   if(view==='live')return <LiveScoringView {...props} selectedComp={selectedComp} activeComp={activeComp}/>;
   if(view==='tournaments')return <TournamentsView {...props} activeComp={activeComp} selectedComp={selectedComp} setSelectedComp={setSelectedComp}/>;
 
+  const homeLiveCount=liveRounds.length;
+  const homeMyRoundsCount=currentUser?myRounds.length:0;
+  const homeLatestLive=homeLiveCount?liveRounds[0]:null;
+  const homeLatestCourse=homeLatestLive?courses.find(co=>co.id===homeLatestLive.course_id):null;
+
   return(
     <div style={{minHeight:'100vh',paddingBottom:60,background:'linear-gradient(180deg,#0d2548 0%,#0a1f3d 100%)'}}>
       {/* Top nav */}
@@ -1042,78 +1047,81 @@ function App(){
         }
       </div>
 
-      <div style={{padding:'20px 16px 0'}}>
-        {/* Live rounds */}
-        {liveRounds.length>0&&(
-          <div style={{marginBottom:24}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-              <div style={{fontSize:22,color:'#fff',fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.03em'}}>Live Now</div>
-              <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{background:'none',border:'none',color:'#0070BB',fontSize:13,cursor:'pointer',fontWeight:600}}>See All</button>
-            </div>
-            <div style={{display:'flex',gap:12,overflowX:'auto',paddingBottom:4}}>
-              {liveRounds.map(rd=>{
-                const rdGroups=groups.filter(g=>g.round_id===rd.id);
-                const course=courses.find(co=>co.id===rd.course_id);
-                return(
-                  <div key={rd.id} onClick={()=>{window.history.replaceState({view:'home'},'',null);setSelectedRound(rd);setView('live');}} style={{...NO_SELECT,minWidth:200,borderRadius:14,overflow:'hidden',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)',flexShrink:0,cursor:'pointer'}}>
-                    <div style={{height:110,background:'linear-gradient(135deg,#0a3d6b 0%,#1a5fa8 60%,#0070BB 100%)',display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
-                      <CourseBadge course={course} round={rd} size={76}/>
-                      <div style={{position:'absolute',top:8,right:8,background:'#ef4444',borderRadius:20,padding:'3px 8px',fontSize:10,color:'#fff',fontWeight:700,letterSpacing:'0.05em'}}>LIVE</div>
-                    </div>
-                    <div style={{padding:'10px 12px'}}>
-                      <div style={{fontSize:15,color:'#fff',fontWeight:600,marginBottom:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||rd.course_name||'Round'}</div>
-                      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4,minWidth:0}}>
-                        <CourseBadge course={course} round={rd} size={22}/>
-                        <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.05em',textTransform:'uppercase',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.course_name}</div>
-                      </div>
-                      <div style={{fontSize:11,color:'rgba(255,255,255,0.5)'}}>{rdGroups.length} group{rdGroups.length!==1?'s':''} scoring</div>
-                    </div>
-                    {rd.join_code&&(
-                      <div style={{padding:'6px 12px',borderTop:'1px solid rgba(255,255,255,0.08)',display:'flex',gap:6}}>
-                        <button onClick={e=>{e.stopPropagation();const url='https://snyder-live.vercel.app?watch='+rd.join_code;if(navigator.share){navigator.share({title:'Watch live scoring',text:'Follow the round live',url});}else{navigator.clipboard&&navigator.clipboard.writeText(url);flash('Link copied!');};}} style={{flex:1,background:'#0070BB',border:'none',color:'#fff',borderRadius:6,padding:'5px 8px',fontSize:10,fontWeight:600,cursor:'pointer',letterSpacing:'0.05em'}}>SHARE LINK</button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Quick action - Play Golf */}
-        <div style={{marginBottom:24}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-            <div style={{fontSize:22,color:'#fff',fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.03em'}}>Play Golf</div>
-          </div>
-          <div onClick={()=>currentUser?setView('play'):promptStartRoundAuth()} style={{borderRadius:16,overflow:'hidden',background:'linear-gradient(135deg,#0070BB 0%,#1a4a8a 60%,#0a2d5a 100%)',cursor:'pointer',padding:'20px',display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-            <div>
-              <div style={{fontSize:20,color:'#fff',fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.03em',marginBottom:4}}>Start a Round</div>
-              <div style={{fontSize:13,color:'rgba(255,255,255,0.7)'}}>Pick a course, add players, go live</div>
-            </div>
-            <div style={{width:52,height:52,borderRadius:'50%',background:'rgba(255,255,255,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24}}>+</div>
-          </div>
-          {currentUser&&myRounds.length>0&&(
-            <div style={{marginTop:18}}>
-              <div style={{fontSize:18,color:'#fff',fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.03em',marginBottom:10}}>My Rounds</div>
-              {myRounds.slice(0,4).map(rd=>{
-                const course=courses.find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee);
-                const live=isLiveRound(rd);
-                return(
-                  <div key={rd.id} onClick={()=>openRound(rd)} style={{...S.card,...NO_SELECT,marginBottom:8,cursor:'pointer',display:'flex',alignItems:'center',gap:10}}>
-                    <CourseBadge course={course} round={rd} size={34}/>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:14,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||getCourseDisplayName(course,rd)||'Round'}</div>
-                      <div style={{fontSize:11,color:'#60b8f0'}}>{live?'Continue scoring':'Completed'} - {formatRoundStart(rd)}</div>
-                    </div>
-                    <div style={{fontSize:10,color:live?'#fff':'#60b8f0',background:live?'#ef4444':'rgba(96,184,240,0.12)',borderRadius:20,padding:'4px 8px',fontWeight:700}}>{live?'LIVE':'DONE'}</div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
+      <div style={{padding:'18px 16px 0'}}>
+        {/* Cleaner home dashboard */}
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:11,color:'#60b8f0',fontWeight:900,letterSpacing:'0.16em',textTransform:'uppercase',marginBottom:6}}>Home</div>
+          <div style={{fontSize:28,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Snyder Live</div>
+          <div style={{fontSize:13,color:'rgba(255,255,255,0.58)',marginTop:6}}>Pick what you need and get straight in.</div>
         </div>
 
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:18}}>
+          <button onClick={()=>currentUser?setView('play'):promptStartRoundAuth()} style={{...NO_SELECT,border:'1px solid rgba(96,184,240,0.22)',borderRadius:24,background:'linear-gradient(135deg,#0070BB 0%,#123d73 100%)',padding:'18px 14px',minHeight:132,textAlign:'left',cursor:'pointer',boxShadow:'0 14px 32px rgba(0,112,187,0.22)',color:'#fff'}}>
+            <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(255,255,255,0.16)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,fontWeight:900,marginBottom:14}}>+</div>
+            <div style={{fontSize:21,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Start Round</div>
+            <div style={{fontSize:12,color:'rgba(255,255,255,0.72)',marginTop:5,lineHeight:1.25}}>Create a card and go live</div>
+          </button>
+
+          <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{...NO_SELECT,border:'1px solid rgba(255,255,255,0.11)',borderRadius:24,background:'rgba(255,255,255,0.075)',padding:'18px 14px',minHeight:132,textAlign:'left',cursor:'pointer',color:'#fff',position:'relative',overflow:'hidden'}}>
+            <div style={{position:'absolute',inset:0,background:homeLiveCount?'linear-gradient(135deg,rgba(239,68,68,0.18),rgba(0,112,187,0.22))':'linear-gradient(135deg,rgba(96,184,240,0.08),rgba(255,255,255,0.03))',pointerEvents:'none'}}/>
+            <div style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+              <div style={{width:48,height:48,borderRadius:'50%',background:homeLiveCount?'rgba(239,68,68,0.22)':'rgba(96,184,240,0.12)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>●</div>
+              <div style={{fontSize:24,fontWeight:900,color:homeLiveCount?'#ef4444':'#60b8f0'}}>{homeLiveCount}</div>
+            </div>
+            <div style={{position:'relative',fontSize:21,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Live Games</div>
+            <div style={{position:'relative',fontSize:12,color:'rgba(255,255,255,0.72)',marginTop:5,lineHeight:1.25}}>{homeLiveCount?'Watch or continue scoring':'No games live right now'}</div>
+          </button>
+
+          <button onClick={()=>setView('tournaments')} style={{...NO_SELECT,border:'1px solid rgba(212,175,55,0.34)',borderRadius:24,background:'linear-gradient(135deg,rgba(212,175,55,0.18),rgba(11,31,77,0.92))',padding:'18px 14px',minHeight:122,textAlign:'left',cursor:'pointer',color:'#fff',boxShadow:'0 14px 30px rgba(212,175,55,0.10)'}}>
+            <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(212,175,55,0.18)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,marginBottom:14}}>🏆</div>
+            <div style={{fontSize:21,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Snyder Cup</div>
+            <div style={{fontSize:12,color:'rgba(255,255,255,0.72)',marginTop:5,lineHeight:1.25}}>Team score, singles, fines</div>
+          </button>
+
+          <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{...NO_SELECT,border:'1px solid rgba(96,184,240,0.18)',borderRadius:24,background:'rgba(255,255,255,0.065)',padding:'18px 14px',minHeight:122,textAlign:'left',cursor:'pointer',color:'#fff'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+              <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(96,184,240,0.12)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>▦</div>
+              {currentUser&&<div style={{fontSize:24,fontWeight:900,color:'#60b8f0'}}>{homeMyRoundsCount}</div>}
+            </div>
+            <div style={{fontSize:21,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Scorecards</div>
+            <div style={{fontSize:12,color:'rgba(255,255,255,0.72)',marginTop:5,lineHeight:1.25}}>Live scores and saved cards</div>
+          </button>
+        </div>
+
+        {homeLatestLive&&(
+          <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setSelectedRound(homeLatestLive);setView('live');}} style={{...NO_SELECT,width:'100%',border:'1px solid rgba(96,184,240,0.18)',borderRadius:22,background:'rgba(255,255,255,0.055)',padding:12,display:'flex',alignItems:'center',gap:12,cursor:'pointer',color:'#fff',marginBottom:16,textAlign:'left'}}>
+            <CourseBadge course={homeLatestCourse} round={homeLatestLive} size={42}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:10,color:'#ef4444',fontWeight:900,letterSpacing:'0.12em',textTransform:'uppercase',marginBottom:3}}>Live now</div>
+              <div style={{fontSize:14,fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{homeLatestLive.name||homeLatestLive.course_name||'Round'}</div>
+              <div style={{fontSize:11,color:'#60b8f0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{homeLatestLive.course_name}</div>
+            </div>
+            <div style={{width:34,height:34,borderRadius:'50%',background:'#0070BB',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900}}>›</div>
+          </button>
+        )}
+
+        {currentUser&&myRounds.length>0&&(
+          <div style={{borderRadius:22,border:'1px solid rgba(255,255,255,0.10)',background:'rgba(255,255,255,0.045)',padding:12,marginBottom:18}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+              <div style={{fontSize:13,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>RECENT ROUND</div>
+              <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{background:'none',border:'none',color:'#60b8f0',fontWeight:800,fontSize:12,cursor:'pointer'}}>See all</button>
+            </div>
+            {myRounds.slice(0,1).map(rd=>{
+              const course=courses.find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee);
+              const live=isLiveRound(rd);
+              return(
+                <button key={rd.id} onClick={()=>openRound(rd)} style={{...NO_SELECT,width:'100%',background:'rgba(13,37,72,0.72)',border:'1px solid rgba(96,184,240,0.16)',borderRadius:18,padding:10,display:'flex',alignItems:'center',gap:10,cursor:'pointer',color:'#fff',textAlign:'left'}}>
+                  <CourseBadge course={course} round={rd} size={36}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:14,fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||getCourseDisplayName(course,rd)||'Round'}</div>
+                    <div style={{fontSize:11,color:'#60b8f0'}}>{live?'Continue scoring':'Completed'} · {formatRoundStart(rd)}</div>
+                  </div>
+                  <div style={{fontSize:10,color:live?'#fff':'#60b8f0',background:live?'#ef4444':'rgba(96,184,240,0.12)',borderRadius:20,padding:'4px 8px',fontWeight:900}}>{live?'LIVE':'DONE'}</div>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
       </div>
 
