@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.95
+// SNYDER LIVE v1.96
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1199,8 +1199,68 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     const rdGroups=groups.filter(g=>g.round_id===rd.id);
     const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
     const roundPlayers=(rps||[]);
-    const po=roundPlayers.map(rp=>({id:rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0,user_id:rp.user_id,guest_id:rp.guest_id,cup_player_id:rp.cup_player_id,round_player_id:rp.id}));
-    const hm={};roundPlayers.forEach(rp=>{[rp.id,rp.user_id,rp.guest_id,rp.cup_player_id].filter(Boolean).forEach(id=>{hm[id]=rp.playing_handicap||0;});});
+    const isCup=isSnyderCupRound(rd);
+    const cupInfo=cupRoundInfoFromName(rd);
+    const cupDay=parseInt((cupInfo&&cupInfo.day)||rd.day_number)||1;
+    const cupGroup=parseInt((cupInfo&&cupInfo.group)||1)||1;
+    const cup=(cupEvents||[])[0];
+    const teams=cup?getCupTeams(cup,cupTeams||[]):{};
+    const cupPlayers=(cupEventPlayers||[]).filter(p=>!cup||p.cup_id===cup.id);
+    function stableCupId(p){return p&&(p.id||p.guest_id||p.user_id);}
+    function cupName(p){return (p&&(p.display_name||p.name||p.username||p.full_name))||'Player';}
+    function findCupPlayerLocal(id){
+      const key=normaliseId(id);
+      return cupPlayers.find(p=>[p.id,p.user_id,p.guest_id].some(x=>normaliseId(x)===key));
+    }
+    function cupDayGroupsLocal(day){
+      const dayMatches=(cupMatches||[]).filter(m=>(parseInt(m.day_number)||1)===(parseInt(day)||1)&&(!cup||m.cup_id===cup.id));
+      const doubles=dayMatches.filter(m=>String(m.match_type||'').toLowerCase()==='doubles');
+      const singles=dayMatches.filter(m=>String(m.match_type||'').toLowerCase()!=='doubles');
+      const usedSingles=new Set();
+      const made=doubles.map((dbl,idx)=>{
+        const ids=new Set([...(dbl.gold_player_ids||[]),...(dbl.navy_player_ids||[])].map(normaliseId));
+        const linked=singles.filter(sg=>{
+          const sIds=[...(sg.gold_player_ids||[]),...(sg.navy_player_ids||[])].map(normaliseId);
+          const ok=sIds.every(id=>ids.has(id));
+          if(ok)usedSingles.add(sg.id);
+          return ok;
+        });
+        return{day,idx:idx+1,doubles:dbl,singles:linked,players:[...(dbl.gold_player_ids||[]),...(dbl.navy_player_ids||[])]};
+      });
+      singles.filter(sg=>!usedSingles.has(sg.id)).forEach(sg=>made.push({day,idx:made.length+1,doubles:null,singles:[sg],players:[...(sg.gold_player_ids||[]),...(sg.navy_player_ids||[])]}));
+      return made;
+    }
+    function cupPlayersForGroupLocal(group){
+      const ids=[...(group&&group.players||[]),...((group&&group.doubles&&group.doubles.gold_player_ids)||[]),...((group&&group.doubles&&group.doubles.navy_player_ids)||[]),...((group&&group.singles||[]).flatMap(m=>[...(m.gold_player_ids||[]),...(m.navy_player_ids||[])]))];
+      const seen=new Set();
+      return ids.map(findCupPlayerLocal).filter(Boolean).filter(p=>{const key=normaliseId(stableCupId(p));if(seen.has(key))return false;seen.add(key);return true;});
+    }
+    function cupScoreGroupFromExistingRows(group){
+      const wanted=cupPlayersForGroupLocal(group);
+      const used=new Set();
+      const participants=wanted.map((p,idx)=>{
+        const nm=cupName(p);
+        const nameKey=String(nm).trim().toLowerCase();
+        let row=roundPlayers.find(r=>!used.has(r.id)&&String(r.display_name||'').trim().toLowerCase()===nameKey);
+        if(!row)row=roundPlayers.find((r,i)=>!used.has(r.id)&&i===idx);
+        if(!row)row=roundPlayers.find(r=>!used.has(r.id));
+        if(row)used.add(row.id);
+        const rid=row&&row.id;
+        const h=parseFloat((row&&row.playing_handicap)??p.playing_handicap??p.handicap??0)||0;
+        return {id:rid||stableCupId(p),name:nm,display_name:nm,current_handicap:h,handicap:h,playing_handicap:h,user_id:p.user_id||null,guest_id:p.guest_id||null,cup_player_id:stableCupId(p),round_player_id:rid||null,is_host:!!(row&&row.is_host)};
+      });
+      if(!participants.length){
+        return null;
+      }
+      const playingHcps={};
+      const cupPlayerMap={};
+      participants.forEach(pt=>{
+        [pt.id,pt.round_player_id,pt.cup_player_id,pt.user_id,pt.guest_id].filter(Boolean).forEach(id=>{playingHcps[id]=parseFloat(pt.playing_handicap||0)||0;});
+        if(pt.cup_player_id&&pt.id)cupPlayerMap[normaliseId(pt.cup_player_id)]=pt.id;
+      });
+      return{round_id:rd.id,group_number:1,player_ids:participants.map(p=>p.id).filter(Boolean),playing_handicaps:playingHcps,participants,_cupPlayerMap:cupPlayerMap};
+    }
+
     if(rdGroups[0]){
       const userGroup=(rdGroups.find(g=>currentUser&&Array.isArray(g.player_ids)&&(g.player_ids||[]).some(pid=>normaliseId(pid)===normaliseId(currentUser.id)))||rdGroups[0]);
       const canScore=userCanScoreRound(currentUser,userGroup,roundPlayers);
@@ -1215,23 +1275,21 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
       const merged={...local,...dbMap};
       if(setHoleScores)setHoleScores(merged);
       try{if(Object.keys(dbMap).length>0)localStorage.setItem('scores_'+rd.id,JSON.stringify(merged));}catch(e){}
-      const cupInfo=cupRoundInfoFromName(rd);
-      const cup=(cupEvents||[])[0];
-      const teams=cup?getCupTeams(cup,cupTeams||[]):{};
-      const cupDay=parseInt((cupInfo&&cupInfo.day)||rd.day_number)||1;
-      const cupGroup=parseInt((cupInfo&&cupInfo.group)||1)||1;
-      const isCup=isSnyderCupRound(rd);
-      const cupDayRounds=isCup?(rounds||[]).filter(r=>parseInt(r.day_number||((cupRoundInfoFromName(r)||{}).day)||0)===cupDay&&isSnyderCupRound(r)):[];
-      const selected={...rd,_spectator:!canScore,_group:{...rdGroups[0],participants:po,playing_handicaps:hm,player_ids:(rdGroups[0].player_ids&&rdGroups[0].player_ids.length?rdGroups[0].player_ids:po.map(p=>p.id))}};
+
       if(isCup){
-        selected._cupScoring=true;
-        selected._cupTeams=teams;
-        selected._cupDayNumber=cupDay;
-        selected._cupGroupData={day:cupDay,idx:cupGroup,players:po};
-        selected._cupDayAllPlayers=(cupEventPlayers||[]).filter(p=>!cup||p.cup_id===cup.id);
-        selected._cupDayRounds=cupDayRounds.length?cupDayRounds:[rd];
-        selected._cupDayGroups=[{day:cupDay,idx:cupGroup,players:po}];
+        const dayGroups=cupDayGroupsLocal(cupDay);
+        const groupData=dayGroups.find(g=>parseInt(g.idx)===cupGroup)||dayGroups[0]||{day:cupDay,idx:cupGroup,players:[]};
+        const cupGroupForScorecard=cupScoreGroupFromExistingRows(groupData);
+        const cupDayRounds=(rounds||[]).filter(r=>parseInt(r.day_number||((cupRoundInfoFromName(r)||{}).day)||0)===cupDay&&isSnyderCupRound(r));
+        const selected={...rd,_spectator:!canScore,_cupScoring:true,_cupTeams:teams,_cupDayNumber:cupDay,_cupGroupData:groupData,_cupDayAllPlayers:cupPlayers,_cupDayRounds:cupDayRounds.length?cupDayRounds:[rd],_cupDayGroups:dayGroups,_group:cupGroupForScorecard||{...rdGroups[0],participants:roundPlayers.map(rp=>({id:rp.id,name:rp.display_name||'Player',display_name:rp.display_name||'Player',current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0})),playing_handicaps:rdGroups[0].playing_handicaps||{},player_ids:rdGroups[0].player_ids||[]}};
+        setSelectedRound(selected);
+        setView('play');
+        return;
       }
+
+      const po=roundPlayers.map(rp=>({id:rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0,user_id:rp.user_id,guest_id:rp.guest_id,cup_player_id:rp.cup_player_id,round_player_id:rp.id}));
+      const hm={};roundPlayers.forEach(rp=>{[rp.id,rp.user_id,rp.guest_id,rp.cup_player_id].filter(Boolean).forEach(id=>{hm[id]=rp.playing_handicap||0;});});
+      const selected={...rd,_spectator:!canScore,_group:{...rdGroups[0],participants:po,playing_handicaps:hm,player_ids:(rdGroups[0].player_ids&&rdGroups[0].player_ids.length?rdGroups[0].player_ids:po.map(p=>p.id))}};
       setSelectedRound(selected);
       setView('play');
     }
