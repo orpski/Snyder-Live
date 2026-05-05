@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.89
+// SNYDER LIVE v1.90
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1062,7 +1062,10 @@ function App(){
                     </div>
                     <div style={{padding:'10px 12px'}}>
                       <div style={{fontSize:15,color:'#fff',fontWeight:600,marginBottom:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||rd.course_name||'Round'}</div>
-                      <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:4}}>{rd.course_name}</div>
+                      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4,minWidth:0}}>
+                        <CourseBadge course={course} round={rd} size={22}/>
+                        <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.05em',textTransform:'uppercase',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.course_name}</div>
+                      </div>
                       <div style={{fontSize:11,color:'rgba(255,255,255,0.5)'}}>{rdGroups.length} group{rdGroups.length!==1?'s':''} scoring</div>
                     </div>
                     {rd.join_code&&(
@@ -1299,6 +1302,10 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
                     <div style={{minWidth:0}}>
                       <div style={{fontSize:16,color:'#fff',fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||rd.course_name}</div>
                       <div style={{fontSize:11,color:'#60b8f0'}}>Round started: {formatRoundStart(rd)}</div>
+                      <div style={{display:'flex',alignItems:'center',gap:5,marginTop:4,minWidth:0}}>
+                        <CourseBadge course={courses.find(co=>co.id===rd.course_id)} round={rd} size={20}/>
+                        <div style={{fontSize:10,color:'rgba(255,255,255,0.58)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.course_name||rd.name||'Course'}</div>
+                      </div>
                     </div>
                   </div>
                   <div style={{fontSize:10,color:'#fff',background:'#ef4444',borderRadius:20,padding:'4px 8px',fontWeight:700,letterSpacing:'0.08em',flexShrink:0}}>LIVE</div>
@@ -4972,15 +4979,17 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     }).sort((a,b)=>(b._fineTotal||0)-(a._fineTotal||0)||String(cupDisplayName(a)).localeCompare(String(cupDisplayName(b))));
   }
   function singlesLeaderboard(){
+    // Cup home overall singles is live: include every saved score row from every Cup day,
+    // not just finished days, so the home screen moves as scores are entered.
     return (playersInCup||[]).map(p=>{
       const dayScores=cupDayNumbers.map(day=>{
-        const finishedDayRounds=cupRoundsForDay(day).filter(isCompletedRound);
-        const points=finishedDayRounds.reduce((t,r)=>t+playerAdjustedSinglesPointsFromRound(r,p,day),0);
-        const holesForDay=finishedDayRounds.reduce((t,r)=>t+cupPlayerScoreRowsForRound(r,p).filter(s=>{
+        const dayRounds=cupRoundsForDay(day);
+        const points=dayRounds.reduce((t,r)=>t+playerAdjustedSinglesPointsFromRound(r,p,day),0);
+        const holesForDay=dayRounds.reduce((t,r)=>t+cupPlayerScoreRowsForRound(r,p).filter(s=>{
           const h=parseInt(s&&s.hole_number);
           return h>=1&&h<=18;
         }).length,0);
-        return{day,points,holes:holesForDay,finished:finishedDayRounds.length>0};
+        return{day,points,holes:holesForDay,finished:dayRounds.some(isCompletedRound),live:dayRounds.some(r=>r&&!isCompletedRound(r))};
       });
       const total=dayScores.reduce((sum,d)=>sum+(parseInt(d.points)||0),0);
       const holes=dayScores.reduce((sum,d)=>sum+(parseInt(d.holes)||0),0);
