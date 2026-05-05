@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.94
+// SNYDER LIVE v1.95
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -186,6 +186,8 @@ function getCourseBadge(course,round){
   const name=getCourseName(course,round).toLowerCase();
   if(name.includes('whitley bay'))return WHITLEY_BAY_BADGE;
   if(name.includes('tynemouth'))return TYNEMOUTH_BADGE;
+  if(name.includes('quinta'))return QUINTA_DO_LAGO_BADGE;
+  if(name.includes('ombria'))return OMBRIA_BADGE;
   return '';
 }
 function getCourseInitials(course,round){
@@ -197,6 +199,16 @@ function CourseBadge({course,round,size=38}){
   return <div style={{width:size,height:size,borderRadius:size>=70?'50%':10,overflow:'hidden',flexShrink:0,background:'linear-gradient(135deg,#0a3d6b,#0070BB)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:Math.max(9,Math.round(size/4)),fontWeight:700,color:'rgba(255,255,255,0.7)',border:'1px solid rgba(255,255,255,0.18)',boxShadow:size>=70?'0 10px 24px rgba(0,0,0,0.25)':'none'}}>
     {src?<img src={src} alt='' style={{width:'100%',height:'100%',objectFit:'contain',background:'transparent',padding:size>=70?4:2,boxSizing:'border-box'}} onError={e=>{e.currentTarget.style.display='none';}}/>:<div style={{textAlign:'center',lineHeight:1.1,padding:2}}>{getCourseInitials(course,round)}</div>}
   </div>;
+}
+
+function cupRoundInfoFromName(round){
+  const name=String((round&&round.name)||'');
+  const m=name.match(/(?:Snyder|Synder) Cup.*?Day\s+(\d+)\s+Group\s+(\d+)/i);
+  return m?{day:parseInt(m[1])||1,group:parseInt(m[2])||1}:null;
+}
+function isSnyderCupRound(round){
+  if(!round)return false;
+  return !!cupRoundInfoFromName(round)||String(round.name||'').toLowerCase().includes('snyder cup')||String(round.name||'').toLowerCase().includes('synder cup');
 }
 
 // =========================================================
@@ -1147,7 +1159,7 @@ function App(){
 // Live scores and completed scores view
 // Lists active rounds, this week's cards and older monthly cards
 // =========================================================
-function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash,setView,selectedComp,activeComp,setSelectedRound,currentUser,setHoleScores,holeScores}){
+function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,sb,flash,setView,selectedComp,activeComp,setSelectedRound,currentUser,setHoleScores,holeScores}){
   const liveRounds=rounds.filter(r=>{
     if(!isLiveRound(r))return false;
     if(!r.is_private)return true;
@@ -1186,11 +1198,12 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
   async function openRound(rd){
     const rdGroups=groups.filter(g=>g.round_id===rd.id);
     const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
-    const po=(rps||[]).map(rp=>({id:rp.user_id||rp.guest_id||rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0}));
-    const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
+    const roundPlayers=(rps||[]);
+    const po=roundPlayers.map(rp=>({id:rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0,user_id:rp.user_id,guest_id:rp.guest_id,cup_player_id:rp.cup_player_id,round_player_id:rp.id}));
+    const hm={};roundPlayers.forEach(rp=>{[rp.id,rp.user_id,rp.guest_id,rp.cup_player_id].filter(Boolean).forEach(id=>{hm[id]=rp.playing_handicap||0;});});
     if(rdGroups[0]){
       const userGroup=(rdGroups.find(g=>currentUser&&Array.isArray(g.player_ids)&&(g.player_ids||[]).some(pid=>normaliseId(pid)===normaliseId(currentUser.id)))||rdGroups[0]);
-      const canScore=userCanScoreRound(currentUser,userGroup,rps);
+      const canScore=userCanScoreRound(currentUser,userGroup,roundPlayers);
       let local={};
       try{local=JSON.parse(localStorage.getItem('scores_'+rd.id)||'{}')||{};}catch(e){local={};}
       const{data:dbScores}=await sb.from('cup_scores').select('*').eq('round_id',rd.id);
@@ -1202,7 +1215,24 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,sb,flash
       const merged={...local,...dbMap};
       if(setHoleScores)setHoleScores(merged);
       try{if(Object.keys(dbMap).length>0)localStorage.setItem('scores_'+rd.id,JSON.stringify(merged));}catch(e){}
-      setSelectedRound({...rd,_spectator:!canScore,_group:{...rdGroups[0],participants:po,playing_handicaps:hm}});
+      const cupInfo=cupRoundInfoFromName(rd);
+      const cup=(cupEvents||[])[0];
+      const teams=cup?getCupTeams(cup,cupTeams||[]):{};
+      const cupDay=parseInt((cupInfo&&cupInfo.day)||rd.day_number)||1;
+      const cupGroup=parseInt((cupInfo&&cupInfo.group)||1)||1;
+      const isCup=isSnyderCupRound(rd);
+      const cupDayRounds=isCup?(rounds||[]).filter(r=>parseInt(r.day_number||((cupRoundInfoFromName(r)||{}).day)||0)===cupDay&&isSnyderCupRound(r)):[];
+      const selected={...rd,_spectator:!canScore,_group:{...rdGroups[0],participants:po,playing_handicaps:hm,player_ids:(rdGroups[0].player_ids&&rdGroups[0].player_ids.length?rdGroups[0].player_ids:po.map(p=>p.id))}};
+      if(isCup){
+        selected._cupScoring=true;
+        selected._cupTeams=teams;
+        selected._cupDayNumber=cupDay;
+        selected._cupGroupData={day:cupDay,idx:cupGroup,players:po};
+        selected._cupDayAllPlayers=(cupEventPlayers||[]).filter(p=>!cup||p.cup_id===cup.id);
+        selected._cupDayRounds=cupDayRounds.length?cupDayRounds:[rd];
+        selected._cupDayGroups=[{day:cupDay,idx:cupGroup,players:po}];
+      }
+      setSelectedRound(selected);
       setView('play');
     }
   }
@@ -4578,6 +4608,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
       if(showCupFinesSummary){setShowCupFinesSummary(false);return;}
       if(showCupSummary){setShowCupSummary(false);return;}
       if(showCupHandicaps){setShowCupHandicaps(false);return;}
+      setView('home');
     }
     window.addEventListener('popstate',handleCupBack);
     return()=>window.removeEventListener('popstate',handleCupBack);
