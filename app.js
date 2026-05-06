@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.06
+// SNYDER LIVE v2.07
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -4533,6 +4533,34 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     const{error}=await sb.from('snyder_cup_matches').delete().eq('id',match.id);
     if(error)flash(error.message,'error');else{flash('Match deleted');await load();}
   }
+  async function resetCompetition(){
+    if(!cup)return;
+    if(!confirm('Reset Snyder Cup setup and scorecards? This clears days, matches and all Cup scorecards, but keeps teams and squad players.'))return;
+    if(!confirm('Are you sure? This cannot be undone.'))return;
+    const cupTitleLocal=cup.name||'Snyder Cup 2026';
+    const isCupRound=rd=>{
+      const name=String(rd&&rd.name||'');
+      return name.startsWith(cupTitleLocal+' Day ')||name.startsWith('Snyder Cup 2026 Day ')||name.startsWith('Synder Cup 2026 Day ')||name.startsWith('Synder Cup Day ');
+    };
+    const{data:cupRounds,error:roundLoadErr}=await sb.from('cup_rounds').select('id,name');
+    if(roundLoadErr){flash(roundLoadErr.message,'error');return;}
+    const resetRounds=(cupRounds||[]).filter(isCupRound);
+    for(const rd of resetRounds){
+      await sb.from('cup_scores').delete().eq('round_id',rd.id);
+      await sb.from('cup_groups').delete().eq('round_id',rd.id);
+      await sb.from('cup_round_players').delete().eq('round_id',rd.id);
+      await sb.from('cup_rounds').delete().eq('id',rd.id);
+      try{localStorage.removeItem('scores_'+rd.id);localStorage.removeItem('pending_scores_'+rd.id);}catch(e){}
+    }
+    await sb.from('snyder_cup_matches').delete().eq('cup_id',cup.id);
+    await sb.from('snyder_cup_days').delete().eq('cup_id',cup.id);
+    try{
+      for(let d=1;d<=10;d++)localStorage.removeItem(cupDayCourseStorageKey(cup.id,d));
+      sessionStorage.removeItem('cupReturnDay');
+    }catch(e){}
+    await load();
+    flash('Snyder Cup reset. Teams and squad players kept.');
+  }
   function TeamAdminCard({teamKey,team,rows}){
     const form=newPlayer[teamKey]||{};
     const usedUsers=cupPlayers.filter(p=>p.user_id).map(p=>p.user_id);
@@ -4558,6 +4586,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     <div style={{...S.card,marginBottom:14,background:'linear-gradient(135deg,rgba(212,175,55,0.13),rgba(11,31,77,0.35))'}}>
       <div style={{fontSize:18,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.07em'}}>SNYDER CUP SETUP</div>
       <div style={{fontSize:12,color:'#9fb6c9',marginTop:4}}>Professional setup panel: Cup details, squads, days, matches and quick fixes.</div>
+      {cup&&<button onClick={resetCompetition} style={{...S.dan,width:'100%',padding:11,fontSize:13,marginTop:12}}>Reset Competition</button>}
     </div>
     {!cup&&<div style={{...S.card,marginBottom:14}}>
       <div style={{fontSize:14,color:'#fff',fontWeight:800,marginBottom:10}}>Create Cup</div>
