@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.08
+// SNYDER LIVE v2.09
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2962,19 +2962,18 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return snakeHolderFromGroupMarks(marks,holeNum);
   }
 
+  function snakeHolderForHole(holeNum){
+    const activeHolder=getSnakeStarter(holeNum);
+    if(activeHolder)return activeHolder;
+    const groups=currentSnakeMarks()||{};
+    const holders=Object.keys(groups).map(k=>snakeHolderFromGroupMarks(groups[k],holeNum)).filter(Boolean);
+    return holders[0]||null;
+  }
+
   function isSnakeHolder(holeNum,pid){
     const id=normaliseId(pid);
-    const holder=getSnakeStarter(holeNum);
-    if(holder&&normaliseId(holder)===id)return true;
-
-    // Spectator/full-card views can hydrate the same round with a different
-    // active group key than the scorer used when saving the snake marker.
-    // Fall back by player id across saved snake groups so spectators see it too.
-    const groups=currentSnakeMarks()||{};
-    return Object.keys(groups).some(k=>{
-      const h=snakeHolderFromGroupMarks(groups[k],holeNum);
-      return h&&normaliseId(h)===id;
-    });
+    const holder=snakeHolderForHole(holeNum);
+    return !!holder&&normaliseId(holder)===id;
   }
 
   function scoreRowHasSnake(holeNum,pid){
@@ -3016,22 +3015,26 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     }
   }
 
-  async function saveSnakeFlagOnExistingScore(holeNum,pid,checked=true){
-    const gross=(holeScores&&holeScores[holeNum]||{})[pid];
-    if(!hasEnteredGross(gross))return;
+  async function saveSnakeFlagsForHole(holeNum,pid,checked=true){
     try{
       const hd=getHole(holeNum);
-      const hcp=parseFloat(playingHcps[pid]!=null?playingHcps[pid]:(grpPlayers.find(p=>p.id===pid)||{}).current_handicap||0);
-      const pts=(gross===-1||isGivenGross(gross))?0:calcStableford(gross,hd.par,hd.stroke_index,hcp)||0;
-      await saveScoreRowToCloud(sb,{
-        round_id:round.id,
-        player_id:pid,
-        hole_number:holeNum,
-        gross_score:gross,
-        stableford_points:stablefordPointsWithSnake(pts,checked),
-        par:hd.par,
-        stroke_index:hd.stroke_index
-      });
+      for(const player of grpPlayers){
+        const rowPid=player&&player.id;
+        const gross=(holeScores&&holeScores[holeNum]||{})[rowPid];
+        if(!rowPid||!hasEnteredGross(gross))continue;
+        const hcp=parseFloat(playingHcps[rowPid]!=null?playingHcps[rowPid]:(player&&player.current_handicap)||0);
+        const pts=(gross===-1||isGivenGross(gross))?0:calcStableford(gross,hd.par,hd.stroke_index,hcp)||0;
+        const shouldFlag=checked&&normaliseId(rowPid)===normaliseId(pid);
+        await saveScoreRowToCloud(sb,{
+          round_id:round.id,
+          player_id:rowPid,
+          hole_number:holeNum,
+          gross_score:gross,
+          stableford_points:stablefordPointsWithSnake(pts,shouldFlag),
+          par:hd.par,
+          stroke_index:hd.stroke_index
+        });
+      }
     }catch(e){/* never block the scorecard for a decorative marker */}
   }
 
@@ -3044,7 +3047,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     next[groupKey]=groupMarks;
     setSnakeMarksSafe(next);
     saveSnakeMarkToCloud(groupKey,holeNum,pid,checked);
-    saveSnakeFlagOnExistingScore(holeNum,pid,checked);
+    saveSnakeFlagsForHole(holeNum,pid,checked);
   }
 
   function saveLocalScore(holeNum,pid,val){
@@ -3324,7 +3327,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           </div>
           <label style={{display:'flex',alignItems:'center',gap:10,width:'100%',padding:'10px 11px',marginBottom:8,borderRadius:10,border:'1px solid rgba(34,197,94,0.42)',background:snakeChecked?'rgba(34,197,94,0.22)':'rgba(255,255,255,0.06)',color:'#fff',cursor:'pointer',fontSize:13,fontWeight:800}}>
             <input type='checkbox' checked={!!snakeChecked} onChange={e=>setSnakeFromHole(holeNum,pid,e.target.checked)} style={{width:18,height:18,accentColor:'#22c55e'}}/>
-            <span style={{flex:1}}>Snake from this hole</span>
+            <span style={{flex:1,fontSize:18,lineHeight:1}}>{EMOJI.snake}?</span>
           </label>
           <button onClick={blob} style={{width:'100%',padding:10,marginBottom:8,borderRadius:10,border:'1px solid rgba(255,255,255,0.2)',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:13}}>
             Blob - pickup ({pickupGrossForNoStableford(hd.par,hd.stroke_index,hcp)}*, 0 pts)
@@ -3435,7 +3438,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
                 const g=(holeScores[hd.hole]||{})[p.id];
                 const pts=(g===-1||isGivenGross(g))?0:getPts(g,hd.hole,p.id);
                 const hasScore=hasEnteredGross(g);
-                const hasSnake=hasScore&&(isSnakeHolder(hd.hole,p.id)||scoreRowHasSnake(hd.hole,p.id));
+                const hasSnake=hasScore&&isSnakeHolder(hd.hole,p.id);
                 return(
                   <div key={p.id} style={{textAlign:'center',minHeight:30,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,color:(g===-1||isGivenGross(g))?'rgba(255,255,255,0.55)':g?'#fff':'rgba(255,255,255,0.2)'}}>
                     <div style={{fontSize:14,fontWeight:800,lineHeight:1.05}}>{hasSnake?EMOJI.snake+' ':''}{grossDisplay(g)}</div>
@@ -3806,7 +3809,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
                   const shots=Math.floor(hcp/18)+((hcp%18)>=hd.stroke_index?1:0);
                   const running=getRunning(p.id,hd.hole);
                   const hasScoreEntered=hasEnteredGross(gross);
-                  const hasSnake=hasScoreEntered&&(isSnakeHolder(hd.hole,p.id)||scoreRowHasSnake(hd.hole,p.id));
+                  const hasSnake=hasScoreEntered&&isSnakeHolder(hd.hole,p.id);
                   return(
                     <div key={p.id} onClick={()=>{
                           if(!canEdit)return;
