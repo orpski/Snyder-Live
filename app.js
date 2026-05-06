@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.05
+// SNYDER LIVE v2.06
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -33,7 +33,8 @@ const EMOJI={
   bunker:'\uD83C\uDFD6\uFE0F',
   dnf:'\u274C',
   moneyWings:'\uD83D\uDCB8',
-  pound:'\u00A3'
+  pound:'\u00A3',
+  portugalFlag:'\uD83C\uDDF5\uD83C\uDDF9'
 };
 // =========================================================
 // Supabase client setup
@@ -5619,6 +5620,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
         </>:!selectedDay?<>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,margin:'2px 0 14px'}}>
             <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cupTitle}</div>
+            <div aria-label="Portugal" title="Portugal" style={{width:36,height:36,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',flex:'0 0 auto',fontSize:24,background:'rgba(255,255,255,0.10)',border:'1px solid rgba(255,255,255,0.20)',boxShadow:'0 8px 18px rgba(0,0,0,0.22)',overflow:'hidden'}}>{EMOJI.portugalFlag}</div>
             <button onClick={openCupFinesSummary} aria-label={'Open fines table, total '+EMOJI.pound+cupFineGrandTotal} style={{flex:'0 0 auto',border:'1px solid rgba(212,175,55,0.38)',borderRadius:999,background:'linear-gradient(135deg,rgba(212,175,55,0.22),rgba(15,23,42,0.80))',padding:'7px 11px',display:'inline-flex',alignItems:'center',gap:7,cursor:'pointer',boxShadow:'0 8px 20px rgba(0,0,0,0.20)'}}>
               <span style={{fontSize:14,lineHeight:1,color:'#F5E6A3',fontWeight:950}}>{EMOJI.moneyWings}</span>
               <span style={{fontSize:11,lineHeight:1,color:'#F5E6A3',fontWeight:950}}>{EMOJI.pound}</span>
