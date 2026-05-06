@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.97
+// SNYDER LIVE v1.98
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1319,29 +1319,52 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     }
   }
   function getDisplayName(pid){
-    const person=(cupUsers||[]).find(u=>u.id===pid)||(players||[]).find(p=>p.id===pid);
+    const key=normaliseId(pid);
+    const person=(cupEventPlayers||[]).find(p=>normaliseId(p.id)===key||normaliseId(p.user_id)===key||normaliseId(p.guest_id)===key)||(cupUsers||[]).find(u=>normaliseId(u.id)===key)||(players||[]).find(p=>normaliseId(p.id)===key);
     return (person&&(person.display_name||person.name||person.username))||'Player';
   }
   function leaderboardForRound(rd){
     const totals={};const holes={};const holePoints={};const seen=new Set();
     const rdGroups=groups.filter(g=>g.round_id===rd.id);
     const rdRoundPlayers=publicRoundPlayers[rd.id]||[];
-    const hcpMap={};const nameMap={};
-    rdGroups.forEach(g=>{
-      Object.assign(hcpMap,g.playing_handicaps||{});
-      (g.player_ids||[]).forEach(pid=>{if(totals[pid]==null)totals[pid]=0;});
-    });
     const isCupRound=isSnyderCupRound(rd);
+    const aliasMap={};
+    const hcpMap={};const nameMap={};
+    function setAlias(alias,canonical){
+      if(alias&&canonical)aliasMap[normaliseId(alias)]=canonical;
+    }
+    function canonicalId(pid){
+      const key=normaliseId(pid);
+      return aliasMap[key]||pid;
+    }
+    function cupPlayerForRoundPlayer(rp){
+      const nm=String(rp&&rp.display_name||'').trim().toLowerCase();
+      return (cupEventPlayers||[]).find(p=>
+        normaliseId(p.id)===normaliseId(rp&&rp.cup_player_id)||
+        normaliseId(p.user_id)===normaliseId(rp&&rp.user_id)||
+        normaliseId(p.guest_id)===normaliseId(rp&&rp.guest_id)||
+        (nm&&String(p.display_name||p.name||p.username||'').trim().toLowerCase()===nm)
+      );
+    }
     rdRoundPlayers.forEach(rp=>{
-      const ids=(isCupRound?[rp.id,rp.user_id,rp.guest_id,rp.cup_player_id]:[rp.user_id,rp.guest_id,rp.id]).filter(Boolean);
-      ids.forEach(pid=>{
-        if(totals[pid]==null)totals[pid]=0;
-        hcpMap[pid]=rp.playing_handicap||hcpMap[pid]||0;
-        nameMap[pid]=rp.display_name||nameMap[pid];
+      const cp=isCupRound?cupPlayerForRoundPlayer(rp):null;
+      const canonical=isCupRound?((cp&&cp.id)||rp.cup_player_id||rp.id):(rp.user_id||rp.guest_id||rp.id);
+      [rp.id,rp.user_id,rp.guest_id,rp.cup_player_id,cp&&cp.id].filter(Boolean).forEach(id=>setAlias(id,canonical));
+      if(canonical){
+        if(totals[canonical]==null)totals[canonical]=0;
+        hcpMap[canonical]=rp.playing_handicap||hcpMap[canonical]||0;
+        nameMap[canonical]=rp.display_name||(cp&&(cp.display_name||cp.name||cp.username))||nameMap[canonical];
+      }
+    });
+    rdGroups.forEach(g=>{
+      Object.keys(g.playing_handicaps||{}).forEach(pid=>{hcpMap[canonicalId(pid)]=(g.playing_handicaps||{})[pid];});
+      (g.player_ids||[]).forEach(pid=>{
+        const id=canonicalId(pid);
+        if(id&&totals[id]==null)totals[id]=0;
       });
     });
     function addScore(pid,holeNum,pts){
-      addLeaderboardScore(totals,holes,holePoints,seen,pid,holeNum,pts);
+      addLeaderboardScore(totals,holes,holePoints,seen,canonicalId(pid),holeNum,pts);
     }
     [...(scores||[]),...(publicScores||[])].filter(sc=>sc.round_id===rd.id&&!isMetaScoreRow(sc)).forEach(sc=>{
       addScore(sc.player_id,sc.hole_number,sc.stableford_points);
@@ -1356,7 +1379,8 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
         const hd=courseHoles.find(x=>parseInt(x.hole)===holeNum)||{par:4,stroke_index:holeNum};
         Object.keys(local[h]||{}).forEach(pid=>{
           const gross=parseInt(local[h][pid]);
-          const pts=calcStableford(gross,parseInt(hd.par)||4,parseInt(hd.stroke_index)||holeNum,parseFloat(hcpMap[pid]||0));
+          const id=canonicalId(pid);
+          const pts=calcStableford(gross,parseInt(hd.par)||4,parseInt(hd.stroke_index)||holeNum,parseFloat(hcpMap[id]||0));
           addScore(pid,holeNum,pts);
         });
       });
