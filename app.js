@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.01
+// SNYDER LIVE v2.02
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -31,7 +31,9 @@ const EMOJI={
   fourPutt:'4\uFE0F\u20E3',
   water:'\uD83D\uDCA7',
   bunker:'\uD83C\uDFD6\uFE0F',
-  dnf:'\u274C'
+  dnf:'\u274C',
+  moneyWings:'\uD83D\uDCB8',
+  pound:'\u00A3'
 };
 // =========================================================
 // Supabase client setup
@@ -4708,7 +4710,7 @@ function CupDayView({day,groups,teams,playersInCup,released,roundForGroup,matchR
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
           <div><div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>GROUP {group.idx}</div><div style={{fontSize:11,color:finished?'#f8fafc':'#8ea0ad',fontWeight:finished?900:500}}>{opening?'Opening scorecard...':rd?finished?'FINISHED':'Scorecard live':locked&&!isAdmin?'Locked until Go Live':'No scorecard yet'}</div></div>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <button onClick={(e)=>{e.stopPropagation(); if(rd&&openFinesGroup)openFinesGroup(group);}} disabled={!rd} style={{border:'1px solid rgba(212,175,55,0.38)',borderRadius:999,padding:'7px 10px',background:rd?'rgba(212,175,55,0.16)':'rgba(255,255,255,0.05)',color:rd?'#F5E6A3':'#8ea0ad',fontSize:11,fontWeight:950,cursor:rd?'pointer':'default',whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:7}}><span>FINES</span><span style={{fontSize:12,color:rd?'#fff':'#8ea0ad',fontWeight:950}}>GBP {finesTotal}</span></button>
+            <button onClick={(e)=>{e.stopPropagation(); if(rd&&openFinesGroup)openFinesGroup(group);}} disabled={!rd} style={{border:'1px solid rgba(212,175,55,0.38)',borderRadius:999,padding:'7px 10px',background:rd?'rgba(212,175,55,0.16)':'rgba(255,255,255,0.05)',color:rd?'#F5E6A3':'#8ea0ad',fontSize:11,fontWeight:950,cursor:rd?'pointer':'default',whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:7}}><span>{EMOJI.moneyWings}</span><span>FINES</span><span style={{fontSize:12,color:rd?'#fff':'#8ea0ad',fontWeight:950}}>{EMOJI.pound}{finesTotal}</span></button>
             <div style={{fontSize:11,color:finished?'#f8fafc':(disabled?'#8ea0ad':'#90ccf0'),fontWeight:900,letterSpacing:'0.08em'}}>{locked&&!isAdmin?'LOCKED':opening?'OPENING':finished?'VIEW FINISHED':'TAP TO OPEN'}</div>
           </div>
         </div>
@@ -4782,28 +4784,28 @@ function CupFinesCard({group,day,round,teams,playersInCup,courses,scores,sb,flas
   return <div style={{minHeight:'100vh',paddingBottom:118}}>
     <div style={{background:'linear-gradient(135deg,#0B1F4D,#061222)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
       <button onClick={onClose} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button>
-      <div style={{fontSize:16,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}>$ FINES CARD</div>
+      <div style={{fontSize:16,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}>{EMOJI.moneyWings} FINES CARD</div>
       <div style={{width:60}}/>
     </div>
     <div style={{padding:16}}>
       <div style={{borderRadius:16,padding:12,marginBottom:10,border:'1px solid rgba(212,175,55,0.30)',background:'linear-gradient(135deg,rgba(212,175,55,0.16),rgba(8,30,58,0.94))'}}>
         <div style={{fontSize:22,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {day} - GROUP {group.idx}</div>
-        <div style={{marginTop:8,display:'grid',gridTemplateColumns:'auto 1fr auto',alignItems:'center',gap:8}}><div style={{fontSize:24,color:'#F5E6A3',fontWeight:950,lineHeight:1}}>GBP</div><div style={{fontSize:11,color:'#8ea0ad',fontWeight:900}}>Group total</div><div style={{fontSize:24,color:'#F5E6A3',fontWeight:950}}>GBP {dayTotal()}</div></div>
+        <div style={{marginTop:8,display:'grid',gridTemplateColumns:'auto 1fr auto',alignItems:'center',gap:8}}><div style={{fontSize:24,color:'#F5E6A3',fontWeight:950,lineHeight:1}}>{EMOJI.moneyWings}</div><div style={{fontSize:11,color:'#8ea0ad',fontWeight:900}}>Group total</div><div style={{fontSize:24,color:'#F5E6A3',fontWeight:950}}>{EMOJI.pound}{dayTotal()}</div></div>
       </div>
       <div style={{...S.card,marginBottom:14}}>
         <div style={{fontSize:12,color:'#fff',fontWeight:950,marginBottom:7}}>Fines leaderboard</div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:6}}>{playerIds.slice().sort((a,b)=>playerTotal(b)-playerTotal(a)).map(pid=><div key={pid} style={{display:'grid',gridTemplateColumns:'1fr auto',gap:6,alignItems:'center',padding:'6px 7px',borderRadius:10,background:'rgba(255,255,255,0.055)',border:'1px solid rgba(255,255,255,0.08)'}}><div style={{fontSize:12,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(pid)}</div><div style={{fontSize:15,color:'#F5E6A3',fontWeight:950}}>GBP {playerTotal(pid)}</div></div>)}</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:6}}>{playerIds.slice().sort((a,b)=>playerTotal(b)-playerTotal(a)).map(pid=><div key={pid} style={{display:'grid',gridTemplateColumns:'1fr auto',gap:6,alignItems:'center',padding:'6px 7px',borderRadius:10,background:'rgba(255,255,255,0.055)',border:'1px solid rgba(255,255,255,0.08)'}}><div style={{fontSize:12,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(pid)}</div><div style={{fontSize:15,color:'#F5E6A3',fontWeight:950}}>{EMOJI.pound}{playerTotal(pid)}</div></div>)}</div>
       </div>
       <div style={{fontSize:11,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em',margin:'10px 0 6px'}}>HOLE-BY-HOLE FINES</div>
       <div style={{display:'grid',gap:8}}>{Array.from({length:18},(_,i)=>i+1).map(h=>{
         const holeTotal=playerIds.reduce((t,pid)=>t+playerHoleFine(pid,h),0);
         const hd=holeInfo(h);
         return <div key={h} style={{border:'1px solid rgba(96,184,240,0.18)',borderRadius:13,background:'rgba(255,255,255,0.045)',padding:8}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,gap:8}}><div style={{display:'flex',alignItems:'baseline',gap:6,minWidth:0}}><span style={{fontSize:10,color:'#60b8f0',fontWeight:950,letterSpacing:'0.16em'}}>HOLE</span><span style={{fontSize:28,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",lineHeight:0.85,letterSpacing:'0.04em'}}>{h}</span><span style={{fontSize:11,color:'#8ea0ad',fontWeight:950,letterSpacing:'0.08em'}}>- PAR {hd.par||'-'}</span></div><div style={{fontSize:14,color:holeTotal?'#F5E6A3':'#8ea0ad',fontWeight:950}}>GBP {holeTotal}</div></div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,gap:8}}><div style={{display:'flex',alignItems:'baseline',gap:6,minWidth:0}}><span style={{fontSize:10,color:'#60b8f0',fontWeight:950,letterSpacing:'0.16em'}}>HOLE</span><span style={{fontSize:28,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",lineHeight:0.85,letterSpacing:'0.04em'}}>{h}</span><span style={{fontSize:11,color:'#8ea0ad',fontWeight:950,letterSpacing:'0.08em'}}>- PAR {hd.par||'-'}</span></div><div style={{fontSize:14,color:holeTotal?'#F5E6A3':'#8ea0ad',fontWeight:950}}>{EMOJI.pound}{holeTotal}</div></div>
           <div style={{display:'grid',gap:6}}>{playerIds.map(pid=>{
             const playerFine=playerHoleFine(pid,h);
             return <div key={pid} style={{border:'1px solid rgba(255,255,255,0.08)',borderRadius:10,padding:6,background:playerFine?'rgba(212,175,55,0.10)':'rgba(0,0,0,0.12)'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}><div style={{fontSize:12,color:'#fff',fontWeight:950}}>{playerName(pid)}</div><div style={{fontSize:12,color:playerFine?'#F5E6A3':'#8ea0ad',fontWeight:950}}>GBP {playerFine}</div></div>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}><div style={{fontSize:12,color:'#fff',fontWeight:950}}>{playerName(pid)}</div><div style={{fontSize:12,color:playerFine?'#F5E6A3':'#8ea0ad',fontWeight:950}}>{EMOJI.pound}{playerFine}</div></div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(6,minmax(0,1fr))',gap:4}}>{CUP_FINE_DEFS.map(def=>{
                 const autoBlob=def.key==='blob'&&hasBlobScore(pid,h);
                 const count=effectiveCount(pid,h,def.key);
@@ -5558,13 +5560,13 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
         </>;})():showCupFinesSummary?(()=>{const rows=cupFinesSummaryRows();return <>
           <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',margin:'2px 0 8px'}}>FINES SUMMARY</div>
           <div style={{fontSize:12,color:'#8ea0ad',marginBottom:12}}>Every player's fines by Cup day, plus the running total.</div>
-          <div style={{border:'1px solid rgba(212,175,55,0.30)',borderRadius:16,background:'linear-gradient(135deg,rgba(212,175,55,0.14),rgba(15,23,42,0.90))',padding:14,marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}><div><div style={{fontSize:11,color:'#F5E6A3',fontWeight:950,letterSpacing:'0.13em'}}>TOTAL FINES POT</div><div style={{fontSize:11,color:'#90ccf0',fontWeight:800}}>All days and groups</div></div><div style={{fontSize:32,color:'#fff',fontWeight:950}}>GBP {cupFineGrandTotal}</div></div>
+          <div style={{border:'1px solid rgba(212,175,55,0.30)',borderRadius:16,background:'linear-gradient(135deg,rgba(212,175,55,0.14),rgba(15,23,42,0.90))',padding:14,marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}><div><div style={{fontSize:11,color:'#F5E6A3',fontWeight:950,letterSpacing:'0.13em'}}>{EMOJI.moneyWings} TOTAL FINES POT</div><div style={{fontSize:11,color:'#90ccf0',fontWeight:800}}>All days and groups</div></div><div style={{fontSize:32,color:'#fff',fontWeight:950}}>{EMOJI.pound}{cupFineGrandTotal}</div></div>
           <div style={{...S.card,padding:0,overflow:'hidden'}}>
             <div style={{display:'grid',gridTemplateColumns:`1fr ${cupDayNumbers.map(()=> '54px').join(' ')} 64px`,gap:0,alignItems:'center',padding:'10px 10px',borderBottom:'1px solid rgba(255,255,255,0.10)',background:'rgba(255,255,255,0.04)'}}>
               <div style={{fontSize:10,color:'#8ea0ad',fontWeight:950,letterSpacing:'0.10em'}}>PLAYER</div>{cupDayNumbers.map(day=><div key={'head-'+day} style={{fontSize:10,color:'#8ea0ad',fontWeight:950,textAlign:'center'}}>D{day}</div>)}<div style={{fontSize:10,color:'#F5E6A3',fontWeight:950,textAlign:'right'}}>TOTAL</div>
             </div>
             {rows.map((p,i)=><div key={p.id||p.user_id||i} style={{display:'grid',gridTemplateColumns:`1fr ${cupDayNumbers.map(()=> '54px').join(' ')} 64px`,gap:0,alignItems:'center',padding:'11px 10px',borderTop:i?'1px solid rgba(255,255,255,0.07)':'none',background:i%2?'rgba(255,255,255,0.025)':'rgba(255,255,255,0.045)'}}>
-              <div style={{fontSize:13,color:'#fff',fontWeight:950,textTransform:'uppercase',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cupDisplayName(p)}</div>{cupDayNumbers.map(day=><div key={(p.id||p.user_id||i)+'-'+day} style={{fontSize:13,color:(p._fineDays&&p._fineDays[day])?'#F5E6A3':'#8ea0ad',fontWeight:950,textAlign:'center'}}>{(p._fineDays&&p._fineDays[day])||0}</div>)}<div style={{fontSize:16,color:'#fff',fontWeight:950,textAlign:'right'}}>GBP {p._fineTotal||0}</div>
+              <div style={{fontSize:13,color:'#fff',fontWeight:950,textTransform:'uppercase',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cupDisplayName(p)}</div>{cupDayNumbers.map(day=><div key={(p.id||p.user_id||i)+'-'+day} style={{fontSize:13,color:(p._fineDays&&p._fineDays[day])?'#F5E6A3':'#8ea0ad',fontWeight:950,textAlign:'center'}}>{(p._fineDays&&p._fineDays[day])||0}</div>)}<div style={{fontSize:16,color:'#fff',fontWeight:950,textAlign:'right'}}>{EMOJI.pound}{p._fineTotal||0}</div>
             </div>)}
           </div>
         </>;})():showCupHandicaps?<>
@@ -5605,8 +5607,9 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
         </>:!selectedDay?<>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,margin:'2px 0 14px'}}>
             <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cupTitle}</div>
-            <button onClick={openCupFinesSummary} aria-label={'Open fines table, total GBP '+cupFineGrandTotal} style={{flex:'0 0 auto',border:'1px solid rgba(212,175,55,0.38)',borderRadius:999,background:'linear-gradient(135deg,rgba(212,175,55,0.22),rgba(15,23,42,0.80))',padding:'7px 11px',display:'inline-flex',alignItems:'center',gap:7,cursor:'pointer',boxShadow:'0 8px 20px rgba(0,0,0,0.20)'}}>
-              <span style={{fontSize:11,lineHeight:1,color:'#F5E6A3',fontWeight:950}}>GBP</span>
+            <button onClick={openCupFinesSummary} aria-label={'Open fines table, total '+EMOJI.pound+cupFineGrandTotal} style={{flex:'0 0 auto',border:'1px solid rgba(212,175,55,0.38)',borderRadius:999,background:'linear-gradient(135deg,rgba(212,175,55,0.22),rgba(15,23,42,0.80))',padding:'7px 11px',display:'inline-flex',alignItems:'center',gap:7,cursor:'pointer',boxShadow:'0 8px 20px rgba(0,0,0,0.20)'}}>
+              <span style={{fontSize:14,lineHeight:1,color:'#F5E6A3',fontWeight:950}}>{EMOJI.moneyWings}</span>
+              <span style={{fontSize:11,lineHeight:1,color:'#F5E6A3',fontWeight:950}}>{EMOJI.pound}</span>
               <span style={{fontSize:16,color:'#fff',fontWeight:950,lineHeight:1}}>{cupFineGrandTotal}</span>
             </button>
           </div>
