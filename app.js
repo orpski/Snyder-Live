@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.100
+// SNYDER LIVE v1.101
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -4354,7 +4354,6 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   async function addExistingPlayer(teamKey,u){
     if(!cup||!u)return;
     if(cupPlayers.some(p=>p.user_id&&p.user_id===u.id)){flash('Player already in this cup','error');return;}
-    if((teamKey==='gold'?goldPlayers:navyPlayers).length>=4){flash('Each team has 4 players','error');return;}
     const displayName=u.display_name||u.username||u.name||'Player';
     const hcp=parseFloat(u.handicap||0)||0;
     const{error}=await sb.from('snyder_cup_players').insert({cup_id:cup.id,user_id:u.id,team_key:teamKey,display_name:displayName,handicap:hcp});
@@ -4366,7 +4365,6 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     const form=newPlayer[teamKey]||{};
     const displayName=(form.name||'').trim();
     if(!displayName){flash('Add a player name first','error');return;}
-    if((teamKey==='gold'?goldPlayers:navyPlayers).length>=4){flash('Each team has 4 players','error');return;}
     const hcp=parseFloat(form.handicap||0)||0;
     const{error}=await sb.from('snyder_cup_players').insert({cup_id:cup.id,user_id:null,team_key:teamKey,display_name:displayName,handicap:hcp});
     if(error){flash(error.message,'error');return;}
@@ -4521,8 +4519,8 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     const form=newPlayer[teamKey]||{};
     const usedUsers=cupPlayers.filter(p=>p.user_id).map(p=>p.user_id);
     return <div style={{...S.card,...cupTeamStyle(teamKey),padding:12}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><CupTeamBadge teamKey={teamKey} label={team.name}/><div style={{fontSize:20,color:'#fff',fontWeight:900}}>{rows.length}/4</div></div>
-      <div style={{fontSize:11,color:'#9fb6c9',marginBottom:8}}>Players and EG handicaps are Cup-specific. Playing shots are calculated from the Cup day course slope/rating when you open the scorecard.</div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><CupTeamBadge teamKey={teamKey} label={team.name}/><div style={{fontSize:20,color:'#fff',fontWeight:900}}>{rows.length} players</div></div>
+      <div style={{fontSize:11,color:'#9fb6c9',marginBottom:8}}>Players and EG handicaps are Cup-specific. Teams can carry extra squad players, then the match builder picks who is playing each match. Playing shots are calculated from the Cup day course slope/rating when you open the scorecard.</div>
       {rows.length===0?<div style={{fontSize:12,color:'#8ea0ad',padding:'8px 0'}}>No players yet.</div>:rows.map(p=><div key={p.id} style={{borderTop:'1px solid rgba(255,255,255,0.08)',padding:'8px 0'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:6}}><input style={{...S.inp,fontSize:13,padding:'8px 9px',flex:1}} value={p.display_name||''} onChange={e=>updateCupPlayer(p,{display_name:e.target.value})}/><button onClick={()=>removeCupPlayer(p)} style={{...S.dan,padding:'7px 9px',fontSize:11}}>Remove</button></div>
         <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center'}}><label style={{fontSize:11,color:'#9fb6c9'}}>EG Handicap</label><HandicapPicker value={p.handicap??0} onChange={v=>updateCupPlayer(p,{handicap:v})} style={{width:76,fontSize:13,padding:'7px 8px'}} label={(p.display_name||'Player')+' EG handicap'} step={0.1} min={0} max={54} defaultValue={parseFloat(p.handicap)||18}/></div>
@@ -4541,7 +4539,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   return <div>
     <div style={{...S.card,marginBottom:14,background:'linear-gradient(135deg,rgba(212,175,55,0.13),rgba(11,31,77,0.35))'}}>
       <div style={{fontSize:18,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.07em'}}>SNYDER CUP SETUP</div>
-      <div style={{fontSize:12,color:'#9fb6c9',marginTop:4}}>Professional setup panel: Cup details, teams, days, matches and quick fixes.</div>
+      <div style={{fontSize:12,color:'#9fb6c9',marginTop:4}}>Professional setup panel: Cup details, squads, days, matches and quick fixes.</div>
     </div>
     {!cup&&<div style={{...S.card,marginBottom:14}}>
       <div style={{fontSize:14,color:'#fff',fontWeight:800,marginBottom:10}}>Create Cup</div>
