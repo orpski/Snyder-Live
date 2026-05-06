@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.00
+// SNYDER LIVE v2.01
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -18,6 +18,21 @@ const SHOW_BREAKING_NEWS=false;
 const BREAKING_NEWS_MESSAGE='';
 // GolfCourseAPI removed from the live frontend in v45; v65.3 uses safe course presets and badges.
 // Course data should be added manually or imported later through a safer backend/admin workflow.
+const EMOJI={
+  golf:'\u26F3\uFE0F',
+  scores:'\uD83D\uDCCA',
+  trophy:'\uD83C\uDFC6',
+  profile:'\uD83D\uDC64',
+  admin:'\u2699\uFE0F',
+  plus:'\u2795',
+  live:'\uD83D\uDD34',
+  blob:'\uD83D\uDCA5',
+  threePutt:'3\uFE0F\u20E3',
+  fourPutt:'4\uFE0F\u20E3',
+  water:'\uD83D\uDCA7',
+  bunker:'\uD83C\uDFD6\uFE0F',
+  dnf:'\u274C'
+};
 // =========================================================
 // Supabase client setup
 // =========================================================
@@ -1165,7 +1180,7 @@ function App(){
 
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:18}}>
           <button onClick={()=>currentUser?setView('play'):promptStartRoundAuth()} style={{...NO_SELECT,border:'1px solid rgba(96,184,240,0.22)',borderRadius:24,background:'linear-gradient(135deg,#0070BB 0%,#123d73 100%)',padding:'18px 14px',minHeight:132,textAlign:'left',cursor:'pointer',boxShadow:'0 14px 32px rgba(0,112,187,0.22)',color:'#fff'}}>
-            <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(255,255,255,0.16)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,fontWeight:900,marginBottom:14}}>+</div>
+            <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(255,255,255,0.16)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,fontWeight:900,marginBottom:14}}>{EMOJI.plus}</div>
             <div style={{fontSize:21,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Start Round</div>
             <div style={{fontSize:12,color:'rgba(255,255,255,0.72)',marginTop:5,lineHeight:1.25}}>Create a card and go live</div>
           </button>
@@ -1173,7 +1188,7 @@ function App(){
           <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{...NO_SELECT,border:'1px solid rgba(255,255,255,0.11)',borderRadius:24,background:'rgba(255,255,255,0.075)',padding:'18px 14px',minHeight:132,textAlign:'left',cursor:'pointer',color:'#fff',position:'relative',overflow:'hidden'}}>
             <div style={{position:'absolute',inset:0,background:homeLiveCount?'linear-gradient(135deg,rgba(239,68,68,0.18),rgba(0,112,187,0.22))':'linear-gradient(135deg,rgba(96,184,240,0.08),rgba(255,255,255,0.03))',pointerEvents:'none'}}/>
             <div style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-              <div style={{width:48,height:48,borderRadius:'50%',background:homeLiveCount?'rgba(239,68,68,0.22)':'rgba(96,184,240,0.12)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:950,letterSpacing:'0.08em',color:homeLiveCount?'#fff':'#60b8f0'}}>LIVE</div>
+              <div style={{width:48,height:48,borderRadius:'50%',background:homeLiveCount?'rgba(239,68,68,0.22)':'rgba(96,184,240,0.12)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,fontWeight:950,color:homeLiveCount?'#fff':'#60b8f0'}}>{EMOJI.scores}</div>
               <div style={{fontSize:24,fontWeight:900,color:homeLiveCount?'#ef4444':'#60b8f0'}}>{homeLiveCount}</div>
             </div>
             <div style={{position:'relative',fontSize:21,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Live Scorecards</div>
@@ -1181,7 +1196,7 @@ function App(){
           </button>
 
           <button onClick={()=>setView('tournaments')} style={{...NO_SELECT,gridColumn:'1 / -1',border:'1px solid rgba(212,175,55,0.34)',borderRadius:24,background:'linear-gradient(135deg,rgba(212,175,55,0.18),rgba(11,31,77,0.92))',padding:'18px 14px',minHeight:104,textAlign:'left',cursor:'pointer',color:'#fff',boxShadow:'0 14px 30px rgba(212,175,55,0.10)'}}>
-            <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(212,175,55,0.18)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:950,letterSpacing:'0.08em',color:'#F5E6A3',marginBottom:14}}>CUP</div>
+            <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(212,175,55,0.18)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,fontWeight:950,color:'#F5E6A3',marginBottom:14}}>{EMOJI.trophy}</div>
             <div style={{fontSize:21,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Snyder Cup</div>
             <div style={{fontSize:12,color:'rgba(255,255,255,0.72)',marginTop:5,lineHeight:1.25}}>Team score, singles, fines</div>
           </button>
@@ -1215,23 +1230,23 @@ function App(){
       {/* Bottom tab bar */}
       <div style={{position:'fixed',bottom:0,left:0,right:0,background:'#0d2548',borderTop:'1px solid rgba(255,255,255,0.1)',display:'flex',padding:'8px 0 20px'}}>
         <button onClick={()=>setView('play')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'#0070BB'}}>
-          <div style={{fontSize:18,marginBottom:1}}>G</div>
+          <div style={{fontSize:18,marginBottom:1}}>{EMOJI.golf}</div>
           <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>PLAY</div>
         </button>
         <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
-          <div style={{fontSize:18,marginBottom:1}}>S</div>
+          <div style={{fontSize:18,marginBottom:1}}>{EMOJI.scores}</div>
           <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>SCORES</div>
         </button>
         <button onClick={()=>setView('tournaments')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
-          <div style={{fontSize:18,marginBottom:1,color:'#D4AF37',fontWeight:900}}>{'\uD83C\uDFC6'}</div>
+          <div style={{fontSize:18,marginBottom:1,color:'#D4AF37',fontWeight:900}}>{EMOJI.trophy}</div>
           <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em'}}>SNYDER CUP</div>
         </button>
         <button onClick={()=>currentUser?setView('profile'):(setAuthPrompt(null),setShowAuth(true))} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
-          <div style={{fontSize:18,marginBottom:1}}>P</div>
+          <div style={{fontSize:18,marginBottom:1}}>{EMOJI.profile}</div>
           <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>PROFILE</div>
         </button>
         <button onClick={()=>setView('admin')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
-          <div style={{fontSize:18,marginBottom:1}}>A</div>
+          <div style={{fontSize:18,marginBottom:1}}>{EMOJI.admin}</div>
           <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>ADMIN</div>
         </button>
       </div>
@@ -1681,12 +1696,12 @@ function isSnakeScoreRow(row){return !!parseSnakeScorePlayerId(row&&row.player_i
 const FINE_SCORE_PREFIX='__fine__|';
 const FINE_HOLE_BASE=900;
 const CUP_FINE_DEFS=[
-  {key:'blob',label:'Blob',emoji:'BLOB',amount:2,type:'toggle'},
-  {key:'threePutt',label:'3 putt',emoji:'3P',amount:2,type:'toggle'},
-  {key:'fourPutt',label:'4 putt',emoji:'4P',amount:5,type:'toggle'},
-  {key:'water',label:'Water',emoji:'W',amount:3,type:'toggle'},
-  {key:'bunker',label:'Bunker',emoji:'BK',amount:2,type:'counter'},
-  {key:'dnf',label:'DNF',emoji:'DNF',amount:5,type:'toggle'}
+  {key:'blob',label:'Blob',emoji:EMOJI.blob,amount:2,type:'toggle'},
+  {key:'threePutt',label:'3 putt',emoji:EMOJI.threePutt,amount:2,type:'toggle'},
+  {key:'fourPutt',label:'4 putt',emoji:EMOJI.fourPutt,amount:5,type:'toggle'},
+  {key:'water',label:'Water',emoji:EMOJI.water,amount:3,type:'toggle'},
+  {key:'bunker',label:'Bunker',emoji:EMOJI.bunker,amount:2,type:'counter'},
+  {key:'dnf',label:'DNF',emoji:EMOJI.dnf,amount:5,type:'toggle'}
 ];
 function makeFineScorePlayerId(pid,key){return FINE_SCORE_PREFIX+encodeURIComponent(normaliseId(pid))+'|'+encodeURIComponent(normaliseId(key));}
 function parseFineScorePlayerId(v){
@@ -5507,7 +5522,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     return <CupFinesCard group={activeFinesGroup} day={activeFinesGroup.day} round={rd} teams={teams} playersInCup={playersInCup} courses={courses} scores={scores} sb={sb} flash={flash} load={load} onClose={goBackOnePage}/>;
   }
   return <div style={{minHeight:'100vh',paddingBottom:80}}>
-    <div style={{background:'linear-gradient(135deg,#0B1F4D,#061222)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}><button onClick={goBackOnePage} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button><div style={{display:'flex',alignItems:'center',gap:8,fontSize:16,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}><span style={{color:'#D4AF37'}}>{'\uD83C\uDFC6'}</span><span>SNYDER CUP</span></div><div style={{width:60}}/></div>
+    <div style={{background:'linear-gradient(135deg,#0B1F4D,#061222)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}><button onClick={goBackOnePage} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button><div style={{display:'flex',alignItems:'center',gap:8,fontSize:16,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}><span style={{color:'#D4AF37'}}>{EMOJI.trophy}</span><span>SNYDER CUP</span></div><div style={{width:60}}/></div>
     <div style={{padding:16}}>
       {!cup?<div style={{...S.card,textAlign:'center',padding:28}}><div style={{fontSize:18,color:'#fff',fontWeight:800,marginBottom:8}}>No Cup set up yet</div><div style={{fontSize:13,color:'#8ea0ad',marginBottom:14}}>Admin can create Gold vs Navy in the Admin Cup tab.</div>{isAdmin&&<button onClick={()=>setView('admin')} style={S.pri}>Open Admin</button>}</div>:<>
         {selectedCupPlayerDetail?(()=>{const p=selectedCupPlayerSummary;const d=selectedCupPlayerDetail;const rows=Array.from({length:18},(_,i)=>i+1).map(h=>{const hd=(d.courseHoles||[]).find(x=>parseInt(x.hole)===h)||{hole:h,par:'-',stroke_index:'-',yards:'-'};return {hole:h,hd,row:d.byHole[h]};});const totalPar=(d.courseHoles||[]).reduce((t,h)=>t+(parseInt(h.par)||0),0);const totalYards=(d.courseHoles||[]).reduce((t,h)=>t+(parseInt(h.yards)||0),0);return <>
