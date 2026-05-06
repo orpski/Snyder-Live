@@ -1,4 +1,4 @@
-// SNYDER LIVE v1.99
+// SNYDER LIVE v1.100
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1291,6 +1291,75 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
   const thisWeeksCards=completedRounds.filter(r=>new Date(roundStartValue(r))>=thisWeekStart);
   const olderCards=completedRounds.filter(r=>new Date(roundStartValue(r))<thisWeekStart);
   const olderCardsByMonth=groupRoundsByMonth(olderCards);
+  async function buildCupSummaryForLiveOpen(cup,teams,currentRound){
+    const cupRounds=(rounds||[]).filter(isSnyderCupRound);
+    const roundIds=cupRounds.map(r=>r&&r.id).filter(Boolean);
+    if(!roundIds.length)return{gold:0,navy:0,goldName:(teams.gold&&teams.gold.name)||'Gold',navyName:(teams.navy&&teams.navy.name)||'Navy'};
+    let scoreRows=(scores||[]).filter(s=>roundIds.includes(s.round_id)&&!isMetaScoreRow(s));
+    let roundPlayerRows=[];
+    try{
+      const [{data:scoreData},{data:rpData}]=await Promise.all([
+        sb.from('cup_scores').select('*').in('round_id',roundIds),
+        sb.from('cup_round_players').select('*').in('round_id',roundIds)
+      ]);
+      if(scoreData)scoreRows=(scoreData||[]).filter(s=>!isMetaScoreRow(s));
+      roundPlayerRows=rpData||[];
+    }catch(e){}
+    const cupPlayers=(cupEventPlayers||[]).filter(p=>!cup||p.cup_id===cup.id);
+    const playerByKey={};
+    cupPlayers.forEach(p=>[p.id,p.user_id,p.guest_id].filter(Boolean).forEach(id=>{playerByKey[normaliseId(id)]=p;}));
+    roundPlayerRows.forEach(rp=>{
+      const name=String(rp.display_name||'').trim().toLowerCase();
+      const cp=(cupPlayers||[]).find(p=>String(cupPlayerDisplayName(p)).trim().toLowerCase()===name);
+      if(cp)playerByKey[normaliseId(rp.id)]=cp;
+    });
+    const scoreIdsFor=id=>{
+      const cp=playerByKey[normaliseId(id)]||(cupPlayers||[]).find(p=>normaliseId(p.id)===normaliseId(id));
+      const ids=new Set([id,cp&&cp.id,cp&&cp.user_id,cp&&cp.guest_id].filter(Boolean).map(normaliseId));
+      roundPlayerRows.filter(rp=>{
+        const nm=String(rp.display_name||'').trim().toLowerCase();
+        return cp&&nm&&nm===String(cupPlayerDisplayName(cp)).trim().toLowerCase();
+      }).forEach(rp=>ids.add(normaliseId(rp.id)));
+      return ids;
+    };
+    const pointsForHole=(rd,id,h)=>{
+      const ids=scoreIdsFor(id);
+      const row=scoreRows.find(s=>s.round_id===rd.id&&parseInt(s.hole_number)===parseInt(h)&&ids.has(normaliseId(s.player_id)));
+      return row?stablefordPointsValue(row.stableford_points):null;
+    };
+    const stablefordTotal=(rd,id)=>{
+      const ids=scoreIdsFor(id);
+      return scoreRows.filter(s=>s.round_id===rd.id&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+stablefordPointsValue(s.stableford_points),0);
+    };
+    const dayNums=Array.from(new Set((cupMatches||[]).map(m=>parseInt(m.day_number)||1))).sort((a,b)=>a-b);
+    let gold=0,navy=0;
+    dayNums.forEach(day=>cupGroupsForDay(cupMatches,day).forEach(group=>{
+      const rd=cupRounds.find(r=>cupRoundDayNumber(r)===day&&cupRoundGroupNumber(r)===(parseInt(group.idx)||1));
+      if(!rd||!isCompletedRound(rd))return;
+      [group.doubles,...(group.singles||[])].filter(Boolean).forEach(match=>{
+        const goldIds=match.gold_player_ids||[];
+        const navyIds=match.navy_player_ids||[];
+        let winner='tie';
+        if(String(match.match_type||'').toLowerCase()==='doubles'){
+          let gHoles=0,nHoles=0;
+          for(let h=1;h<=18;h++){
+            const gPts=goldIds.map(id=>pointsForHole(rd,id,h)).filter(v=>v!==null&&v!==undefined);
+            const nPts=navyIds.map(id=>pointsForHole(rd,id,h)).filter(v=>v!==null&&v!==undefined);
+            if(!gPts.length||!nPts.length)continue;
+            const g=Math.max(...gPts),n=Math.max(...nPts);
+            if(g>n)gHoles++; else if(n>g)nHoles++;
+          }
+          winner=gHoles>nHoles?'gold':nHoles>gHoles?'navy':'tie';
+        }else{
+          const g=goldIds.reduce((t,id)=>t+stablefordTotal(rd,id),0);
+          const n=navyIds.reduce((t,id)=>t+stablefordTotal(rd,id),0);
+          winner=g>n?'gold':n>g?'navy':'tie';
+        }
+        if(winner==='gold')gold+=1; else if(winner==='navy')navy+=1; else {gold+=0.5;navy+=0.5;}
+      });
+    }));
+    return{gold,navy,goldName:(teams.gold&&teams.gold.name)||'Gold',navyName:(teams.navy&&teams.navy.name)||'Navy'};
+  }
   async function openRound(rd){
     const rdGroups=groups.filter(g=>g.round_id===rd.id);
     const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
@@ -1329,6 +1398,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
         }
         selected._cupScoring=true;
         selected._cupTeams=teams;
+        selected._cupSummary=await buildCupSummaryForLiveOpen(cup,teams,rd);
         selected._cupDayNumber=cupDay;
         selected._cupGroupData=groupData;
         selected._cupDayAllPlayers=(cupEventPlayers||[]).filter(p=>!cup||p.cup_id===cup.id);
@@ -3789,7 +3859,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
               <div>
                 <div style={{fontSize:18,color:'#fff',fontWeight:800}}>{overallMode==='cupOverall'?'Overall Cup':(overallMode==='cupDay'?('Day '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)+' Singles Leaderboard'):'Overall Leaderboard')}</div>
-                <div style={{fontSize:12,color:'#60b8f0'}}>{overallMode==='cupOverall'?'If it stays like this + overall singles':(overallMode==='cupDay'?('All singles scores for Day '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)):'All groups in this round')}</div>
+                {overallMode!=='cupOverall'&&<div style={{fontSize:12,color:'#60b8f0'}}>{overallMode==='cupDay'?('All singles scores for Day '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)):'All groups in this round'}</div>}
               </div>
               <button onClick={()=>setShowOverall(false)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Close</button>
             </div>
