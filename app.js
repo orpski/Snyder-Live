@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.03
+// SNYDER LIVE v2.04
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -4760,11 +4760,13 @@ function CupFinesCard({group,day,round,teams,playersInCup,courses,scores,sb,flas
   async function saveFine(pid,h,key,count){
     if(!round){flash&&flash('No scorecard found for this group yet');return;}
     const cleanCount=Math.max(0,parseInt(count)||0);
+    const pairedPuttKey=key==='threePutt'?'fourPutt':key==='fourPutt'?'threePutt':null;
     setPlayerFineRows(prev=>{
       const next={...(prev||{})};
       next[h]={...(next[h]||{})};
       next[h][pid]={...(next[h][pid]||{})};
       if(cleanCount)next[h][pid][key]=cleanCount; else delete next[h][pid][key];
+      if(cleanCount&&pairedPuttKey)delete next[h][pid][pairedPuttKey];
       return next;
     });
     if(key==='blob')return;
@@ -4772,6 +4774,11 @@ function CupFinesCard({group,day,round,teams,playersInCup,courses,scores,sb,flas
       const row={round_id:round.id,player_id:pid,hole_number:makeFineScoreHoleNumber(h,key),gross_score:cleanCount,stableford_points:fineAmount(key,cleanCount),par:0,stroke_index:0};
       const res=await saveScoreRowToCloud(sb,row);
       if(!res||!res.ok)throw new Error((res&&res.error)||'Unknown cloud save error');
+      if(cleanCount&&pairedPuttKey){
+        const pairedRow={round_id:round.id,player_id:pid,hole_number:makeFineScoreHoleNumber(h,pairedPuttKey),gross_score:0,stableford_points:0,par:0,stroke_index:0};
+        const pairedRes=await saveScoreRowToCloud(sb,pairedRow);
+        if(!pairedRes||!pairedRes.ok)throw new Error((pairedRes&&pairedRes.error)||'Unknown cloud save error');
+      }
       if(load)await load(false);
     }catch(e){flash&&flash('Fines save failed: '+(e&&e.message?e.message:String(e)));}
   }
@@ -4810,12 +4817,15 @@ function CupFinesCard({group,day,round,teams,playersInCup,courses,scores,sb,flas
                 const autoBlob=def.key==='blob'&&hasBlobScore(pid,h);
                 const count=effectiveCount(pid,h,def.key);
                 const active=count>0;
+                const puttBlocked=(def.key==='threePutt'&&storedCount(pid,h,'fourPutt')>0)||(def.key==='fourPutt'&&storedCount(pid,h,'threePutt')>0);
+                const tileColor=active?'#F5E6A3':puttBlocked?'rgba(255,255,255,0.34)':'#fff';
+                const tileBg=active?'rgba(212,175,55,0.16)':puttBlocked?'rgba(255,255,255,0.025)':'rgba(255,255,255,0.05)';
                 if(def.type==='counter')return <div key={def.key} style={{border:'1px solid '+(active?'rgba(212,175,55,0.50)':'rgba(255,255,255,0.10)'),borderRadius:9,padding:4,background:active?'rgba(212,175,55,0.14)':'rgba(255,255,255,0.05)',textAlign:'center'}}>
-                  <div style={{fontSize:14,lineHeight:1}}>{def.emoji}</div><div style={{fontSize:8,color:'#8ea0ad',fontWeight:900,lineHeight:1.05}}>{def.label}</div>
+                  <div style={{display:'grid',gridTemplateRows:'18px 18px',alignItems:'center',justifyItems:'center',minHeight:36}}><div style={{fontSize:15,lineHeight:1}}>{def.emoji}</div><div style={{fontSize:8,color:'#8ea0ad',fontWeight:900,lineHeight:1.05,whiteSpace:'nowrap'}}>{def.label}</div></div>
                   <div style={{display:'flex',gap:2,alignItems:'center',justifyContent:'center',marginTop:3}}><button onClick={()=>saveFine(pid,h,def.key,Math.max(0,storedCount(pid,h,def.key)-1))} style={{...S.gho,padding:'1px 5px',fontSize:11,minHeight:20}}>-</button><div style={{fontSize:12,color:'#fff',fontWeight:950,minWidth:12}}>{count}</div><button onClick={()=>saveFine(pid,h,def.key,storedCount(pid,h,def.key)+1)} style={{...S.gho,padding:'1px 5px',fontSize:11,minHeight:20}}>+</button></div>
                 </div>;
                 const blobLocked=def.key==='blob';
-                return <button key={def.key} onClick={()=>toggleFine(pid,h,def.key)} disabled={blobLocked} title={blobLocked?'Blob fines are automatic from scoring':''} style={{border:'1px solid '+(active?'rgba(212,175,55,0.55)':'rgba(255,255,255,0.10)'),borderRadius:9,padding:'5px 2px',minHeight:48,background:active?'rgba(212,175,55,0.16)':'rgba(255,255,255,0.05)',color:active?'#F5E6A3':(blobLocked?'rgba(255,255,255,0.55)':'#fff'),fontSize:8,fontWeight:950,cursor:blobLocked?'default':'pointer',lineHeight:1.05}}><div style={{fontSize:14,lineHeight:1}}>{def.emoji}</div><div>{def.label}</div>{blobLocked&&<div style={{fontSize:7,color:autoBlob?'#90ccf0':'#8ea0ad'}}>{autoBlob?'AUTO':'AUTO ONLY'}</div>}</button>;
+                return <button key={def.key} onClick={()=>toggleFine(pid,h,def.key)} disabled={blobLocked||puttBlocked} title={blobLocked?'Blob fines are automatic from scoring':puttBlocked?'A 3 putt and 4 putt cannot both apply on the same hole':''} style={{border:'1px solid '+(active?'rgba(212,175,55,0.55)':'rgba(255,255,255,0.10)'),borderRadius:9,padding:'5px 2px',minHeight:54,background:tileBg,color:blobLocked?'rgba(255,255,255,0.55)':tileColor,fontSize:8,fontWeight:950,cursor:(blobLocked||puttBlocked)?'default':'pointer',lineHeight:1.05,opacity:puttBlocked?0.58:1}}><div style={{display:'grid',gridTemplateRows:'18px 18px',alignItems:'center',justifyItems:'center',minHeight:36}}><div style={{fontSize:15,lineHeight:1}}>{def.emoji}</div><div style={{whiteSpace:'nowrap'}}>{def.label}</div></div>{blobLocked&&<div style={{fontSize:7,color:autoBlob?'#90ccf0':'#8ea0ad',marginTop:1}}>{autoBlob?'AUTO':'AUTO ONLY'}</div>}</button>;
               })}</div>
             </div>;
           })}</div>
