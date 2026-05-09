@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.11
+// SNYDER LIVE v2.12
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1757,11 +1757,33 @@ function parseSweepstakeScoreRow(row){
 function isSweepstakeScoreRow(row){return !!parseSweepstakeScoreRow(row);}
 function sweepstakeConfigFromRows(rows,round){
   const row=(rows||[]).filter(r=>r&&(!round||r.round_id===round.id)).map(parseSweepstakeScoreRow).filter(Boolean).find(x=>x.key==='config');
+  const local=round&&round.id?loadLocalSweepstakeConfig(round.id):null;
   const fallback=round&&round._sweepstake;
-  const amountPence=row?row.amountPence:(fallback&&fallback.amountPence)||0;
-  const enabled=row?row.enabled:!!(fallback&&fallback.enabled);
-  const scope=row?row.scope:(fallback&&fallback.scope)||'round';
+  const amountPence=row?row.amountPence:(local&&local.amountPence)||(fallback&&fallback.amountPence)||0;
+  const enabled=row?row.enabled:local?!!local.enabled:!!(fallback&&fallback.enabled);
+  const scope=row?row.scope:(local&&local.scope)||(fallback&&fallback.scope)||'round';
   return {enabled:!!enabled&&amountPence>0,amountPence:amountPence>0?amountPence:200,scope:scope==='group'?'group':'round'};
+}
+function sweepstakeStorageKey(roundId){return 'sweepstake_config_'+roundId;}
+function loadLocalSweepstakeConfig(roundId){
+  try{const raw=localStorage.getItem(sweepstakeStorageKey(roundId));return raw?JSON.parse(raw):null;}catch(e){return null;}
+}
+function saveLocalSweepstakeConfig(roundId,cfg){
+  try{if(roundId&&cfg)localStorage.setItem(sweepstakeStorageKey(roundId),JSON.stringify({enabled:!!cfg.enabled,amountPence:parseInt(cfg.amountPence)||200,scope:cfg.scope==='group'?'group':'round'}));}catch(e){}
+}
+async function saveSweepstakeConfigToCloud(roundId,cfg){
+  if(!roundId||!cfg||!cfg.enabled)return {ok:true,count:0};
+  const clean={enabled:!!cfg.enabled,amountPence:parseInt(cfg.amountPence)||200,scope:cfg.scope==='group'?'group':'round'};
+  saveLocalSweepstakeConfig(roundId,clean);
+  return saveScoreRowsToCloud(sb,[{
+    round_id:roundId,
+    player_id:makeSweepstakeScorePlayerId('config'),
+    hole_number:SWEEPSTAKE_CONFIG_HOLE,
+    gross_score:clean.amountPence,
+    stableford_points:clean.enabled?1:0,
+    par:clean.scope==='group'?4:5,
+    stroke_index:1
+  }]);
 }
 function moneyFromPence(v){
   const n=Math.round(parseFloat(v)||0);
@@ -2083,15 +2105,8 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       if(groupErr)throw groupErr;
 
       if(setup.sweepstake&&setup.sweepstake.enabled){
-        await saveScoreRowsToCloud(sb,[{
-          round_id:rd.id,
-          player_id:makeSweepstakeScorePlayerId('config'),
-          hole_number:SWEEPSTAKE_CONFIG_HOLE,
-          gross_score:parseInt(setup.sweepstake.amountPence)||200,
-          stableford_points:1,
-          par:(setup.sweepstake&&setup.sweepstake.scope)==='group'?4:5,
-          stroke_index:1
-        }]);
+        const swSave=await saveSweepstakeConfigToCloud(rd.id,{enabled:true,amountPence:parseInt(setup.sweepstake.amountPence)||200,scope:(setup.sweepstake&&setup.sweepstake.scope)==='group'?'group':'round'});
+        if(!swSave.ok)flash('Sweepstake setting did not sync yet. Tap refresh/retry if it is missing on another device.','error');
       }
 
       for(const p of allParticipants){
@@ -2453,6 +2468,10 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const[cupOverallRoundPlayers,setCupOverallRoundPlayers]=useState([]);
   const[sweepstakeConfig,setSweepstakeConfig]=useState(sweepstakeConfigFromRows(scores,round));
   const[showSweepstake,setShowSweepstake]=useState(false);
+
+  useEffect(()=>{
+    if(round&&round.id&&sweepstakeConfig&&sweepstakeConfig.enabled)saveLocalSweepstakeConfig(round.id,sweepstakeConfig);
+  },[round&&round.id,sweepstakeConfig&&sweepstakeConfig.enabled,sweepstakeConfig&&sweepstakeConfig.amountPence,sweepstakeConfig&&sweepstakeConfig.scope]);
 
   function setSnakeMarksSafe(next){
     const clean=next&&typeof next==='object'?next:{};
@@ -3308,7 +3327,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return <div style={{...S.card,margin:compact?'0 0 10px':16,background:'linear-gradient(135deg,rgba(245,158,11,0.18),rgba(255,255,255,0.05))',borderColor:'rgba(245,158,11,0.38)'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:10}}>
         <div><div style={{fontSize:16,color:'#fff',fontWeight:950}}>💰 Sweepstake</div><div style={{fontSize:11,color:'#fbbf24'}}>Stableford side pots · {moneyFromPence(sw.amountPence)} front/back/overall · {sw.scope==='round'?'all groups':'this group'}</div></div>
-        {compact&&<button onClick={()=>setShowSweepstake(true)} style={{...S.pri,padding:'7px 10px',fontSize:12,background:'#d97706'}}>View</button>}
       </div>
       {sw.pots.map(pot=><div key={pot.key} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'7px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
         <div style={{fontSize:12,color:'#fff',fontWeight:800}}>{pot.label}</div>
@@ -3321,6 +3339,11 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         {sw.payments.length?sw.payments.map((p,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}><span style={{fontSize:13,color:'#fff'}}>{p.from} → {p.to}</span><span style={{fontSize:13,color:'#fbbf24',fontWeight:950}}>{moneyFromPence(p.amount)}</span></div>):<div style={{fontSize:13,color:'rgba(255,255,255,0.65)',paddingTop:8}}>All square.</div>}
       </>}
     </div>;
+  }
+  function SweepstakeMoneyButton(){
+    const sw=sweepstakePlayerRows();
+    if(!sw.enabled)return null;
+    return <button aria-label="Open sweepstake standings" title="Sweepstake" onClick={()=>{refreshScoresFromCloud(false);setShowSweepstake(true);}} style={{width:38,height:38,borderRadius:10,border:'1px solid rgba(245,158,11,0.45)',background:'rgba(245,158,11,0.14)',color:'#fbbf24',fontSize:20,fontWeight:950,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,lineHeight:1}}>💰</button>;
   }
 
     // ---------------------------------------------------------
@@ -3769,6 +3792,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             <div style={{fontSize:13,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{getCourseDisplayName(course,round)||'Scorecard'}</div>
             <div style={{fontSize:10,color:'#60b8f0'}}>Round start: {roundStartText}</div>
           </div>
+          {!round._cupScoring&&<SweepstakeMoneyButton/>}
           <button onClick={()=>round._cupScoring?openCupOverallSummary(true):openOverallLeaderboard(true)} style={{background:round._cupScoring?'linear-gradient(135deg,rgba(212,175,55,0.95),rgba(37,99,235,0.92))':'rgba(255,255,255,0.08)',border:round._cupScoring?'1px solid rgba(255,255,255,0.35)':'1px solid rgba(96,184,240,0.28)',color:'#fff',borderRadius:10,padding:'8px 11px',fontSize:12,fontWeight:950,cursor:'pointer',flexShrink:0,boxShadow:round._cupScoring?'0 8px 18px rgba(0,0,0,0.26)':'none',letterSpacing:'0.04em'}}>Overall</button>
           {round.join_code&&<button onClick={()=>{
             const url='https://snyder-live.vercel.app?watch='+round.join_code;
@@ -3811,7 +3835,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             </button>;})()}
           </div>
         )}
-        {sweepstakeConfig&&sweepstakeConfig.enabled&&!round._cupScoring&&activeGroupId!=='leaderboard'&&<div style={{padding:'8px 12px 0'}}><SweepstakePanel compact={true}/></div>}
         {allGroups.length>1&&<>
           {(()=>{const leader=overallLeaderboardRows()[0];return (
             <button onClick={()=>{setActiveGroupId('leaderboard');openOverallLeaderboard(false);}} style={{width:'calc(100% - 24px)',margin:'8px 12px 6px',padding:'10px 12px',borderRadius:12,border:'1px solid rgba(245,158,11,0.55)',background:'linear-gradient(135deg,rgba(245,158,11,0.95),rgba(180,83,9,0.9))',boxShadow:'0 8px 22px rgba(180,83,9,0.22)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,cursor:'pointer',textAlign:'left'}}>
