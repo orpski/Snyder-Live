@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.14
+// SNYDER LIVE v2.15
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -881,8 +881,17 @@ function App(){
   const[homeRefreshing,setHomeRefreshing]=useState(false);
   const viewRef=useRef(view);
   const homeRefreshRef=useRef(false);
-  const pullRef=useRef({active:false,startX:0,startY:0,dy:0});
+  const pullRef=useRef({active:false,startX:0,startY:0,dy:0,view:'home'});
   const isAdmin=true; // Admin panel is password protected internally
+
+  function pullRefreshLabel(v){
+    if(v==='play')return 'scorecard';
+    if(v==='live')return 'live scores';
+    return 'home';
+  }
+  function canPullRefreshView(v){
+    return v==='home'||v==='play'||v==='live';
+  }
 
   useEffect(()=>{viewRef.current=view;},[view]);
 
@@ -953,8 +962,9 @@ function App(){
       const t=e.touches&&e.touches[0];
       if(!t)return;
       swipeStartX=t.clientX;swipeStartY=t.clientY;swipeStartT=Date.now();
-      const canPull=viewRef.current==='home'&&window.scrollY<=2&&!homeRefreshRef.current;
-      pullRef.current={active:canPull,startX:t.clientX,startY:t.clientY,dy:0};
+      const pullView=viewRef.current;
+      const canPull=canPullRefreshView(pullView)&&window.scrollY<=2&&!homeRefreshRef.current;
+      pullRef.current={active:canPull,startX:t.clientX,startY:t.clientY,dy:0,view:pullView};
     }
     function handleTouchMove(e){
       const t=e.touches&&e.touches[0];
@@ -968,13 +978,18 @@ function App(){
       setHomePull(Math.max(0,resisted));
       p.dy=dy;
     }
-    async function handleHomeRefresh(){
+    async function handlePullRefresh(targetView){
       if(homeRefreshRef.current)return;
+      const label=pullRefreshLabel(targetView);
       homeRefreshRef.current=true;
       setHomeRefreshing(true);
       setHomePull(92);
-      try{await loadAll();flash('Home refreshed');}
-      catch(err){flash('Could not refresh home','error');}
+      try{
+        await loadAll();
+        try{window.dispatchEvent(new CustomEvent('snyderPullRefresh',{detail:{view:targetView}}));}catch(err){}
+        flash(label.charAt(0).toUpperCase()+label.slice(1)+' refreshed');
+      }
+      catch(err){flash('Could not refresh '+label,'error');}
       setTimeout(()=>{setHomeRefreshing(false);setHomePull(0);homeRefreshRef.current=false;},450);
     }
     function handleTouchEnd(e){
@@ -982,9 +997,10 @@ function App(){
       if(!t)return;
       const p=pullRef.current;
       const pullDy=p&&p.active?p.dy:0;
-      pullRef.current={active:false,startX:0,startY:0,dy:0};
-      if(viewRef.current==='home'&&pullDy>135&&Math.abs(t.clientX-(p.startX||t.clientX))<80&&window.scrollY<=6){
-        handleHomeRefresh();
+      pullRef.current={active:false,startX:0,startY:0,dy:0,view:'home'};
+      const targetView=p&&p.view||viewRef.current;
+      if(canPullRefreshView(targetView)&&pullDy>135&&Math.abs(t.clientX-(p.startX||t.clientX))<80&&window.scrollY<=6){
+        handlePullRefresh(targetView);
         return;
       }
       if(!homeRefreshRef.current)setHomePull(0);
@@ -1087,7 +1103,9 @@ function App(){
     }
     refreshLiveRoundData();
     const timer=setInterval(refreshLiveRoundData,15000);
-    return()=>{alive=false;clearInterval(timer);};
+    function onPullRefresh(e){if(e&&e.detail&&e.detail.view==='live')refreshLiveRoundData();}
+    window.addEventListener('snyderPullRefresh',onPullRefresh);
+    return()=>{alive=false;clearInterval(timer);window.removeEventListener('snyderPullRefresh',onPullRefresh);};
   },[liveRoundIds.join('|')]);
   const completedRounds=sortRoundsNewestFirst(rounds.filter(isCompletedRound));
   const myRounds=myRoundsForUser(rounds,groups,currentUser);
@@ -1186,6 +1204,15 @@ function App(){
   }
 
   const props={...appData,sb,flash,setView,load:loadAll,isAdmin,currentUser,setSelectedRound,selectedRound,holeScores,setHoleScores,promptStartRoundAuth};
+  const pullLabel=pullRefreshLabel(view);
+  const pullIndicator=(
+    <div style={{position:'fixed',top:8,left:'50%',transform:`translateX(-50%) translateY(${homePull?0:-54}px)`,opacity:homePull?1:0,transition:homeRefreshing?'none':'transform 0.18s ease, opacity 0.18s ease',zIndex:9998,pointerEvents:'none'}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 13px',borderRadius:999,background:'rgba(13,37,72,0.96)',border:'1px solid rgba(96,184,240,0.26)',boxShadow:'0 12px 28px rgba(0,0,0,0.32)',fontSize:12,color:'#fff',fontWeight:900}}>
+        <span style={{fontSize:15}}>{homeRefreshing?'⟳':homePull>76?'↻':'↓'}</span>
+        <span>{homeRefreshing?'Refreshing '+pullLabel:homePull>76?'Release to refresh':'Pull down to refresh'}</span>
+      </div>
+    </div>
+  );
 
   if(splash)return(
     <div style={{position:'fixed',inset:0,background:'#0a1f3d',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',zIndex:9999}}>
@@ -1195,10 +1222,10 @@ function App(){
     </div>
   );
 
-  if(view==='play')return <PlayGolf {...props}/>;
+  if(view==='play')return <>{pullIndicator}<PlayGolf {...props}/></>;
   if(view==='admin')return <AdminPanel {...props}/>;
   if(view==='profile')return <ProfileView {...props} setCurrentUser={setCurrentUser}/>;
-  if(view==='live')return <LiveScoringView {...props} selectedComp={selectedComp} activeComp={activeComp}/>;
+  if(view==='live')return <>{pullIndicator}<LiveScoringView {...props} selectedComp={selectedComp} activeComp={activeComp}/></>;
   if(view==='tournaments')return <TournamentsView {...props} activeComp={activeComp} selectedComp={selectedComp} setSelectedComp={setSelectedComp}/>;
 
   const homeLiveCount=liveRounds.length;
@@ -1208,12 +1235,7 @@ function App(){
 
   return(
     <div style={{minHeight:'100vh',paddingBottom:60,background:'linear-gradient(180deg,#0d2548 0%,#0a1f3d 100%)'}}>
-      <div style={{position:'fixed',top:8,left:'50%',transform:`translateX(-50%) translateY(${homePull?0:-54}px)`,opacity:homePull?1:0,transition:homeRefreshing?'none':'transform 0.18s ease, opacity 0.18s ease',zIndex:9998,pointerEvents:'none'}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 13px',borderRadius:999,background:'rgba(13,37,72,0.96)',border:'1px solid rgba(96,184,240,0.26)',boxShadow:'0 12px 28px rgba(0,0,0,0.32)',fontSize:12,color:'#fff',fontWeight:900}}>
-          <span style={{fontSize:15}}>{homeRefreshing?'⟳':homePull>76?'↻':'↓'}</span>
-          <span>{homeRefreshing?'Refreshing home':homePull>76?'Release to refresh':'Pull down to refresh'}</span>
-        </div>
-      </div>
+      {pullIndicator}
       {/* Top nav */}
       <div style={{background:'#0d2548',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
         <img src={LOGO} alt="Snyder Live" style={{width:36,height:36,objectFit:'contain',background:'transparent',borderRadius:0,display:'block'}}/>
@@ -1355,7 +1377,9 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     }
     refreshLiveRoundData();
     const timer=setInterval(refreshLiveRoundData,15000);
-    return()=>{alive=false;clearInterval(timer);};
+    function onPullRefresh(e){if(e&&e.detail&&e.detail.view==='live')refreshLiveRoundData();}
+    window.addEventListener('snyderPullRefresh',onPullRefresh);
+    return()=>{alive=false;clearInterval(timer);window.removeEventListener('snyderPullRefresh',onPullRefresh);};
   },[liveRoundIds.join('|')]);
   const completedRounds=sortRoundsNewestFirst(rounds.filter(isCompletedRound));
   const thisWeekStart=startOfThisWeek();
@@ -2653,6 +2677,14 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       setRefreshing(false);
     }
   }
+
+  useEffect(()=>{
+    function onPullRefresh(e){
+      if(e&&e.detail&&e.detail.view==='play')refreshScoresFromCloud(false);
+    }
+    window.addEventListener('snyderPullRefresh',onPullRefresh);
+    return()=>window.removeEventListener('snyderPullRefresh',onPullRefresh);
+  },[round&&round.id]);
 
   async function openOverallLeaderboard(openModal=true){
     try{
