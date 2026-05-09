@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.09
+// SNYDER LIVE v2.10
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2384,6 +2384,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const[inputHole,setInputHole]=useState(null);
   const[inputVal,setInputVal]=useState('');
   const[showOverall,setShowOverall]=useState(false);
+  const[showWatchMode,setShowWatchMode]=useState(false);
+  const[watchHole,setWatchHole]=useState(1);
   const[snakeMarks,setSnakeMarks]=useState({});
   const snakeMarksRef=useRef({});
   const[overallPlayers,setOverallPlayers]=useState([]);
@@ -2937,6 +2939,10 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       if(!allScored)return h;
     }
     return null;
+  }
+  function nextHoleToScore(){
+    const next=holes.find(h=>grpPlayers.some(p=>(holeScores[h.hole]||{})[p.id]===undefined));
+    return next&&next.hole?next.hole:1;
   }
 
     // ---------------------------------------------------------
@@ -3609,6 +3615,86 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     );
   }
 
+
+
+  // ---------------------------------------------------------
+  // Android watch mode
+  // Tiny-screen scoring surface that reuses the existing score save path.
+  // This deliberately does not create separate Watch/Wear OS routing yet.
+  // ---------------------------------------------------------
+  function WatchMode(){
+    if(!canEdit)return null;
+    const currentHole=Math.min(Math.max(parseInt(watchHole)||1,1),holes.length||18);
+    const hd=getHole(currentHole);
+    const currentMap=holeScores[currentHole]||{};
+    const enteredCount=grpPlayers.filter(p=>currentMap[p.id]!==undefined).length;
+    const complete=grpPlayers.length>0&&enteredCount===grpPlayers.length;
+    const nextUnscored=holes.find(h=>grpPlayers.some(p=>(holeScores[h.hole]||{})[p.id]===undefined));
+    function scoreFor(p){return currentMap[p.id];}
+    function shownScore(p){const g=scoreFor(p);return grossScoreValue(g)||hd.par;}
+    function nudgeScore(p,delta){
+      const current=scoreFor(p);
+      const base=grossScoreValue(current)||hd.par;
+      setScore(currentHole,p.id,Math.max(1,base+delta));
+    }
+    function quickBlob(p){
+      const hcp=parseFloat(playingHcps[p.id]!=null?playingHcps[p.id]:p.current_handicap||0);
+      setScore(currentHole,p.id,-pickupGrossForNoStableford(hd.par,hd.stroke_index,hcp));
+    }
+    function jump(delta){setWatchHole(Math.min(Math.max(currentHole+delta,1),holes.length||18));}
+    return(
+      <div style={{position:'fixed',inset:0,zIndex:9999,background:'linear-gradient(160deg,#061325 0%,#0b2344 58%,#061325 100%)',color:'#fff',overflowY:'auto',padding:'8px 8px 18px',touchAction:'manipulation'}}>
+        <div style={{position:'sticky',top:0,zIndex:2,background:'linear-gradient(160deg,#061325,#0b2344)',padding:'4px 0 8px',borderBottom:'1px solid rgba(255,255,255,0.12)'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6}}>
+            <button onClick={()=>setShowWatchMode(false)} style={{border:'1px solid rgba(255,255,255,0.18)',background:'rgba(255,255,255,0.08)',color:'#fff',borderRadius:999,padding:'7px 9px',fontSize:12,fontWeight:900}}>Back</button>
+            <div style={{textAlign:'center',minWidth:0,flex:1}}>
+              <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,letterSpacing:'0.12em'}}>WATCH MODE</div>
+              <div style={{fontSize:22,lineHeight:1,fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif"}}>Hole {currentHole}</div>
+              <div style={{fontSize:11,color:'#fbbf24',fontWeight:800}}>Par {hd.par} · SI {hd.stroke_index}</div>
+            </div>
+            <button onClick={()=>refreshScoresFromCloud(true)} disabled={refreshing} style={{border:'1px solid rgba(96,184,240,0.35)',background:'rgba(0,112,187,0.24)',color:'#90ccf0',borderRadius:999,padding:'7px 9px',fontSize:12,fontWeight:900,opacity:refreshing?0.55:1}}>↻</button>
+          </div>
+          <div style={{marginTop:7,display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:10,color:complete?'#86efac':'#cbd5e1',fontWeight:800}}>{complete?'Hole complete':'Scores '+enteredCount+'/'+grpPlayers.length}{cloudError?' · offline save':cloudStatus?' · saving':''}</div>
+        </div>
+
+        <div style={{display:'flex',flexDirection:'column',gap:7,marginTop:8}}>
+          {grpPlayers.map(p=>{
+            const gross=scoreFor(p);
+            const hasScore=hasEnteredGross(gross);
+            const display=hasScore?grossDisplay(gross):shownScore(p);
+            const pts=hasScore?getPts(gross,currentHole,p.id):getPts(shownScore(p),currentHole,p.id);
+            const snakeChecked=isSnakeHolder(currentHole,p.id);
+            return(
+              <div key={p.id} style={{border:'1px solid rgba(255,255,255,0.13)',background:hasScore?'rgba(255,255,255,0.08)':'rgba(255,255,255,0.045)',borderRadius:18,padding:8,boxShadow:'0 10px 20px rgba(0,0,0,0.18)'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,marginBottom:7}}>
+                  <div style={{fontSize:17,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{gameFirstName(p.name||p.display_name||'Player')}</div>
+                  <button onClick={()=>setSnakeFromHole(currentHole,p.id,!snakeChecked)} style={{border:'1px solid '+(snakeChecked?'rgba(34,197,94,0.85)':'rgba(255,255,255,0.16)'),background:snakeChecked?'rgba(34,197,94,0.26)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:999,padding:'6px 8px',fontSize:15,fontWeight:950,lineHeight:1}}>{EMOJI.snake}</button>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'58px minmax(74px,1fr) 58px',gap:7,alignItems:'center'}}>
+                  <button onClick={()=>nudgeScore(p,-1)} style={{height:54,borderRadius:16,border:'1px solid rgba(255,255,255,0.16)',background:'rgba(255,255,255,0.08)',color:'#fff',fontSize:28,fontWeight:950}}>−</button>
+                  <button onClick={()=>{if(!hasScore)setScore(currentHole,p.id,shownScore(p));}} style={{height:58,borderRadius:16,border:'1px solid rgba(255,255,255,0.20)',background:hasScore?ptsColor(pts):'rgba(0,112,187,0.22)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                    <span style={{fontSize:32,fontWeight:950,lineHeight:1}}>{display}</span>
+                    <span style={{fontSize:11,color:'rgba(255,255,255,0.86)',fontWeight:900}}>{pts||0}pt</span>
+                  </button>
+                  <button onClick={()=>nudgeScore(p,1)} style={{height:54,borderRadius:16,border:'1px solid rgba(255,255,255,0.16)',background:'rgba(255,255,255,0.08)',color:'#fff',fontSize:28,fontWeight:950}}>+</button>
+                </div>
+                <button onClick={()=>quickBlob(p)} style={{marginTop:7,width:'100%',border:'1px solid rgba(248,113,113,0.28)',background:'rgba(248,113,113,0.10)',color:'#fecaca',borderRadius:14,padding:'7px 8px',fontSize:11,fontWeight:900}}>Blob / pick up</button>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{position:'sticky',bottom:0,marginTop:10,background:'linear-gradient(0deg,#061325 70%,rgba(6,19,37,0))',paddingTop:10}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1.4fr 1fr',gap:7}}>
+            <button onClick={()=>jump(-1)} disabled={currentHole<=1} style={{border:'1px solid rgba(255,255,255,0.16)',background:'rgba(255,255,255,0.08)',color:'#fff',borderRadius:16,padding:'12px 6px',fontSize:12,fontWeight:950,opacity:currentHole<=1?0.4:1}}>← Hole</button>
+            <button onClick={()=>setWatchHole(nextUnscored?nextUnscored.hole:Math.min(currentHole+1,holes.length||18))} style={{border:'none',background:'linear-gradient(135deg,#0070BB,#0a8a4a)',color:'#fff',borderRadius:16,padding:'12px 6px',fontSize:13,fontWeight:950}}>Next unscored</button>
+            <button onClick={()=>jump(1)} disabled={currentHole>=holes.length} style={{border:'1px solid rgba(255,255,255,0.16)',background:'rgba(255,255,255,0.08)',color:'#fff',borderRadius:16,padding:'12px 6px',fontSize:12,fontWeight:950,opacity:currentHole>=holes.length?0.4:1}}>Hole →</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const rowH=80;
   const f9complete=front9.every(hd=>grpPlayers.every(p=>(holeScores[hd.hole]||{})[p.id]!==undefined));
   function goToBack9(){
@@ -3622,6 +3708,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
 
   return(
     <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)',overflowX:'hidden',touchAction:inputHole?'none':'auto'}}>
+      {showWatchMode&&<WatchMode/>}
       <div style={{position:'sticky',top:0,zIndex:10,background:'linear-gradient(160deg,#0a1528,#0d2040)',borderBottom:'2px solid #0070BB'}}>
         {!canEdit&&(
           <div style={{background:'rgba(0,112,187,0.2)',borderBottom:'1px solid rgba(0,112,187,0.3)',padding:'8px 14px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -3637,6 +3724,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             <div style={{fontSize:10,color:'#60b8f0'}}>Round start: {roundStartText}</div>
           </div>
           <button onClick={()=>round._cupScoring?openCupOverallSummary(true):openOverallLeaderboard(true)} style={{background:round._cupScoring?'linear-gradient(135deg,rgba(212,175,55,0.95),rgba(37,99,235,0.92))':'rgba(255,255,255,0.08)',border:round._cupScoring?'1px solid rgba(255,255,255,0.35)':'1px solid rgba(96,184,240,0.28)',color:'#fff',borderRadius:10,padding:'8px 11px',fontSize:12,fontWeight:950,cursor:'pointer',flexShrink:0,boxShadow:round._cupScoring?'0 8px 18px rgba(0,0,0,0.26)':'none',letterSpacing:'0.04em'}}>Overall</button>
+          {canEdit&&activeGroupId!=='leaderboard'&&<button onClick={()=>{setWatchHole(nextHoleToScore());setShowWatchMode(true);}} style={{background:'linear-gradient(135deg,#16a34a,#0070BB)',border:'1px solid rgba(255,255,255,0.30)',color:'#fff',borderRadius:10,padding:'8px 10px',fontSize:12,fontWeight:950,cursor:'pointer',flexShrink:0,letterSpacing:'0.04em'}}>Watch</button>}
           {round.join_code&&<button onClick={()=>{
             const url='https://snyder-live.vercel.app?watch='+round.join_code;
             if(navigator.share){navigator.share({title:'Watch live - '+( course&&course.name||''),url});}
