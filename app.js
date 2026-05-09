@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.12
+// SNYDER LIVE v2.13
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2610,17 +2610,35 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
 
   async function openOverallLeaderboard(openModal=true){
     try{
-      const [{data:rps,error:rpErr},{data:scs,error:scErr}]=await Promise.all([
+      const [{data:rps,error:rpErr},{data:scs,error:scErr},{data:grps,error:gErr}]=await Promise.all([
         sb.from('cup_round_players').select('*').eq('round_id',round.id),
-        sb.from('cup_scores').select('*').eq('round_id',round.id)
+        sb.from('cup_scores').select('*').eq('round_id',round.id),
+        sb.from('cup_groups').select('*').eq('round_id',round.id).order('group_number',{ascending:true})
       ]);
       if(rpErr)throw rpErr;
       if(scErr)throw scErr;
-      setOverallPlayers((rps||[]).map(rp=>({
-        id:rp.id,
-        name:rp.display_name||'Player',
-        playing_handicap:rp.playing_handicap||0
-      })));
+      if(gErr)throw gErr;
+      const byStableId={};
+      (rps||[]).forEach(rp=>{
+        const stableId=normaliseId(rp.user_id||rp.guest_id||rp.id);
+        if(!stableId||byStableId[stableId])return;
+        byStableId[stableId]={
+          id:stableId,
+          name:rp.display_name||'Player',
+          playing_handicap:rp.playing_handicap||0
+        };
+      });
+      const groupsForBoard=(grps&&grps.length?grps:allGroups)||[];
+      const wantedIds=new Set();
+      if(groupsForBoard.length>1){
+        groupsForBoard.forEach(g=>(g.player_ids||[]).forEach(pid=>wantedIds.add(normaliseId(pid))));
+      }else if(group&&group.player_ids&&group.player_ids.length){
+        (group.player_ids||[]).forEach(pid=>wantedIds.add(normaliseId(pid)));
+      }
+      let players=Object.values(byStableId);
+      if(wantedIds.size)players=players.filter(p=>wantedIds.has(normaliseId(p.id)));
+      if(!players.length)players=(grpPlayers||[]).map(p=>({id:normaliseId(p.id),name:p.display_name||p.name||'Player',playing_handicap:p.playing_handicap||p.current_handicap||0}));
+      setOverallPlayers(players);
       setOverallMode('round');
       setOverallScores((scs||[]).filter(r=>!isMetaScoreRow(r)));
       setOverallRefreshNote('Refreshed '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
@@ -2802,7 +2820,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   }
   function overallLeaderboardRows(){
     const playerMap={};
-    (overallPlayers.length?overallPlayers:grpPlayers).forEach(p=>{playerMap[p.id]=p;});
+    (overallPlayers.length?overallPlayers:grpPlayers).forEach(p=>{const key=normaliseId(p&&p.id); if(key&&!playerMap[key])playerMap[key]={...p,id:key};});
     (allGroups||[]).forEach((g,idx)=>{(g.player_ids||[]).forEach(pid=>{const key=normaliseId(pid); if(playerMap[key])playerMap[key]={...playerMap[key],groupNumber:g.group_number||idx+1};});});
     const scoreRows=(overallScores.length?overallScores.filter(r=>!isMetaScoreRow(r)):Object.keys(holeScores||{}).flatMap(h=>Object.keys(holeScores[h]||{}).map(pid=>{
       const gross=holeScores[h][pid];
@@ -2813,8 +2831,9 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const totals={}; const holesPlayed={}; const holePoints={};
     Object.keys(playerMap).forEach(pid=>{totals[pid]=0;holesPlayed[pid]=new Set();});
     scoreRows.forEach(s=>{
-      const pid=s.player_id;
+      const pid=normaliseId(s.player_id);
       if(!pid)return;
+      if(Object.keys(playerMap).length&&!playerMap[pid])return;
       if(totals[pid]==null)totals[pid]=0;
       const points=stablefordPointsValue(s.stableford_points);
       totals[pid]+=points;
@@ -3273,10 +3292,43 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     },0);
   }
 
-  function sweepstakePlayerRows(){
+  function currentSweepstakeThroughHole(){
+    let max=0;
+    Object.keys(holeScores||{}).forEach(h=>{
+      const hn=parseInt(h);
+      if(!hn)return;
+      const row=holeScores[h]||{};
+      const has=Object.keys(row).some(pid=>hasEnteredGross(row[pid]));
+      if(has&&hn>max)max=hn;
+    });
+    (overallScores||[]).filter(r=>r&&!isMetaScoreRow(r)).forEach(r=>{
+      const hn=parseInt(r.hole_number);
+      if(hn&&hasEnteredGross(r.gross_score)&&hn>max)max=hn;
+    });
+    return Math.min(18,Math.max(0,max));
+  }
+
+  function sweepstakePlayerRows(opts={}){
     const amountPence=parseInt(sweepstakeConfig&&sweepstakeConfig.amountPence)||200;
     const scope=(sweepstakeConfig&&sweepstakeConfig.scope)==='group'?'group':'round';
-    const pots=[{key:'front',label:'Front 9',holes:front9},{key:'back',label:'Back 9',holes:back9},{key:'overall',label:'Overall',holes}];
+    const throughHole=opts&&opts.throughHole!=null?parseInt(opts.throughHole):currentSweepstakeThroughHole();
+    const safeThrough=Math.min(18,Math.max(0,throughHole||0));
+    const final=safeThrough>=18;
+    const overallLive=holes.filter(h=>h.hole<=Math.max(1,safeThrough));
+    const pots=[];
+    if(safeThrough>=9){
+      pots.push({key:'front',label:'Front 9',holes:front9,settles:true});
+    }else if(safeThrough>0){
+      pots.push({key:'frontlive',label:'Front 9 so far',holes:front9.filter(h=>h.hole<=safeThrough),settles:false});
+    }
+    if(safeThrough>=18){
+      pots.push({key:'back',label:'Back 9',holes:back9,settles:true});
+    }else if(safeThrough>=10){
+      pots.push({key:'backlive',label:'Back 9 so far',holes:back9.filter(h=>h.hole<=safeThrough),settles:false});
+    }
+    if(safeThrough>0){
+      pots.push({key:'overall',label:final?'Overall':'Overall so far',holes:final?holes:overallLive,settles:final});
+    }
     const playerSource=scope==='round'?(allRoundPlayers&&allRoundPlayers.length?allRoundPlayers:grpPlayers):grpPlayers;
     const sweepPlayers=(playerSource||[]).filter((p,idx,arr)=>p&&p.id&&arr.findIndex(x=>normaliseId(x&&x.id)===normaliseId(p.id))===idx);
     const pointByPlayerHole={};
@@ -3295,7 +3347,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         return t+((g===-1||isGivenGross(g))?0:(getPts(g,hn,pid)||0));
       },0);
     }
-    const rows=sweepPlayers.map(p=>({id:p.id,name:gameFirstName((p.name||p.display_name)||'?'),paid:amountPence*pots.length,winnings:0,net:-(amountPence*pots.length),potWins:[]}));
+    const rows=sweepPlayers.map(p=>({id:p.id,name:gameFirstName((p.name||p.display_name)||'?'),paid:amountPence*3,winnings:0,net:-(amountPence*3),potWins:[]}));
     const byId={};rows.forEach(r=>{byId[normaliseId(r.id)]=r;});
     const potRows=pots.map(pot=>{
       const scores=sweepPlayers.map(p=>({id:p.id,name:gameFirstName((p.name||p.display_name)||'?'),points:sweepPts(p.id,pot.holes)}));
@@ -3304,12 +3356,14 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       const potTotal=amountPence*sweepPlayers.length;
       const share=winners.length?Math.floor(potTotal/winners.length):0;
       const remainder=winners.length?potTotal-(share*winners.length):0;
-      winners.forEach((w,idx)=>{const row=byId[normaliseId(w.id)];if(row){const win=share+(idx<remainder?1:0);row.winnings+=win;row.potWins.push({label:pot.label,amount:win,points:w.points});}});
+      if(pot.settles){
+        winners.forEach((w,idx)=>{const row=byId[normaliseId(w.id)];if(row){const win=share+(idx<remainder?1:0);row.winnings+=win;row.potWins.push({label:pot.label,amount:win,points:w.points});}});
+      }
       return {...pot,best,winners,potTotal,share};
     });
     rows.forEach(r=>{r.net=r.winnings-r.paid;});
-    const creditors=rows.filter(r=>r.net>0).map(r=>({...r,remaining:r.net}));
-    const debtors=rows.filter(r=>r.net<0).map(r=>({...r,remaining:-r.net}));
+    const creditors=final?rows.filter(r=>r.net>0).map(r=>({...r,remaining:r.net})):[];
+    const debtors=final?rows.filter(r=>r.net<0).map(r=>({...r,remaining:-r.net})):[];
     const payments=[];
     let i=0,j=0;
     while(i<debtors.length&&j<creditors.length){
@@ -3319,24 +3373,26 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       if(debtors[i].remaining<=0)i++;
       if(creditors[j].remaining<=0)j++;
     }
-    return {enabled:!!(sweepstakeConfig&&sweepstakeConfig.enabled)&&!round._cupScoring,amountPence,scope,pots:potRows,rows,payments,totalEntry:amountPence*3,playerCount:sweepPlayers.length};
+    return {enabled:!!(sweepstakeConfig&&sweepstakeConfig.enabled)&&!round._cupScoring,amountPence,scope,pots:potRows,rows,payments,totalEntry:amountPence*3,playerCount:sweepPlayers.length,throughHole:safeThrough,final};
   }
-  function SweepstakePanel({compact=false}){
-    const sw=sweepstakePlayerRows();
+  function SweepstakePanel({compact=false,throughHole=null,reviewTitle='',payUp=false}){
+    const sw=sweepstakePlayerRows({throughHole});
     if(!sw.enabled)return null;
-    return <div style={{...S.card,margin:compact?'0 0 10px':16,background:'linear-gradient(135deg,rgba(245,158,11,0.18),rgba(255,255,255,0.05))',borderColor:'rgba(245,158,11,0.38)'}}>
+    const title=reviewTitle||'💰 Sweepstake';
+    return <div style={{...S.card,margin:compact?'0 0 10px':16,background:payUp?'linear-gradient(135deg,rgba(245,158,11,0.30),rgba(10,21,40,0.96))':'linear-gradient(135deg,rgba(245,158,11,0.18),rgba(255,255,255,0.05))',borderColor:'rgba(245,158,11,0.55)',boxShadow:payUp?'0 14px 36px rgba(245,158,11,0.18)':'none'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:10}}>
-        <div><div style={{fontSize:16,color:'#fff',fontWeight:950}}>💰 Sweepstake</div><div style={{fontSize:11,color:'#fbbf24'}}>Stableford side pots · {moneyFromPence(sw.amountPence)} front/back/overall · {sw.scope==='round'?'all groups':'this group'}</div></div>
+        <div><div style={{fontSize:payUp?21:16,color:'#fff',fontWeight:950}}>{title}</div><div style={{fontSize:11,color:'#fbbf24'}}>Stableford side pots · {moneyFromPence(sw.amountPence)} front/back/overall · {sw.scope==='round'?'all groups':'this group'} · {sw.playerCount} players</div></div>
       </div>
+      {!sw.final&&<div style={{padding:'8px 10px',borderRadius:10,background:'rgba(96,184,240,0.12)',border:'1px solid rgba(96,184,240,0.22)',fontSize:12,color:'#dbeafe',fontWeight:800,marginBottom:8}}>Live standings only — final net settlement appears after 18 holes.</div>}
       {sw.pots.map(pot=><div key={pot.key} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'7px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
         <div style={{fontSize:12,color:'#fff',fontWeight:800}}>{pot.label}</div>
-        <div style={{fontSize:12,color:'#fbbf24',fontWeight:900,textAlign:'right'}}>{pot.winners.map(w=>w.name).join(' / ')} <span style={{color:'rgba(255,255,255,0.65)'}}>({pot.best} pts)</span></div>
+        <div style={{fontSize:12,color:'#fbbf24',fontWeight:900,textAlign:'right'}}>{pot.winners.map(w=>w.name).join(' / ')||'-'} <span style={{color:'rgba(255,255,255,0.65)'}}>({pot.best||0} pts)</span></div>
       </div>)}
-      {!compact&&<>
-        <div style={{marginTop:12,fontSize:12,color:'#90ccf0',fontWeight:900,letterSpacing:'0.08em'}}>FINAL BALANCES</div>
-        {sw.rows.map(r=><div key={r.id} style={{display:'flex',justifyContent:'space-between',padding:'7px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}><span style={{fontSize:13,color:'#fff'}}>{r.name}</span><span style={{fontSize:13,fontWeight:950,color:r.net>0?'#86efac':r.net<0?'#fca5a5':'#e5e7eb'}}>{r.net>0?'+':''}{moneyFromPence(r.net)}</span></div>)}
-        <div style={{marginTop:12,fontSize:12,color:'#90ccf0',fontWeight:900,letterSpacing:'0.08em'}}>SETTLE UP</div>
-        {sw.payments.length?sw.payments.map((p,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}><span style={{fontSize:13,color:'#fff'}}>{p.from} → {p.to}</span><span style={{fontSize:13,color:'#fbbf24',fontWeight:950}}>{moneyFromPence(p.amount)}</span></div>):<div style={{fontSize:13,color:'rgba(255,255,255,0.65)',paddingTop:8}}>All square.</div>}
+      {sw.final&&<>
+        <div style={{marginTop:12,fontSize:payUp?14:12,color:'#90ccf0',fontWeight:950,letterSpacing:'0.08em'}}>FINAL BALANCES</div>
+        {sw.rows.map(r=><div key={r.id} style={{display:'flex',justifyContent:'space-between',padding:'7px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}><span style={{fontSize:13,color:'#fff'}}>{r.name}</span><span style={{fontSize:15,fontWeight:950,color:r.net>0?'#86efac':r.net<0?'#fca5a5':'#e5e7eb'}}>{r.net>0?'+':''}{moneyFromPence(r.net)}</span></div>)}
+        <div style={{marginTop:12,fontSize:payUp?15:12,color:'#fbbf24',fontWeight:950,letterSpacing:'0.08em'}}>WHO PAYS WHO</div>
+        {sw.payments.length?sw.payments.map((p,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:payUp?'11px 0':'8px 0',borderTop:'1px solid rgba(255,255,255,0.10)'}}><span style={{fontSize:payUp?16:13,color:'#fff',fontWeight:payUp?900:500}}>{p.from} → {p.to}</span><span style={{fontSize:payUp?18:13,color:'#fbbf24',fontWeight:950}}>{moneyFromPence(p.amount)}</span></div>):<div style={{fontSize:13,color:'rgba(255,255,255,0.65)',paddingTop:8}}>All square.</div>}
       </>}
     </div>;
   }
@@ -3652,6 +3708,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             ))}
           </div>
           <MiniCard holeList={back9} label="BACK 9"/>
+          <SweepstakePanel throughHole={18} reviewTitle="💰 Sweepstake after Back 9" payUp={false}/>
         </div>
       </div>
     );
@@ -3686,6 +3743,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           <div style={{padding:'10px 12px',background:'rgba(0,0,0,0.3)',marginBottom:12,borderRadius:8}}><div style={{fontSize:15,color:'#fff',fontWeight:700}}>{getCourseDisplayName(course,round)}</div><div style={{fontSize:11,color:'#60b8f0',marginTop:3}}>Round start: {roundStartText}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.55)',marginTop:2}}>{courseSummaryLine(course,round,holes)}</div></div>
           <div id="f9-card"><MiniCard holeList={front9} label="FRONT 9"/></div>
           <MiniCard holeList={back9} label="BACK 9"/>
+          <SweepstakePanel throughHole={18} reviewTitle="💰 SWEEPSTAKE - PAY UP" payUp={true}/>
           <div style={{...S.card}}>
             <div style={{display:'grid',gridTemplateColumns:'64px '+grpPlayers.map(()=>'minmax(54px,1fr)').join(' '),gap:6,alignItems:'center'}}>
               <div style={{fontSize:11,color:'#60b8f0'}}>Total</div>
@@ -3712,6 +3770,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           <button onClick={()=>{setShowEnd(false);setView('home');}} style={{...S.pri,padding:'8px 14px',fontSize:13}}>Done</button>
         </div>
         <div id="stats-card" style={{padding:16,background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)'}}>
+          <SweepstakePanel throughHole={18} reviewTitle="💰 SWEEPSTAKE - PAY UP" payUp={true}/>
           {grpPlayers.map(p=>{
             const st=getStats(p.id);
             return(
@@ -3757,6 +3816,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             ))}
           </div>
           <MiniCard holeList={front9} label="FRONT 9"/>
+          <SweepstakePanel throughHole={9} reviewTitle="💰 Sweepstake after Front 9" payUp={false}/>
           <div style={{display:'flex',gap:8,marginTop:16}}>
             <button onClick={goToBack9} style={{...S.pri,flex:1,padding:12,fontSize:13}}>Back 9</button>
           </div>
