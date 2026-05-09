@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.10
+// SNYDER LIVE v2.11
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1745,7 +1745,31 @@ function parseFineScoreRow(row){
   return {pid:normaliseId(row.player_id),key:parsedHole.key,hole:parsedHole.hole,legacy:false};
 }
 function isFineScoreRow(row){return !!parseFineScoreRow(row);}
-function isMetaScoreRow(row){return isSnakeScoreRow(row)||isFineScoreRow(row);}
+const SWEEPSTAKE_SCORE_PREFIX='__sweepstake__|';
+const SWEEPSTAKE_CONFIG_HOLE=950001;
+function makeSweepstakeScorePlayerId(key){return SWEEPSTAKE_SCORE_PREFIX+encodeURIComponent(key||'config');}
+function parseSweepstakeScoreRow(row){
+  const txt=String(row&&row.player_id||'');
+  if(!txt.startsWith(SWEEPSTAKE_SCORE_PREFIX))return null;
+  try{return {key:decodeURIComponent(txt.slice(SWEEPSTAKE_SCORE_PREFIX.length)||'config'),amountPence:parseInt(row.gross_score)||0,enabled:(parseInt(row.stableford_points)||0)>0,scope:parseInt(row.par)===5?'round':'group'};}
+  catch(e){return {key:'config',amountPence:parseInt(row&&row.gross_score)||0,enabled:(parseInt(row&&row.stableford_points)||0)>0,scope:parseInt(row&&row.par)===5?'round':'group'};}
+}
+function isSweepstakeScoreRow(row){return !!parseSweepstakeScoreRow(row);}
+function sweepstakeConfigFromRows(rows,round){
+  const row=(rows||[]).filter(r=>r&&(!round||r.round_id===round.id)).map(parseSweepstakeScoreRow).filter(Boolean).find(x=>x.key==='config');
+  const fallback=round&&round._sweepstake;
+  const amountPence=row?row.amountPence:(fallback&&fallback.amountPence)||0;
+  const enabled=row?row.enabled:!!(fallback&&fallback.enabled);
+  const scope=row?row.scope:(fallback&&fallback.scope)||'round';
+  return {enabled:!!enabled&&amountPence>0,amountPence:amountPence>0?amountPence:200,scope:scope==='group'?'group':'round'};
+}
+function moneyFromPence(v){
+  const n=Math.round(parseFloat(v)||0);
+  const sign=n<0?'-':'';
+  const abs=Math.abs(n);
+  return sign+'£'+(abs/100).toFixed(abs%100?2:0);
+}
+function isMetaScoreRow(row){return isSnakeScoreRow(row)||isFineScoreRow(row)||isSweepstakeScoreRow(row);}
 function fineAmount(key,count){const def=fineDef(key);return def?(parseInt(count)||0)*(def.amount||0):0;}
 
 function cupFineTotalForRound(round,scores){
@@ -1809,7 +1833,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   const[step,setStep]=useState('menu');
   const[activeRound,setActiveRound]=useState(null);
   const[activeGroup,setActiveGroup]=useState(null);
-  const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:1});
+  const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:1,sweepstake:{enabled:false,amountPence:200,scope:'round'}});
   const[participants,setParticipants]=useState([]);
   const[groupSetup,setGroupSetup]=useState([[]]);
   const[pickerGroup,setPickerGroup]=useState(0);
@@ -2058,6 +2082,18 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       const{data:createdGroups,error:groupErr}=await sb.from('cup_groups').insert(groupRows).select();
       if(groupErr)throw groupErr;
 
+      if(setup.sweepstake&&setup.sweepstake.enabled){
+        await saveScoreRowsToCloud(sb,[{
+          round_id:rd.id,
+          player_id:makeSweepstakeScorePlayerId('config'),
+          hole_number:SWEEPSTAKE_CONFIG_HOLE,
+          gross_score:parseInt(setup.sweepstake.amountPence)||200,
+          stableford_points:1,
+          par:(setup.sweepstake&&setup.sweepstake.scope)==='group'?4:5,
+          stroke_index:1
+        }]);
+      }
+
       for(const p of allParticipants){
         await sb.from('cup_round_players').upsert({
           round_id:rd.id,
@@ -2078,7 +2114,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       const scorerGroup=(createdGroups||[]).find(g=>currentUser&&Array.isArray(g.player_ids)&&g.player_ids.includes(currentUser.id))||(createdGroups||[])[0];
       const scorerIds=(scorerGroup&&scorerGroup.player_ids)||playerIds;
       const scorerParticipants=po.filter(p=>scorerIds.includes(p.id));
-      setActiveRound({...rd,join_code:joinCode,_allParticipants:po});
+      setActiveRound({...rd,join_code:joinCode,_allParticipants:po,_sweepstake:{enabled:!!(setup.sweepstake&&setup.sweepstake.enabled),amountPence:parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||200,scope:(setup.sweepstake&&setup.sweepstake.scope)==='group'?'group':'round'}});
       setActiveGroup({...scorerGroup,playing_handicaps:(scorerGroup&&scorerGroup.playing_handicaps)||playingHcps,participants:scorerParticipants,player_ids:scorerIds});
       setHoleScores({}); // Fresh scores for new round
       setStep('scorecard');
@@ -2215,6 +2251,30 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
             <div onClick={()=>setSetup(q=>({...q,is_private:!q.is_private}))} style={{width:48,height:28,borderRadius:14,background:setup.is_private?'#0070BB':'rgba(255,255,255,0.2)',cursor:'pointer',position:'relative',transition:'background 0.2s',flexShrink:0}}>
               <div style={{position:'absolute',top:3,left:setup.is_private?22:3,width:22,height:22,borderRadius:'50%',background:'#fff',transition:'left 0.2s'}}/>
             </div>
+          </div>
+          <div style={{padding:'12px 14px',background:setup.sweepstake&&setup.sweepstake.enabled?'rgba(245,158,11,0.12)':'rgba(255,255,255,0.06)',borderRadius:10,marginBottom:16,border:'1px solid '+(setup.sweepstake&&setup.sweepstake.enabled?'rgba(245,158,11,0.35)':'rgba(255,255,255,0.12)')}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+              <div>
+                <div style={{fontSize:14,color:'#fff',fontWeight:800}}>Sweepstake</div>
+                <div style={{fontSize:11,color:'#fbbf24',marginTop:2}}>Optional side pot from Stableford only: front, back and overall.</div>
+              </div>
+              <div onClick={()=>setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),enabled:!(q.sweepstake&&q.sweepstake.enabled)}}))} style={{width:48,height:28,borderRadius:14,background:setup.sweepstake&&setup.sweepstake.enabled?'#d97706':'rgba(255,255,255,0.2)',cursor:'pointer',position:'relative',transition:'background 0.2s',flexShrink:0}}>
+                <div style={{position:'absolute',top:3,left:setup.sweepstake&&setup.sweepstake.enabled?22:3,width:22,height:22,borderRadius:'50%',background:'#fff',transition:'left 0.2s'}}/>
+              </div>
+            </div>
+            {setup.sweepstake&&setup.sweepstake.enabled&&<div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,alignItems:'center'}}>
+              <select value={setup.sweepstake.amountPence} onChange={e=>setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),amountPence:parseInt(e.target.value)||200}}))} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}>
+                <option value={100}>£1 each pot</option>
+                <option value={200}>£2 each pot</option>
+                <option value={500}>£5 each pot</option>
+                <option value={1000}>£10 each pot</option>
+              </select>
+              <select value={(setup.sweepstake&&setup.sweepstake.scope)||'round'} onChange={e=>setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),scope:e.target.value==='group'?'group':'round'}}))} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}>
+                <option value="round">Whole round / all groups</option>
+                <option value="group">My group only</option>
+              </select>
+              <div style={{gridColumn:'1 / -1',fontSize:11,color:'rgba(255,255,255,0.72)',lineHeight:1.35}}>Max loss per player: <b>{moneyFromPence((setup.sweepstake.amountPence||200)*3)}</b> · {(setup.sweepstake&&setup.sweepstake.scope)==='group'?'Settles this group only':'Settles every group in the round'}</div>
+            </div>}
           </div>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
             <label style={{...S.lbl,margin:0}}>{isSingleGroupDay?'Players':'Groups'} ({participants.length} players)</label>
@@ -2384,8 +2444,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const[inputHole,setInputHole]=useState(null);
   const[inputVal,setInputVal]=useState('');
   const[showOverall,setShowOverall]=useState(false);
-  const[showWatchMode,setShowWatchMode]=useState(false);
-  const[watchHole,setWatchHole]=useState(1);
   const[snakeMarks,setSnakeMarks]=useState({});
   const snakeMarksRef=useRef({});
   const[overallPlayers,setOverallPlayers]=useState([]);
@@ -2393,6 +2451,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const[overallMode,setOverallMode]=useState('round');
   const[overallRefreshNote,setOverallRefreshNote]=useState('');
   const[cupOverallRoundPlayers,setCupOverallRoundPlayers]=useState([]);
+  const[sweepstakeConfig,setSweepstakeConfig]=useState(sweepstakeConfigFromRows(scores,round));
+  const[showSweepstake,setShowSweepstake]=useState(false);
 
   function setSnakeMarksSafe(next){
     const clean=next&&typeof next==='object'?next:{};
@@ -2441,6 +2501,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           sb.from('cup_scores').select('*').eq('round_id',round.id)
         ]);
         if(!alive)return;
+        setSweepstakeConfig(sweepstakeConfigFromRows(scs||[],round));
         const initialParts=(group&&group.participants)||[];
         const byName={};initialParts.forEach(p=>{byName[String(p.display_name||p.name||'').trim().toLowerCase()]=p;});
         const people=(rps||[]).map((rp,idx)=>{
@@ -2508,6 +2569,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         m[s.hole_number][s.player_id]=s.gross_score;
       });
       const cloudSnakes=rowsToSnakeMarks(rows);
+      setSweepstakeConfig(sweepstakeConfigFromRows(rows,round));
       if(Object.keys(m).length>0){
         setHoleScores(prev=>({...prev,...m}));
         try{localStorage.setItem('scores_'+round.id,JSON.stringify(m));}catch(e){}
@@ -2940,10 +3002,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     }
     return null;
   }
-  function nextHoleToScore(){
-    const next=holes.find(h=>grpPlayers.some(p=>(holeScores[h.hole]||{})[p.id]===undefined));
-    return next&&next.hole?next.hole:1;
-  }
 
     // ---------------------------------------------------------
   // Score autosave
@@ -3194,6 +3252,75 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       const g=(holeScores[h.hole]||{})[pid];
       return t+((g===-1||isGivenGross(g))?0:(getPts(g,h.hole,pid)||0));
     },0);
+  }
+
+  function sweepstakePlayerRows(){
+    const amountPence=parseInt(sweepstakeConfig&&sweepstakeConfig.amountPence)||200;
+    const scope=(sweepstakeConfig&&sweepstakeConfig.scope)==='group'?'group':'round';
+    const pots=[{key:'front',label:'Front 9',holes:front9},{key:'back',label:'Back 9',holes:back9},{key:'overall',label:'Overall',holes}];
+    const playerSource=scope==='round'?(allRoundPlayers&&allRoundPlayers.length?allRoundPlayers:grpPlayers):grpPlayers;
+    const sweepPlayers=(playerSource||[]).filter((p,idx,arr)=>p&&p.id&&arr.findIndex(x=>normaliseId(x&&x.id)===normaliseId(p.id))===idx);
+    const pointByPlayerHole={};
+    (overallScores||[]).filter(r=>r&&!isMetaScoreRow(r)).forEach(r=>{
+      const pid=normaliseId(r.player_id); const hn=parseInt(r.hole_number);
+      if(!pid||!hn)return;
+      if(!pointByPlayerHole[pid])pointByPlayerHole[pid]={};
+      pointByPlayerHole[pid][hn]=stablefordPointsValue(r.stableford_points);
+    });
+    function sweepPts(pid,holeList){
+      const key=normaliseId(pid);
+      return (holeList||[]).reduce((t,h)=>{
+        const hn=h.hole;
+        if(pointByPlayerHole[key]&&pointByPlayerHole[key][hn]!=null)return t+(pointByPlayerHole[key][hn]||0);
+        const g=(holeScores[hn]||{})[pid];
+        return t+((g===-1||isGivenGross(g))?0:(getPts(g,hn,pid)||0));
+      },0);
+    }
+    const rows=sweepPlayers.map(p=>({id:p.id,name:gameFirstName((p.name||p.display_name)||'?'),paid:amountPence*pots.length,winnings:0,net:-(amountPence*pots.length),potWins:[]}));
+    const byId={};rows.forEach(r=>{byId[normaliseId(r.id)]=r;});
+    const potRows=pots.map(pot=>{
+      const scores=sweepPlayers.map(p=>({id:p.id,name:gameFirstName((p.name||p.display_name)||'?'),points:sweepPts(p.id,pot.holes)}));
+      const best=scores.length?Math.max(...scores.map(x=>x.points)):0;
+      const winners=scores.filter(x=>x.points===best);
+      const potTotal=amountPence*sweepPlayers.length;
+      const share=winners.length?Math.floor(potTotal/winners.length):0;
+      const remainder=winners.length?potTotal-(share*winners.length):0;
+      winners.forEach((w,idx)=>{const row=byId[normaliseId(w.id)];if(row){const win=share+(idx<remainder?1:0);row.winnings+=win;row.potWins.push({label:pot.label,amount:win,points:w.points});}});
+      return {...pot,best,winners,potTotal,share};
+    });
+    rows.forEach(r=>{r.net=r.winnings-r.paid;});
+    const creditors=rows.filter(r=>r.net>0).map(r=>({...r,remaining:r.net}));
+    const debtors=rows.filter(r=>r.net<0).map(r=>({...r,remaining:-r.net}));
+    const payments=[];
+    let i=0,j=0;
+    while(i<debtors.length&&j<creditors.length){
+      const amt=Math.min(debtors[i].remaining,creditors[j].remaining);
+      if(amt>0)payments.push({from:debtors[i].name,to:creditors[j].name,amount:amt});
+      debtors[i].remaining-=amt;creditors[j].remaining-=amt;
+      if(debtors[i].remaining<=0)i++;
+      if(creditors[j].remaining<=0)j++;
+    }
+    return {enabled:!!(sweepstakeConfig&&sweepstakeConfig.enabled)&&!round._cupScoring,amountPence,scope,pots:potRows,rows,payments,totalEntry:amountPence*3,playerCount:sweepPlayers.length};
+  }
+  function SweepstakePanel({compact=false}){
+    const sw=sweepstakePlayerRows();
+    if(!sw.enabled)return null;
+    return <div style={{...S.card,margin:compact?'0 0 10px':16,background:'linear-gradient(135deg,rgba(245,158,11,0.18),rgba(255,255,255,0.05))',borderColor:'rgba(245,158,11,0.38)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:10}}>
+        <div><div style={{fontSize:16,color:'#fff',fontWeight:950}}>💰 Sweepstake</div><div style={{fontSize:11,color:'#fbbf24'}}>Stableford side pots · {moneyFromPence(sw.amountPence)} front/back/overall · {sw.scope==='round'?'all groups':'this group'}</div></div>
+        {compact&&<button onClick={()=>setShowSweepstake(true)} style={{...S.pri,padding:'7px 10px',fontSize:12,background:'#d97706'}}>View</button>}
+      </div>
+      {sw.pots.map(pot=><div key={pot.key} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'7px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
+        <div style={{fontSize:12,color:'#fff',fontWeight:800}}>{pot.label}</div>
+        <div style={{fontSize:12,color:'#fbbf24',fontWeight:900,textAlign:'right'}}>{pot.winners.map(w=>w.name).join(' / ')} <span style={{color:'rgba(255,255,255,0.65)'}}>({pot.best} pts)</span></div>
+      </div>)}
+      {!compact&&<>
+        <div style={{marginTop:12,fontSize:12,color:'#90ccf0',fontWeight:900,letterSpacing:'0.08em'}}>FINAL BALANCES</div>
+        {sw.rows.map(r=><div key={r.id} style={{display:'flex',justifyContent:'space-between',padding:'7px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}><span style={{fontSize:13,color:'#fff'}}>{r.name}</span><span style={{fontSize:13,fontWeight:950,color:r.net>0?'#86efac':r.net<0?'#fca5a5':'#e5e7eb'}}>{r.net>0?'+':''}{moneyFromPence(r.net)}</span></div>)}
+        <div style={{marginTop:12,fontSize:12,color:'#90ccf0',fontWeight:900,letterSpacing:'0.08em'}}>SETTLE UP</div>
+        {sw.payments.length?sw.payments.map((p,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}><span style={{fontSize:13,color:'#fff'}}>{p.from} → {p.to}</span><span style={{fontSize:13,color:'#fbbf24',fontWeight:950}}>{moneyFromPence(p.amount)}</span></div>):<div style={{fontSize:13,color:'rgba(255,255,255,0.65)',paddingTop:8}}>All square.</div>}
+      </>}
+    </div>;
   }
 
     // ---------------------------------------------------------
@@ -3615,86 +3742,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     );
   }
 
-
-
-  // ---------------------------------------------------------
-  // Android watch mode
-  // Tiny-screen scoring surface that reuses the existing score save path.
-  // This deliberately does not create separate Watch/Wear OS routing yet.
-  // ---------------------------------------------------------
-  function WatchMode(){
-    if(!canEdit)return null;
-    const currentHole=Math.min(Math.max(parseInt(watchHole)||1,1),holes.length||18);
-    const hd=getHole(currentHole);
-    const currentMap=holeScores[currentHole]||{};
-    const enteredCount=grpPlayers.filter(p=>currentMap[p.id]!==undefined).length;
-    const complete=grpPlayers.length>0&&enteredCount===grpPlayers.length;
-    const nextUnscored=holes.find(h=>grpPlayers.some(p=>(holeScores[h.hole]||{})[p.id]===undefined));
-    function scoreFor(p){return currentMap[p.id];}
-    function shownScore(p){const g=scoreFor(p);return grossScoreValue(g)||hd.par;}
-    function nudgeScore(p,delta){
-      const current=scoreFor(p);
-      const base=grossScoreValue(current)||hd.par;
-      setScore(currentHole,p.id,Math.max(1,base+delta));
-    }
-    function quickBlob(p){
-      const hcp=parseFloat(playingHcps[p.id]!=null?playingHcps[p.id]:p.current_handicap||0);
-      setScore(currentHole,p.id,-pickupGrossForNoStableford(hd.par,hd.stroke_index,hcp));
-    }
-    function jump(delta){setWatchHole(Math.min(Math.max(currentHole+delta,1),holes.length||18));}
-    return(
-      <div style={{position:'fixed',inset:0,zIndex:9999,background:'linear-gradient(160deg,#061325 0%,#0b2344 58%,#061325 100%)',color:'#fff',overflowY:'auto',padding:'8px 8px 18px',touchAction:'manipulation'}}>
-        <div style={{position:'sticky',top:0,zIndex:2,background:'linear-gradient(160deg,#061325,#0b2344)',padding:'4px 0 8px',borderBottom:'1px solid rgba(255,255,255,0.12)'}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6}}>
-            <button onClick={()=>setShowWatchMode(false)} style={{border:'1px solid rgba(255,255,255,0.18)',background:'rgba(255,255,255,0.08)',color:'#fff',borderRadius:999,padding:'7px 9px',fontSize:12,fontWeight:900}}>Back</button>
-            <div style={{textAlign:'center',minWidth:0,flex:1}}>
-              <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,letterSpacing:'0.12em'}}>WATCH MODE</div>
-              <div style={{fontSize:22,lineHeight:1,fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif"}}>Hole {currentHole}</div>
-              <div style={{fontSize:11,color:'#fbbf24',fontWeight:800}}>Par {hd.par} · SI {hd.stroke_index}</div>
-            </div>
-            <button onClick={()=>refreshScoresFromCloud(true)} disabled={refreshing} style={{border:'1px solid rgba(96,184,240,0.35)',background:'rgba(0,112,187,0.24)',color:'#90ccf0',borderRadius:999,padding:'7px 9px',fontSize:12,fontWeight:900,opacity:refreshing?0.55:1}}>↻</button>
-          </div>
-          <div style={{marginTop:7,display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:10,color:complete?'#86efac':'#cbd5e1',fontWeight:800}}>{complete?'Hole complete':'Scores '+enteredCount+'/'+grpPlayers.length}{cloudError?' · offline save':cloudStatus?' · saving':''}</div>
-        </div>
-
-        <div style={{display:'flex',flexDirection:'column',gap:7,marginTop:8}}>
-          {grpPlayers.map(p=>{
-            const gross=scoreFor(p);
-            const hasScore=hasEnteredGross(gross);
-            const display=hasScore?grossDisplay(gross):shownScore(p);
-            const pts=hasScore?getPts(gross,currentHole,p.id):getPts(shownScore(p),currentHole,p.id);
-            const snakeChecked=isSnakeHolder(currentHole,p.id);
-            return(
-              <div key={p.id} style={{border:'1px solid rgba(255,255,255,0.13)',background:hasScore?'rgba(255,255,255,0.08)':'rgba(255,255,255,0.045)',borderRadius:18,padding:8,boxShadow:'0 10px 20px rgba(0,0,0,0.18)'}}>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,marginBottom:7}}>
-                  <div style={{fontSize:17,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{gameFirstName(p.name||p.display_name||'Player')}</div>
-                  <button onClick={()=>setSnakeFromHole(currentHole,p.id,!snakeChecked)} style={{border:'1px solid '+(snakeChecked?'rgba(34,197,94,0.85)':'rgba(255,255,255,0.16)'),background:snakeChecked?'rgba(34,197,94,0.26)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:999,padding:'6px 8px',fontSize:15,fontWeight:950,lineHeight:1}}>{EMOJI.snake}</button>
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:'58px minmax(74px,1fr) 58px',gap:7,alignItems:'center'}}>
-                  <button onClick={()=>nudgeScore(p,-1)} style={{height:54,borderRadius:16,border:'1px solid rgba(255,255,255,0.16)',background:'rgba(255,255,255,0.08)',color:'#fff',fontSize:28,fontWeight:950}}>−</button>
-                  <button onClick={()=>{if(!hasScore)setScore(currentHole,p.id,shownScore(p));}} style={{height:58,borderRadius:16,border:'1px solid rgba(255,255,255,0.20)',background:hasScore?ptsColor(pts):'rgba(0,112,187,0.22)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-                    <span style={{fontSize:32,fontWeight:950,lineHeight:1}}>{display}</span>
-                    <span style={{fontSize:11,color:'rgba(255,255,255,0.86)',fontWeight:900}}>{pts||0}pt</span>
-                  </button>
-                  <button onClick={()=>nudgeScore(p,1)} style={{height:54,borderRadius:16,border:'1px solid rgba(255,255,255,0.16)',background:'rgba(255,255,255,0.08)',color:'#fff',fontSize:28,fontWeight:950}}>+</button>
-                </div>
-                <button onClick={()=>quickBlob(p)} style={{marginTop:7,width:'100%',border:'1px solid rgba(248,113,113,0.28)',background:'rgba(248,113,113,0.10)',color:'#fecaca',borderRadius:14,padding:'7px 8px',fontSize:11,fontWeight:900}}>Blob / pick up</button>
-              </div>
-            );
-          })}
-        </div>
-
-        <div style={{position:'sticky',bottom:0,marginTop:10,background:'linear-gradient(0deg,#061325 70%,rgba(6,19,37,0))',paddingTop:10}}>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1.4fr 1fr',gap:7}}>
-            <button onClick={()=>jump(-1)} disabled={currentHole<=1} style={{border:'1px solid rgba(255,255,255,0.16)',background:'rgba(255,255,255,0.08)',color:'#fff',borderRadius:16,padding:'12px 6px',fontSize:12,fontWeight:950,opacity:currentHole<=1?0.4:1}}>← Hole</button>
-            <button onClick={()=>setWatchHole(nextUnscored?nextUnscored.hole:Math.min(currentHole+1,holes.length||18))} style={{border:'none',background:'linear-gradient(135deg,#0070BB,#0a8a4a)',color:'#fff',borderRadius:16,padding:'12px 6px',fontSize:13,fontWeight:950}}>Next unscored</button>
-            <button onClick={()=>jump(1)} disabled={currentHole>=holes.length} style={{border:'1px solid rgba(255,255,255,0.16)',background:'rgba(255,255,255,0.08)',color:'#fff',borderRadius:16,padding:'12px 6px',fontSize:12,fontWeight:950,opacity:currentHole>=holes.length?0.4:1}}>Hole →</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const rowH=80;
   const f9complete=front9.every(hd=>grpPlayers.every(p=>(holeScores[hd.hole]||{})[p.id]!==undefined));
   function goToBack9(){
@@ -3708,7 +3755,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
 
   return(
     <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)',overflowX:'hidden',touchAction:inputHole?'none':'auto'}}>
-      {showWatchMode&&<WatchMode/>}
       <div style={{position:'sticky',top:0,zIndex:10,background:'linear-gradient(160deg,#0a1528,#0d2040)',borderBottom:'2px solid #0070BB'}}>
         {!canEdit&&(
           <div style={{background:'rgba(0,112,187,0.2)',borderBottom:'1px solid rgba(0,112,187,0.3)',padding:'8px 14px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -3724,7 +3770,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             <div style={{fontSize:10,color:'#60b8f0'}}>Round start: {roundStartText}</div>
           </div>
           <button onClick={()=>round._cupScoring?openCupOverallSummary(true):openOverallLeaderboard(true)} style={{background:round._cupScoring?'linear-gradient(135deg,rgba(212,175,55,0.95),rgba(37,99,235,0.92))':'rgba(255,255,255,0.08)',border:round._cupScoring?'1px solid rgba(255,255,255,0.35)':'1px solid rgba(96,184,240,0.28)',color:'#fff',borderRadius:10,padding:'8px 11px',fontSize:12,fontWeight:950,cursor:'pointer',flexShrink:0,boxShadow:round._cupScoring?'0 8px 18px rgba(0,0,0,0.26)':'none',letterSpacing:'0.04em'}}>Overall</button>
-          {canEdit&&activeGroupId!=='leaderboard'&&<button onClick={()=>{setWatchHole(nextHoleToScore());setShowWatchMode(true);}} style={{background:'linear-gradient(135deg,#16a34a,#0070BB)',border:'1px solid rgba(255,255,255,0.30)',color:'#fff',borderRadius:10,padding:'8px 10px',fontSize:12,fontWeight:950,cursor:'pointer',flexShrink:0,letterSpacing:'0.04em'}}>Watch</button>}
           {round.join_code&&<button onClick={()=>{
             const url='https://snyder-live.vercel.app?watch='+round.join_code;
             if(navigator.share){navigator.share({title:'Watch live - '+( course&&course.name||''),url});}
@@ -3766,6 +3811,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             </button>;})()}
           </div>
         )}
+        {sweepstakeConfig&&sweepstakeConfig.enabled&&!round._cupScoring&&activeGroupId!=='leaderboard'&&<div style={{padding:'8px 12px 0'}}><SweepstakePanel compact={true}/></div>}
         {allGroups.length>1&&<>
           {(()=>{const leader=overallLeaderboardRows()[0];return (
             <button onClick={()=>{setActiveGroupId('leaderboard');openOverallLeaderboard(false);}} style={{width:'calc(100% - 24px)',margin:'8px 12px 6px',padding:'10px 12px',borderRadius:12,border:'1px solid rgba(245,158,11,0.55)',background:'linear-gradient(135deg,rgba(245,158,11,0.95),rgba(180,83,9,0.9))',boxShadow:'0 8px 22px rgba(180,83,9,0.22)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,cursor:'pointer',textAlign:'left'}}>
@@ -3970,6 +4016,18 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       </div>
 
       </>}
+
+      {showSweepstake&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.78)',zIndex:9998,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={e=>{if(e.target===e.currentTarget)setShowSweepstake(false);}}>
+          <div style={{width:'100%',maxWidth:520,maxHeight:'82vh',overflowY:'auto',background:'#0d2548',borderTop:'1px solid rgba(255,255,255,0.16)',borderRadius:'18px 18px 0 0',padding:16}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+              <div><div style={{fontSize:18,color:'#fff',fontWeight:900}}>Sweepstake Money</div><div style={{fontSize:12,color:'#fbbf24'}}>Net settlement only · {sweepstakePlayerRows().scope==='round'?'whole round / all groups':'my group only'}</div></div>
+              <button onClick={()=>setShowSweepstake(false)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Close</button>
+            </div>
+            <SweepstakePanel compact={false}/>
+          </div>
+        </div>
+      )}
 
       {showOverall&&(
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.78)',zIndex:9998,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={e=>{if(e.target===e.currentTarget)setShowOverall(false);}}>
