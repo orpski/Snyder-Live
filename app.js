@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.13
+// SNYDER LIVE v2.14
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -877,7 +877,14 @@ function App(){
   const[selectedRound,setSelectedRound]=useState(null);
   const[selectedComp,setSelectedComp]=useState(null);
   const[holeScores,setHoleScores]=useState({});
+  const[homePull,setHomePull]=useState(0);
+  const[homeRefreshing,setHomeRefreshing]=useState(false);
+  const viewRef=useRef(view);
+  const homeRefreshRef=useRef(false);
+  const pullRef=useRef({active:false,startX:0,startY:0,dy:0});
   const isAdmin=true; // Admin panel is password protected internally
+
+  useEffect(()=>{viewRef.current=view;},[view]);
 
   function setView(v){
     if(v!=='home')window.history.pushState({view:v},'',null);
@@ -946,10 +953,41 @@ function App(){
       const t=e.touches&&e.touches[0];
       if(!t)return;
       swipeStartX=t.clientX;swipeStartY=t.clientY;swipeStartT=Date.now();
+      const canPull=viewRef.current==='home'&&window.scrollY<=2&&!homeRefreshRef.current;
+      pullRef.current={active:canPull,startX:t.clientX,startY:t.clientY,dy:0};
+    }
+    function handleTouchMove(e){
+      const t=e.touches&&e.touches[0];
+      const p=pullRef.current;
+      if(!t||!p.active)return;
+      const dx=Math.abs(t.clientX-p.startX);
+      const dy=t.clientY-p.startY;
+      if(dy<=0||dx>70){setHomePull(0);return;}
+      if(dy>12&&window.scrollY<=2){try{e.preventDefault();}catch(err){}}
+      const resisted=Math.min(92,Math.round((dy-10)*0.46));
+      setHomePull(Math.max(0,resisted));
+      p.dy=dy;
+    }
+    async function handleHomeRefresh(){
+      if(homeRefreshRef.current)return;
+      homeRefreshRef.current=true;
+      setHomeRefreshing(true);
+      setHomePull(92);
+      try{await loadAll();flash('Home refreshed');}
+      catch(err){flash('Could not refresh home','error');}
+      setTimeout(()=>{setHomeRefreshing(false);setHomePull(0);homeRefreshRef.current=false;},450);
     }
     function handleTouchEnd(e){
       const t=e.changedTouches&&e.changedTouches[0];
       if(!t)return;
+      const p=pullRef.current;
+      const pullDy=p&&p.active?p.dy:0;
+      pullRef.current={active:false,startX:0,startY:0,dy:0};
+      if(viewRef.current==='home'&&pullDy>135&&Math.abs(t.clientX-(p.startX||t.clientX))<80&&window.scrollY<=6){
+        handleHomeRefresh();
+        return;
+      }
+      if(!homeRefreshRef.current)setHomePull(0);
       const dx=t.clientX-swipeStartX;
       const dy=Math.abs(t.clientY-swipeStartY);
       const quick=Date.now()-swipeStartT<900;
@@ -959,10 +997,12 @@ function App(){
     }
     window.addEventListener('popstate',handlePop);
     window.addEventListener('touchstart',handleTouchStart,{passive:true});
+    window.addEventListener('touchmove',handleTouchMove,{passive:false});
     window.addEventListener('touchend',handleTouchEnd,{passive:true});
     return()=>{
       window.removeEventListener('popstate',handlePop);
       window.removeEventListener('touchstart',handleTouchStart);
+      window.removeEventListener('touchmove',handleTouchMove);
       window.removeEventListener('touchend',handleTouchEnd);
     };
   },[]);
@@ -1168,6 +1208,12 @@ function App(){
 
   return(
     <div style={{minHeight:'100vh',paddingBottom:60,background:'linear-gradient(180deg,#0d2548 0%,#0a1f3d 100%)'}}>
+      <div style={{position:'fixed',top:8,left:'50%',transform:`translateX(-50%) translateY(${homePull?0:-54}px)`,opacity:homePull?1:0,transition:homeRefreshing?'none':'transform 0.18s ease, opacity 0.18s ease',zIndex:9998,pointerEvents:'none'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 13px',borderRadius:999,background:'rgba(13,37,72,0.96)',border:'1px solid rgba(96,184,240,0.26)',boxShadow:'0 12px 28px rgba(0,0,0,0.32)',fontSize:12,color:'#fff',fontWeight:900}}>
+          <span style={{fontSize:15}}>{homeRefreshing?'⟳':homePull>76?'↻':'↓'}</span>
+          <span>{homeRefreshing?'Refreshing home':homePull>76?'Release to refresh':'Pull down to refresh'}</span>
+        </div>
+      </div>
       {/* Top nav */}
       <div style={{background:'#0d2548',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
         <img src={LOGO} alt="Snyder Live" style={{width:36,height:36,objectFit:'contain',background:'transparent',borderRadius:0,display:'block'}}/>
