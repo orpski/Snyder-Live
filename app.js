@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.17
+// SNYDER LIVE v2.18
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -4064,7 +4064,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       <FinalStablefordSweepstakeBlock topMargin={12}/>
 
       {/* Spectator live leaderboard */}
-      {!canEdit&&(
+      {!canEdit&&!isCompletedRound(round)&&(
         <div style={{padding:'12px 14px',background:'rgba(0,0,0,0.2)',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
           <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.15em',fontWeight:600,marginBottom:10}}>LIVE LEADERBOARD</div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
