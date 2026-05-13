@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.16
+// SNYDER LIVE v2.17
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -3939,7 +3939,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   return(
     <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)',overflowX:'hidden',touchAction:inputHole?'none':'auto'}}>
       <div style={{position:'sticky',top:0,zIndex:10,background:'linear-gradient(160deg,#0a1528,#0d2040)',borderBottom:'2px solid #0070BB'}}>
-        {!canEdit&&(
+        {!canEdit&&isLiveRound(round)&&(
           <div style={{background:'rgba(0,112,187,0.2)',borderBottom:'1px solid rgba(0,112,187,0.3)',padding:'8px 14px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
             <div style={{fontSize:12,color:'#60b8f0',fontWeight:600}}>Spectator View</div>
             <div style={{fontSize:11,color:'rgba(255,255,255,0.4)'}}>{currentUser&&playerIds.includes(currentUser.id)?'Spectator mode':'Sign in to score'}</div>
