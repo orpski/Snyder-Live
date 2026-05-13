@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.18
+// SNYDER LIVE v2.19
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -3581,6 +3581,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   function ScoreInput(){
     if(!inputHole)return null;
     const{holeNum,pid}=inputHole;
+    const shouldAutoAdvance=!!(inputHole&&inputHole.autoAdvance);
     const hd=getHole(holeNum);
     const player=grpPlayers.find(p=>p.id===pid);
     const hcp=parseFloat(playingHcps[pid]!=null?playingHcps[pid]:player&&player.current_handicap||0);
@@ -3594,8 +3595,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     function confirm(){
       setScore(holeNum,pid,dv);setInputHole(null);
       const pIdx=grpPlayers.findIndex(p=>p.id===pid);
-      if(pIdx<grpPlayers.length-1){
-        setTimeout(()=>{setInputVal('');setInputHole({holeNum,pid:grpPlayers[pIdx+1].id});},150);
+      if(shouldAutoAdvance&&pIdx<grpPlayers.length-1){
+        setTimeout(()=>{setInputVal('');setInputHole({holeNum,pid:grpPlayers[pIdx+1].id,autoAdvance:true});},150);
       }
     }
 
@@ -3603,8 +3604,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       const pickupGross=pickupGrossForNoStableford(hd.par,hd.stroke_index,hcp);
       setScore(holeNum,pid,-pickupGross);setInputHole(null);
       const pIdx=grpPlayers.findIndex(p=>p.id===pid);
-      if(pIdx<grpPlayers.length-1){
-        setTimeout(()=>{setInputVal('');setInputHole({holeNum,pid:grpPlayers[pIdx+1].id});},150);
+      if(shouldAutoAdvance&&pIdx<grpPlayers.length-1){
+        setTimeout(()=>{setInputVal('');setInputHole({holeNum,pid:grpPlayers[pIdx+1].id,autoAdvance:true});},150);
       }
     }
 
@@ -4136,8 +4137,10 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
                           if(skipped&&skipped!==hd.hole){
                             if(!window.confirm('You have not entered hole '+skipped+' yet. Continue anyway?'))return;
                           }
+                          const existingHoleScores=holeScores&&holeScores[hd.hole]&&typeof holeScores[hd.hole]==='object'?holeScores[hd.hole]:{};
+                          const holeAlreadyStarted=Object.values(existingHoleScores).some(v=>v!==undefined&&v!==null&&v!=='');
                           setInputVal(grossScoreValue(gross)?String(grossScoreValue(gross)):'');
-                          setInputHole({holeNum:hd.hole,pid:p.id});
+                          setInputHole({holeNum:hd.hole,pid:p.id,autoAdvance:!holeAlreadyStarted});
                         }} style={{minHeight:rowH,position:'relative',display:'flex',alignItems:'center',justifyContent:'center',cursor:canEdit?'pointer':'default',background:gross&&gross!==-1&&!isGivenGross(gross)?ptsColor(pts):(gross===-1||isGivenGross(gross))?'rgba(20,20,20,0.8)':'rgba(255,255,255,0.04)',borderLeft:'1px solid rgba(255,255,255,0.06)'}}>
                       {shots>0&&<div style={{position:'absolute',top:5,left:6,display:'flex',gap:2}}>{Array.from({length:shots}).map((_,i)=><div key={i} style={{width:6,height:6,borderRadius:'50%',background:'#f59e0b'}}/>)}</div>}
                       {hasSnake&&<div style={{position:'absolute',bottom:4,left:5,fontSize:13,fontWeight:950,filter:'drop-shadow(0 1px 2px rgba(0,0,0,0.5))'}}>{EMOJI.snake}</div>}
