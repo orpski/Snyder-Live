@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.15
+// SNYDER LIVE v2.16
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -3480,6 +3480,28 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return <button aria-label="Open sweepstake standings" title="Sweepstake" onClick={()=>{refreshScoresFromCloud(false);setShowSweepstake(true);}} style={{width:38,height:38,borderRadius:10,border:'1px solid rgba(245,158,11,0.45)',background:'rgba(245,158,11,0.14)',color:'#fbbf24',fontSize:20,fontWeight:950,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,lineHeight:1}}>💰</button>;
   }
 
+  function FinalStablefordSweepstakeBlock({topMargin=12}){
+    if(!isCompletedRound(round)||round._cupScoring)return null;
+    const finalRows=[...grpPlayers].map(p=>({id:p.id,name:gameFirstName((p.name||p.display_name)||'?'),total:getRunning(p.id,holes.length)})).sort((a,b)=>b.total-a.total);
+    return <div style={{margin:topMargin+'px 16px 12px'}}>
+      <div style={{...S.card,margin:0,background:'linear-gradient(135deg,rgba(0,112,187,0.22),rgba(255,255,255,0.05))',borderColor:'rgba(96,184,240,0.42)'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
+          <div>
+            <div style={{fontSize:18,color:'#fff',fontWeight:950}}>Final Stableford Scores</div>
+            <div style={{fontSize:11,color:'#90ccf0'}}>Completed round · group scorecard</div>
+          </div>
+          <div style={{fontSize:11,color:'#86efac',fontWeight:950,letterSpacing:'0.08em'}}>FINAL</div>
+        </div>
+        {finalRows.map((r,idx)=><div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:idx?'1px solid rgba(255,255,255,0.08)':'none'}}>
+          <div style={{width:26,height:26,borderRadius:9,background:idx===0?'rgba(251,191,36,0.22)':'rgba(255,255,255,0.08)',border:'1px solid '+(idx===0?'rgba(251,191,36,0.38)':'rgba(255,255,255,0.10)'),display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:idx===0?'#fbbf24':'rgba(255,255,255,0.78)',fontWeight:950}}>{idx+1}</div>
+          <div style={{flex:1,fontSize:14,color:'#fff',fontWeight:850}}>{r.name}</div>
+          <div style={{fontSize:24,color:'#60b8f0',fontWeight:950,lineHeight:1}}>{r.total} <span style={{fontSize:10,color:'#90ccf0',fontWeight:900}}>pts</span></div>
+        </div>)}
+      </div>
+      <SweepstakePanel throughHole={18} reviewTitle="💰 SWEEPSTAKE - WHO PAYS WHO" payUp={true}/>
+    </div>;
+  }
+
     // ---------------------------------------------------------
   // Manual full score save
   // ---------------------------------------------------------
@@ -3819,9 +3841,9 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             }} style={{...S.pri,padding:'8px 16px',fontSize:13,background:'#25D366'}}>Share Card</button>
           </div>
           <div style={{padding:'10px 12px',background:'rgba(0,0,0,0.3)',marginBottom:12,borderRadius:8}}><div style={{fontSize:15,color:'#fff',fontWeight:700}}>{getCourseDisplayName(course,round)}</div><div style={{fontSize:11,color:'#60b8f0',marginTop:3}}>Round start: {roundStartText}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.55)',marginTop:2}}>{courseSummaryLine(course,round,holes)}</div></div>
+          <FinalStablefordSweepstakeBlock topMargin={0}/>
           <div id="f9-card"><MiniCard holeList={front9} label="FRONT 9"/></div>
           <MiniCard holeList={back9} label="BACK 9"/>
-          <SweepstakePanel throughHole={18} reviewTitle="💰 SWEEPSTAKE - PAY UP" payUp={true}/>
           <div style={{...S.card}}>
             <div style={{display:'grid',gridTemplateColumns:'64px '+grpPlayers.map(()=>'minmax(54px,1fr)').join(' '),gap:6,alignItems:'center'}}>
               <div style={{fontSize:11,color:'#60b8f0'}}>Total</div>
@@ -4038,6 +4060,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{refreshing?'Refreshing latest scores...':lastRefreshed?'Last updated '+lastRefreshed:'Tap refresh for latest scores'}</span>
         <button onClick={()=>refreshScoresFromCloud(true)} disabled={refreshing} style={{border:'1px solid rgba(96,184,240,0.35)',background:'rgba(0,112,187,0.22)',color:'#90ccf0',borderRadius:999,padding:'5px 10px',fontSize:11,fontWeight:700,flexShrink:0,opacity:refreshing?0.6:1}}>Refresh</button>
       </div>
+
+      <FinalStablefordSweepstakeBlock topMargin={12}/>
 
       {/* Spectator live leaderboard */}
       {!canEdit&&(
