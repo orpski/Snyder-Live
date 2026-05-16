@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.21
+// SNYDER LIVE v2.22
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -48,7 +48,8 @@ const sb=supabase.createClient(SURL,SKEY);
 // can fan these out to saved push subscriptions when configured.
 // =========================================================
 const SNYDER_NOTIFY_EDGE='send-live-notification';
-const SNYDER_VAPID_PUBLIC_KEY=''; // Add your VAPID public key here when the push_subscriptions table/Edge Function is ready.
+const SNYDER_PUSH_TABLE='live_push_subscriptions';
+const SNYDER_VAPID_PUBLIC_KEY=''; // Add your Snyder Live VAPID public key here. This stays separate from Snyder League.
 const snyderNotifySent=new Set();
 function snyderNotifyKey(type,payload){
   return [type,payload&&payload.roundId,payload&&payload.groupId,payload&&payload.hole,payload&&payload.playerId,payload&&payload.status].filter(v=>v!==undefined&&v!==null).join('|');
@@ -75,12 +76,13 @@ async function enableSnyderLiveNotifications(user){
     try{
       const sub=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(SNYDER_VAPID_PUBLIC_KEY)});
       const json=sub.toJSON();
-      await sb.from('push_subscriptions').upsert({
+      await sb.from(SNYDER_PUSH_TABLE).upsert({
         endpoint:json.endpoint,
         p256dh:json.keys&&json.keys.p256dh,
         auth:json.keys&&json.keys.auth,
         user_id:user&&user.id||null,
         app:'snyder-live',
+        source:'snyder-live-pwa',
         updated_at:new Date().toISOString()
       },{onConflict:'endpoint'});
     }catch(e){/* Permission still stands; server push can be wired once VAPID/table are ready. */}
@@ -95,7 +97,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',version:'v2.21',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.22',createdAt:new Date().toISOString(),...(payload||{})};
     fetch(`${SURL}/functions/v1/${SNYDER_NOTIFY_EDGE}`,{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SKEY,'Authorization':'Bearer '+SKEY},
@@ -104,7 +106,7 @@ async function sendSnyderLiveNotification(type,payload){
     if('Notification' in window&&Notification.permission==='granted'&&document.visibilityState!=='visible'){
       const reg=await registerSnyderServiceWorker();
       const title=body.title||'Snyder Live';
-      const options={body:body.body||'',icon:'./icon-live-192.png',badge:'./icon-live-192.png',tag:key||type,data:{url:'./',type,roundId:body.roundId}};
+      const options={body:body.body||'',icon:'./icon-live-192.png',badge:'./icon-live-192.png',tag:'snyder-live-'+(key||type),data:{url:'./',type,roundId:body.roundId,app:'snyder-live'}};
       if(reg&&reg.showNotification)reg.showNotification(title,options);
       else new Notification(title,options);
     }
