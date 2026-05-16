@@ -5,3 +5,14 @@ input,button,select{font-family:'Inter',sans-serif;}
 input:focus{outline:2px solid #0070BB;}
 ::-webkit-scrollbar{display:none;}
 h1,h2,.heading{font-family:'Barlow Condensed',sans-serif;}
+
+/* v2.20 quicker opening splash */
+.quick-splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 38%,rgba(96,184,240,.20),transparent 31%),linear-gradient(160deg,#07111f 0%,#0d2548 58%,#071426 100%);animation:quickSplashOut .65s cubic-bezier(.2,.85,.25,1) forwards;overflow:hidden;}
+.quick-splash:before{content:"";position:absolute;width:210px;height:210px;border-radius:999px;background:rgba(212,175,55,.09);filter:blur(26px);transform:translateY(-8px);}
+.quick-splash-ring{position:relative;width:122px;height:122px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,rgba(255,255,255,.11),rgba(255,255,255,.02));border:1px solid rgba(212,175,55,.24);box-shadow:0 20px 55px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.15);animation:quickSplashPop .34s cubic-bezier(.18,.9,.24,1.2) both;}
+.quick-splash-logo{width:86px;height:86px;object-fit:contain;background:transparent;border-radius:0;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.35));}
+.quick-splash-text{position:relative;margin-top:16px;font-size:19px;color:#fff;letter-spacing:.26em;font-family:'Barlow Condensed',sans-serif;font-weight:800;text-shadow:0 8px 24px rgba(0,0,0,.45);animation:quickSplashText .34s ease-out both;}
+.quick-splash-sub{position:relative;margin-top:5px;font-size:11px;color:#d4af37;letter-spacing:.16em;text-transform:uppercase;font-weight:800;opacity:.92;animation:quickSplashText .38s ease-out both;}
+@keyframes quickSplashPop{from{opacity:0;transform:scale(.86) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes quickSplashText{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes quickSplashOut{0%,72%{opacity:1}100%{opacity:0}}

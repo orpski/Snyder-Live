@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.19
+// SNYDER LIVE v2.20
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -950,7 +950,7 @@ function App(){
         }
       });
     } else {
-      setTimeout(()=>setSplash(false),3000);
+      setTimeout(()=>setSplash(false),650);
     }
     const saved=localStorage.getItem('snyder_user');
     if(saved){try{setCurrentUser(JSON.parse(saved));}catch(e){}}
@@ -1215,10 +1215,12 @@ function App(){
   );
 
   if(splash)return(
-    <div style={{position:'fixed',inset:0,background:'#0a1f3d',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',zIndex:9999}}>
-      <img src={LOGO} alt="Snyder Live" style={{width:200,height:200,objectFit:'contain',animation:'fadeIn 0.8s ease-in',background:'transparent',borderRadius:0,display:'block'}}/>
-      <div style={{fontSize:18,color:'#60b8f0',letterSpacing:'0.3em',fontFamily:"'Barlow Condensed',sans-serif",marginTop:16,fontWeight:700}}>SNYDER LIVE</div>
-      <style>{`@keyframes fadeIn{from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}}`}</style>
+    <div className="quick-splash">
+      <div className="quick-splash-ring">
+        <img src={LOGO} alt="Snyder Live" className="quick-splash-logo"/>
+      </div>
+      <div className="quick-splash-text">SNYDER LIVE</div>
+      <div className="quick-splash-sub">Live golf scoring</div>
     </div>
   );
 
