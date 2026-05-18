@@ -1,4 +1,4 @@
-/* SNYDER LIVE v2.24 styles */
+/* SNYDER LIVE v2.25 styles */
 /* Base reset and global element defaults */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{font-family:'Inter',sans-serif;background:linear-gradient(160deg,#0a1528 0%,#0d2040 40%,#0a1830 100%);min-height:100vh;color:#fff;}
@@ -7,7 +7,7 @@ input:focus{outline:2px solid #0070BB;}
 ::-webkit-scrollbar{display:none;}
 h1,h2,.heading{font-family:'Barlow Condensed',sans-serif;}
 
-/* v2.23 polished opening splash - short but visible */
+/* v2.25 polished opening splash - short but visible */
 .quick-splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 38%,rgba(96,184,240,.20),transparent 31%),linear-gradient(160deg,#07111f 0%,#0d2548 58%,#071426 100%);animation:quickSplashOut 1.4s cubic-bezier(.2,.85,.25,1) forwards;overflow:hidden;}
 .quick-splash:before{content:"";position:absolute;width:210px;height:210px;border-radius:999px;background:rgba(212,175,55,.09);filter:blur(26px);transform:translateY(-8px);}
 .quick-splash-ring{position:relative;width:138px;height:138px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,rgba(255,255,255,.11),rgba(255,255,255,.02));border:1px solid rgba(212,175,55,.24);box-shadow:0 20px 55px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.15);animation:quickSplashPop .34s cubic-bezier(.18,.9,.24,1.2) both;}
