@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.23
+// SNYDER LIVE v2.24
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -108,7 +108,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.22',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.24',createdAt:new Date().toISOString(),...(payload||{})};
     fetch(`${SURL}/functions/v1/${SNYDER_NOTIFY_EDGE}`,{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SKEY,'Authorization':'Bearer '+SKEY},
@@ -953,6 +953,7 @@ function App(){
   const[view,setViewRaw]=useState('home');
   const[toast,setToast]=useState(null);
   const[notifPermission,setNotifPermission]=useState(('Notification' in window)?Notification.permission:'unsupported');
+  const[notificationsEnabled,setNotificationsEnabled]=useState(()=>localStorage.getItem('liveNotificationsEnabled')==='true'||(('Notification' in window)&&Notification.permission==='granted'&&localStorage.getItem('liveNotificationsEnabled')==='true'));
   const[currentUser,setCurrentUser]=useState(null);
   const[showAuth,setShowAuth]=useState(false);
   const[authPrompt,setAuthPrompt]=useState(null);
@@ -987,9 +988,22 @@ function App(){
     setShowAuth(true);
   }
   async function enableNotificationsFromHome(){
+    if(notificationsEnabled){
+      flash('Notifications are already enabled on this phone');
+      return;
+    }
     const res=await enableSnyderLiveNotifications(currentUser);
-    setNotifPermission(('Notification' in window)?Notification.permission:'unsupported');
-    flash(res.ok?'Notifications enabled':'Notifications not enabled: '+(res.error||'permission denied'),res.ok?undefined:'error');
+    const permission=('Notification' in window)?Notification.permission:'unsupported';
+    setNotifPermission(permission);
+    if(res.ok){
+      localStorage.setItem('liveNotificationsEnabled','true');
+      setNotificationsEnabled(true);
+      flash('Notifications enabled');
+    }else{
+      localStorage.removeItem('liveNotificationsEnabled');
+      setNotificationsEnabled(false);
+      flash('Notifications not enabled: '+(res.error||'permission denied'),'error');
+    }
   }
 
   useEffect(()=>{
@@ -1348,9 +1362,14 @@ function App(){
         </div>
 
         {notifPermission!=='unsupported'&&(
-          <button onClick={enableNotificationsFromHome} style={{...NO_SELECT,width:'100%',border:'1px solid rgba(212,175,55,0.28)',borderRadius:18,background:'linear-gradient(135deg,rgba(212,175,55,0.14),rgba(96,184,240,0.08))',padding:'12px 14px',marginBottom:14,textAlign:'left',color:'#fff',cursor:'pointer',boxShadow:'0 12px 26px rgba(0,0,0,0.18)'}}>
-            <div style={{fontSize:14,fontWeight:950,letterSpacing:'0.03em'}}>{notifPermission==='granted'?'🔔 Sync notifications to this phone':'🔔 Enable round notifications'}</div>
-            <div style={{fontSize:11,color:'rgba(255,255,255,0.62)',marginTop:3,lineHeight:1.35}}>{notifPermission==='granted'?'Notifications are allowed. Tap to save this phone to Snyder Live again.':'Only round starts, birdies, snake changes, front 9 scores and finished scores.'}</div>
+          <button onClick={enableNotificationsFromHome} disabled={notificationsEnabled} style={{...NO_SELECT,width:'100%',border:notificationsEnabled?'1px solid rgba(34,197,94,0.34)':'1px solid rgba(212,175,55,0.30)',borderRadius:16,background:notificationsEnabled?'linear-gradient(135deg,rgba(34,197,94,0.15),rgba(15,23,42,0.74))':'linear-gradient(135deg,rgba(212,175,55,0.16),rgba(15,23,42,0.72))',padding:'10px 12px',marginBottom:14,textAlign:'left',color:'#fff',cursor:notificationsEnabled?'default':'pointer',boxShadow:'0 8px 20px rgba(0,0,0,0.16)',opacity:1}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:950,letterSpacing:'0.03em'}}>{notificationsEnabled?'🟢 Notifications Enabled':'🔔 Enable Notifications'}</div>
+                <div style={{fontSize:10.5,color:'rgba(255,255,255,0.62)',marginTop:2,lineHeight:1.3}}>{notificationsEnabled?'This phone will receive Snyder Live alerts':'Get live round updates on this phone'}</div>
+              </div>
+              <div style={{fontSize:11,fontWeight:900,color:notificationsEnabled?'#86efac':'#f5d76e',whiteSpace:'nowrap'}}>{notificationsEnabled?'ON':'TAP ONCE'}</div>
+            </div>
           </button>
         )}
 
