@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.22
+// SNYDER LIVE v2.23
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -49,7 +49,7 @@ const sb=supabase.createClient(SURL,SKEY);
 // =========================================================
 const SNYDER_NOTIFY_EDGE='send-live-notification';
 const SNYDER_PUSH_TABLE='live_push_subscriptions';
-const SNYDER_VAPID_PUBLIC_KEY=''; // Add your Snyder Live VAPID public key here. This stays separate from Snyder League.
+const SNYDER_VAPID_PUBLIC_KEY='BPhGMHb32v-wFIAdTOihEH4nSfwlRG7lrIxwSIEYlw9DUbS691wcw0fnIbILeQg1VNwsniOTDt3lmy95BIav3IM'; // Snyder Live VAPID public key - separate from Snyder League table/function names.
 const snyderNotifySent=new Set();
 function snyderNotifyKey(type,payload){
   return [type,payload&&payload.roundId,payload&&payload.groupId,payload&&payload.hole,payload&&payload.playerId,payload&&payload.status].filter(v=>v!==undefined&&v!==null).join('|');
@@ -69,24 +69,35 @@ async function registerSnyderServiceWorker(){
 }
 async function enableSnyderLiveNotifications(user){
   if(!('Notification' in window))return {ok:false,error:'Notifications are not supported on this device/browser'};
-  const permission=await Notification.requestPermission();
+  if(!SNYDER_VAPID_PUBLIC_KEY)return {ok:false,error:'Missing Snyder Live VAPID public key'};
+  const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
   if(permission!=='granted')return {ok:false,error:'Notifications were not allowed'};
   const registration=await registerSnyderServiceWorker();
-  if(registration&&SNYDER_VAPID_PUBLIC_KEY&&registration.pushManager){
-    try{
-      const sub=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(SNYDER_VAPID_PUBLIC_KEY)});
-      const json=sub.toJSON();
-      await sb.from(SNYDER_PUSH_TABLE).upsert({
-        endpoint:json.endpoint,
-        p256dh:json.keys&&json.keys.p256dh,
-        auth:json.keys&&json.keys.auth,
-        user_id:user&&user.id||null,
-        app:'snyder-live',
-        source:'snyder-live-pwa',
-        updated_at:new Date().toISOString()
-      },{onConflict:'endpoint'});
-    }catch(e){/* Permission still stands; server push can be wired once VAPID/table are ready. */}
+  if(!registration||!registration.pushManager)return {ok:false,error:'Push notifications are not available on this browser'};
+
+  let sub=await registration.pushManager.getSubscription();
+  if(!sub){
+    sub=await registration.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:urlBase64ToUint8Array(SNYDER_VAPID_PUBLIC_KEY)
+    });
   }
+
+  const json=sub.toJSON();
+  if(!json.endpoint||!json.keys||!json.keys.p256dh||!json.keys.auth)return {ok:false,error:'Browser did not return a valid push subscription'};
+
+  const {error}=await sb.from(SNYDER_PUSH_TABLE).upsert({
+    endpoint:json.endpoint,
+    p256dh:json.keys.p256dh,
+    auth:json.keys.auth,
+    user_id:user&&user.id||null,
+    app:'snyder-live',
+    source:'snyder-live-pwa',
+    user_agent:navigator.userAgent||null,
+    updated_at:new Date().toISOString()
+  },{onConflict:'endpoint'});
+  if(error)return {ok:false,error:error.message||'Could not save push subscription'};
+
   return {ok:true,permission};
 }
 async function sendSnyderLiveNotification(type,payload){
@@ -1336,10 +1347,10 @@ function App(){
           <div style={{fontSize:13,color:'rgba(255,255,255,0.58)',marginTop:6}}>Pick what you need and get straight in.</div>
         </div>
 
-        {notifPermission!=='granted'&&notifPermission!=='unsupported'&&(
+        {notifPermission!=='unsupported'&&(
           <button onClick={enableNotificationsFromHome} style={{...NO_SELECT,width:'100%',border:'1px solid rgba(212,175,55,0.28)',borderRadius:18,background:'linear-gradient(135deg,rgba(212,175,55,0.14),rgba(96,184,240,0.08))',padding:'12px 14px',marginBottom:14,textAlign:'left',color:'#fff',cursor:'pointer',boxShadow:'0 12px 26px rgba(0,0,0,0.18)'}}>
-            <div style={{fontSize:14,fontWeight:950,letterSpacing:'0.03em'}}>🔔 Enable round notifications</div>
-            <div style={{fontSize:11,color:'rgba(255,255,255,0.62)',marginTop:3,lineHeight:1.35}}>Only round starts, birdies, snake changes, front 9 scores and finished scores.</div>
+            <div style={{fontSize:14,fontWeight:950,letterSpacing:'0.03em'}}>{notifPermission==='granted'?'🔔 Sync notifications to this phone':'🔔 Enable round notifications'}</div>
+            <div style={{fontSize:11,color:'rgba(255,255,255,0.62)',marginTop:3,lineHeight:1.35}}>{notifPermission==='granted'?'Notifications are allowed. Tap to save this phone to Snyder Live again.':'Only round starts, birdies, snake changes, front 9 scores and finished scores.'}</div>
           </button>
         )}
 
