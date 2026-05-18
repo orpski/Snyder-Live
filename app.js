@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.25
+// SNYDER LIVE v2.26
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -108,7 +108,8 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.25',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.26',createdAt:new Date().toISOString(),...(payload||{})};
+    if(body.body&&!body.message)body.message=body.body;
     fetch(`${SURL}/functions/v1/${SNYDER_NOTIFY_EDGE}`,{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SKEY,'Authorization':'Bearer '+SKEY},
@@ -1345,12 +1346,20 @@ function App(){
       <div style={{background:'#0d2548',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
         <img src={LOGO} alt="Snyder Live" style={{width:36,height:36,objectFit:'contain',background:'transparent',borderRadius:0,display:'block'}}/>
         <div style={{fontSize:15,color:'#fff',fontWeight:700,letterSpacing:'0.15em',fontFamily:"'Barlow Condensed',sans-serif"}}>SNYDER LIVE</div>
-        {currentUser
-          ?<button onClick={()=>setView('profile')} style={{background:'none',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
-            <Avatar user={currentUser} size={32}/>
-          </button>
-          :<button onClick={()=>{setAuthPrompt(null);setShowAuth(true);}} style={{...S.pri,padding:'7px 12px',fontSize:12,lineHeight:1.15,boxShadow:'0 6px 18px rgba(0,112,187,0.28)'}}>Sign In / Sign up</button>
-        }
+        <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:8,minWidth:74}}>
+          {notifPermission!=='unsupported'&&(
+            <button onClick={enableNotificationsFromHome} aria-label={notificationsEnabled?'Notifications enabled':'Enable notifications'} title={notificationsEnabled?'Notifications enabled':'Enable notifications'} style={{...NO_SELECT,width:34,height:34,borderRadius:'50%',border:notificationsEnabled?'1px solid rgba(34,197,94,0.55)':'1px solid rgba(212,175,55,0.40)',background:notificationsEnabled?'linear-gradient(135deg,rgba(34,197,94,0.22),rgba(15,23,42,0.88))':'rgba(255,255,255,0.06)',color:notificationsEnabled?'#86efac':'#f5d76e',display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,cursor:'pointer',boxShadow:notificationsEnabled?'0 0 0 3px rgba(34,197,94,0.08)':'none',position:'relative'}}>
+              🔔
+              {notificationsEnabled&&<span style={{position:'absolute',right:2,top:2,width:8,height:8,borderRadius:'50%',background:'#22c55e',boxShadow:'0 0 8px rgba(34,197,94,0.85)'}}/>}
+            </button>
+          )}
+          {currentUser
+            ?<button onClick={()=>setView('profile')} style={{background:'none',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,padding:0}}>
+              <Avatar user={currentUser} size={32}/>
+            </button>
+            :<button onClick={()=>{setAuthPrompt(null);setShowAuth(true);}} style={{...S.pri,padding:'7px 10px',fontSize:11,lineHeight:1.15,boxShadow:'0 6px 18px rgba(0,112,187,0.28)',whiteSpace:'nowrap'}}>Sign In</button>
+          }
+        </div>
       </div>
 
       <div style={{padding:'18px 16px 0'}}>
@@ -1360,18 +1369,6 @@ function App(){
           <div style={{fontSize:28,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Snyder Live</div>
           <div style={{fontSize:13,color:'rgba(255,255,255,0.58)',marginTop:6}}>Pick what you need and get straight in.</div>
         </div>
-
-        {notifPermission!=='unsupported'&&(
-          <button onClick={enableNotificationsFromHome} disabled={notificationsEnabled} style={{...NO_SELECT,width:'100%',border:notificationsEnabled?'1px solid rgba(34,197,94,0.34)':'1px solid rgba(212,175,55,0.30)',borderRadius:16,background:notificationsEnabled?'linear-gradient(135deg,rgba(34,197,94,0.15),rgba(15,23,42,0.74))':'linear-gradient(135deg,rgba(212,175,55,0.16),rgba(15,23,42,0.72))',padding:'10px 12px',marginBottom:14,textAlign:'left',color:'#fff',cursor:notificationsEnabled?'default':'pointer',boxShadow:'0 8px 20px rgba(0,0,0,0.16)',opacity:1}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-              <div>
-                <div style={{fontSize:13,fontWeight:950,letterSpacing:'0.03em'}}>{notificationsEnabled?'🟢 Notifications Enabled':'🔔 Enable Notifications'}</div>
-                <div style={{fontSize:10.5,color:'rgba(255,255,255,0.62)',marginTop:2,lineHeight:1.3}}>{notificationsEnabled?'This phone will receive Snyder Live alerts':'Get live round updates on this phone'}</div>
-              </div>
-              <div style={{fontSize:11,fontWeight:900,color:notificationsEnabled?'#86efac':'#f5d76e',whiteSpace:'nowrap'}}>{notificationsEnabled?'ON':'TAP ONCE'}</div>
-            </div>
-          </button>
-        )}
 
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:18}}>
           <button onClick={()=>currentUser?setView('play'):promptStartRoundAuth()} style={{...NO_SELECT,border:'1px solid rgba(96,184,240,0.22)',borderRadius:24,background:'linear-gradient(135deg,#0070BB 0%,#123d73 100%)',padding:'18px 14px',minHeight:132,textAlign:'left',cursor:'pointer',boxShadow:'0 14px 32px rgba(0,112,187,0.22)',color:'#fff'}}>
