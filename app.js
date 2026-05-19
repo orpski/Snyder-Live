@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.75
+// SNYDER LIVE v2.76
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2957,12 +2957,20 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       if(roundErr)throw roundErr;
 
       const groupBuckets=foursomesMode?[allParticipants]:groupSetup.map(g=>g.filter(Boolean)).filter(g=>g.length>0);
-      const groupRows=groupBuckets.map((bucket,idx)=>({
-        round_id:rd.id,
-        group_number:idx+1,
-        player_ids:bucket.map(p=>p.id),
-        playing_handicaps:bucket.reduce((acc,p)=>{acc[p.id]=p.playing_handicap||0;return acc;},{})
-      }));
+      // Foursomes scorecards use two synthetic team IDs inside the UI, but Supabase
+      // cup_groups.player_ids is a real user/guest ID array. Saving the synthetic IDs
+      // there makes the insert fail, so persist the signed-in host as the group scorer
+      // and then rehydrate the scorecard locally from the saved foursomes config.
+      const groupRows=groupBuckets.map((bucket,idx)=>{
+        const dbPlayers=foursomesMode?(currentUser&&currentUser.id?[currentUser.id]:[]):bucket.map(p=>p.id);
+        const dbPlayingHcps=foursomesMode?(currentUser&&currentUser.id?{[currentUser.id]:0}:{}):bucket.reduce((acc,p)=>{acc[p.id]=p.playing_handicap||0;return acc;},{});
+        return {
+          round_id:rd.id,
+          group_number:idx+1,
+          player_ids:dbPlayers,
+          playing_handicaps:dbPlayingHcps
+        };
+      });
       const{data:createdGroups,error:groupErr}=groupRows.length?await sb.from('cup_groups').insert(groupRows).select():{data:[],error:null};
       if(groupErr)throw groupErr;
 
@@ -3006,11 +3014,11 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       if(notifyResult&&!notifyResult.ok)console.warn('Snyder Live notification failed',notifyResult);
       await load();
       const scorerGroup=(createdGroups||[]).find(g=>currentUser&&Array.isArray(g.player_ids)&&g.player_ids.includes(currentUser.id))||(createdGroups||[])[0];
-      const scorerIds=(scorerGroup&&scorerGroup.player_ids)||playerIds;
+      const scorerIds=foursomesMode?playerIds:((scorerGroup&&scorerGroup.player_ids)||playerIds);
       const scorerParticipants=foursomesMode?po:po.filter(p=>scorerIds.includes(p.id));
       const activeMatchplay=(cleanMatchplaySetup(setup.matchplay||{},scorerParticipants).mode==='singles'?applySinglesMatchplayShots(setup.matchplay||{},scorerParticipants):cleanMatchplaySetup(setup.matchplay||{},scorerParticipants));
       setActiveRound({...rd,join_code:joinCode,_allParticipants:po,_sweepstake:{enabled:!!(setup.sweepstake&&setup.sweepstake.enabled),amountPence:parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||200,scope:(setup.sweepstake&&setup.sweepstake.scope)==='group'?'group':'round'},_matchplay:activeMatchplay});
-      setActiveGroup({...scorerGroup,playing_handicaps:(scorerGroup&&scorerGroup.playing_handicaps)||playingHcps,participants:scorerParticipants,player_ids:scorerIds});
+      setActiveGroup({...scorerGroup,playing_handicaps:foursomesMode?playingHcps:((scorerGroup&&scorerGroup.playing_handicaps)||playingHcps),participants:scorerParticipants,player_ids:scorerIds});
       setHoleScores({}); // Fresh scores for new round
       setStep('scorecard');
     }catch(e){flash('Error: '+e.message,'error');}
