@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.43
+// SNYDER LIVE v2.44
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -110,7 +110,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.43',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.44',createdAt:new Date().toISOString(),...(payload||{})};
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const controller=new AbortController();
@@ -1279,7 +1279,7 @@ function App(){
     if(userGroup){
       const canScore=userCanScoreRound(currentUser,userGroup,roundPlayers);
       await hydrateRoundScores(rd.id);
-      const selected={...rd,_spectator:!canScore,_group:{...rdGroups[0],participants:po,playing_handicaps:hm,player_ids:(rdGroups[0].player_ids&&rdGroups[0].player_ids.length?rdGroups[0].player_ids:po.map(p=>p.id))}};
+      const selected={...rd,_spectator:!canScore,_group:{...userGroup,participants:po,playing_handicaps:hm,player_ids:(userGroup.player_ids&&userGroup.player_ids.length?userGroup.player_ids:po.map(p=>p.id))}};
       if(isCupRound){
         const cup=(cupEvents||[])[0];
         const cupDay=cupRoundDayNumber(rd);
@@ -1338,6 +1338,50 @@ function App(){
     }catch(e){}
     return Object.keys(totals).map(pid=>({id:pid,name:getDisplayName(pid),total:totals[pid]||0,holes:holes[pid]?holes[pid].size:0,_holePoints:holePoints[pid]||{}})).sort(compareStablefordLeaderboardRows);
   }
+  function foursomesMatchplaySummaryForRound(rd){
+    try{
+      const rdGroups=(groups||[]).filter(g=>g.round_id===rd.id);
+      const g=rdGroups[0]||{id:'group'};
+      const allRows=[...(scores||[]),...(publicScores||[])].filter(r=>r&&r.round_id===rd.id);
+      const cfg=matchplayConfigFromRows(allRows,rd,g);
+      if(!cfg||!cfg.enabled||cfg.mode!=='foursomes')return null;
+      const course=(courses||[]).find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee)||{};
+      const ch=Array.isArray(course.holes)?course.holes:[];
+      const holeList=ch.length?ch:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1}));
+      const map={};
+      allRows.filter(r=>!isMetaScoreRow(r)).forEach(r=>{
+        if(r.player_id!==MATCHPLAY_FOURSOMES_A&&r.player_id!==MATCHPLAY_FOURSOMES_B)return;
+        const h=parseInt(r.hole_number);
+        if(!map[h])map[h]={};
+        map[h][r.player_id]=r.gross_score;
+      });
+      let lead=0,played=0,lastHole=0;
+      holeList.filter(h=>parseInt(h.hole)>=1&&parseInt(h.hole)<=18).forEach(hd=>{
+        const h=parseInt(hd.hole);
+        const a=(map[h]||{})[MATCHPLAY_FOURSOMES_A];
+        const b=(map[h]||{})[MATCHPLAY_FOURSOMES_B];
+        if(!hasEnteredGross(a)||!hasEnteredGross(b))return;
+        const si=parseInt(hd.stroke_index)||h;
+        const aNet=(parseInt(a)||0)-((parseInt(cfg.teamAShots)||0)>=si?1:0);
+        const bNet=(parseInt(b)||0)-((parseInt(cfg.teamBShots)||0)>=si?1:0);
+        if(aNet<bNet)lead+=1;
+        else if(bNet<aNet)lead-=1;
+        played+=1;lastHole=h;
+      });
+      const aName=cfg.teamAName||'Team 1';
+      const bName=cfg.teamBName||'Team 2';
+      const remaining=Math.max(0,18-played);
+      const abs=Math.abs(lead);
+      let label='A/S',sub=played?'Thru '+lastHole:'Not started yet';
+      if(played&&lead!==0){
+        const leader=lead>0?aName:bName;
+        if(abs>remaining){label=leader+' win '+abs+'&'+remaining;sub='Match finished';}
+        else {label=leader+' '+abs+'UP';sub='Thru '+lastHole;}
+      }
+      return {mode:'foursomes',aName,bName,label,sub,lead,played,teamAShots:parseInt(cfg.teamAShots)||0,teamBShots:parseInt(cfg.teamBShots)||0};
+    }catch(e){return null;}
+  }
+
   function CompletedCard({rd}){
     return(
       <div style={{...S.card,...NO_SELECT,marginBottom:8,cursor:'pointer',opacity:0.9}} onClick={()=>openRound(rd)}>
@@ -1633,7 +1677,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
       const cupDay=cupRoundDayNumber(rd);
       const cupGroup=cupRoundGroupNumber(rd);
       const cupDayRounds=isCup?(rounds||[]).filter(r=>cupRoundDayNumber(r)===cupDay&&isSnyderCupRound(r)):[];
-      const selected={...rd,_spectator:!canScore,_group:{...rdGroups[0],participants:po,playing_handicaps:hm,player_ids:(rdGroups[0].player_ids&&rdGroups[0].player_ids.length?rdGroups[0].player_ids:po.map(p=>p.id))}};
+      const selected={...rd,_spectator:!canScore,_group:{...userGroup,participants:po,playing_handicaps:hm,player_ids:(userGroup.player_ids&&userGroup.player_ids.length?userGroup.player_ids:po.map(p=>p.id))}};
       if(isCup){
         const dayGroups=cupGroupsForDay(cupMatches,cupDay);
         const groupData=dayGroups.find(g=>parseInt(g.idx)===cupGroup)||{day:cupDay,idx:cupGroup,players:po.map(p=>p.id),doubles:null,singles:[]};
@@ -1773,7 +1817,8 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
           </div>
           :liveRounds.map(rd=>{
             const rdGroups=groups.filter(g=>g.round_id===rd.id);
-            const board=leaderboardForRound(rd);
+            const mp=foursomesMatchplaySummaryForRound(rd);
+            const board=mp?[]:leaderboardForRound(rd);
             return(
               <div key={rd.id} style={{...S.card,...NO_SELECT,marginBottom:16,cursor:'pointer',borderColor:'rgba(239,68,68,0.3)'}} onClick={()=>openRound(rd)}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:10}}>
@@ -1790,20 +1835,31 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                   </div>
                   <div style={{fontSize:10,color:'#fff',background:'#ef4444',borderRadius:20,padding:'4px 8px',fontWeight:700,letterSpacing:'0.08em',flexShrink:0}}>LIVE</div>
                 </div>
-                <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.14em',fontWeight:600,marginBottom:8}}>LIVE LEADERBOARD</div>
-                <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:10}}>
-                  {(board.length?board:[{id:'empty',name:'Waiting for scores',total:0,holes:0}]).slice(0,4).map((p,rank)=>(
-                    <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',background:rank===0&&board.length?'rgba(184,134,11,0.15)':'rgba(255,255,255,0.05)',borderRadius:9}}>
-                      <div style={{width:22,textAlign:'center',fontSize:15,fontWeight:700,color:rank===0&&board.length?'#fbbf24':'rgba(255,255,255,0.45)'}}>{board.length?rank+1:'-'}</div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:13,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
-                        <div style={{fontSize:10,color:'rgba(255,255,255,0.45)'}}>{p.holes} hole{p.holes===1?'':'s'} scored</div>
-                      </div>
-                      <div style={{fontSize:20,color:'#fff',fontWeight:700}}>{p.total}</div>
-                      <div style={{fontSize:9,color:'#60b8f0',letterSpacing:'0.08em'}}>PTS</div>
+                {mp? <>
+                  <div style={{fontSize:10,color:'#fbbf24',letterSpacing:'0.14em',fontWeight:900,marginBottom:8}}>FOURSOMES MATCHPLAY</div>
+                  <div style={{marginBottom:10,padding:'12px',borderRadius:14,border:'1px solid rgba(96,184,240,0.36)',background:mp.lead>0?'linear-gradient(135deg,rgba(251,191,36,0.24),rgba(255,255,255,0.05))':mp.lead<0?'linear-gradient(135deg,rgba(0,112,187,0.30),rgba(255,255,255,0.05))':'linear-gradient(135deg,rgba(255,255,255,0.08),rgba(96,184,240,0.12))'}}>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:10,alignItems:'center'}}>
+                      <div style={{minWidth:0}}><div style={{fontSize:13,color:'#fbbf24',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div><div style={{fontSize:10,color:'#90ccf0'}}>{mp.teamAShots?mp.teamAShots+' shots':'No shots'}</div></div>
+                      <div style={{textAlign:'center'}}><div style={{fontSize:22,color:'#fff',fontWeight:950,lineHeight:1}}>{mp.label}</div><div style={{fontSize:11,color:'#90ccf0',fontWeight:850,marginTop:3}}>{mp.sub}</div></div>
+                      <div style={{minWidth:0,textAlign:'right'}}><div style={{fontSize:13,color:'#60b8f0',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.bName}</div><div style={{fontSize:10,color:'#90ccf0'}}>{mp.teamBShots?mp.teamBShots+' shots':'No shots'}</div></div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                </> : <>
+                  <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.14em',fontWeight:600,marginBottom:8}}>LIVE LEADERBOARD</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:10}}>
+                    {(board.length?board:[{id:'empty',name:'Waiting for scores',total:0,holes:0}]).slice(0,4).map((p,rank)=>(
+                      <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',background:rank===0&&board.length?'rgba(184,134,11,0.15)':'rgba(255,255,255,0.05)',borderRadius:9}}>
+                        <div style={{width:22,textAlign:'center',fontSize:15,fontWeight:700,color:rank===0&&board.length?'#fbbf24':'rgba(255,255,255,0.45)'}}>{board.length?rank+1:'-'}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
+                          <div style={{fontSize:10,color:'rgba(255,255,255,0.45)'}}>{p.holes} hole{p.holes===1?'':'s'} scored</div>
+                        </div>
+                        <div style={{fontSize:20,color:'#fff',fontWeight:700}}>{p.total}</div>
+                        <div style={{fontSize:9,color:'#60b8f0',letterSpacing:'0.08em'}}>PTS</div>
+                      </div>
+                    ))}
+                  </div>
+                </>}
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',borderTop:'1px solid rgba(255,255,255,0.08)',paddingTop:10}}>
                   <div style={{fontSize:11,color:'rgba(255,255,255,0.5)'}}>{rdGroups.length} group{rdGroups.length!==1?'s':''} live - Tap to view</div>
                   <button onClick={e=>{e.stopPropagation();openRound(rd);}} style={{...S.pri,padding:'7px 10px',fontSize:11}}>Check Scorecard</button>
@@ -4079,20 +4135,20 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const canInput=canEdit;
     return <div style={{paddingBottom:40}}>
       <FoursomesScoreInput/>
-      <div style={{padding:'8px 14px 10px',background:'rgba(0,0,0,0.20)',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
+      <div style={{padding:'10px 14px 12px',background:'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(251,191,36,0.10))',borderBottom:'1px solid rgba(96,184,240,0.18)'}}>
         <MatchplayMiniStatus/>
       </div>
       {['FRONT 9','BACK 9'].map((label,sec)=>{const list=sec===0?front9:back9;return <div key={label}>
         <div style={{padding:'6px 12px',fontSize:11,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(0,0,0,0.3)'}}>{label}</div>
-        <div style={{display:'grid',gridTemplateColumns:'80px 1fr 1fr',padding:'8px 12px',borderBottom:'1px solid rgba(255,255,255,0.1)',background:'rgba(0,50,120,0.4)',gap:6,alignItems:'center'}}>
+        <div style={{display:'grid',gridTemplateColumns:'80px 1fr 1fr',padding:'8px 12px',borderBottom:'1px solid rgba(255,255,255,0.1)',background:'linear-gradient(135deg,rgba(0,50,120,0.72),rgba(0,112,187,0.32))',gap:6,alignItems:'center'}}>
           <div style={{fontSize:9,color:'#60b8f0',textTransform:'uppercase',letterSpacing:'0.08em'}}>Hole</div>
           {names.map((n,i)=><div key={i} style={{textAlign:'center'}}><div style={{fontSize:18,color:'#fff',fontWeight:950,lineHeight:1}}>{n}</div><div style={{fontSize:10,color:'#90ccf0',fontWeight:800}}>{shots[i]?shots[i]+' shots':'No shots'}</div></div>)}
         </div>
         {list.map((hd,i)=>{const vals=teamIds.map(id=>(holeScores[hd.hole]||{})[id]);return <div key={hd.hole} style={{display:'grid',gridTemplateColumns:'80px 1fr 1fr',minHeight:74,borderBottom:'1px solid rgba(255,255,255,0.06)',background:i%2===0?'rgba(255,255,255,0.03)':'rgba(255,255,255,0.06)'}}>
           <div style={{padding:'8px 12px',background:'rgba(0,0,0,0.18)'}}><div style={{fontSize:26,color:'#fff',fontWeight:300}}>{hd.hole}</div><div style={{fontSize:12,color:'#60b8f0'}}>Par {hd.par}</div><div style={{fontSize:11,color:'#d4af37',fontWeight:800}}>SI {hd.stroke_index}</div></div>
-          {teamIds.map((id,idx)=>{const g=vals[idx];const has=hasEnteredGross(g);const gets=(shots[idx]||0)>=parseInt(hd.stroke_index||99);return <div key={id} onClick={()=>canInput&&(setInputVal(has?String(Math.abs(parseInt(g)||0)):''),setInputHole({holeNum:hd.hole,pid:id}))} style={{display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:4,borderLeft:'1px solid rgba(255,255,255,0.06)',cursor:canInput?'pointer':'default',background:has?'rgba(0,112,187,0.16)':'transparent'}}>
+          {teamIds.map((id,idx)=>{const g=vals[idx];const has=hasEnteredGross(g);const gets=(shots[idx]||0)>=parseInt(hd.stroke_index||99);const other=vals[idx===0?1:0];const both=hasEnteredGross(g)&&hasEnteredGross(other);const net=(parseInt(g)||0)-(gets?1:0);const otherGets=(shots[idx===0?1:0]||0)>=parseInt(hd.stroke_index||99);const otherNet=(parseInt(other)||0)-(otherGets?1:0);const won=both&&net<otherNet;const lost=both&&net>otherNet;const bg=won?'linear-gradient(135deg,rgba(34,197,94,0.34),rgba(34,197,94,0.12))':lost?'linear-gradient(135deg,rgba(239,68,68,0.22),rgba(255,255,255,0.04))':has?'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(96,184,240,0.08))':'transparent';return <div key={id} onClick={()=>canInput&&(setInputVal(has?String(Math.abs(parseInt(g)||0)):''),setInputHole({holeNum:hd.hole,pid:id}))} style={{display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:4,borderLeft:'1px solid rgba(255,255,255,0.06)',cursor:canInput?'pointer':'default',background:bg,boxShadow:won?'inset 0 0 0 1px rgba(34,197,94,0.30)':lost?'inset 0 0 0 1px rgba(239,68,68,0.18)':'none'}}>
             <div style={{fontSize:34,color:has?'#fff':'rgba(255,255,255,0.25)',fontWeight:900}}>{has?grossDisplay(g):canInput?'TAP':'-'}</div>
-            {has&&<div style={{fontSize:11,color:'#90ccf0',fontWeight:900}}>{gets?'Net '+((parseInt(g)||0)-1):'Gross'}</div>}
+            {has&&<div style={{fontSize:11,color:won?'#86efac':lost?'#fecaca':'#90ccf0',fontWeight:950}}>{gets?'Net '+net:'Gross'}{won?' · won hole':''}</div>}
             {!has&&gets&&<div style={{fontSize:11,color:'#d4af37',fontWeight:900}}>shot</div>}
           </div>;})}
         </div>;})}
