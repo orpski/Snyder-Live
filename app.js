@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.55
+// SNYDER LIVE v2.56
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1275,6 +1275,7 @@ function App(){
     const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
     const roundPlayers=(rps||[]);
     const isCupRound=isSnyderCupRound(rd);
+    if(!rdGroups.length){const rpGroup=groupFromRoundPlayers(rd,roundPlayers,isCupRound);if(rpGroup)rdGroups=[rpGroup];}
     const po=roundPlayers.map(rp=>mapRoundPlayerForScorecard(rp,isCupRound));
     const hm={};roundPlayers.forEach(rp=>addRoundPlayerHandicaps(hm,rp,isCupRound));
     await hydrateRoundScores(rd.id);
@@ -1679,6 +1680,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
     const roundPlayers=(rps||[]);
     const isCup=isSnyderCupRound(rd);
+    if(!rdGroups.length){const rpGroup=groupFromRoundPlayers(rd,roundPlayers,isCup);if(rpGroup)rdGroups=[rpGroup];}
     const po=roundPlayers.map(rp=>mapRoundPlayerForScorecard(rp,isCup));
     const hm={};roundPlayers.forEach(rp=>addRoundPlayerHandicaps(hm,rp,isCup));
     {
@@ -2212,6 +2214,20 @@ function foursomesFallbackGroup(round,cfg){
     {id:MATCHPLAY_FOURSOMES_B,name:clean.teamBName||'Team 2',display_name:clean.teamBName||'Team 2',current_handicap:0,handicap:0,playing_handicap:0,is_foursomes_team:true}
   ];
   return {id:'foursomes',round_id:round&&round.id,group_number:1,player_ids:parts.map(p=>p.id),participants:parts,playing_handicaps:{[MATCHPLAY_FOURSOMES_A]:0,[MATCHPLAY_FOURSOMES_B]:0},_foursomesFallback:true};
+}
+function groupFromRoundPlayers(round,roundPlayers,isCupRound){
+  const participants=(roundPlayers||[]).map(rp=>mapRoundPlayerForScorecard(rp,!!isCupRound));
+  const playing_handicaps={};
+  (roundPlayers||[]).forEach(rp=>addRoundPlayerHandicaps(playing_handicaps,rp,!!isCupRound));
+  return participants.length?{
+    id:'round_players',
+    round_id:round&&round.id,
+    group_number:1,
+    player_ids:participants.map(p=>p.id),
+    participants,
+    playing_handicaps,
+    _roundPlayersFallback:true
+  }:null;
 }
 
 function foursomesConfigFromGroupMeta(group){
@@ -2785,13 +2801,14 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       if(roundErr)throw roundErr;
 
       const groupBuckets=groupSetup.map(g=>g.filter(Boolean)).filter(g=>g.length>0);
+      if(foursomesMode&&!groupBuckets.length&&allParticipants.length)groupBuckets.push(allParticipants);
       const groupRows=groupBuckets.map((bucket,idx)=>({
         round_id:rd.id,
         group_number:idx+1,
         player_ids:bucket.map(p=>p.id),
         playing_handicaps:bucket.reduce((acc,p)=>{acc[p.id]=p.playing_handicap||0;return acc;},{})
       }));
-      const{data:createdGroups,error:groupErr}=await sb.from('cup_groups').insert(groupRows).select();
+      const{data:createdGroups,error:groupErr}=groupRows.length?await sb.from('cup_groups').insert(groupRows).select():{data:[],error:null};
       if(groupErr)throw groupErr;
 
       if(setup.sweepstake&&setup.sweepstake.enabled){
@@ -2799,15 +2816,15 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
         if(!swSave.ok)flash('Sweepstake setting did not sync yet. Tap refresh/retry if it is missing on another device.','error');
       }
 
-      if(setup.matchplay&&setup.matchplay.enabled&&createdGroups&&createdGroups[0]){
+      if(setup.matchplay&&setup.matchplay.enabled){
         const mp=cleanMatchplaySetup(setup.matchplay,groupBuckets[0]||[]);
         if(mp.mode==='foursomes'||(mp.teamA.length&&mp.teamB.length)){
-          const primaryGroupKey=normaliseId(createdGroups[0].id||createdGroups[0].group_number||'group');
+          const primaryGroupKey=normaliseId((createdGroups&&createdGroups[0]&&(createdGroups[0].id||createdGroups[0].group_number))||'group');
           const mpSave=await saveMatchplayConfigToCloud(rd.id,primaryGroupKey,mp);
           // Also save a generic fallback key so spectator scorecards can show matchplay even before the real group id hydrates.
           if(primaryGroupKey!=='group')await saveMatchplayConfigToCloud(rd.id,'group',mp);
           if(!mpSave.ok)flash('Matchplay setting did not sync yet. Tap refresh if it is missing on another device.','error');
-          if(mp.mode==='foursomes'){const gm=await saveFoursomesConfigToGroupMeta(sb,createdGroups[0],mp);if(!gm.ok)flash('Foursomes spectator setup did not sync yet. Tap refresh if it is missing on another device.','error');}
+          if(mp.mode==='foursomes'&&createdGroups&&createdGroups[0]){const gm=await saveFoursomesConfigToGroupMeta(sb,createdGroups[0],mp);if(!gm.ok)flash('Foursomes spectator setup did not sync yet. Tap refresh if it is missing on another device.','error');}
         }
       }
 
