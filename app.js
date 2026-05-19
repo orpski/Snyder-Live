@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.49
+// SNYDER LIVE v2.50
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1269,7 +1269,11 @@ function App(){
   // Round opening / scorecard hydration
   // ---------------------------------------------------------
   async function openRound(rd){
-    const rdGroups=groups.filter(g=>g.round_id===rd.id);
+    let rdGroups=groups.filter(g=>g.round_id===rd.id);
+    try{
+      const{data:dbGroups}=await sb.from('cup_groups').select('*').eq('round_id',rd.id).order('group_number',{ascending:true});
+      if(dbGroups&&dbGroups.length)rdGroups=dbGroups;
+    }catch(e){}
     const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
     const roundPlayers=(rps||[]);
     const isCupRound=isSnyderCupRound(rd);
@@ -1278,7 +1282,10 @@ function App(){
     await hydrateRoundScores(rd.id);
     const{data:latestDbScores}=await sb.from('cup_scores').select('*').eq('round_id',rd.id);
     const latestRows=[...(scores||[]),...(publicScores||[]),...(latestDbScores||[]),...localScoreRowsForRound(rd.id)].filter(r=>r&&r.round_id===rd.id);
-    const latestMatchplay=matchplayConfigFromRows(latestRows,rd,rdGroups[0]||{id:'group',group_number:1});
+    let latestMatchplay=matchplayConfigFromRows(latestRows,rd,rdGroups[0]||{id:'group',group_number:1});
+    if((!latestMatchplay||!latestMatchplay.enabled)&&hasFoursomesScoreRows(latestRows,rd)){
+      latestMatchplay={enabled:true,mode:'foursomes',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0};
+    }
     const fallbackGroup=(latestMatchplay&&latestMatchplay.enabled&&latestMatchplay.mode==='foursomes')?foursomesFallbackGroup(rd,latestMatchplay):null;
     const userGroup=fallbackGroup||(currentUser&&rdGroups.find(g=>Array.isArray(g.player_ids)&&g.player_ids.includes(currentUser.id)))||rdGroups[0];
     if(userGroup){
