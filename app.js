@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.73
+// SNYDER LIVE v2.75
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2233,7 +2233,16 @@ function saveLocalMatchplayConfig(roundId,groupKey,cfg){
 function matchplayMetaFromRows(rows,round,groupKey){
   const all=(rows||[]).filter(r=>r&&(!round||r.round_id===round.id)).map(parseMatchplayMetaRow).filter(Boolean);
   let meta=all.filter(x=>normaliseId(x.groupKey)===normaliseId(groupKey||'group'));
+  if(!meta.length){
+    const generic=all.filter(x=>normaliseId(x.groupKey)==='group');
+    if(generic.length)meta=generic;
+  }
   if(!meta.length){const keys=Array.from(new Set(all.map(x=>normaliseId(x.groupKey)).filter(Boolean)));if(keys.length===1)meta=all;}
+  // Spectator scorecards can be opened through the round_players fallback group, while
+  // the matchplay setup was saved against the real cup_groups id and a generic "group"
+  // fallback. If the current group key does not match either, still use the saved
+  // matchplay meta rather than falling back to a normal Stableford spectator board.
+  if(!meta.length&&all.length)meta=all;
   const get=k=>meta.find(x=>x.key===k);
   if(!meta.length)return null;
   const nameA=meta.find(x=>String(x.key||'').startsWith('teamAName:'));
@@ -2374,9 +2383,18 @@ function matchplayConfigFromRows(rows,round,group){
   const allParsed=(rows||[]).filter(r=>r&&(!round||r.round_id===round.id)).map(parseMatchplayScoreRow).filter(Boolean).filter(x=>x.enabled);
   let parsed=allParsed.filter(x=>normaliseId(x.groupKey)===groupKey);
   if(!parsed.length){
+    const generic=allParsed.filter(x=>normaliseId(x.groupKey)==='group');
+    if(generic.length)parsed=generic;
+  }
+  if(!parsed.length){
     const groupKeys=Array.from(new Set(allParsed.map(x=>normaliseId(x.groupKey)).filter(Boolean)));
     if(groupKeys.length===1)parsed=allParsed;
   }
+  // Same protection as matchplayMetaFromRows: spectator views sometimes use a
+  // round_players fallback group id, so the exact group id may not match the saved
+  // matchplay rows. Use the available saved matchplay team rows instead of rendering
+  // the standard leaderboard.
+  if(!parsed.length&&allParsed.length)parsed=allParsed;
   const meta=matchplayMetaFromRows(rows,round,groupKey);
   const groupMeta=foursomesConfigFromGroupMeta(group);
   const hasFoursomesScores=hasFoursomesScoreRows(rows,round)||foursomesScoreRowsFromGroupMeta(round&&round.id,group).length>0;
@@ -2490,6 +2508,7 @@ function cleanMatchplaySetup(matchplay,players){
   let teamA=keep(matchplay&&matchplay.teamA);
   let teamB=keep(matchplay&&matchplay.teamB).filter(id=>!teamA.includes(id));
   if(mode==='doubles'&&(!teamA.length&&!teamB.length)&&ids.length>=4){teamA=[ids[0],ids[1]];teamB=[ids[2],ids[3]];}
+  if(mode==='foursomes'){teamA=[MATCHPLAY_FOURSOMES_A];teamB=[MATCHPLAY_FOURSOMES_B];}
   return {enabled:!!(matchplay&&matchplay.enabled),mode,teamA,teamB,teamAName:(matchplay&&matchplay.teamAName)||'Team 1',teamBName:(matchplay&&matchplay.teamBName)||'Team 2',teamAShots:Math.max(0,parseInt(matchplay&&matchplay.teamAShots)||0),teamBShots:Math.max(0,parseInt(matchplay&&matchplay.teamBShots)||0),keepStableford:matchplay&&matchplay.keepStableford!==false};
 }
 
@@ -2865,17 +2884,18 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
     if(!currentUser){promptStartRoundAuth&&promptStartRoundAuth();return;}
     if(!setup.course_id){flash('Pick a course','error');return;}
     const currentUserInRound=allParticipants.some(p=>normaliseId(p.id)===normaliseId(currentUser.id));
-    // Foursomes can be scored/hosted by the signed-in user even if they are not one of
-    // the four named players. Do not silently add the host once four players have been
-    // selected, because that turns a valid foursomes match into 5 players and blocks start.
-    if(foursomesMode&&!currentUserInRound&&allParticipants.length<4){
-      const host=withPlayingHandicap({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap},selectedCourse,setup.allowance);
-      const next=groupSetup.map((g,i)=>i===0?[host,...g]:[...g]);
-      syncGroups(next);
-      allParticipants=next.flat();
+    // Foursomes uses the two named teams as the scorecard players. Do not ask for, or
+    // silently add, four individual players on this setup screen: that made the Go Live
+    // button look ready but still fail with an Add players validation message.
+    if(foursomesMode){
+      const aName=String((setup.matchplay&&setup.matchplay.teamAName)||'').trim()||'Team 1';
+      const bName=String((setup.matchplay&&setup.matchplay.teamBName)||'').trim()||'Team 2';
+      allParticipants=[
+        {id:MATCHPLAY_FOURSOMES_A,display_name:aName,name:aName,playing_handicap:0,current_handicap:0,handicap:0,is_guest:true,is_foursomes_team:true},
+        {id:MATCHPLAY_FOURSOMES_B,display_name:bName,name:bName,playing_handicap:0,current_handicap:0,handicap:0,is_guest:true,is_foursomes_team:true}
+      ];
     }
     if(allParticipants.length===0){flash('Add players','error');return;}
-    if(foursomesMode&&allParticipants.length!==4){flash('Foursomes needs exactly 4 players','error');return;}
     if(!foursomesMode&&!allParticipants.some(p=>normaliseId(p.id)===normaliseId(currentUser.id))){flash('Add yourself first so at least one signed-in player is in the round','error');return;}
     if(singlesMode&&allParticipants.length!==2){flash('Singles matchplay needs exactly 2 players','error');return;}
     if(foursomesMode&&(!(setup.matchplay.teamAName||'').trim()||!(setup.matchplay.teamBName||'').trim())){flash('Add both foursomes team names','error');return;}
@@ -2936,8 +2956,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       }
       if(roundErr)throw roundErr;
 
-      const groupBuckets=groupSetup.map(g=>g.filter(Boolean)).filter(g=>g.length>0);
-      if(foursomesMode&&!groupBuckets.length&&allParticipants.length)groupBuckets.push(allParticipants);
+      const groupBuckets=foursomesMode?[allParticipants]:groupSetup.map(g=>g.filter(Boolean)).filter(g=>g.length>0);
       const groupRows=groupBuckets.map((bucket,idx)=>({
         round_id:rd.id,
         group_number:idx+1,
@@ -2966,6 +2985,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       }
 
       for(const p of allParticipants){
+        if(p.is_foursomes_team)continue;
         await sb.from('cup_round_players').upsert({
           round_id:rd.id,
           [p.is_guest?'guest_id':'user_id']:p.id,
@@ -2987,8 +3007,9 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       await load();
       const scorerGroup=(createdGroups||[]).find(g=>currentUser&&Array.isArray(g.player_ids)&&g.player_ids.includes(currentUser.id))||(createdGroups||[])[0];
       const scorerIds=(scorerGroup&&scorerGroup.player_ids)||playerIds;
-      const scorerParticipants=po.filter(p=>scorerIds.includes(p.id));
-      setActiveRound({...rd,join_code:joinCode,_allParticipants:po,_sweepstake:{enabled:!!(setup.sweepstake&&setup.sweepstake.enabled),amountPence:parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||200,scope:(setup.sweepstake&&setup.sweepstake.scope)==='group'?'group':'round'},_matchplay:(cleanMatchplaySetup(setup.matchplay||{},scorerParticipants).mode==='singles'?applySinglesMatchplayShots(setup.matchplay||{},scorerParticipants):cleanMatchplaySetup(setup.matchplay||{},scorerParticipants))});
+      const scorerParticipants=foursomesMode?po:po.filter(p=>scorerIds.includes(p.id));
+      const activeMatchplay=(cleanMatchplaySetup(setup.matchplay||{},scorerParticipants).mode==='singles'?applySinglesMatchplayShots(setup.matchplay||{},scorerParticipants):cleanMatchplaySetup(setup.matchplay||{},scorerParticipants));
+      setActiveRound({...rd,join_code:joinCode,_allParticipants:po,_sweepstake:{enabled:!!(setup.sweepstake&&setup.sweepstake.enabled),amountPence:parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||200,scope:(setup.sweepstake&&setup.sweepstake.scope)==='group'?'group':'round'},_matchplay:activeMatchplay});
       setActiveGroup({...scorerGroup,playing_handicaps:(scorerGroup&&scorerGroup.playing_handicaps)||playingHcps,participants:scorerParticipants,player_ids:scorerIds});
       setHoleScores({}); // Fresh scores for new round
       setStep('scorecard');
@@ -3198,7 +3219,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
               </div>}
             </div>
           )}
-          {<><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+          {!isFoursomesSetup()&&<><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
             <label style={{...S.lbl,margin:0}}>{isSingleGroupDay?'Players':'Groups'} ({participants.length} players)</label>
           </div>
           {currentUser&&!participants.find(p=>normaliseId(p.id)===normaliseId(currentUser.id))&&isSingleGroupDay&&(
@@ -5584,7 +5605,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       <FoursomesScorecard/>
 
       {/* Spectator live leaderboard */}
-      {!(matchplayConfig&&matchplayConfig.enabled&&matchplayConfig.mode==='foursomes')&&!canEdit&&!isCompletedRound(round)&&(
+      {!(matchplayConfig&&matchplayConfig.enabled&&(matchplayConfig.mode==='foursomes'||matchplayConfig.mode==='singles'))&&!canEdit&&!isCompletedRound(round)&&(
         <div style={{padding:'12px 14px',background:'rgba(0,0,0,0.2)',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
           <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.15em',fontWeight:600,marginBottom:10}}>LIVE LEADERBOARD</div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
