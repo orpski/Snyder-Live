@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.69
+// SNYDER LIVE v2.70
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1474,10 +1474,10 @@ function App(){
         {currentUser&&myRounds.length>0&&(
           <div style={{borderRadius:22,border:'1px solid rgba(255,255,255,0.10)',background:'rgba(255,255,255,0.045)',padding:12,marginBottom:18}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-              <div style={{fontSize:13,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>RECENT ROUND</div>
+              <div style={{fontSize:13,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>MY ROUNDS</div>
               <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{background:'none',border:'none',color:'#60b8f0',fontWeight:800,fontSize:12,cursor:'pointer'}}>See all</button>
             </div>
-            {myRounds.slice(0,1).map(rd=>{
+            {myRounds.slice(0,3).map(rd=>{
               const course=courses.find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee);
               const live=isLiveRound(rd);
               return(
@@ -1826,6 +1826,22 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
       let lead=0,played=0,lastHole=0;const holeRows=[];
       holeList.filter(h=>parseInt(h.hole)>=1&&parseInt(h.hole)<=18).forEach(hd=>{
         const h=parseInt(hd.hole);
+        if(mode==='singles'){
+          const aPid=teamA[0];
+          const bPid=teamB[0];
+          const aRow=rowMap[h]&&rowMap[h][aPid];
+          const bRow=rowMap[h]&&rowMap[h][bPid];
+          if(!aRow||!bRow||!hasEnteredGross(aRow.gross_score)||!hasEnteredGross(bRow.gross_score))return;
+          const aShot=(parseInt(cfg.teamAShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
+          const bShot=(parseInt(cfg.teamBShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
+          const aNet=(parseInt(aRow.gross_score)||0)-aShot;
+          const bNet=(parseInt(bRow.gross_score)||0)-bShot;
+          let winner='halve';
+          if(aNet<bNet){lead+=1;winner='A';}
+          else if(bNet<aNet){lead-=1;winner='B';}
+          played+=1;lastHole=h;holeRows.push({hole:h,aNet,bNet,winner,lead});
+          return;
+        }
         const scored=[...teamA,...teamB].every(pid=>rowMap[h]&&rowMap[h][pid]&&hasEnteredGross(rowMap[h][pid].gross_score));
         if(!scored)return;
         const pts=pid=>stablefordPointsValue(rowMap[h][pid].stableford_points||0);
@@ -1901,6 +1917,10 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                     const aShots=parseInt(mp.teamAShots)||0;
                     const bShots=parseInt(mp.teamBShots)||0;
                     const shotsText=(aShots||bShots)?(aShots&&bShots?((mp.aName+' get '+aShots+' shot'+(aShots===1?'':'s'))+' · '+(mp.bName+' get '+bShots+' shot'+(bShots===1?'':'s'))):(aShots?(mp.aName+' get '+aShots+' shot'+(aShots===1?'':'s')):(mp.bName+' get '+bShots+' shot'+(bShots===1?'':'s')))):'No shots given';
+                    const stableRows=mp.mode==='singles'&&mp.keepStableford!==false?leaderboardForRound(rd):[];
+                    const stableFor=id=>{const row=stableRows.find(r=>normaliseId(r.id)===normaliseId(id));return row?row.total:0;};
+                    const aStable=mp.mode==='singles'?stableFor((mp.teamA||[])[0]):0;
+                    const bStable=mp.mode==='singles'?stableFor((mp.teamB||[])[0]):0;
                     const bg=leadTeam==='A'?'linear-gradient(90deg,rgba(251,191,36,0.20),rgba(0,112,187,0.16))':leadTeam==='B'?'linear-gradient(90deg,rgba(251,191,36,0.12),rgba(0,112,187,0.28))':'linear-gradient(90deg,rgba(251,191,36,0.12),rgba(0,112,187,0.18))';
                     return <>
                       <div style={{marginBottom:10,padding:'10px 12px',borderRadius:13,border:'1px solid '+(leadTeam==='A'?'rgba(251,191,36,0.42)':leadTeam==='B'?'rgba(96,184,240,0.46)':'rgba(255,255,255,0.13)'),background:bg,display:'grid',gridTemplateColumns:'58px minmax(0,1fr) 58px',gap:8,alignItems:'center',boxShadow:'inset 0 0 0 1px rgba(255,255,255,0.04)'}}>
@@ -1910,6 +1930,10 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                           <div style={{fontSize:12,color:'#fff',fontWeight:950,whiteSpace:'normal',overflowWrap:'anywhere',lineHeight:1.12}}><span style={{color:'#fbbf24'}}>{mp.aName}</span> <span style={{color:'rgba(255,255,255,0.48)',fontWeight:900}}>v</span> <span style={{color:'#60b8f0'}}>{mp.bName}</span></div>
                           <div style={{fontSize:10,color:'#90ccf0',fontWeight:850,marginTop:2}}>{leadTeam==='tie'?centerScore+' · '+mp.sub:mp.sub}</div>
                           <div style={{fontSize:9,color:'rgba(255,255,255,0.58)',fontWeight:800,marginTop:3,whiteSpace:'normal',overflowWrap:'anywhere'}}>{shotsText}</div>
+                          {mp.mode==='singles'&&mp.keepStableford!==false&&<div style={{marginTop:6,display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                            <div style={{border:'1px solid rgba(251,191,36,0.24)',background:'rgba(251,191,36,0.10)',borderRadius:9,padding:'5px 6px'}}><div style={{fontSize:9,color:'#fbbf24',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div><div style={{fontSize:16,color:'#fff',fontWeight:950,lineHeight:1}}>{aStable} <span style={{fontSize:9,color:'#90ccf0'}}>pts</span></div></div>
+                            <div style={{border:'1px solid rgba(96,184,240,0.24)',background:'rgba(96,184,240,0.10)',borderRadius:9,padding:'5px 6px'}}><div style={{fontSize:9,color:'#60b8f0',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.bName}</div><div style={{fontSize:16,color:'#fff',fontWeight:950,lineHeight:1}}>{bStable} <span style={{fontSize:9,color:'#90ccf0'}}>pts</span></div></div>
+                          </div>}
                         </div>
                         <div style={{minWidth:0,textAlign:'right',fontSize:20,color:leadTeam==='B'?'#60b8f0':'rgba(255,255,255,0.18)',fontWeight:950,lineHeight:1}}>{bScore}</div>
                       </div>
@@ -2469,6 +2493,23 @@ function cleanMatchplaySetup(matchplay,players){
   return {enabled:!!(matchplay&&matchplay.enabled),mode,teamA,teamB,teamAName:(matchplay&&matchplay.teamAName)||'Team 1',teamBName:(matchplay&&matchplay.teamBName)||'Team 2',teamAShots:Math.max(0,parseInt(matchplay&&matchplay.teamAShots)||0),teamBShots:Math.max(0,parseInt(matchplay&&matchplay.teamBShots)||0),keepStableford:matchplay&&matchplay.keepStableford!==false};
 }
 
+function applySinglesMatchplayShots(matchplay,players){
+  const clean=cleanMatchplaySetup(matchplay||{},players||[]);
+  if(clean.mode!=='singles')return clean;
+  const playerById={};
+  (players||[]).forEach(p=>{playerById[normaliseId(p.id)]=p;});
+  const aId=normaliseId((clean.teamA||[])[0]);
+  const bId=normaliseId((clean.teamB||[])[0]);
+  const shotsFor=id=>{
+    const p=playerById[id]||{};
+    return parseInt(p.playing_handicap??p.current_handicap??p.handicap??0)||0;
+  };
+  const aShots=shotsFor(aId);
+  const bShots=shotsFor(bId);
+  const diff=Math.abs(aShots-bShots);
+  return {...clean,teamAShots:aShots>bShots?diff:0,teamBShots:bShots>aShots?diff:0};
+}
+
 function moneyFromPence(v){
   const n=Math.round(parseFloat(v)||0);
   const sign=n<0?'-':'';
@@ -2557,7 +2598,7 @@ function playerRangeLabel(range){
 // Round setup, player selection, joining live rounds and launch into scorecard
 // =========================================================
 function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSelectedRound,load,isAdmin,currentUser,cupUsers,guests,selectedRound,holeScores,setHoleScores,promptStartRoundAuth}){
-  const[step,setStep]=useState('menu');
+  const[step,setStep]=useState('playerCount');
   const[activeRound,setActiveRound]=useState(null);
   const[activeGroup,setActiveGroup]=useState(null);
   const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:1,sweepstake:{enabled:false,amountPence:200,scope:'round'},matchplay:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,keepStableford:true}});
@@ -2772,7 +2813,8 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
         const clean=cleanMatchplaySetup(q.matchplay||{},participants);
         const a=participants[0]?[String(participants[0].id)]:clean.teamA.slice(0,1);
         const b=participants[1]?[String(participants[1].id)]:clean.teamB.slice(0,1);
-        return {...q,matchplay:{...clean,enabled:true,mode:'singles',teamA:a,teamB:b,teamAName:'Player 1',teamBName:'Player 2',keepStableford:clean.keepStableford!==false}};
+        const next=applySinglesMatchplayShots({...clean,enabled:true,mode:'singles',teamA:a,teamB:b,teamAName:'Player 1',teamBName:'Player 2',keepStableford:clean.keepStableford!==false},participants);
+        return {...q,matchplay:next};
       });
       return;
     }
@@ -2907,7 +2949,8 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       }
 
       if(setup.matchplay&&setup.matchplay.enabled){
-        const mp=cleanMatchplaySetup(setup.matchplay,groupBuckets[0]||[]);
+        let mp=cleanMatchplaySetup(setup.matchplay,groupBuckets[0]||[]);
+        if(mp.mode==='singles')mp=applySinglesMatchplayShots(mp,groupBuckets[0]||[]);
         if(mp.mode==='foursomes'||(mp.teamA.length&&mp.teamB.length)){
           const primaryGroupKey=normaliseId((createdGroups&&createdGroups[0]&&(createdGroups[0].id||createdGroups[0].group_number))||'group');
           const mpSave=await saveMatchplayConfigToCloud(rd.id,primaryGroupKey,mp);
@@ -2941,7 +2984,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       const scorerGroup=(createdGroups||[]).find(g=>currentUser&&Array.isArray(g.player_ids)&&g.player_ids.includes(currentUser.id))||(createdGroups||[])[0];
       const scorerIds=(scorerGroup&&scorerGroup.player_ids)||playerIds;
       const scorerParticipants=po.filter(p=>scorerIds.includes(p.id));
-      setActiveRound({...rd,join_code:joinCode,_allParticipants:po,_sweepstake:{enabled:!!(setup.sweepstake&&setup.sweepstake.enabled),amountPence:parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||200,scope:(setup.sweepstake&&setup.sweepstake.scope)==='group'?'group':'round'},_matchplay:cleanMatchplaySetup(setup.matchplay||{},scorerParticipants)});
+      setActiveRound({...rd,join_code:joinCode,_allParticipants:po,_sweepstake:{enabled:!!(setup.sweepstake&&setup.sweepstake.enabled),amountPence:parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||200,scope:(setup.sweepstake&&setup.sweepstake.scope)==='group'?'group':'round'},_matchplay:(cleanMatchplaySetup(setup.matchplay||{},scorerParticipants).mode==='singles'?applySinglesMatchplayShots(setup.matchplay||{},scorerParticipants):cleanMatchplaySetup(setup.matchplay||{},scorerParticipants))});
       setActiveGroup({...scorerGroup,playing_handicaps:(scorerGroup&&scorerGroup.playing_handicaps)||playingHcps,participants:scorerParticipants,player_ids:scorerIds});
       setHoleScores({}); // Fresh scores for new round
       setStep('scorecard');
@@ -3237,7 +3280,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
           <div style={{fontSize:16,color:'#fff',marginBottom:4}}>Start a New Round</div>
           <div style={{fontSize:13,color:'#60b8f0'}}>Pick a course, add players, go live</div>
         </div>
-        {currentUser&&myRounds.length>0&&(
+        {false&&currentUser&&myRounds.length>0&&(
           <div>
             <div style={{fontSize:12,color:'#60b8f0',margin:'16px 0 8px',letterSpacing:'0.1em'}}>MY ROUNDS</div>
             {myRounds.map(rd=>{
@@ -4660,6 +4703,21 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         else if(aNet!==null&&bNet!==null&&bNet<aNet){lead-=1;winner='B';}
         played+=1;lastHole=h;
         holeRows.push({hole:h,aGross,bGross,aNet,bNet,winner,lead});
+      }else if(mode==='singles'){
+        const aPid=teamA[0];
+        const bPid=teamB[0];
+        const aGross=(holeScores[h]||{})[aPid];
+        const bGross=(holeScores[h]||{})[bPid];
+        if(!hasEnteredGross(aGross)||!hasEnteredGross(bGross))return;
+        const aShot=(parseInt(cfg.teamAShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
+        const bShot=(parseInt(cfg.teamBShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
+        const aNet=(parseInt(aGross)||0)-aShot;
+        const bNet=(parseInt(bGross)||0)-bShot;
+        let winner='halve';
+        if(aNet<bNet){lead+=1;winner='A';}
+        else if(bNet<aNet){lead-=1;winner='B';}
+        played+=1;lastHole=h;
+        holeRows.push({hole:h,aGross,bGross,aNet,bNet,winner,lead});
       }else{
         const scored=[...teamA,...teamB].every(pid=>hasEnteredGross((holeScores[h]||{})[pid]));
         if(!scored)return;
@@ -4753,6 +4811,11 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         <div style={{textAlign:'center',minWidth:0}}>
           <div style={{fontSize:15,color:'#fff',fontWeight:950,whiteSpace:'normal',overflowWrap:'anywhere',lineHeight:1.12}}>{mp.aName} <span style={{color:'rgba(255,255,255,0.45)'}}>v</span> {mp.bName}</div>
           <div style={{fontSize:11,color:'#90ccf0',fontWeight:800,marginTop:3}}>{leadTeam==='tie'?mp.label+' · '+mp.sub:mp.sub}</div>
+          {mp.mode==='singles'&&<div style={{fontSize:10,color:'rgba(255,255,255,0.62)',fontWeight:850,marginTop:3}}>{(mp.teamAShots||mp.teamBShots)?((mp.teamAShots?mp.aName+' get '+mp.teamAShots+' shot'+(mp.teamAShots===1?'':'s'):mp.bName+' get '+mp.teamBShots+' shot'+(mp.teamBShots===1?'':'s'))):'No shots given'}</div>}
+          {mp.mode==='singles'&&mp.keepStableford!==false&&<div style={{marginTop:7,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+            <div style={{background:'rgba(251,191,36,0.10)',border:'1px solid rgba(251,191,36,0.22)',borderRadius:10,padding:'6px 8px'}}><div style={{fontSize:10,color:'#fbbf24',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{getRunning((mp.teamA||[])[0],holes.length)} <span style={{fontSize:10,color:'#90ccf0'}}>pts</span></div></div>
+            <div style={{background:'rgba(96,184,240,0.10)',border:'1px solid rgba(96,184,240,0.22)',borderRadius:10,padding:'6px 8px'}}><div style={{fontSize:10,color:'#60b8f0',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.bName}</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{getRunning((mp.teamB||[])[0],holes.length)} <span style={{fontSize:10,color:'#90ccf0'}}>pts</span></div></div>
+          </div>}
         </div>
         <div style={{textAlign:'right',fontSize:24,color:leadTeam==='B'?'#60b8f0':'rgba(255,255,255,0.18)',fontWeight:950,lineHeight:1}}>{leadTeam==='B'?upText:''}</div>
       </div>
