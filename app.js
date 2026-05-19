@@ -102,13 +102,16 @@ async function enableSnyderLiveNotifications(user){
 }
 async function sendSnyderLiveNotification(type,payload){
   try{
+    if(localStorage.getItem('liveNotificationsMuted')==='true')return {ok:true,skipped:true,muted:true};
+    const excluded=(payload&&Array.isArray(payload.excludeUserIds)?payload.excludeUserIds:[]).map(String);
+    const currentLocalUser=(payload&&payload.excludeUserId)||null;
     const key=snyderNotifyKey(type,payload||{});
     if(key&&snyderNotifySent.has(key))return {ok:true,skipped:true};
     if(key){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.31',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.32',createdAt:new Date().toISOString(),...(payload||{})};
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const res=await fetch(`${SURL}/functions/v1/${SNYDER_NOTIFY_EDGE}`,{
@@ -960,6 +963,13 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
 // Top-level state, routing, data loading and dashboard rendering
 // =========================================================
 function App(){
+  useEffect(()=>{
+    const el=document.getElementById('boot-splash');
+    if(el){
+      el.classList.add('boot-splash-hide');
+      setTimeout(()=>{try{el.remove();}catch(e){}},220);
+    }
+  },[]);
   const[splash,setSplash]=useState(false);
   const[view,setViewRaw]=useState('home');
   const[toast,setToast]=useState(null);
@@ -998,11 +1008,37 @@ function App(){
     setAuthPrompt('startRound');
     setShowAuth(true);
   }
-  async function enableNotificationsFromHome(){
-    if(notificationsEnabled){
-      flash('Notifications are already enabled on this phone');
+  async function disableNotificationsFromHome(){
+    try{
+      if('serviceWorker' in navigator){
+        const registration=await navigator.serviceWorker.getRegistration('./sw-live.js').catch(()=>null)||await navigator.serviceWorker.ready.catch(()=>null);
+        const sub=registration&&registration.pushManager?await registration.pushManager.getSubscription():null;
+        if(sub){
+          const endpoint=sub.endpoint;
+          await sub.unsubscribe().catch(()=>false);
+          if(endpoint){
+            await sb.from(SNYDER_PUSH_TABLE).delete().eq('endpoint',endpoint);
+          }
+        }
+      }
+      localStorage.removeItem('liveNotificationsEnabled');
+      localStorage.setItem('liveNotificationsMuted','true');
+      setNotificationsEnabled(false);
+      setNotifPermission(('Notification' in window)?Notification.permission:'unsupported');
+      flash('Notifications turned off on this phone');
+    }catch(e){
+      localStorage.removeItem('liveNotificationsEnabled');
+      localStorage.setItem('liveNotificationsMuted','true');
+      setNotificationsEnabled(false);
+      flash('Notifications turned off locally. You may also need to block them in browser settings.','error');
+    }
+  }
+  async function toggleNotificationsFromHome(){
+    if(notificationsEnabled&&notifPermission==='granted'){
+      await disableNotificationsFromHome();
       return;
     }
+    localStorage.removeItem('liveNotificationsMuted');
     const res=await enableSnyderLiveNotifications(currentUser);
     const permission=('Notification' in window)?Notification.permission:'unsupported';
     setNotifPermission(permission);
@@ -1358,7 +1394,7 @@ function App(){
         <div style={{fontSize:15,color:'#fff',fontWeight:700,letterSpacing:'0.15em',fontFamily:"'Barlow Condensed',sans-serif"}}>SNYDER LIVE</div>
         <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:8,minWidth:74}}>
           {notifPermission!=='unsupported'&&(
-            <button onClick={enableNotificationsFromHome} aria-label={notificationsEnabled?'Notifications enabled':'Enable notifications'} title={notificationsEnabled?'Notifications enabled':'Enable notifications'} style={{...NO_SELECT,width:34,height:34,borderRadius:'50%',border:notificationsEnabled?'1px solid rgba(34,197,94,0.55)':'1px solid rgba(212,175,55,0.40)',background:notificationsEnabled?'linear-gradient(135deg,rgba(34,197,94,0.22),rgba(15,23,42,0.88))':'rgba(255,255,255,0.06)',color:notificationsEnabled?'#86efac':'#f5d76e',display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,cursor:'pointer',boxShadow:notificationsEnabled?'0 0 0 3px rgba(34,197,94,0.08)':'none',position:'relative'}}>
+            <button onClick={toggleNotificationsFromHome} aria-label={notificationsEnabled?'Turn notifications off':'Enable notifications'} title={notificationsEnabled?'Turn notifications off':'Enable notifications'} style={{...NO_SELECT,width:34,height:34,borderRadius:'50%',border:notificationsEnabled?'1px solid rgba(34,197,94,0.55)':'1px solid rgba(212,175,55,0.40)',background:notificationsEnabled?'linear-gradient(135deg,rgba(34,197,94,0.22),rgba(15,23,42,0.88))':'rgba(255,255,255,0.06)',color:notificationsEnabled?'#86efac':'#f5d76e',display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,cursor:'pointer',boxShadow:notificationsEnabled?'0 0 0 3px rgba(34,197,94,0.08)':'none',position:'relative'}}>
               🔔
               {notificationsEnabled&&<span style={{position:'absolute',right:2,top:2,width:8,height:8,borderRadius:'50%',background:'#22c55e',boxShadow:'0 0 8px rgba(34,197,94,0.85)'}}/>}
             </button>
@@ -2320,7 +2356,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       }));
 
       const starterName=((currentUser&&currentUser.display_name)||'Someone').split(' ')[0];
-      const notifyResult=await sendSnyderLiveNotification('round_started',{roundId:rd&&rd.id,status:'created',title:'🏌️ '+starterName+' is LIVE!',body:'Tap for live scores · '+(courseBaseName||roundName||'Snyder Live'),roundName:roundName,courseName:courseBaseName,createdBy:currentUser&&currentUser.id});
+      const notifyResult=await sendSnyderLiveNotification('round_started',{excludeUserId:currentUser&&currentUser.id||null,excludePlayerId:currentUser&&currentUser.id||null,excludeUserIds:currentUser&&currentUser.id?[String(currentUser.id)]:[],roundId:rd&&rd.id,status:'created',title:'🏌️ '+starterName+' is LIVE!',body:'Tap for live scores · '+(courseBaseName||roundName||'Snyder Live'),roundName:roundName,courseName:courseBaseName,createdBy:currentUser&&currentUser.id});
       if(notifyResult&&!notifyResult.ok)console.warn('Snyder Live notification failed',notifyResult);
       await load();
       const scorerGroup=(createdGroups||[]).find(g=>currentUser&&Array.isArray(g.player_ids)&&g.player_ids.includes(currentUser.id))||(createdGroups||[])[0];
@@ -3359,7 +3395,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     ]);
     if(checked&&pid){
       const name=notifyPlayerName(pid);
-      const res=await sendSnyderLiveNotification('snake_changed',{roundId:round&&round.id,groupId:groupKey,hole:holeNum,playerId:pid,title:'🐍 '+name+' has the snake!',body:notifyHoleOrdinal(holeNum)+' hole · '+notifyRoundName(),playerName:name,roundName:notifyRoundName()});
+      const res=await sendSnyderLiveNotification('snake_changed',{...notifyPayload([pid]),roundId:round&&round.id,groupId:groupKey,hole:holeNum,playerId:pid,title:'🐍 '+name+' has the snake!',body:notifyHoleOrdinal(holeNum)+' hole · '+notifyRoundName(),playerName:name,roundName:notifyRoundName()});
       if(res&&!res.ok)console.warn('Snyder Live snake notification failed',res);
     }
   }
@@ -3383,6 +3419,18 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       round_id:round.id,player_id:pid,hole_number:holeNum,
       gross_score:gross,stableford_points:flaggedPts,par:hd.par,stroke_index:hd.stroke_index,
     };
+  }
+
+  function currentNotifyExcludeIds(extra){
+    const ids=[];
+    if(currentUser&&currentUser.id)ids.push(currentUser.id);
+    if(activeGroup&&Array.isArray(activeGroup.player_ids))ids.push(...activeGroup.player_ids);
+    if(group&&Array.isArray(group.player_ids))ids.push(...group.player_ids);
+    if(Array.isArray(extra))ids.push(...extra);
+    return Array.from(new Set(ids.filter(Boolean).map(String)));
+  }
+  function notifyPayload(extra){
+    return {excludeUserId:currentUser&&currentUser.id||null,excludePlayerId:currentUser&&currentUser.id||null,excludeUserIds:currentNotifyExcludeIds(extra)};
   }
 
   function notifyPlayerName(pid){
@@ -3412,7 +3460,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const hd=getHole(holeNum);
     if(Number(gross)===Number(hd.par)-1){
       const name=notifyPlayerName(pid);
-      const res=await sendSnyderLiveNotification('birdie',{roundId:round&&round.id,groupId:snakeGroupKey(),hole:holeNum,playerId:pid,title:'🐦 '+name+' birdied '+notifyHoleOrdinal(holeNum)+'!',body:'🔥 What a dart · '+notifyRoundName()+(notifyGroupName()?' · '+notifyGroupName():''),playerName:name,roundName:notifyRoundName()});
+      const res=await sendSnyderLiveNotification('birdie',{...notifyPayload([pid]),roundId:round&&round.id,groupId:snakeGroupKey(),hole:holeNum,playerId:pid,title:'🐦 '+name+' birdied '+notifyHoleOrdinal(holeNum)+'!',body:'🔥 What a dart · '+notifyRoundName()+(notifyGroupName()?' · '+notifyGroupName():''),playerName:name,roundName:notifyRoundName()});
       if(res&&!res.ok)console.warn('Snyder Live birdie notification failed',res);
       return res;
     }
@@ -3422,13 +3470,13 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const allFront9=Array.from({length:9},(_,i)=>i+1).every(h=>grpPlayers.every(p=>(updatedScores[h]||{})[p.id]!==undefined));
     if(!allFront9)return {ok:true,skipped:true};
     const frontHoles=holes.filter(h=>h.hole<=9);
-    const res=await sendSnyderLiveNotification('front9_scores',{roundId:round&&round.id,groupId:snakeGroupKey(),hole:9,status:'front9-complete',title:'📊 Front 9 is in!',body:notifyScoresForHoles(frontHoles),roundName:notifyRoundName(),groupName:notifyGroupName()});
+    const res=await sendSnyderLiveNotification('front9_scores',{...notifyPayload(),roundId:round&&round.id,groupId:snakeGroupKey(),hole:9,status:'front9-complete',title:'📊 Front 9 is in!',body:notifyScoresForHoles(frontHoles),roundName:notifyRoundName(),groupName:notifyGroupName()});
     if(res&&!res.ok)console.warn('Snyder Live front 9 notification failed',res);
     return res;
   }
   async function notifyFinishedScores(){
     const allHoles=holes.filter(h=>h.hole>=1&&h.hole<=18);
-    const res=await sendSnyderLiveNotification('round_finished_scores',{roundId:round&&round.id,groupId:snakeGroupKey(),hole:18,status:'round-finished',title:'🏁 Final scores are in!',body:notifyScoresForHoles(allHoles),roundName:notifyRoundName(),groupName:notifyGroupName()});
+    const res=await sendSnyderLiveNotification('round_finished_scores',{...notifyPayload(),roundId:round&&round.id,groupId:snakeGroupKey(),hole:18,status:'round-finished',title:'🏁 Final scores are in!',body:notifyScoresForHoles(allHoles),roundName:notifyRoundName(),groupName:notifyGroupName()});
     if(res&&!res.ok)console.warn('Snyder Live finished-round notification failed',res);
     return res;
   }
