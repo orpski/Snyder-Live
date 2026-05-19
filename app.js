@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.28
+// SNYDER LIVE v2.29
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -47,7 +47,7 @@ const sb=supabase.createClient(SURL,SKEY);
 // Frontend emits only the approved golf events. The Supabase Edge Function
 // can fan these out to saved push subscriptions when configured.
 // =========================================================
-const SNYDER_NOTIFY_EDGE='send-live-notification';
+const SNYDER_NOTIFY_EDGE='hyper-handler'; // Supabase deployed function slug shown in dashboard URL
 const SNYDER_PUSH_TABLE='live_push_subscriptions';
 const SNYDER_VAPID_PUBLIC_KEY='BPhGMHb32v-wFIAdTOihEH4nSfwlRG7lrIxwSIEYlw9DUbS691wcw0fnIbILeQg1VNwsniOTDt3lmy95BIav3IM'; // Snyder Live VAPID public key - separate from Snyder League table/function names.
 const snyderNotifySent=new Set();
@@ -108,7 +108,8 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.28',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.29',createdAt:new Date().toISOString(),...(payload||{})};
+    console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const res=await fetch(`${SURL}/functions/v1/${SNYDER_NOTIFY_EDGE}`,{
       method:'POST',
