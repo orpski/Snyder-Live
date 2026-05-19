@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.61
+// SNYDER LIVE v2.62
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -110,7 +110,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.48',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.62',createdAt:new Date().toISOString(),...(payload||{})};
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const controller=new AbortController();
@@ -3291,9 +3291,15 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const[matchplayConfig,setMatchplayConfig]=useState(matchplayConfigFromRows(initialScoreRows,round,group));
   const[showSweepstake,setShowSweepstake]=useState(false);
   const[scorecardNotificationsOff,setScorecardNotificationsOff]=useState(()=>scorecardNotificationsMuted(round&&round.id));
+  const[foursomesAutoFinished,setFoursomesAutoFinished]=useState(false);
+  const foursomesNotifyStateRef=useRef(null);
+  const foursomesAutoFinishRef=useRef('');
 
   useEffect(()=>{
     setScorecardNotificationsOff(scorecardNotificationsMuted(round&&round.id));
+    setFoursomesAutoFinished(false);
+    foursomesNotifyStateRef.current=null;
+    foursomesAutoFinishRef.current='';
     syncMutedScorecardsToServiceWorker();
   },[round&&round.id]);
 
@@ -4172,6 +4178,63 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return res;
   }
 
+  function foursomesNotifyStorageKey(type,status){
+    return ['foursomesNotify',round&&round.id,snakeGroupKey(),type,status].filter(Boolean).join('|');
+  }
+  function foursomesNotifyAlreadySent(type,status){
+    try{return localStorage.getItem(foursomesNotifyStorageKey(type,status))==='1';}catch(e){return false;}
+  }
+  function markFoursomesNotifySent(type,status){
+    try{localStorage.setItem(foursomesNotifyStorageKey(type,status),'1');}catch(e){}
+  }
+  async function sendFoursomesMatchNotification(type,status,title,body,extra={}){
+    if(!round||!round.id||!status||foursomesNotifyAlreadySent(type,status))return {ok:true,skipped:true};
+    markFoursomesNotifySent(type,status);
+    const res=await sendSnyderLiveNotification(type,{...notifyPayload(),roundId:round.id,groupId:snakeGroupKey(),status,title,body,roundName:notifyRoundName(),groupName:notifyGroupName(),...(extra||{})});
+    if(res&&!res.ok)console.warn('Snyder Live foursomes notification failed',type,res);
+    return res;
+  }
+  function foursomesWinningStreak(rows){
+    const last3=(rows||[]).slice(-3);
+    if(last3.length<3||last3.some(r=>!r||!r.winner||r.winner==='halve'))return null;
+    return last3.every(r=>r.winner===last3[0].winner)?last3[0].winner:null;
+  }
+  function foursomesTeamNameFromKey(mp,key){
+    return key==='A'?(mp&&mp.aName||'Team 1'):(mp&&mp.bName||'Team 2');
+  }
+  async function notifyFoursomesBirdiesForNewRows(mp,prev){
+    const previousHoles=new Set(((prev&&prev.holeRows)||[]).map(r=>parseInt(r.hole)));
+    const newRows=(mp.holeRows||[]).filter(r=>!previousHoles.has(parseInt(r.hole)));
+    for(const row of newRows){
+      const hd=getHole(row.hole);
+      [['A',row.aGross],['B',row.bGross]].forEach(([team,gross])=>{
+        if(isFoursomesOutcomeMarker(gross)||!hasEnteredGross(gross))return;
+        if(Number(gross)===Number(hd.par)-1){
+          const name=foursomesTeamNameFromKey(mp,team);
+          sendFoursomesMatchNotification('foursomes_birdie',team+'-'+row.hole,'🐦 '+name+' birdied '+notifyHoleOrdinal(row.hole)+'!','Foursomes birdie · '+notifyRoundName(),{hole:row.hole,teamName:name});
+        }
+      });
+    }
+  }
+  async function finishFoursomesMatchAutomatically(mp){
+    if(!mp||!mp.isFinished||!canEdit||!isLiveRound(round)||foursomesAutoFinishRef.current===String(round&&round.id))return;
+    foursomesAutoFinishRef.current=String(round&&round.id);
+    try{
+      setCloudStatus('Foursomes match won - finishing scorecard...');
+      await syncLocalFoursomesScoresToCloud('auto-finish');
+      const {error}=await sb.from('cup_rounds').update({status:'complete'}).eq('id',round.id);
+      if(error){setCloudError(error.message||'Could not auto-finish foursomes match');foursomesAutoFinishRef.current='';return;}
+      await sendFoursomesMatchNotification('foursomes_won','won-'+mp.winningTeam+'-'+mp.finalScore,'🏁 '+mp.winningName+' win the match!',mp.finalScore+' · '+notifyRoundName(),{hole:mp.lastHole,teamName:mp.winningName,finalScore:mp.finalScore});
+      round.status='complete';
+      setFoursomesAutoFinished(true);
+      setCloudStatus('Foursomes match finished automatically');
+      if(load)setTimeout(()=>load(),300);
+    }catch(e){
+      setCloudError(e&&e.message||String(e));
+      foursomesAutoFinishRef.current='';
+    }
+  }
+
   async function saveCompletedHoleToCloud(holeNum,holeMap){
     const rows=grpPlayers.map(p=>buildScoreRow(holeNum,p.id,holeMap[p.id]));
     setCloudStatus('Saving hole '+holeNum+' to cloud...');
@@ -4542,17 +4605,55 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     });
     const remaining=Math.max(0,18-played);
     const abs=Math.abs(lead);
+    const isFinished=played&&lead!==0&&abs>remaining;
+    const isDormie=played&&lead!==0&&remaining>0&&abs===remaining;
     const aName=mode==='foursomes'?(cfg.teamAName||'Team 1'):(matchplayTeamName(teamA)||'Team A');
     const bName=mode==='foursomes'?(cfg.teamBName||'Team 2'):(matchplayTeamName(teamB)||'Team B');
+    const winningTeam=lead>0?'A':lead<0?'B':null;
+    const winningName=winningTeam==='A'?aName:winningTeam==='B'?bName:'';
+    const finalScore=isFinished?(abs+'&'+remaining):'';
     let label='A/S';
     let sub=played?'Thru '+lastHole:'Not started yet';
     if(played&&lead!==0){
       const leader=lead>0?aName:bName;
-      if(abs>remaining) { label=leader+' win '+abs+'&'+remaining; sub='Match finished'; }
+      if(isFinished) { label=leader+' win '+finalScore; sub='Match finished'; }
       else { label=leader+' '+abs+'UP'; sub='Thru '+lastHole; }
     } else if(played){ label='A/S'; sub='Thru '+lastHole; }
-    return {mode,teamA,teamB,aName,bName,lead,played,lastHole,label,sub,holeRows,teamAShots:parseInt(cfg.teamAShots)||0,teamBShots:parseInt(cfg.teamBShots)||0};
+    return {mode,teamA,teamB,aName,bName,lead,played,lastHole,remaining,abs,isFinished,isDormie,winningTeam,winningName,finalScore,label,sub,holeRows,teamAShots:parseInt(cfg.teamAShots)||0,teamBShots:parseInt(cfg.teamBShots)||0};
   }
+  useEffect(()=>{
+    const mp=matchplayState();
+    if(!mp||mp.mode!=='foursomes'){foursomesNotifyStateRef.current=null;return;}
+    const prev=foursomesNotifyStateRef.current;
+    if(!prev){
+      foursomesNotifyStateRef.current={lead:mp.lead,played:mp.played,lastHole:mp.lastHole,holeRows:mp.holeRows||[],isFinished:mp.isFinished,isDormie:mp.isDormie};
+      if(mp.isFinished)finishFoursomesMatchAutomatically(mp);
+      return;
+    }
+    if(mp.played>prev.played){
+      notifyFoursomesBirdiesForNewRows(mp,prev).catch(e=>console.warn('Snyder Live foursomes birdie notification error',e));
+    }
+    if(mp.lead>0&&prev.lead<=0){
+      sendFoursomesMatchNotification('foursomes_lead','lead-A-'+mp.lastHole,'🔥 '+mp.aName+' go into the lead!',mp.label+' · '+notifyRoundName(),{hole:mp.lastHole,teamName:mp.aName});
+    }else if(mp.lead<0&&prev.lead>=0){
+      sendFoursomesMatchNotification('foursomes_lead','lead-B-'+mp.lastHole,'🔥 '+mp.bName+' go into the lead!',mp.label+' · '+notifyRoundName(),{hole:mp.lastHole,teamName:mp.bName});
+    }
+    const streakTeam=foursomesWinningStreak(mp.holeRows);
+    const prevStreakTeam=foursomesWinningStreak(prev.holeRows);
+    if(streakTeam&&streakTeam!==prevStreakTeam){
+      const name=foursomesTeamNameFromKey(mp,streakTeam);
+      sendFoursomesMatchNotification('foursomes_rampage','rampage-'+streakTeam+'-'+mp.lastHole,'🚨 '+name+' are on a rampage!',name+' have won 3 holes in a row · '+notifyRoundName(),{hole:mp.lastHole,teamName:name});
+    }
+    if(mp.isDormie&&!prev.isDormie&&mp.winningTeam){
+      sendFoursomesMatchNotification('foursomes_dormie','dormie-'+mp.winningTeam+'-'+mp.remaining,'🔒 '+mp.winningName+' are dormie!',mp.abs+'UP with '+mp.remaining+' to play · '+notifyRoundName(),{hole:mp.lastHole,teamName:mp.winningName});
+    }
+    if(mp.isFinished&&!prev.isFinished&&mp.winningTeam){
+      sendFoursomesMatchNotification('foursomes_won','won-'+mp.winningTeam+'-'+mp.finalScore,'🏁 '+mp.winningName+' win the match!',mp.finalScore+' · '+notifyRoundName(),{hole:mp.lastHole,teamName:mp.winningName,finalScore:mp.finalScore});
+    }
+    if(mp.isFinished)finishFoursomesMatchAutomatically(mp);
+    foursomesNotifyStateRef.current={lead:mp.lead,played:mp.played,lastHole:mp.lastHole,holeRows:mp.holeRows||[],isFinished:mp.isFinished,isDormie:mp.isDormie};
+  },[JSON.stringify(holeScores),matchplayConfig&&matchplayConfig.mode,matchplayConfig&&matchplayConfig.teamAName,matchplayConfig&&matchplayConfig.teamBName,canEdit,round&&round.id]);
+
   function MatchplayScoreBanner(){
     const mp=matchplayState();
     if(!mp)return null;
@@ -4625,11 +4726,13 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const teamIds=[MATCHPLAY_FOURSOMES_A,MATCHPLAY_FOURSOMES_B];
     const names=[mp.aName,mp.bName];
     const shots=[mp.teamAShots,mp.teamBShots];
-    const canInput=canEdit;
+    const matchFinished=!!(mp.isFinished||foursomesAutoFinished||!isLiveRound(round));
+    const canInput=canEdit&&!matchFinished;
     return <div style={{paddingBottom:40}}>
       <FoursomesScoreInput/>
       <div style={{padding:'10px 14px 12px',background:'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(251,191,36,0.10))',borderBottom:'1px solid rgba(96,184,240,0.18)'}}>
         <MatchplayMiniStatus/>
+        {matchFinished&&<div style={{marginTop:10,padding:'10px 12px',borderRadius:12,background:'rgba(34,197,94,0.16)',border:'1px solid rgba(34,197,94,0.35)',color:'#bbf7d0',fontSize:13,fontWeight:950,textAlign:'center'}}>🏁 Match finished · {mp.label}</div>}
       </div>
       {['FRONT 9','BACK 9'].map((label,sec)=>{const list=sec===0?front9:back9;return <div key={label}>
         <div style={{padding:'6px 12px',fontSize:11,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(0,0,0,0.3)'}}>{label}</div>
@@ -4646,6 +4749,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           </div>;})}
         </div>;})}
       </div>;})}
+      {matchFinished&&<div style={{padding:'14px 16px 24px'}}><button onClick={()=>setView('home')} style={{...S.pri,width:'100%',padding:15,fontSize:16,background:'#0a8a4a'}}>Home</button></div>}
     </div>;
   }
 
