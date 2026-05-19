@@ -102,7 +102,6 @@ async function enableSnyderLiveNotifications(user){
 }
 async function sendSnyderLiveNotification(type,payload){
   try{
-    if(localStorage.getItem('liveNotificationsMuted')==='true')return {ok:true,skipped:true,muted:true};
     const excluded=(payload&&Array.isArray(payload.excludeUserIds)?payload.excludeUserIds:[]).map(String);
     const currentLocalUser=(payload&&payload.excludeUserId)||null;
     const key=snyderNotifyKey(type,payload||{});
@@ -111,21 +110,29 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.32',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.33',createdAt:new Date().toISOString(),...(payload||{})};
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
-    const res=await fetch(`${SURL}/functions/v1/${SNYDER_NOTIFY_EDGE}`,{
-      method:'POST',
-      mode:'cors',
-      headers:{'Content-Type':'application/json','apikey':SKEY,'Authorization':'Bearer '+SKEY},
-      body:JSON.stringify(body)
-    });
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),6000);
+    let res;
+    try{
+      res=await fetch(`${SURL}/functions/v1/${SNYDER_NOTIFY_EDGE}`,{
+        method:'POST',
+        mode:'cors',
+        signal:controller.signal,
+        headers:{'Content-Type':'application/json','apikey':SKEY,'Authorization':'Bearer '+SKEY},
+        body:JSON.stringify(body)
+      });
+    }finally{
+      clearTimeout(timeout);
+    }
     let data=null;
     try{data=await res.json();}catch(err){}
     if(!res.ok||data&&data.success===false){
       return {ok:false,status:res.status,error:data&&data.error||'Notification send failed'};
     }
-    if('Notification' in window&&Notification.permission==='granted'&&document.visibilityState!=='visible'){
+    if(localStorage.getItem('liveNotificationsMuted')!=='true'&&'Notification' in window&&Notification.permission==='granted'&&document.visibilityState!=='visible'){
       const reg=await registerSnyderServiceWorker();
       const title=body.title||'Snyder Live';
       const options={body:body.body||body.message||'',icon:'./icon-live-192.png',badge:'./notification-badge-v2.png',tag:'snyder-live-'+(key||type),renotify:true,vibrate:[120,70,120],timestamp:Date.now(),data:{url:'./',type,roundId:body.roundId,app:'snyder-live'}};
@@ -3395,7 +3402,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     ]);
     if(checked&&pid){
       const name=notifyPlayerName(pid);
-      const res=await sendSnyderLiveNotification('snake_changed',{...notifyPayload([pid]),roundId:round&&round.id,groupId:groupKey,hole:holeNum,playerId:pid,title:'🐍 '+name+' has the snake!',body:notifyHoleOrdinal(holeNum)+' hole · '+notifyRoundName(),playerName:name,roundName:notifyRoundName()});
+      const res=await sendSnyderLiveNotification('snake_changed',{...notifyPayload(),roundId:round&&round.id,groupId:groupKey,hole:holeNum,playerId:pid,title:'🐍 '+name+' has the snake!',body:notifyHoleOrdinal(holeNum)+' hole · '+notifyRoundName(),playerName:name,roundName:notifyRoundName()});
       if(res&&!res.ok)console.warn('Snyder Live snake notification failed',res);
     }
   }
@@ -3421,16 +3428,16 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     };
   }
 
-  function currentNotifyExcludeIds(extra){
+  function currentNotifyExcludeIds(){
+    // Only exclude the signed-in scorer/device that is creating the event.
+    // Do not exclude every player in the group, otherwise spectators/players miss birdie, snake and finish alerts.
     const ids=[];
     if(currentUser&&currentUser.id)ids.push(currentUser.id);
-    if(activeGroup&&Array.isArray(activeGroup.player_ids))ids.push(...activeGroup.player_ids);
-    if(group&&Array.isArray(group.player_ids))ids.push(...group.player_ids);
-    if(Array.isArray(extra))ids.push(...extra);
     return Array.from(new Set(ids.filter(Boolean).map(String)));
   }
-  function notifyPayload(extra){
-    return {excludeUserId:currentUser&&currentUser.id||null,excludePlayerId:currentUser&&currentUser.id||null,excludeUserIds:currentNotifyExcludeIds(extra)};
+  function notifyPayload(){
+    const currentId=currentUser&&currentUser.id||null;
+    return {excludeUserId:currentId,excludePlayerId:currentId,excludeUserIds:currentNotifyExcludeIds()};
   }
 
   function notifyPlayerName(pid){
@@ -3460,7 +3467,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const hd=getHole(holeNum);
     if(Number(gross)===Number(hd.par)-1){
       const name=notifyPlayerName(pid);
-      const res=await sendSnyderLiveNotification('birdie',{...notifyPayload([pid]),roundId:round&&round.id,groupId:snakeGroupKey(),hole:holeNum,playerId:pid,title:'🐦 '+name+' birdied '+notifyHoleOrdinal(holeNum)+'!',body:'🔥 What a dart · '+notifyRoundName()+(notifyGroupName()?' · '+notifyGroupName():''),playerName:name,roundName:notifyRoundName()});
+      const res=await sendSnyderLiveNotification('birdie',{...notifyPayload(),roundId:round&&round.id,groupId:snakeGroupKey(),hole:holeNum,playerId:pid,title:'🐦 '+name+' birdied '+notifyHoleOrdinal(holeNum)+'!',body:'🔥 What a dart · '+notifyRoundName()+(notifyGroupName()?' · '+notifyGroupName():''),playerName:name,roundName:notifyRoundName()});
       if(res&&!res.ok)console.warn('Snyder Live birdie notification failed',res);
       return res;
     }
@@ -3784,7 +3791,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(!synced&&!window.confirm('Scores did not sync to cloud. Finish anyway? Other players may not see them.'))return;
     const {error}=await sb.from('cup_rounds').update({status:'complete'}).eq('id',round.id);
     if(error){flash(error.message||'Could not finish round','error');return;}
-    await notifyFinishedScores();
+    notifyFinishedScores().catch(e=>console.warn('Snyder Live finished-round notification error',e));
     round.status='complete';
     await load();
     setShowEnd(false);
@@ -4430,7 +4437,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           if(!synced&&!window.confirm('Scores did not sync to cloud. Finish anyway? Other players may not see them.'))return;
           const{error}=await sb.from('cup_rounds').update({status:'complete'}).eq('id',round.id);
           if(error){flash(error.message||'Could not finish round','error');return;}
-          await notifyFinishedScores();
+          notifyFinishedScores().catch(e=>console.warn('Snyder Live finished-round notification error',e));
           round.status='complete';
           await load();
           setEndStep(1);setShowEnd(true);
