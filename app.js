@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.72
+// SNYDER LIVE v2.73
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -3198,7 +3198,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
               </div>}
             </div>
           )}
-          {!isFoursomesSetup()&&<><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+          {<><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
             <label style={{...S.lbl,margin:0}}>{isSingleGroupDay?'Players':'Groups'} ({participants.length} players)</label>
           </div>
           {currentUser&&!participants.find(p=>normaliseId(p.id)===normaliseId(currentUser.id))&&isSingleGroupDay&&(
