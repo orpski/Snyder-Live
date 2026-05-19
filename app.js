@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.34
+// SNYDER LIVE v2.36
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -110,7 +110,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.35',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.36',createdAt:new Date().toISOString(),...(payload||{})};
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const controller=new AbortController();
@@ -3746,7 +3746,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(safeThrough>0){
       pots.push({key:'overall',label:final?'Overall':'Overall so far',holes:final?holes:overallLive,settles:final});
     }
-    const playerSource=scope==='round'?(allRoundPlayers&&allRoundPlayers.length?allRoundPlayers:grpPlayers):grpPlayers;
+    const fallbackGroupPlayers=(grpPlayers&&grpPlayers.length)?grpPlayers:(((allGroups&&allGroups[0]&&allGroups[0].participants)||[]).length?(allGroups[0].participants):((group&&group.participants)||[]));
+    const playerSource=scope==='round'?(allRoundPlayers&&allRoundPlayers.length?allRoundPlayers:(fallbackGroupPlayers&&fallbackGroupPlayers.length?fallbackGroupPlayers:grpPlayers)):(grpPlayers&&grpPlayers.length?grpPlayers:fallbackGroupPlayers);
     const sweepPlayers=(playerSource||[]).filter((p,idx,arr)=>p&&p.id&&arr.findIndex(x=>normaliseId(x&&x.id)===normaliseId(p.id))===idx);
     const pointByPlayerHole={};
     (overallScores||[]).filter(r=>r&&!isMetaScoreRow(r)).forEach(r=>{
@@ -3871,6 +3872,18 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       </div>
     </div>;
   }
+  function MatchplayMiniStatus(){
+    const mp=matchplayState();
+    if(!mp)return null;
+    const leadTeam=mp.lead>0?'A':mp.lead<0?'B':'tie';
+    const tone=leadTeam==='A'?'rgba(251,191,36,0.18)':leadTeam==='B'?'rgba(0,112,187,0.24)':'rgba(255,255,255,0.08)';
+    return <div style={{marginTop:9,padding:'10px 11px',borderRadius:12,background:tone,border:'1px solid '+(leadTeam==='tie'?'rgba(255,255,255,0.13)':leadTeam==='A'?'rgba(251,191,36,0.34)':'rgba(96,184,240,0.36)'),display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}>
+      <div style={{minWidth:0,textAlign:'left'}}><div style={{fontSize:10,color:'#fbbf24',fontWeight:950,letterSpacing:'0.08em'}}>MATCHPLAY</div><div style={{fontSize:12,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div></div>
+      <div style={{textAlign:'center',minWidth:88}}><div style={{fontSize:18,color:'#fff',fontWeight:950,lineHeight:1}}>{mp.label}</div><div style={{fontSize:10,color:'#90ccf0',fontWeight:850,marginTop:2}}>{mp.sub}</div></div>
+      <div style={{minWidth:0,textAlign:'right'}}><div style={{fontSize:10,color:'#90ccf0',fontWeight:950,letterSpacing:'0.08em'}}>DOUBLES</div><div style={{fontSize:12,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.bName}</div></div>
+    </div>;
+  }
+
   function SweepstakeMoneyButton(){
     const sw=sweepstakePlayerRows();
     if(!sw.enabled)return null;
@@ -4453,6 +4466,22 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             </div>
           </div>
         ))}
+        {isCompletedRound(round)&&!round._cupScoring&&(
+          <div style={{marginTop:12}}>
+            <div style={{...S.card,margin:'0 0 12px',background:'linear-gradient(135deg,rgba(0,112,187,0.22),rgba(255,255,255,0.05))',borderColor:'rgba(96,184,240,0.42)'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
+                <div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>Final Stableford Scores</div><div style={{fontSize:11,color:'#90ccf0'}}>Completed round · spectator summary</div></div>
+                <div style={{fontSize:11,color:'#86efac',fontWeight:950,letterSpacing:'0.08em'}}>FINAL</div>
+              </div>
+              {overallLeaderboardRows().map((r,idx)=><div key={'final-'+r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:idx?'1px solid rgba(255,255,255,0.08)':'none'}}>
+                <div style={{width:26,height:26,borderRadius:9,background:idx===0?'rgba(251,191,36,0.22)':'rgba(255,255,255,0.08)',border:'1px solid '+(idx===0?'rgba(251,191,36,0.38)':'rgba(255,255,255,0.10)'),display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:idx===0?'#fbbf24':'rgba(255,255,255,0.78)',fontWeight:950}}>{idx+1}</div>
+                <div style={{flex:1,fontSize:14,color:'#fff',fontWeight:850}}>{gameFirstName(r.name||'?')}</div>
+                <div style={{fontSize:24,color:'#60b8f0',fontWeight:950,lineHeight:1}}>{r.total} <span style={{fontSize:10,color:'#90ccf0',fontWeight:900}}>pts</span></div>
+              </div>)}
+            </div>
+            <SweepstakePanel throughHole={18} reviewTitle="💰 SWEEPSTAKE - WHO PAYS WHO" payUp={true}/>
+          </div>
+        )}
       </div> : <>
 
       <div style={{padding:'6px 14px',fontSize:11,color:'rgba(144,204,240,0.75)',borderBottom:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.14)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
@@ -4491,6 +4520,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
               );
             })}
           </div>
+          <MatchplayMiniStatus/>
           <button onClick={()=>{setEndStep(2);setShowEnd(true);}} style={{...S.pri,width:'100%',marginTop:10,fontSize:13}}>Stats</button>
           <div style={{fontSize:10,color:'rgba(255,255,255,0.3)',textAlign:'center',marginTop:8}}>Scroll down to see full scorecard</div>
         </div>
