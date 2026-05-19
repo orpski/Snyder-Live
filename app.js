@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.41
+// SNYDER LIVE v2.42
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -110,7 +110,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.41',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.42',createdAt:new Date().toISOString(),...(payload||{})};
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const controller=new AbortController();
@@ -2708,13 +2708,24 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
                 {(setup.matchplay&&setup.matchplay.mode)==='foursomes'&&<>
                   <input value={(setup.matchplay&&setup.matchplay.teamAName)||''} onChange={e=>updateMatchplayField('teamAName',e.target.value)} placeholder='Team 1 name, e.g. Paolo & James' style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}/>
                   <input value={(setup.matchplay&&setup.matchplay.teamBName)||''} onChange={e=>updateMatchplayField('teamBName',e.target.value)} placeholder="Team 2 name, e.g. The Reids" style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}/>
-                  <select value={(parseInt(setup.matchplay&&setup.matchplay.teamAShots)||0)>0?'A':((parseInt(setup.matchplay&&setup.matchplay.teamBShots)||0)>0?'B':'none')} onChange={e=>{const team=e.target.value;setSetup(q=>{const clean=cleanMatchplaySetup(q.matchplay||{},participants);const shotCount=Math.max(parseInt(clean.teamAShots)||0,parseInt(clean.teamBShots)||0,0);return {...q,matchplay:{...clean,enabled:true,mode:'foursomes',teamAShots:team==='A'?shotCount:0,teamBShots:team==='B'?shotCount:0}};});}} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}>
-                    <option value='none'>No shots given</option>
-                    <option value='A'>{(setup.matchplay&&setup.matchplay.teamAName)||'Team 1'} get shots</option>
-                    <option value='B'>{(setup.matchplay&&setup.matchplay.teamBName)||'Team 2'} get shots</option>
-                  </select>
-                  <input type='number' min='0' value={Math.max(parseInt(setup.matchplay&&setup.matchplay.teamAShots)||0,parseInt(setup.matchplay&&setup.matchplay.teamBShots)||0)} onChange={e=>{const n=Math.max(0,parseInt(e.target.value)||0);setSetup(q=>{const clean=cleanMatchplaySetup(q.matchplay||{},participants);const receiver=(parseInt(clean.teamAShots)||0)>0?'A':((parseInt(clean.teamBShots)||0)>0?'B':'none');return {...q,matchplay:{...clean,enabled:true,mode:'foursomes',teamAShots:receiver==='A'?n:0,teamBShots:receiver==='B'?n:0}};});}} placeholder='Shots in the match' style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}/>
-                  <div style={{gridColumn:'1 / -1',fontSize:11,color:'rgba(255,255,255,0.72)',lineHeight:1.35}}>These two team names are the players on the scorecard. Only one side can receive shots. Pick “No shots given” and leave shots as 0 for a scratch match.</div>
+                  <div style={{gridColumn:'1 / -1',display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:7}}>
+                    {[
+                      {key:'none',label:'No shots'},
+                      {key:'A',label:((setup.matchplay&&setup.matchplay.teamAName)||'Team 1')+' shots'},
+                      {key:'B',label:((setup.matchplay&&setup.matchplay.teamBName)||'Team 2')+' shots'}
+                    ].map(opt=>{
+                      const active=(parseInt(setup.matchplay&&setup.matchplay.teamAShots)||0)>0?'A':((parseInt(setup.matchplay&&setup.matchplay.teamBShots)||0)>0?'B':'none');
+                      return <button key={opt.key} onClick={()=>setSetup(q=>{const clean=cleanMatchplaySetup(q.matchplay||{},participants);const n=opt.key==='none'?0:Math.max(parseInt(clean.teamAShots)||0,parseInt(clean.teamBShots)||0,1);return {...q,matchplay:{...clean,enabled:true,mode:'foursomes',teamAShots:opt.key==='A'?n:0,teamBShots:opt.key==='B'?n:0}};})} style={{border:'1px solid '+(active===opt.key?'rgba(251,191,36,0.65)':'rgba(255,255,255,0.12)'),background:active===opt.key?'rgba(251,191,36,0.20)':'rgba(255,255,255,0.06)',color:active===opt.key?'#fbbf24':'#fff',borderRadius:10,padding:'9px 5px',fontSize:11,fontWeight:950}}>{opt.label}</button>;
+                    })}
+                  </div>
+                  <div style={{gridColumn:'1 / -1',display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:6,marginTop:2}}>
+                    {Array.from({length:19},(_,i)=>i).map(n=>{
+                      const activeShots=Math.max(parseInt(setup.matchplay&&setup.matchplay.teamAShots)||0,parseInt(setup.matchplay&&setup.matchplay.teamBShots)||0);
+                      const isActive=activeShots===n;
+                      return <button key={n} onClick={()=>setSetup(q=>{const clean=cleanMatchplaySetup(q.matchplay||{},participants);let receiver=(parseInt(clean.teamAShots)||0)>0?'A':((parseInt(clean.teamBShots)||0)>0?'B':'none');if(n===0)receiver='none';if(n>0&&receiver==='none')receiver='B';return {...q,matchplay:{...clean,enabled:true,mode:'foursomes',teamAShots:receiver==='A'?n:0,teamBShots:receiver==='B'?n:0}};})} style={{border:'1px solid '+(isActive?'rgba(96,184,240,0.70)':'rgba(255,255,255,0.12)'),background:isActive?'rgba(0,112,187,0.42)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:9,padding:'8px 0',fontSize:12,fontWeight:950}}>{n}</button>;
+                    })}
+                  </div>
+                  <div style={{gridColumn:'1 / -1',fontSize:11,color:'rgba(255,255,255,0.72)',lineHeight:1.35}}>Choose the team receiving shots, then tap the whole-number shot allowance. Use 0 for a scratch match.</div>
                 </>}
                 {(setup.matchplay&&setup.matchplay.mode)!=='foursomes'&&participants.map(p=>{
                   const id=normaliseId(p.id);
@@ -2732,11 +2743,6 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
               </div>}
             </div>
           )}
-          {isFoursomesSetup()&&<div style={{...S.card,marginBottom:12,background:'rgba(251,191,36,0.09)',borderColor:'rgba(251,191,36,0.28)'}}>
-            <div style={{fontSize:13,color:'#fff',fontWeight:900,marginBottom:4}}>Foursomes setup</div>
-            <div style={{fontSize:11,color:'#fbbf24',lineHeight:1.35}}>Do not add four players here. The two team names above become the two score columns. You will score one ball for each team.</div>
-            <div style={{fontSize:11,color:'#90ccf0',lineHeight:1.35,marginTop:6}}>Scorer: <b>{currentUser&&currentUser.display_name||'you'}</b></div>
-          </div>}
           {!isFoursomesSetup()&&<><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
             <label style={{...S.lbl,margin:0}}>{isSingleGroupDay?'Players':'Groups'} ({participants.length} players)</label>
           </div>
