@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.39
+// SNYDER LIVE v2.40
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -110,7 +110,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.39',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.40',createdAt:new Date().toISOString(),...(payload||{})};
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const controller=new AbortController();
@@ -2347,6 +2347,25 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       return {...q,matchplay:next};
     });
   }
+
+  function setRoundMode(mode){
+    if(mode==='foursomes'){
+      if(playerRange!=='1-4'){
+        setPlayerRange('1-4');
+        resetGroupsForRange('1-4');
+      }
+      setSetup(q=>{
+        const clean=cleanMatchplaySetup(q.matchplay||{},participants);
+        return {...q,matchplay:{...clean,enabled:true,mode:'foursomes',teamAName:clean.teamAName||'Team 1',teamBName:clean.teamBName||'Team 2'}};
+      });
+      return;
+    }
+    setSetup(q=>{
+      const clean=cleanMatchplaySetup(q.matchplay||{},participants);
+      return {...q,matchplay:{...clean,mode:'doubles',enabled:false}};
+    });
+  }
+  function isFoursomesSetup(){return !!(setup.matchplay&&setup.matchplay.enabled&&setup.matchplay.mode==='foursomes');}
   function blockingLiveRound(){
     return myLiveRounds.find(r=>!clearedLiveRoundIds.some(id=>normaliseId(id)===normaliseId(r.id)))||null;
   }
@@ -2380,11 +2399,19 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   // Start round / create Supabase round records
   // ---------------------------------------------------------
   async function startRound(skipHandicapConfirm=false){
-    const allParticipants=groupSetup.flat();
+    const foursomesMode=!!(setup.matchplay&&setup.matchplay.enabled&&setup.matchplay.mode==='foursomes');
+    let allParticipants=groupSetup.flat();
     if(!currentUser){promptStartRoundAuth&&promptStartRoundAuth();return;}
     if(!setup.course_id){flash('Pick a course','error');return;}
+    if(foursomesMode&&!allParticipants.some(p=>normaliseId(p.id)===normaliseId(currentUser.id))){
+      const host=withPlayingHandicap({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap},selectedCourse,setup.allowance);
+      const next=groupSetup.map((g,i)=>i===0?[host,...g]:[...g]);
+      syncGroups(next);
+      allParticipants=next.flat();
+    }
     if(allParticipants.length===0){flash('Add players','error');return;}
     if(!allParticipants.some(p=>normaliseId(p.id)===normaliseId(currentUser.id))){flash('Add yourself first so at least one signed-in player is in the round','error');return;}
+    if(foursomesMode&&(!(setup.matchplay.teamAName||'').trim()||!(setup.matchplay.teamBName||'').trim())){flash('Add both foursomes team names','error');return;}
     const blocked=blockingLiveRound();
     if(blocked){
       let canDelete=idMatches(blocked.created_by,currentUser.id);
@@ -2550,21 +2577,22 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   // ---------------------------------------------------------
   if(step==='playerCount'){
     const options=[
-      {key:'1-4',title:'1-4 players',sub:'One 4-ball or smaller'},
-      {key:'5-8',title:'5-8 players',sub:'Two groups'},
-      {key:'9-12',title:'9-12 players',sub:'Three groups'},
-      {key:'more',title:'More',sub:'More than three groups'},
+      {key:'1-4',title:'1 group',sub:'Normal Stableford scoring for 1-4 players'},
+      {key:'5-8',title:'Groups',sub:'Multi-group round - choose 5-8 players first'},
+      {key:'9-12',title:'Groups - 9-12 players',sub:'Three live groups'},
+      {key:'more',title:'Groups - more',sub:'More than three groups'},
+      {key:'foursomes',title:'Foursomes matchplay',sub:'Alternate shots: 2 team scores only, optional team shots'},
     ];
     return(
       <div style={{minHeight:'100vh',paddingBottom:40}}>
         <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
           <button onClick={()=>setStep('menu')} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button>
-          <div style={{fontSize:16,color:'#fff'}}>How many players?</div>
+          <div style={{fontSize:16,color:'#fff'}}>Choose round mode</div>
         </div>
         <div style={{padding:16}}>
-          <div style={{fontSize:13,color:'#90ccf0',marginBottom:12}}>This sets up the day and creates the live overall leaderboard between groups.</div>
+          <div style={{fontSize:13,color:'#90ccf0',marginBottom:12}}>Choose a normal round, multi-group round, or foursomes matchplay.</div>
           {options.map(o=>(
-            <div key={o.key} onClick={()=>{setPlayerRange(o.key);resetGroupsForRange(o.key);setStep('setup');}} style={{...S.card,marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+            <div key={o.key} onClick={()=>{if(o.key==='foursomes'){setPlayerRange('1-4');resetGroupsForRange('1-4');setSetup(q=>({...q,matchplay:{...(q.matchplay||{}),enabled:true,mode:'foursomes',teamAName:(q.matchplay&&q.matchplay.teamAName)||'Team 1',teamBName:(q.matchplay&&q.matchplay.teamBName)||'Team 2',teamAShots:(q.matchplay&&q.matchplay.teamAShots)||0,teamBShots:(q.matchplay&&q.matchplay.teamBShots)||0}}));}else{setPlayerRange(o.key);resetGroupsForRange(o.key);setSetup(q=>({...q,matchplay:{...(q.matchplay||{}),enabled:false,mode:'doubles'}}));}setStep('setup');}} style={{...S.card,marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,border:o.key==='foursomes'?'1px solid rgba(251,191,36,0.35)':'1px solid rgba(255,255,255,0.08)',background:o.key==='foursomes'?'rgba(251,191,36,0.10)':'rgba(255,255,255,0.05)'}}>
               <div>
                 <div style={{fontSize:18,color:'#fff',fontWeight:800}}>{o.title}</div>
                 <div style={{fontSize:12,color:'#60b8f0',marginTop:2}}>{o.sub}</div>
@@ -2588,6 +2616,14 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
           <div style={{fontSize:16,color:'#fff'}}>Start a Round</div>
         </div>
         <div style={{padding:16}}>
+          <div style={{...S.card,marginBottom:12,background:isFoursomesSetup()?'rgba(251,191,36,0.12)':'rgba(0,112,187,0.10)',borderColor:isFoursomesSetup()?'rgba(251,191,36,0.35)':'rgba(96,184,240,0.22)'}}>
+            <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,letterSpacing:'0.12em',marginBottom:8}}>ROUND MODE</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <button onClick={()=>setRoundMode('normal')} style={{border:'1px solid '+(!isFoursomesSetup()?'rgba(96,184,240,0.55)':'rgba(255,255,255,0.12)'),background:!isFoursomesSetup()?'rgba(96,184,240,0.18)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'11px 8px',fontSize:13,fontWeight:950}}>Normal round</button>
+              <button onClick={()=>setRoundMode('foursomes')} style={{border:'1px solid '+(isFoursomesSetup()?'rgba(251,191,36,0.58)':'rgba(255,255,255,0.12)'),background:isFoursomesSetup()?'rgba(251,191,36,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'11px 8px',fontSize:13,fontWeight:950}}>Foursomes</button>
+            </div>
+            <div style={{fontSize:11,color:isFoursomesSetup()?'#fbbf24':'rgba(255,255,255,0.62)',marginTop:8,lineHeight:1.35}}>{isFoursomesSetup()?'Alternate shots: the scorecard will show 2 team score columns only.':'Standard Stableford scoring. You can still add doubles matchplay as a side game below if you have 4 players.'}</div>
+          </div>
           {!isSingleGroupDay&&<div style={{...S.card,marginBottom:12,background:'rgba(0,112,187,0.12)',borderColor:'rgba(0,112,187,0.25)'}}>
             <div style={{fontSize:12,color:'#60b8f0',letterSpacing:'0.08em',textTransform:'uppercase'}}>Day setup</div>
             <div style={{fontSize:16,color:'#fff',fontWeight:800,marginTop:3}}>{playerRangeLabel(playerRange)}</div>
@@ -2653,16 +2689,16 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
             </div>}
           </div>
 
-          {isSingleGroupDay&&participants.length===4&&(
+          {isSingleGroupDay&&(isFoursomesSetup()||participants.length===4)&&(
             <div style={{padding:'12px 14px',background:setup.matchplay&&setup.matchplay.enabled?'rgba(96,184,240,0.13)':'rgba(255,255,255,0.06)',borderRadius:10,marginBottom:16,border:'1px solid '+(setup.matchplay&&setup.matchplay.enabled?'rgba(96,184,240,0.38)':'rgba(255,255,255,0.12)')}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
                 <div>
-                  <div style={{fontSize:14,color:'#fff',fontWeight:800}}>Doubles Matchplay</div>
-                  <div style={{fontSize:11,color:'#90ccf0',marginTop:2}}>Optional side match. Best Stableford score on each hole wins the hole.</div>
+                  <div style={{fontSize:14,color:'#fff',fontWeight:800}}>{isFoursomesSetup()?'Foursomes Matchplay':'Doubles Matchplay'}</div>
+                  <div style={{fontSize:11,color:'#90ccf0',marginTop:2}}>{isFoursomesSetup()?'Main format: alternate shots, two team score columns.':'Optional side match. Best Stableford score on each hole wins the hole.'}</div>
                 </div>
-                <div onClick={toggleMatchplaySetup} style={{width:48,height:28,borderRadius:14,background:setup.matchplay&&setup.matchplay.enabled?'#0070BB':'rgba(255,255,255,0.2)',cursor:'pointer',position:'relative',transition:'background 0.2s',flexShrink:0}}>
+                {!isFoursomesSetup()?<div onClick={toggleMatchplaySetup} style={{width:48,height:28,borderRadius:14,background:setup.matchplay&&setup.matchplay.enabled?'#0070BB':'rgba(255,255,255,0.2)',cursor:'pointer',position:'relative',transition:'background 0.2s',flexShrink:0}}>
                   <div style={{position:'absolute',top:3,left:setup.matchplay&&setup.matchplay.enabled?22:3,width:22,height:22,borderRadius:'50%',background:'#fff',transition:'left 0.2s'}}/>
-                </div>
+                </div>:<div style={{fontSize:11,color:'#fbbf24',fontWeight:950}}>ON</div>}
               </div>
               {setup.matchplay&&setup.matchplay.enabled&&<div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
                 <div style={{gridColumn:'1 / -1',display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:2}}>
@@ -2692,8 +2728,12 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
               </div>}
             </div>
           )}
+          {isFoursomesSetup()&&<div style={{...S.card,marginBottom:12,background:'rgba(251,191,36,0.09)',borderColor:'rgba(251,191,36,0.28)'}}>
+            <div style={{fontSize:13,color:'#fff',fontWeight:900,marginBottom:4}}>Foursomes setup</div>
+            <div style={{fontSize:11,color:'#fbbf24',lineHeight:1.35}}>You only need the scorer/host in the round. The scorecard will use the two team names below, not four individual player columns.</div>
+          </div>}
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-            <label style={{...S.lbl,margin:0}}>{isSingleGroupDay?'Players':'Groups'} ({participants.length} players)</label>
+            <label style={{...S.lbl,margin:0}}>{isFoursomesSetup()?'Scorer / players':(isSingleGroupDay?'Players':'Groups')} ({participants.length} players)</label>
           </div>
           {currentUser&&!participants.find(p=>normaliseId(p.id)===normaliseId(currentUser.id))&&isSingleGroupDay&&(
             <button onClick={()=>addPersonToGroup({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap},0)} style={{...S.gho,width:'100%',marginBottom:10,fontSize:13}}>
