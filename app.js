@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.26
+// SNYDER LIVE v2.27
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -103,26 +103,36 @@ async function enableSnyderLiveNotifications(user){
 async function sendSnyderLiveNotification(type,payload){
   try{
     const key=snyderNotifyKey(type,payload||{});
-    if(key&&snyderNotifySent.has(key))return;
+    if(key&&snyderNotifySent.has(key))return {ok:true,skipped:true};
     if(key){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.26',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.27',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
-    fetch(`${SURL}/functions/v1/${SNYDER_NOTIFY_EDGE}`,{
+    const res=await fetch(`${SURL}/functions/v1/${SNYDER_NOTIFY_EDGE}`,{
       method:'POST',
+      mode:'cors',
+      keepalive:true,
       headers:{'Content-Type':'application/json','apikey':SKEY,'Authorization':'Bearer '+SKEY},
       body:JSON.stringify(body)
-    }).catch(()=>{});
+    });
+    let data=null;
+    try{data=await res.json();}catch(err){}
+    if(!res.ok||data&&data.success===false){
+      return {ok:false,status:res.status,error:data&&data.error||'Notification send failed'};
+    }
     if('Notification' in window&&Notification.permission==='granted'&&document.visibilityState!=='visible'){
       const reg=await registerSnyderServiceWorker();
       const title=body.title||'Snyder Live';
-      const options={body:body.body||'',icon:'./icon-live-192.png',badge:'./icon-live-192.png',tag:'snyder-live-'+(key||type),data:{url:'./',type,roundId:body.roundId,app:'snyder-live'}};
+      const options={body:body.body||body.message||'',icon:'./icon-live-192.png',badge:'./icon-live-192.png',tag:'snyder-live-'+(key||type),data:{url:'./',type,roundId:body.roundId,app:'snyder-live'}};
       if(reg&&reg.showNotification)reg.showNotification(title,options);
       else new Notification(title,options);
     }
-  }catch(e){}
+    return {ok:true,data};
+  }catch(e){
+    return {ok:false,error:e&&e.message||String(e)};
+  }
 }
 // =========================================================
 // Embedded assets
@@ -2309,8 +2319,9 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
         user_id:p.is_guest?null:p.id,guest_id:p.is_guest?p.id:null,is_host:currentUser&&normaliseId(p.id)===normaliseId(currentUser.id),
       }));
 
+      const notifyResult=await sendSnyderLiveNotification('round_started',{roundId:rd&&rd.id,status:'created',title:'🏌️ '+((currentUser&&currentUser.display_name)||'Someone').split(' ')[0]+' started a round',body:(roundName||'Round')+(courseBaseName?' · '+courseBaseName:''),roundName:roundName,courseName:courseBaseName,createdBy:currentUser&&currentUser.id});
+      if(notifyResult&&!notifyResult.ok)console.warn('Snyder Live notification failed',notifyResult);
       await load();
-      sendSnyderLiveNotification('round_started',{roundId:rd&&rd.id,title:'🏌️ '+((currentUser&&currentUser.display_name)||'Someone').split(' ')[0]+' started a round',body:(roundName||'Round')+(courseBaseName?' · '+courseBaseName:''),roundName:roundName,courseName:courseBaseName,createdBy:currentUser&&currentUser.id});
       const scorerGroup=(createdGroups||[]).find(g=>currentUser&&Array.isArray(g.player_ids)&&g.player_ids.includes(currentUser.id))||(createdGroups||[])[0];
       const scorerIds=(scorerGroup&&scorerGroup.player_ids)||playerIds;
       const scorerParticipants=po.filter(p=>scorerIds.includes(p.id));
