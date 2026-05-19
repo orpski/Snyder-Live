@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.48
+// SNYDER LIVE v2.49
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -3022,9 +3022,14 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const currentUserKey=currentUser&&normaliseId(currentUser.id);
   const currentUserNameKey=currentUser&&String(currentUser.display_name||currentUser.name||currentUser.username||'').trim().toLowerCase();
   const currentUserFirstNameKey=currentUserNameKey&&currentUserNameKey.split(/\s+/)[0];
+  const isFoursomesScorecard=!!(
+    (round._matchplay&&round._matchplay.enabled&&round._matchplay.mode==='foursomes')||
+    (activeScoreGroup&&activeScoreGroup._foursomesFallback)
+  );
   const currentUserIsAssignedToGroup=!!currentUserKey&&(
     playerIds.some(id=>normaliseId(id)===currentUserKey)||
     grpPlayers.some(p=>[p.id,p.user_id,p.guest_id,p.cup_player_id,p.round_player_id].filter(Boolean).some(id=>normaliseId(id)===currentUserKey))||
+    (isFoursomesScorecard&&!round._spectator)||
     (round._cupScoring&&!!currentUserNameKey&&grpPlayers.some(p=>{const nm=String(p.display_name||p.name||'').trim().toLowerCase();return nm===currentUserNameKey||(currentUserFirstNameKey&&nm.split(/\s+/)[0]===currentUserFirstNameKey);}))
   );
   const cupDayOpenForScoring=!round._cupScoring||round._cupDayReleased!==false;
