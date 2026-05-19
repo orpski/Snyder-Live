@@ -110,7 +110,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.34',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.35',createdAt:new Date().toISOString(),...(payload||{})};
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const controller=new AbortController();
@@ -2007,13 +2007,62 @@ async function saveSweepstakeConfigToCloud(roundId,cfg){
     stroke_index:1
   }]);
 }
+
+const MATCHPLAY_SCORE_PREFIX='__matchplay__|';
+const MATCHPLAY_CONFIG_HOLE=960001;
+function makeMatchplayScorePlayerId(groupKey,team,pid){return MATCHPLAY_SCORE_PREFIX+encodeURIComponent(normaliseId(groupKey||'group'))+'|'+encodeURIComponent(team||'A')+'|'+encodeURIComponent(normaliseId(pid));}
+function parseMatchplayScoreRow(row){
+  const txt=String(row&&row.player_id||'');
+  if(!txt.startsWith(MATCHPLAY_SCORE_PREFIX))return null;
+  const parts=txt.split('|');
+  if(parts.length<4)return null;
+  try{return {groupKey:decodeURIComponent(parts[1]||'group'),team:decodeURIComponent(parts[2]||'A'),pid:decodeURIComponent(parts.slice(3).join('|')||''),enabled:(parseInt(row&&row.stableford_points)||0)>0};}
+  catch(e){return null;}
+}
+function isMatchplayScoreRow(row){return !!parseMatchplayScoreRow(row);}
+function matchplayStorageKey(roundId,groupKey){return 'matchplay_config_'+roundId+'_'+normaliseId(groupKey||'group');}
+function loadLocalMatchplayConfig(roundId,groupKey){
+  try{const raw=localStorage.getItem(matchplayStorageKey(roundId,groupKey));return raw?JSON.parse(raw):null;}catch(e){return null;}
+}
+function saveLocalMatchplayConfig(roundId,groupKey,cfg){
+  try{if(roundId&&cfg)localStorage.setItem(matchplayStorageKey(roundId,groupKey),JSON.stringify({enabled:!!cfg.enabled,teamA:(cfg.teamA||[]).map(String),teamB:(cfg.teamB||[]).map(String)}));}catch(e){}
+}
+function matchplayConfigFromRows(rows,round,group){
+  const groupKey=normaliseId((group&&group.id)||(group&&group.group_number)||'group');
+  const parsed=(rows||[]).filter(r=>r&&(!round||r.round_id===round.id)).map(parseMatchplayScoreRow).filter(Boolean).filter(x=>normaliseId(x.groupKey)===groupKey&&x.enabled);
+  const cloud={enabled:parsed.length>0,teamA:parsed.filter(x=>x.team==='A').map(x=>x.pid),teamB:parsed.filter(x=>x.team==='B').map(x=>x.pid)};
+  const local=round&&round.id?loadLocalMatchplayConfig(round.id,groupKey):null;
+  const fallback=round&&round._matchplay;
+  const cfg=cloud.enabled?cloud:(local&&local.enabled?local:(fallback&&fallback.enabled?fallback:{enabled:false,teamA:[],teamB:[]}));
+  const teamA=Array.from(new Set((cfg.teamA||[]).map(String).filter(Boolean)));
+  const teamB=Array.from(new Set((cfg.teamB||[]).map(String).filter(Boolean)));
+  return {enabled:!!cfg.enabled&&teamA.length>0&&teamB.length>0,teamA,teamB};
+}
+async function saveMatchplayConfigToCloud(roundId,groupKey,cfg){
+  if(!roundId||!cfg||!cfg.enabled)return {ok:true,count:0};
+  const clean={enabled:!!cfg.enabled,teamA:(cfg.teamA||[]).map(String).filter(Boolean),teamB:(cfg.teamB||[]).map(String).filter(Boolean)};
+  saveLocalMatchplayConfig(roundId,groupKey,clean);
+  const rows=[];
+  clean.teamA.forEach(pid=>rows.push({round_id:roundId,player_id:makeMatchplayScorePlayerId(groupKey,'A',pid),hole_number:MATCHPLAY_CONFIG_HOLE,gross_score:1,stableford_points:1,par:4,stroke_index:1}));
+  clean.teamB.forEach(pid=>rows.push({round_id:roundId,player_id:makeMatchplayScorePlayerId(groupKey,'B',pid),hole_number:MATCHPLAY_CONFIG_HOLE,gross_score:1,stableford_points:1,par:4,stroke_index:1}));
+  return rows.length?saveScoreRowsToCloud(sb,rows):{ok:true,count:0};
+}
+function cleanMatchplaySetup(matchplay,players){
+  const ids=(players||[]).map(p=>normaliseId(p.id));
+  const keep=(arr)=>(arr||[]).map(normaliseId).filter(id=>ids.includes(id));
+  let teamA=keep(matchplay&&matchplay.teamA);
+  let teamB=keep(matchplay&&matchplay.teamB).filter(id=>!teamA.includes(id));
+  if((!teamA.length&&!teamB.length)&&ids.length>=4){teamA=[ids[0],ids[1]];teamB=[ids[2],ids[3]];}
+  return {enabled:!!(matchplay&&matchplay.enabled),teamA,teamB};
+}
+
 function moneyFromPence(v){
   const n=Math.round(parseFloat(v)||0);
   const sign=n<0?'-':'';
   const abs=Math.abs(n);
   return sign+'£'+(abs/100).toFixed(abs%100?2:0);
 }
-function isMetaScoreRow(row){return isSnakeScoreRow(row)||isFineScoreRow(row)||isSweepstakeScoreRow(row);}
+function isMetaScoreRow(row){return isSnakeScoreRow(row)||isFineScoreRow(row)||isSweepstakeScoreRow(row)||isMatchplayScoreRow(row);}
 function fineAmount(key,count){const def=fineDef(key);return def?(parseInt(count)||0)*(def.amount||0):0;}
 
 function cupFineTotalForRound(round,scores){
@@ -2077,7 +2126,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   const[step,setStep]=useState('menu');
   const[activeRound,setActiveRound]=useState(null);
   const[activeGroup,setActiveGroup]=useState(null);
-  const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:1,sweepstake:{enabled:false,amountPence:200,scope:'round'}});
+  const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:1,sweepstake:{enabled:false,amountPence:200,scope:'round'},matchplay:{enabled:false,teamA:[],teamB:[]}});
   const[participants,setParticipants]=useState([]);
   const[groupSetup,setGroupSetup]=useState([[]]);
   const[pickerGroup,setPickerGroup]=useState(0);
@@ -2126,6 +2175,12 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
     const next=groupSetup.map(g=>g.map(p=>withPlayingHandicap(p,selectedCourse,setup.allowance)));
     syncGroups(next);
   },[setup.course_id,setup.tee,setup.allowance]);
+  useEffect(()=>{
+    const current=cleanMatchplaySetup(setup.matchplay||{},participants);
+    const before=JSON.stringify(setup.matchplay||{});
+    const after=JSON.stringify(current);
+    if(before!==after)setSetup(q=>({...q,matchplay:current}));
+  },[participants.length,participants.map(p=>normaliseId(p.id)).join('|')]);
   async function continueRound(rd){
     const rdGroups=groups.filter(g=>g.round_id===rd.id);
     const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
@@ -2221,6 +2276,24 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       return {...p,playing_handicap:ph,handicap_index:normalHcp,current_handicap:normalHcp,handicap:normalHcp,_playingHandicapEdited:true};
     }):[...g]);
     syncGroups(next);
+  }
+  function setMatchplayTeam(pid,team){
+    const id=normaliseId(pid);
+    setSetup(q=>{
+      const base=cleanMatchplaySetup(q.matchplay||{},participants);
+      let teamA=(base.teamA||[]).filter(x=>normaliseId(x)!==id);
+      let teamB=(base.teamB||[]).filter(x=>normaliseId(x)!==id);
+      if(team==='A')teamA=[...teamA,id].slice(0,2);
+      if(team==='B')teamB=[...teamB,id].slice(0,2);
+      return {...q,matchplay:{...base,enabled:true,teamA,teamB}};
+    });
+  }
+  function toggleMatchplaySetup(){
+    setSetup(q=>{
+      const clean=cleanMatchplaySetup(q.matchplay||{},participants);
+      const enabled=!clean.enabled;
+      return {...q,matchplay:{...clean,enabled}};
+    });
   }
   function blockingLiveRound(){
     return myLiveRounds.find(r=>!clearedLiveRoundIds.some(id=>normaliseId(id)===normaliseId(r.id)))||null;
@@ -2331,6 +2404,14 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
         if(!swSave.ok)flash('Sweepstake setting did not sync yet. Tap refresh/retry if it is missing on another device.','error');
       }
 
+      if(setup.matchplay&&setup.matchplay.enabled&&createdGroups&&createdGroups[0]){
+        const mp=cleanMatchplaySetup(setup.matchplay,groupBuckets[0]||[]);
+        if(mp.teamA.length&&mp.teamB.length){
+          const mpSave=await saveMatchplayConfigToCloud(rd.id,normaliseId(createdGroups[0].id||createdGroups[0].group_number||'group'),mp);
+          if(!mpSave.ok)flash('Matchplay setting did not sync yet. Tap refresh if it is missing on another device.','error');
+        }
+      }
+
       for(const p of allParticipants){
         await sb.from('cup_round_players').upsert({
           round_id:rd.id,
@@ -2354,7 +2435,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       const scorerGroup=(createdGroups||[]).find(g=>currentUser&&Array.isArray(g.player_ids)&&g.player_ids.includes(currentUser.id))||(createdGroups||[])[0];
       const scorerIds=(scorerGroup&&scorerGroup.player_ids)||playerIds;
       const scorerParticipants=po.filter(p=>scorerIds.includes(p.id));
-      setActiveRound({...rd,join_code:joinCode,_allParticipants:po,_sweepstake:{enabled:!!(setup.sweepstake&&setup.sweepstake.enabled),amountPence:parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||200,scope:(setup.sweepstake&&setup.sweepstake.scope)==='group'?'group':'round'}});
+      setActiveRound({...rd,join_code:joinCode,_allParticipants:po,_sweepstake:{enabled:!!(setup.sweepstake&&setup.sweepstake.enabled),amountPence:parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||200,scope:(setup.sweepstake&&setup.sweepstake.scope)==='group'?'group':'round'},_matchplay:cleanMatchplaySetup(setup.matchplay||{},scorerParticipants)});
       setActiveGroup({...scorerGroup,playing_handicaps:(scorerGroup&&scorerGroup.playing_handicaps)||playingHcps,participants:scorerParticipants,player_ids:scorerIds});
       setHoleScores({}); // Fresh scores for new round
       setStep('scorecard');
@@ -2516,6 +2597,35 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
               <div style={{gridColumn:'1 / -1',fontSize:11,color:'rgba(255,255,255,0.72)',lineHeight:1.35}}>Max loss per player: <b>{moneyFromPence((setup.sweepstake.amountPence||200)*3)}</b> · {(setup.sweepstake&&setup.sweepstake.scope)==='group'?'Settles this group only':'Settles every group in the round'}</div>
             </div>}
           </div>
+
+          {isSingleGroupDay&&participants.length===4&&(
+            <div style={{padding:'12px 14px',background:setup.matchplay&&setup.matchplay.enabled?'rgba(96,184,240,0.13)':'rgba(255,255,255,0.06)',borderRadius:10,marginBottom:16,border:'1px solid '+(setup.matchplay&&setup.matchplay.enabled?'rgba(96,184,240,0.38)':'rgba(255,255,255,0.12)')}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+                <div>
+                  <div style={{fontSize:14,color:'#fff',fontWeight:800}}>Doubles Matchplay</div>
+                  <div style={{fontSize:11,color:'#90ccf0',marginTop:2}}>Optional side match. Best Stableford score on each hole wins the hole.</div>
+                </div>
+                <div onClick={toggleMatchplaySetup} style={{width:48,height:28,borderRadius:14,background:setup.matchplay&&setup.matchplay.enabled?'#0070BB':'rgba(255,255,255,0.2)',cursor:'pointer',position:'relative',transition:'background 0.2s',flexShrink:0}}>
+                  <div style={{position:'absolute',top:3,left:setup.matchplay&&setup.matchplay.enabled?22:3,width:22,height:22,borderRadius:'50%',background:'#fff',transition:'left 0.2s'}}/>
+                </div>
+              </div>
+              {setup.matchplay&&setup.matchplay.enabled&&<div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                {participants.map(p=>{
+                  const id=normaliseId(p.id);
+                  const teamA=(setup.matchplay.teamA||[]).map(normaliseId).includes(id);
+                  const teamB=(setup.matchplay.teamB||[]).map(normaliseId).includes(id);
+                  return <div key={p.id} style={{background:'rgba(0,0,0,0.18)',border:'1px solid rgba(255,255,255,0.10)',borderRadius:10,padding:8}}>
+                    <div style={{fontSize:12,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginBottom:7}}>{gameFirstName(p.display_name||p.name||'Player')}</div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                      <button onClick={()=>setMatchplayTeam(p.id,'A')} style={{border:'1px solid '+(teamA?'rgba(251,191,36,0.6)':'rgba(255,255,255,0.12)'),background:teamA?'rgba(251,191,36,0.22)':'rgba(255,255,255,0.06)',color:teamA?'#fbbf24':'rgba(255,255,255,0.72)',borderRadius:8,padding:'7px 5px',fontSize:11,fontWeight:900}}>Team A</button>
+                      <button onClick={()=>setMatchplayTeam(p.id,'B')} style={{border:'1px solid '+(teamB?'rgba(96,184,240,0.6)':'rgba(255,255,255,0.12)'),background:teamB?'rgba(96,184,240,0.22)':'rgba(255,255,255,0.06)',color:teamB?'#90ccf0':'rgba(255,255,255,0.72)',borderRadius:8,padding:'7px 5px',fontSize:11,fontWeight:900}}>Team B</button>
+                    </div>
+                  </div>;
+                })}
+                <div style={{gridColumn:'1 / -1',fontSize:11,color:'rgba(255,255,255,0.72)',lineHeight:1.35}}>Team A: <b>{(setup.matchplay.teamA||[]).map(id=>gameFirstName((participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).display_name||(participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).name||'')).filter(Boolean).join(' & ')||'Pick 2'}</b> · Team B: <b>{(setup.matchplay.teamB||[]).map(id=>gameFirstName((participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).display_name||(participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).name||'')).filter(Boolean).join(' & ')||'Pick 2'}</b></div>
+              </div>}
+            </div>
+          )}
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
             <label style={{...S.lbl,margin:0}}>{isSingleGroupDay?'Players':'Groups'} ({participants.length} players)</label>
           </div>
@@ -2692,6 +2802,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const[overallRefreshNote,setOverallRefreshNote]=useState('');
   const[cupOverallRoundPlayers,setCupOverallRoundPlayers]=useState([]);
   const[sweepstakeConfig,setSweepstakeConfig]=useState(sweepstakeConfigFromRows(scores,round));
+  const[matchplayConfig,setMatchplayConfig]=useState(matchplayConfigFromRows(scores,round,group));
   const[showSweepstake,setShowSweepstake]=useState(false);
 
   useEffect(()=>{
@@ -2746,6 +2857,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         ]);
         if(!alive)return;
         setSweepstakeConfig(sweepstakeConfigFromRows(scs||[],round));
+          setMatchplayConfig(matchplayConfigFromRows(scs||[],round,activeScoreGroup||group));
         const initialParts=(group&&group.participants)||[];
         const byName={};initialParts.forEach(p=>{byName[String(p.display_name||p.name||'').trim().toLowerCase()]=p;});
         const people=(rps||[]).map((rp,idx)=>{
@@ -2814,6 +2926,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       });
       const cloudSnakes=rowsToSnakeMarks(rows);
       setSweepstakeConfig(sweepstakeConfigFromRows(rows,round));
+      setMatchplayConfig(matchplayConfigFromRows(rows,round,activeScoreGroup||group));
       if(Object.keys(m).length>0){
         setHoleScores(prev=>({...prev,...m}));
         try{localStorage.setItem('scores_'+round.id,JSON.stringify(m));}catch(e){}
@@ -3700,6 +3813,64 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       </>}
     </div>;
   }
+
+  function matchplayPlayerName(pid){
+    const p=grpPlayers.find(x=>normaliseId(x.id)===normaliseId(pid));
+    return gameFirstName((p&&(p.display_name||p.name))||'Player');
+  }
+  function matchplayTeamName(ids){return (ids||[]).map(matchplayPlayerName).filter(Boolean).join(' & ');}
+  function matchplayState(){
+    const cfg=matchplayConfig||{};
+    const teamA=(cfg.teamA||[]).map(normaliseId).filter(Boolean);
+    const teamB=(cfg.teamB||[]).map(normaliseId).filter(Boolean);
+    if(!cfg.enabled||!teamA.length||!teamB.length||round._cupScoring)return null;
+    let lead=0,played=0,lastHole=0;
+    const holeRows=[];
+    holes.filter(h=>h.hole>=1&&h.hole<=18).forEach(hd=>{
+      const h=hd.hole;
+      const scored=[...teamA,...teamB].every(pid=>hasEnteredGross((holeScores[h]||{})[pid]));
+      if(!scored)return;
+      const aBest=Math.max(...teamA.map(pid=>stablefordPointsValue(getPts((holeScores[h]||{})[pid],h,pid)||0)));
+      const bBest=Math.max(...teamB.map(pid=>stablefordPointsValue(getPts((holeScores[h]||{})[pid],h,pid)||0)));
+      let winner='halve';
+      if(aBest>bBest){lead+=1;winner='A';}
+      else if(bBest>aBest){lead-=1;winner='B';}
+      played+=1;lastHole=h;
+      holeRows.push({hole:h,aBest,bBest,winner,lead});
+    });
+    const remaining=Math.max(0,18-played);
+    const abs=Math.abs(lead);
+    const aName=matchplayTeamName(teamA)||'Team A';
+    const bName=matchplayTeamName(teamB)||'Team B';
+    let label='A/S';
+    let sub=played?'Thru '+lastHole:'Not started yet';
+    if(played&&lead!==0){
+      const leader=lead>0?aName:bName;
+      if(abs>remaining) { label=leader+' win '+abs+'&'+remaining; sub='Match finished'; }
+      else { label=leader+' '+abs+'UP'; sub='Thru '+lastHole; }
+    } else if(played){ label='A/S'; sub='Thru '+lastHole; }
+    return {teamA,teamB,aName,bName,lead,played,lastHole,label,sub,holeRows};
+  }
+  function MatchplayScoreBanner(){
+    const mp=matchplayState();
+    if(!mp)return null;
+    const leadTeam=mp.lead>0?'A':mp.lead<0?'B':'tie';
+    const bg=leadTeam==='A'?'linear-gradient(135deg,rgba(251,191,36,0.22),rgba(255,255,255,0.05))':leadTeam==='B'?'linear-gradient(135deg,rgba(0,112,187,0.28),rgba(255,255,255,0.05))':'linear-gradient(135deg,rgba(255,255,255,0.08),rgba(96,184,240,0.10))';
+    return <div style={{margin:'12px 16px 10px',...S.card,background:bg,borderColor:leadTeam==='A'?'rgba(251,191,36,0.38)':leadTeam==='B'?'rgba(96,184,240,0.42)':'rgba(255,255,255,0.13)'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:8}}>
+        <div>
+          <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,letterSpacing:'0.12em'}}>DOUBLES MATCHPLAY</div>
+          <div style={{fontSize:13,color:'rgba(255,255,255,0.72)',marginTop:2}}>Best Stableford score wins each hole</div>
+        </div>
+        <div style={{fontSize:11,color:'#d4af37',fontWeight:950}}>LIVE</div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:10,alignItems:'center'}}>
+        <div style={{textAlign:'left'}}><div style={{fontSize:14,color:'#fbbf24',fontWeight:950}}>{mp.aName}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.58)'}}>Team A</div></div>
+        <div style={{textAlign:'center',minWidth:96}}><div style={{fontSize:24,color:'#fff',fontWeight:950,lineHeight:1.05}}>{mp.label}</div><div style={{fontSize:11,color:'#90ccf0',fontWeight:800,marginTop:3}}>{mp.sub}</div></div>
+        <div style={{textAlign:'right'}}><div style={{fontSize:14,color:'#90ccf0',fontWeight:950}}>{mp.bName}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.58)'}}>Team B</div></div>
+      </div>
+    </div>;
+  }
   function SweepstakeMoneyButton(){
     const sw=sweepstakePlayerRows();
     if(!sw.enabled)return null;
@@ -4290,6 +4461,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       </div>
 
       <FinalStablefordSweepstakeBlock topMargin={12}/>
+      <MatchplayScoreBanner/>
 
       {/* Spectator live leaderboard */}
       {!canEdit&&!isCompletedRound(round)&&(
