@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.67
+// SNYDER LIVE v2.68
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1864,7 +1864,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                     const centerScore=leadTeam==='tie'?resultText:'';
                     const aShots=parseInt(mp.teamAShots)||0;
                     const bShots=parseInt(mp.teamBShots)||0;
-                    const shotsText=(aShots||bShots)?((aShots?mp.aName+' get '+aShots+' shot'+(aShots===1?'':'s'):mp.aName+' get no shots')+' · '+(bShots?mp.bName+' get '+bShots+' shot'+(bShots===1?'':'s'):mp.bName+' get no shots')):'No shots given';
+                    const shotsText=(aShots||bShots)?(aShots&&bShots?((mp.aName+' get '+aShots+' shot'+(aShots===1?'':'s'))+' · '+(mp.bName+' get '+bShots+' shot'+(bShots===1?'':'s'))):(aShots?(mp.aName+' get '+aShots+' shot'+(aShots===1?'':'s')):(mp.bName+' get '+bShots+' shot'+(bShots===1?'':'s')))):'No shots given';
                     const bg=leadTeam==='A'?'linear-gradient(90deg,rgba(251,191,36,0.20),rgba(0,112,187,0.16))':leadTeam==='B'?'linear-gradient(90deg,rgba(251,191,36,0.12),rgba(0,112,187,0.28))':'linear-gradient(90deg,rgba(251,191,36,0.12),rgba(0,112,187,0.18))';
                     return <>
                       <div style={{marginBottom:10,padding:'10px 12px',borderRadius:13,border:'1px solid '+(leadTeam==='A'?'rgba(251,191,36,0.42)':leadTeam==='B'?'rgba(96,184,240,0.46)':'rgba(255,255,255,0.13)'),background:bg,display:'grid',gridTemplateColumns:'58px minmax(0,1fr) 58px',gap:8,alignItems:'center',boxShadow:'inset 0 0 0 1px rgba(255,255,255,0.04)'}}>
