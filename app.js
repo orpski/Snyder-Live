@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.59
+// SNYDER LIVE v2.60
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -143,6 +143,29 @@ async function sendSnyderLiveNotification(type,payload){
   }catch(e){
     return {ok:false,error:e&&e.message||String(e)};
   }
+}
+function mutedScorecardNotificationIds(){
+  try{return JSON.parse(localStorage.getItem('mutedScorecardNotifications')||'[]').map(String).filter(Boolean);}catch(e){return [];}
+}
+function scorecardNotificationsMuted(roundId){
+  if(!roundId)return false;
+  return mutedScorecardNotificationIds().includes(String(roundId));
+}
+function syncMutedScorecardsToServiceWorker(){
+  try{
+    if(!('serviceWorker' in navigator))return;
+    const ids=mutedScorecardNotificationIds();
+    const msg={type:'snyder-live-muted-rounds',roundIds:ids};
+    if(navigator.serviceWorker.controller)navigator.serviceWorker.controller.postMessage(msg);
+    navigator.serviceWorker.ready.then(reg=>{if(reg&&reg.active)reg.active.postMessage(msg);}).catch(()=>{});
+  }catch(e){}
+}
+function setScorecardNotificationsMuted(roundId,muted){
+  if(!roundId)return;
+  const set=new Set(mutedScorecardNotificationIds());
+  if(muted)set.add(String(roundId)); else set.delete(String(roundId));
+  try{localStorage.setItem('mutedScorecardNotifications',JSON.stringify(Array.from(set)));}catch(e){}
+  syncMutedScorecardsToServiceWorker();
 }
 // =========================================================
 // Embedded assets
@@ -3256,6 +3279,12 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const[sweepstakeConfig,setSweepstakeConfig]=useState(sweepstakeConfigFromRows(initialScoreRows,round));
   const[matchplayConfig,setMatchplayConfig]=useState(matchplayConfigFromRows(initialScoreRows,round,group));
   const[showSweepstake,setShowSweepstake]=useState(false);
+  const[scorecardNotificationsOff,setScorecardNotificationsOff]=useState(()=>scorecardNotificationsMuted(round&&round.id));
+
+  useEffect(()=>{
+    setScorecardNotificationsOff(scorecardNotificationsMuted(round&&round.id));
+    syncMutedScorecardsToServiceWorker();
+  },[round&&round.id]);
 
   function realCloudGroupForFoursomesSync(){
     return [activeScoreGroup,group,...(allGroups||[])].find(g=>g&&g.id&&g.id!=='foursomes'&&g.id!=='round_players'&&!g._foursomesFallback&&!g._roundPlayersFallback);
@@ -3445,11 +3474,17 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(!round||!round.id||refreshing)return;
     setRefreshing(true);
     try{
-      const {data,error}=await sb.from('cup_scores').select('*').eq('round_id',round.id);
+      const [{data,error},{data:groupRows,error:groupError}]=await Promise.all([
+        sb.from('cup_scores').select('*').eq('round_id',round.id),
+        sb.from('cup_groups').select('*').eq('round_id',round.id).order('group_number',{ascending:true})
+      ]);
       if(error)throw error;
+      if(groupError)throw groupError;
       const rows=normaliseFoursomesScoreRows(data||[]);
-      setCloudScoreRows(rows);
-      const scoreRows=rows.filter(r=>!isMetaScoreRow(r));
+      const groupMetaRows=(groupRows||[]).flatMap(g=>foursomesScoreRowsFromGroupMeta(round.id,g));
+      const allScoreRows=normaliseFoursomesScoreRows([...rows,...groupMetaRows]);
+      setCloudScoreRows(allScoreRows);
+      const scoreRows=allScoreRows.filter(r=>!isMetaScoreRow(r));
       const snakeRows=rows.filter(isSnakeScoreRow);
       const m={};
       scoreRows.forEach(s=>{
@@ -3458,7 +3493,13 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       });
       const cloudSnakes=rowsToSnakeMarks(rows);
       setSweepstakeConfig(sweepstakeConfigFromRows(rows,round));
-      setMatchplayConfig(matchplayConfigFromRows(rows,round,activeScoreGroup||group));
+      setMatchplayConfig(matchplayConfigFromRows(allScoreRows,round,(groupRows&&groupRows[0])||activeScoreGroup||group));
+      if(groupRows&&groupRows.length){
+        setAllGroups(prev=>(groupRows||[]).map((g,idx)=>{
+          const existing=(prev||[]).find(p=>normaliseId(p.id)===normaliseId(g.id))||{};
+          return {...existing,...g,participants:existing.participants||[],player_ids:(existing.player_ids&&existing.player_ids.length?existing.player_ids:g.player_ids),playing_handicaps:g.playing_handicaps||existing.playing_handicaps||{},group_number:g.group_number||idx+1};
+        }));
+      }
       if(Object.keys(m).length>0){
         setHoleScores(prev=>({...prev,...m}));
         try{localStorage.setItem('scores_'+round.id,JSON.stringify(m));}catch(e){}
@@ -4067,7 +4108,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   }
   function notifyPayload(){
     const currentId=currentUser&&currentUser.id||null;
-    return {excludeUserId:currentId,excludePlayerId:currentId,excludeUserIds:currentNotifyExcludeIds()};
+    return {excludeUserId:currentId,excludePlayerId:currentId,excludeUserIds:currentNotifyExcludeIds(),mutedRoundIds:mutedScorecardNotificationIds()};
   }
 
   function notifyPlayerName(pid){
@@ -4459,6 +4500,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(!mp)return null;
     const leadTeam=mp.lead>0?'A':mp.lead<0?'B':'tie';
     const bg=leadTeam==='A'?'linear-gradient(135deg,rgba(251,191,36,0.22),rgba(255,255,255,0.05))':leadTeam==='B'?'linear-gradient(135deg,rgba(0,112,187,0.28),rgba(255,255,255,0.05))':'linear-gradient(135deg,rgba(255,255,255,0.08),rgba(96,184,240,0.10))';
+    const upText=mp.lead===0?'':Math.abs(mp.lead)+' UP';
     return <div style={{margin:'12px 16px 10px',...S.card,background:bg,borderColor:leadTeam==='A'?'rgba(251,191,36,0.38)':leadTeam==='B'?'rgba(96,184,240,0.42)':'rgba(255,255,255,0.13)'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:8}}>
         <div>
@@ -4467,10 +4509,13 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         </div>
         <div style={{fontSize:11,color:'#d4af37',fontWeight:950}}>LIVE</div>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:10,alignItems:'center'}}>
-        <div style={{textAlign:'left'}}><div style={{fontSize:14,color:'#fbbf24',fontWeight:950}}>{mp.aName}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.58)'}}>Team A</div></div>
-        <div style={{textAlign:'center',minWidth:96}}><div style={{fontSize:24,color:'#fff',fontWeight:950,lineHeight:1.05}}>{mp.label}</div><div style={{fontSize:11,color:'#90ccf0',fontWeight:800,marginTop:3}}>{mp.sub}</div></div>
-        <div style={{textAlign:'right'}}><div style={{fontSize:14,color:'#90ccf0',fontWeight:950}}>{mp.bName}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.58)'}}>Team B</div></div>
+      <div style={{display:'grid',gridTemplateColumns:'minmax(62px,0.8fr) minmax(0,1.5fr) minmax(62px,0.8fr)',gap:10,alignItems:'center'}}>
+        <div style={{textAlign:'left',fontSize:24,color:leadTeam==='A'?'#fbbf24':'rgba(255,255,255,0.18)',fontWeight:950,lineHeight:1}}>{leadTeam==='A'?upText:''}</div>
+        <div style={{textAlign:'center',minWidth:0}}>
+          <div style={{fontSize:18,color:'#fff',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName} <span style={{color:'rgba(255,255,255,0.45)'}}>v</span> {mp.bName}</div>
+          <div style={{fontSize:11,color:'#90ccf0',fontWeight:800,marginTop:3}}>{leadTeam==='tie'?mp.label+' · '+mp.sub:mp.sub}</div>
+        </div>
+        <div style={{textAlign:'right',fontSize:24,color:leadTeam==='B'?'#60b8f0':'rgba(255,255,255,0.18)',fontWeight:950,lineHeight:1}}>{leadTeam==='B'?upText:''}</div>
       </div>
     </div>;
   }
@@ -4479,10 +4524,15 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(!mp)return null;
     const leadTeam=mp.lead>0?'A':mp.lead<0?'B':'tie';
     const tone=leadTeam==='A'?'rgba(251,191,36,0.18)':leadTeam==='B'?'rgba(0,112,187,0.24)':'rgba(255,255,255,0.08)';
-    return <div style={{marginTop:9,padding:'10px 11px',borderRadius:12,background:tone,border:'1px solid '+(leadTeam==='tie'?'rgba(255,255,255,0.13)':leadTeam==='A'?'rgba(251,191,36,0.34)':'rgba(96,184,240,0.36)'),display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}>
-      <div style={{minWidth:0,textAlign:'left'}}><div style={{fontSize:10,color:'#fbbf24',fontWeight:950,letterSpacing:'0.08em'}}>MATCHPLAY</div><div style={{fontSize:12,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div></div>
-      <div style={{textAlign:'center',minWidth:88}}><div style={{fontSize:18,color:'#fff',fontWeight:950,lineHeight:1}}>{mp.label}</div><div style={{fontSize:10,color:'#90ccf0',fontWeight:850,marginTop:2}}>{mp.sub}</div></div>
-      <div style={{minWidth:0,textAlign:'right'}}><div style={{fontSize:10,color:'#90ccf0',fontWeight:950,letterSpacing:'0.08em'}}>{mp.mode==='foursomes'?'TEAM B':'DOUBLES'}</div><div style={{fontSize:12,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.bName}</div></div>
+    const upText=mp.lead===0?'':Math.abs(mp.lead)+' UP';
+    return <div style={{marginTop:9,padding:'10px 11px',borderRadius:12,background:tone,border:'1px solid '+(leadTeam==='tie'?'rgba(255,255,255,0.13)':leadTeam==='A'?'rgba(251,191,36,0.34)':'rgba(96,184,240,0.36)'),display:'grid',gridTemplateColumns:'minmax(54px,0.8fr) minmax(0,1.5fr) minmax(54px,0.8fr)',gap:8,alignItems:'center'}}>
+      <div style={{minWidth:0,textAlign:'left',fontSize:20,color:leadTeam==='A'?'#fbbf24':'rgba(255,255,255,0.18)',fontWeight:950,lineHeight:1}}>{leadTeam==='A'?upText:''}</div>
+      <div style={{textAlign:'center',minWidth:0}}>
+        <div style={{fontSize:10,color:'#90ccf0',fontWeight:950,letterSpacing:'0.1em'}}>MATCHPLAY</div>
+        <div style={{fontSize:13,color:'#fff',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName} <span style={{color:'rgba(255,255,255,0.48)',fontWeight:900}}>v</span> {mp.bName}</div>
+        <div style={{fontSize:10,color:'#90ccf0',fontWeight:850,marginTop:2}}>{leadTeam==='tie'?mp.label+' · '+mp.sub:mp.sub}</div>
+      </div>
+      <div style={{minWidth:0,textAlign:'right',fontSize:20,color:leadTeam==='B'?'#60b8f0':'rgba(255,255,255,0.18)',fontWeight:950,lineHeight:1}}>{leadTeam==='B'?upText:''}</div>
     </div>;
   }
 
@@ -4537,6 +4587,17 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const sw=sweepstakePlayerRows();
     if(!sw.enabled)return null;
     return <button aria-label="Open sweepstake standings" title="Sweepstake" onClick={()=>{refreshScoresFromCloud(false);setShowSweepstake(true);}} style={{width:38,height:38,borderRadius:10,border:'1px solid rgba(245,158,11,0.45)',background:'rgba(245,158,11,0.14)',color:'#fbbf24',fontSize:20,fontWeight:950,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,lineHeight:1}}>💰</button>;
+  }
+  function ScorecardNotificationButton(){
+    if(!round||!round.id||!isLiveRound(round))return null;
+    const enabledGlobally=localStorage.getItem('liveNotificationsEnabled')==='true'||(('Notification' in window)&&Notification.permission==='granted'&&localStorage.getItem('liveNotificationsMuted')!=='true');
+    const muted=scorecardNotificationsOff;
+    return <button aria-label={muted?'Turn scorecard notifications on':'Turn scorecard notifications off'} title={muted?'Notifications off for this scorecard':'Notifications on for this scorecard'} onClick={()=>{
+      const next=!muted;
+      setScorecardNotificationsMuted(round.id,next);
+      setScorecardNotificationsOff(next);
+      flash(next?'Notifications off for this scorecard':'Notifications on for this scorecard');
+    }} style={{width:38,height:38,borderRadius:10,border:'1px solid '+(muted?'rgba(148,163,184,0.34)':enabledGlobally?'rgba(34,197,94,0.42)':'rgba(245,158,11,0.38)'),background:muted?'rgba(148,163,184,0.12)':enabledGlobally?'rgba(34,197,94,0.15)':'rgba(245,158,11,0.12)',color:muted?'#94a3b8':enabledGlobally?'#86efac':'#fbbf24',fontSize:18,fontWeight:950,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,lineHeight:1}}>{muted?'🔕':'🔔'}</button>;
   }
 
   function FinalStablefordSweepstakeBlock({topMargin=12}){
@@ -5026,6 +5087,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             <div style={{fontSize:10,color:'#60b8f0'}}>Round start: {roundStartText}</div>
           </div>
           {!round._cupScoring&&<SweepstakeMoneyButton/>}
+          <ScorecardNotificationButton/>
           <button onClick={()=>round._cupScoring?openCupOverallSummary(true):openOverallLeaderboard(true)} style={{background:round._cupScoring?'linear-gradient(135deg,rgba(212,175,55,0.95),rgba(37,99,235,0.92))':'rgba(255,255,255,0.08)',border:round._cupScoring?'1px solid rgba(255,255,255,0.35)':'1px solid rgba(96,184,240,0.28)',color:'#fff',borderRadius:10,padding:'8px 11px',fontSize:12,fontWeight:950,cursor:'pointer',flexShrink:0,boxShadow:round._cupScoring?'0 8px 18px rgba(0,0,0,0.26)':'none',letterSpacing:'0.04em'}}>Overall</button>
           {round.join_code&&<button onClick={()=>{
             const url='https://snyder-live.vercel.app?watch='+round.join_code;
