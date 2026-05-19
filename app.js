@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.71
+// SNYDER LIVE v2.72
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -4837,6 +4837,11 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         <div style={{fontSize:10,color:'#90ccf0',fontWeight:950,letterSpacing:'0.1em'}}>MATCHPLAY</div>
         <div style={{fontSize:12,color:'#fff',fontWeight:950,whiteSpace:'normal',overflowWrap:'anywhere',lineHeight:1.12}}><span style={{color:'#fbbf24'}}>{mp.aName}</span> <span style={{color:'rgba(255,255,255,0.48)',fontWeight:900}}>v</span> <span style={{color:'#60b8f0'}}>{mp.bName}</span></div>
         <div style={{fontSize:10,color:'#90ccf0',fontWeight:850,marginTop:2}}>{leadTeam==='tie'?mp.label+' · '+mp.sub:mp.sub}</div>
+        {mp.mode==='singles'&&<div style={{fontSize:10,color:'rgba(255,255,255,0.62)',fontWeight:850,marginTop:3}}>{(mp.teamAShots||mp.teamBShots)?((mp.teamAShots?mp.aName+' get '+mp.teamAShots+' shot'+(mp.teamAShots===1?'':'s'):mp.bName+' get '+mp.teamBShots+' shot'+(mp.teamBShots===1?'':'s'))):'No shots given'}</div>}
+        {mp.mode==='singles'&&mp.keepStableford!==false&&<div style={{marginTop:7,display:'grid',gridTemplateColumns:'1fr 1fr',gap:7}}>
+          <div style={{background:'rgba(251,191,36,0.10)',border:'1px solid rgba(251,191,36,0.22)',borderRadius:9,padding:'5px 7px'}}><div style={{fontSize:9,color:'#fbbf24',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div><div style={{fontSize:16,color:'#fff',fontWeight:950}}>{getRunning((mp.teamA||[])[0],holes.length)} <span style={{fontSize:9,color:'#90ccf0'}}>pts</span></div></div>
+          <div style={{background:'rgba(96,184,240,0.10)',border:'1px solid rgba(96,184,240,0.22)',borderRadius:9,padding:'5px 7px'}}><div style={{fontSize:9,color:'#60b8f0',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.bName}</div><div style={{fontSize:16,color:'#fff',fontWeight:950}}>{getRunning((mp.teamB||[])[0],holes.length)} <span style={{fontSize:9,color:'#90ccf0'}}>pts</span></div></div>
+        </div>}
       </div>
       <div style={{minWidth:0,textAlign:'right',fontSize:20,color:leadTeam==='B'?'#60b8f0':'rgba(255,255,255,0.18)',fontWeight:950,lineHeight:1}}>{leadTeam==='B'?upText:''}</div>
     </div>;
