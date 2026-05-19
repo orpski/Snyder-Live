@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.70
+// SNYDER LIVE v2.71
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2864,15 +2864,19 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
     let allParticipants=groupSetup.flat();
     if(!currentUser){promptStartRoundAuth&&promptStartRoundAuth();return;}
     if(!setup.course_id){flash('Pick a course','error');return;}
-    if(foursomesMode&&!allParticipants.some(p=>normaliseId(p.id)===normaliseId(currentUser.id))){
+    const currentUserInRound=allParticipants.some(p=>normaliseId(p.id)===normaliseId(currentUser.id));
+    // Foursomes can be scored/hosted by the signed-in user even if they are not one of
+    // the four named players. Do not silently add the host once four players have been
+    // selected, because that turns a valid foursomes match into 5 players and blocks start.
+    if(foursomesMode&&!currentUserInRound&&allParticipants.length<4){
       const host=withPlayingHandicap({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap},selectedCourse,setup.allowance);
       const next=groupSetup.map((g,i)=>i===0?[host,...g]:[...g]);
       syncGroups(next);
       allParticipants=next.flat();
     }
     if(allParticipants.length===0){flash('Add players','error');return;}
-    if(!allParticipants.some(p=>normaliseId(p.id)===normaliseId(currentUser.id))){flash('Add yourself first so at least one signed-in player is in the round','error');return;}
     if(foursomesMode&&allParticipants.length!==4){flash('Foursomes needs exactly 4 players','error');return;}
+    if(!foursomesMode&&!allParticipants.some(p=>normaliseId(p.id)===normaliseId(currentUser.id))){flash('Add yourself first so at least one signed-in player is in the round','error');return;}
     if(singlesMode&&allParticipants.length!==2){flash('Singles matchplay needs exactly 2 players','error');return;}
     if(foursomesMode&&(!(setup.matchplay.teamAName||'').trim()||!(setup.matchplay.teamBName||'').trim())){flash('Add both foursomes team names','error');return;}
     if(singlesMode){setup.matchplay.teamA=[String(allParticipants[0].id)];setup.matchplay.teamB=[String(allParticipants[1].id)];setup.matchplay.teamAName=gameFirstName(allParticipants[0].display_name||allParticipants[0].name||'Player 1');setup.matchplay.teamBName=gameFirstName(allParticipants[1].display_name||allParticipants[1].name||'Player 2');}
