@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.62
+// SNYDER LIVE v2.63
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1373,48 +1373,8 @@ function App(){
     return Object.keys(totals).map(pid=>({id:pid,name:getDisplayName(pid),total:totals[pid]||0,holes:holes[pid]?holes[pid].size:0,_holePoints:holePoints[pid]||{}})).sort(compareStablefordLeaderboardRows);
   }
   function foursomesMatchplaySummaryForRound(rd){
-    try{
-      const rdGroups=(groups||[]).filter(g=>g.round_id===rd.id);
-      const g=rdGroups[0]||{id:'group'};
-      const groupMetaRows=(rdGroups||[]).flatMap(gr=>foursomesScoreRowsFromGroupMeta(rd.id,gr));
-      const allRows=normaliseFoursomesScoreRows([...(scores||[]),...(publicScores||[]),...groupMetaRows,...localScoreRowsForRound(rd.id)]).filter(r=>r&&r.round_id===rd.id);
-      const cfg=foursomesConfigForLiveSnapshot(rd,rdGroups,allRows)||matchplayConfigFromRows(allRows,rd,g);
-      if(!cfg||!cfg.enabled||cfg.mode!=='foursomes')return null;
-      const course=(courses||[]).find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee)||{};
-      const ch=Array.isArray(course.holes)?course.holes:[];
-      const holeList=ch.length?ch:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1}));
-      const map={};
-      allRows.filter(r=>!isMetaScoreRow(r)).forEach(r=>{
-        if(!isFoursomesTeamPlayerId(r.player_id))return;
-        const h=parseInt(r.hole_number);
-        if(!map[h])map[h]={};
-        map[h][canonicalFoursomesPlayerId(r.player_id)]=r.gross_score;
-      });
-      let lead=0,played=0,lastHole=0;
-      holeList.filter(h=>parseInt(h.hole)>=1&&parseInt(h.hole)<=18).forEach(hd=>{
-        const h=parseInt(hd.hole);
-        const a=(map[h]||{})[MATCHPLAY_FOURSOMES_A];
-        const b=(map[h]||{})[MATCHPLAY_FOURSOMES_B];
-        if(!hasEnteredGross(a)||!hasEnteredGross(b))return;
-        const si=parseInt(hd.stroke_index)||h;
-        const aNet=(parseInt(a)||0)-((parseInt(cfg.teamAShots)||0)>=si?1:0);
-        const bNet=(parseInt(b)||0)-((parseInt(cfg.teamBShots)||0)>=si?1:0);
-        if(aNet<bNet)lead+=1;
-        else if(bNet<aNet)lead-=1;
-        played+=1;lastHole=h;
-      });
-      const aName=cfg.teamAName||'Team 1';
-      const bName=cfg.teamBName||'Team 2';
-      const remaining=Math.max(0,18-played);
-      const abs=Math.abs(lead);
-      let label='A/S',sub=played?'Thru '+lastHole:'Not started yet';
-      if(played&&lead!==0){
-        const leader=lead>0?aName:bName;
-        if(abs>remaining){label=leader+' win '+abs+'&'+remaining;sub='Match finished';}
-        else {label=leader+' '+abs+'UP';sub='Thru '+lastHole;}
-      }
-      return {mode:'foursomes',aName,bName,label,sub,lead,played,teamAShots:parseInt(cfg.teamAShots)||0,teamBShots:parseInt(cfg.teamBShots)||0};
-    }catch(e){return null;}
+    const rdGroups=(groups||[]).filter(g=>g.round_id===rd.id);
+    return buildFoursomesMatchplaySummary(rd,rdGroups,[...(scores||[]),...(publicScores||[]),...localScoreRowsForRound(rd.id)],courses||[]);
   }
 
   function CompletedCard({rd}){
@@ -1844,48 +1804,8 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     return Object.keys(totals).map(pid=>({id:pid,name:nameMap[pid]||getDisplayName(pid),total:totals[pid]||0,holes:holes[pid]?holes[pid].size:0,_holePoints:holePoints[pid]||{}})).sort(compareStablefordLeaderboardRows);
   }
   function foursomesMatchplaySummaryForLiveRound(rd){
-    try{
-      const rdGroups=groupsForRound(rd);
-      const g=rdGroups[0]||{id:'group'};
-      const groupMetaRows=(rdGroups||[]).flatMap(gr=>foursomesScoreRowsFromGroupMeta(rd.id,gr));
-      const allRows=normaliseFoursomesScoreRows([...(scores||[]),...(publicScores||[]),...groupMetaRows,...localScoreRowsForRound(rd.id)]).filter(r=>r&&r.round_id===rd.id);
-      const cfg=foursomesConfigForLiveSnapshot(rd,rdGroups,allRows)||matchplayConfigFromRows(allRows,rd,g);
-      if(!cfg||!cfg.enabled||cfg.mode!=='foursomes')return null;
-      const course=(courses||[]).find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee)||{};
-      const ch=Array.isArray(course.holes)?course.holes:[];
-      const holeList=ch.length?ch:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1}));
-      const map={};
-      allRows.filter(r=>!isMetaScoreRow(r)).forEach(r=>{
-        if(!isFoursomesTeamPlayerId(r.player_id))return;
-        const h=parseInt(r.hole_number);
-        if(!map[h])map[h]={};
-        map[h][canonicalFoursomesPlayerId(r.player_id)]=r.gross_score;
-      });
-      let lead=0,played=0,lastHole=0;
-      holeList.filter(h=>parseInt(h.hole)>=1&&parseInt(h.hole)<=18).forEach(hd=>{
-        const h=parseInt(hd.hole);
-        const a=(map[h]||{})[MATCHPLAY_FOURSOMES_A];
-        const b=(map[h]||{})[MATCHPLAY_FOURSOMES_B];
-        if(!hasEnteredGross(a)||!hasEnteredGross(b))return;
-        const si=parseInt(hd.stroke_index)||h;
-        const aNet=(parseInt(a)||0)-((parseInt(cfg.teamAShots)||0)>=si?1:0);
-        const bNet=(parseInt(b)||0)-((parseInt(cfg.teamBShots)||0)>=si?1:0);
-        if(aNet<bNet)lead+=1;
-        else if(bNet<aNet)lead-=1;
-        played+=1;lastHole=h;
-      });
-      const aName=cfg.teamAName||'Team 1';
-      const bName=cfg.teamBName||'Team 2';
-      const remaining=Math.max(0,18-played);
-      const abs=Math.abs(lead);
-      let label='A/S',sub=played?'Thru '+lastHole:'Not started yet';
-      if(played&&lead!==0){
-        const leader=lead>0?aName:bName;
-        if(abs>remaining){label=leader+' win '+abs+'&'+remaining;sub='Match finished';}
-        else {label=leader+' '+abs+'UP';sub='Thru '+lastHole;}
-      }
-      return {mode:'foursomes',aName,bName,label,sub,lead,played,teamAShots:parseInt(cfg.teamAShots)||0,teamBShots:parseInt(cfg.teamBShots)||0};
-    }catch(e){return null;}
+    const rdGroups=groupsForRound(rd);
+    return buildFoursomesMatchplaySummary(rd,rdGroups,[...(scores||[]),...(publicScores||[]),...localScoreRowsForRound(rd.id)],courses||[]);
   }
   function CompletedCard({rd}){
     return(
@@ -2400,6 +2320,58 @@ function foursomesConfigForLiveSnapshot(round,groups,rows){
     if(hasFoursomesScoreRows(rows||[],round))return {enabled:true,mode:'foursomes',teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,teamA:[],teamB:[]};
   }catch(e){}
   return null;
+}
+
+function buildFoursomesMatchplaySummary(rd,rdGroups,rowSources,courseList){
+  try{
+    const groupsList=(rdGroups&&rdGroups.length)?rdGroups:[{id:'group',group_number:1,playing_handicaps:{}}];
+    const groupMetaRows=groupsList.flatMap(gr=>foursomesScoreRowsFromGroupMeta(rd&&rd.id,gr));
+    const allRows=normaliseFoursomesScoreRows([...(rowSources||[]),...groupMetaRows]).filter(r=>r&&(!rd||r.round_id===rd.id));
+    const g=groupsList[0]||{id:'group'};
+    const cfg=foursomesConfigForLiveSnapshot(rd,groupsList,allRows)||matchplayConfigFromRows(allRows,rd,g);
+    if(!cfg||!cfg.enabled||cfg.mode!=='foursomes')return null;
+    const course=(courseList||[]).find(co=>co.id===(rd&&rd.course_id))||findCourseForTee(courseList||[],rd&&rd.course_name,rd&&rd.tee)||{};
+    const ch=Array.isArray(course.holes)?course.holes:[];
+    const holeList=ch.length?ch:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1}));
+    const map={};
+    allRows.filter(r=>!isMetaScoreRow(r)).forEach(r=>{
+      if(!isFoursomesTeamPlayerId(r.player_id))return;
+      const h=parseInt(r.hole_number);
+      if(!map[h])map[h]={};
+      map[h][canonicalFoursomesPlayerId(r.player_id)]=r.gross_score;
+    });
+    let lead=0,played=0,lastHole=0;
+    holeList.filter(h=>parseInt(h.hole)>=1&&parseInt(h.hole)<=18).forEach(hd=>{
+      const h=parseInt(hd.hole);
+      const aGross=(map[h]||{})[MATCHPLAY_FOURSOMES_A];
+      const bGross=(map[h]||{})[MATCHPLAY_FOURSOMES_B];
+      if(!hasEnteredGross(aGross)||!hasEnteredGross(bGross))return;
+      const markedAWon=isFoursomesWonMarker(aGross)||isFoursomesConcededMarker(bGross);
+      const markedBWon=isFoursomesWonMarker(bGross)||isFoursomesConcededMarker(aGross);
+      const si=parseInt(hd.stroke_index)||h;
+      const aShot=(parseInt(cfg.teamAShots)||0)>=si?1:0;
+      const bShot=(parseInt(cfg.teamBShots)||0)>=si?1:0;
+      const aNet=isFoursomesOutcomeMarker(aGross)?null:(parseInt(aGross)||0)-aShot;
+      const bNet=isFoursomesOutcomeMarker(bGross)?null:(parseInt(bGross)||0)-bShot;
+      if(markedAWon&&!markedBWon)lead+=1;
+      else if(markedBWon&&!markedAWon)lead-=1;
+      else if(aNet!==null&&bNet!==null&&aNet<bNet)lead+=1;
+      else if(aNet!==null&&bNet!==null&&bNet<aNet)lead-=1;
+      played+=1;
+      lastHole=h;
+    });
+    const aName=cfg.teamAName||'Team 1';
+    const bName=cfg.teamBName||'Team 2';
+    const remaining=Math.max(0,18-played);
+    const abs=Math.abs(lead);
+    let label='A/S',sub=played?'Thru '+lastHole:'Not started yet';
+    if(played&&lead!==0){
+      const leader=lead>0?aName:bName;
+      if(abs>remaining){label=leader+' win '+abs+'&'+remaining;sub='Match finished';}
+      else {label=leader+' '+abs+'UP';sub='Thru '+lastHole;}
+    }
+    return {mode:'foursomes',aName,bName,label,sub,lead,played,teamAShots:parseInt(cfg.teamAShots)||0,teamBShots:parseInt(cfg.teamBShots)||0};
+  }catch(e){return null;}
 }
 function userCanScoreFoursomesRound(currentUser,round,realGroup,roundPlayers){
   if(!currentUser)return false;
@@ -3293,12 +3265,14 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const[scorecardNotificationsOff,setScorecardNotificationsOff]=useState(()=>scorecardNotificationsMuted(round&&round.id));
   const[foursomesAutoFinished,setFoursomesAutoFinished]=useState(false);
   const foursomesNotifyStateRef=useRef(null);
+  const suppressFoursomesNotifyRef=useRef(false);
   const foursomesAutoFinishRef=useRef('');
 
   useEffect(()=>{
     setScorecardNotificationsOff(scorecardNotificationsMuted(round&&round.id));
     setFoursomesAutoFinished(false);
     foursomesNotifyStateRef.current=null;
+    suppressFoursomesNotifyRef.current=false;
     foursomesAutoFinishRef.current='';
     syncMutedScorecardsToServiceWorker();
   },[round&&round.id]);
@@ -3474,7 +3448,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
 
   useEffect(()=>{
     if(!round||!round.id)return;
-    setMatchplayConfig(matchplayConfigFromRows(cloudScoreRows&&cloudScoreRows.length?cloudScoreRows:(scores||[]),round,activeScoreGroup||group));
+    const nextCfg=matchplayConfigFromRows(cloudScoreRows&&cloudScoreRows.length?cloudScoreRows:(scores||[]),round,activeScoreGroup||group);
+    setMatchplayConfig(prev=>preserveFoursomesTeamNames(nextCfg,prev));
   },[round&&round.id,activeScoreGroup&&activeScoreGroup.id,cloudScoreRows&&cloudScoreRows.length]);
 
   useEffect(()=>{
@@ -3487,8 +3462,21 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return()=>clearTimeout(t);
   },[round&&round.id,canEdit,isFoursomesScorecard,JSON.stringify(holeScores||{})]);
 
+  function preserveFoursomesTeamNames(next,prev=matchplayConfig){
+    if(!next||next.mode!=='foursomes')return next;
+    if(!prev||prev.mode!=='foursomes')return next;
+    const prevA=String(prev.teamAName||'').trim();
+    const prevB=String(prev.teamBName||'').trim();
+    const nextA=String(next.teamAName||'').trim();
+    const nextB=String(next.teamBName||'').trim();
+    const keepA=prevA&&prevA!=='Team 1'&&(!nextA||nextA==='Team 1');
+    const keepB=prevB&&prevB!=='Team 2'&&(!nextB||nextB==='Team 2');
+    return {...next,teamAName:keepA?prevA:(next.teamAName||prevA||'Team 1'),teamBName:keepB?prevB:(next.teamBName||prevB||'Team 2')};
+  }
+
   async function refreshScoresFromCloud(showMessage=true){
     if(!round||!round.id||refreshing)return;
+    suppressFoursomesNotifyRef.current=true;
     setRefreshing(true);
     try{
       const [{data,error},{data:groupRows,error:groupError}]=await Promise.all([
@@ -3510,7 +3498,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       });
       const cloudSnakes=rowsToSnakeMarks(rows);
       setSweepstakeConfig(sweepstakeConfigFromRows(rows,round));
-      setMatchplayConfig(matchplayConfigFromRows(allScoreRows,round,(groupRows&&groupRows[0])||activeScoreGroup||group));
+      const refreshedMatchplayConfig=matchplayConfigFromRows(allScoreRows,round,(groupRows&&groupRows[0])||activeScoreGroup||group);
+      setMatchplayConfig(prev=>preserveFoursomesTeamNames(refreshedMatchplayConfig,prev));
       if(groupRows&&groupRows.length){
         setAllGroups(prev=>(groupRows||[]).map((g,idx)=>{
           const existing=(prev||[]).find(p=>normaliseId(p.id)===normaliseId(g.id))||{};
@@ -4624,6 +4613,11 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   useEffect(()=>{
     const mp=matchplayState();
     if(!mp||mp.mode!=='foursomes'){foursomesNotifyStateRef.current=null;return;}
+    if(!canEdit||suppressFoursomesNotifyRef.current){
+      foursomesNotifyStateRef.current={lead:mp.lead,played:mp.played,lastHole:mp.lastHole,holeRows:mp.holeRows||[],isFinished:mp.isFinished,isDormie:mp.isDormie};
+      suppressFoursomesNotifyRef.current=false;
+      return;
+    }
     const prev=foursomesNotifyStateRef.current;
     if(!prev){
       foursomesNotifyStateRef.current={lead:mp.lead,played:mp.played,lastHole:mp.lastHole,holeRows:mp.holeRows||[],isFinished:mp.isFinished,isDormie:mp.isDormie};
