@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.50
+// SNYDER LIVE v2.51
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1281,12 +1281,17 @@ function App(){
     const hm={};roundPlayers.forEach(rp=>addRoundPlayerHandicaps(hm,rp,isCupRound));
     await hydrateRoundScores(rd.id);
     const{data:latestDbScores}=await sb.from('cup_scores').select('*').eq('round_id',rd.id);
-    const latestRows=[...(scores||[]),...(publicScores||[]),...(latestDbScores||[]),...localScoreRowsForRound(rd.id)].filter(r=>r&&r.round_id===rd.id);
+    const groupMetaRows=(rdGroups||[]).flatMap(g=>foursomesScoreRowsFromGroupMeta(rd.id,g));
+    const latestRows=[...(scores||[]),...(publicScores||[]),...(latestDbScores||[]),...groupMetaRows,...localScoreRowsForRound(rd.id)].filter(r=>r&&r.round_id===rd.id);
     let latestMatchplay=matchplayConfigFromRows(latestRows,rd,rdGroups[0]||{id:'group',group_number:1});
     if((!latestMatchplay||!latestMatchplay.enabled)&&hasFoursomesScoreRows(latestRows,rd)){
       latestMatchplay={enabled:true,mode:'foursomes',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0};
     }
     const fallbackGroup=(latestMatchplay&&latestMatchplay.enabled&&latestMatchplay.mode==='foursomes')?foursomesFallbackGroup(rd,latestMatchplay):null;
+    if(fallbackGroup){
+      const metaScores=foursomesHoleScoresFromGroupMeta(rdGroups[0]||{});
+      if(Object.keys(metaScores).length&&setHoleScores)setHoleScores(prev=>({...prev,...metaScores}));
+    }
     const userGroup=fallbackGroup||(currentUser&&rdGroups.find(g=>Array.isArray(g.player_ids)&&g.player_ids.includes(currentUser.id)))||rdGroups[0];
     if(userGroup){
       const canScore=(fallbackGroup&&userGroup===fallbackGroup)?!!currentUser:userCanScoreRound(currentUser,userGroup,roundPlayers);
@@ -1355,7 +1360,7 @@ function App(){
     try{
       const rdGroups=(groups||[]).filter(g=>g.round_id===rd.id);
       const g=rdGroups[0]||{id:'group'};
-      const allRows=[...(scores||[]),...(publicScores||[]),...localScoreRowsForRound(rd.id)].filter(r=>r&&r.round_id===rd.id);
+      const allRows=[...(scores||[]),...(publicScores||[]),...foursomesScoreRowsFromGroupMeta(rd.id,g),...localScoreRowsForRound(rd.id)].filter(r=>r&&r.round_id===rd.id);
       const cfg=matchplayConfigFromRows(allRows,rd,g);
       if(!cfg||!cfg.enabled||cfg.mode!=='foursomes')return null;
       const course=(courses||[]).find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee)||{};
@@ -1810,7 +1815,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     try{
       const rdGroups=(groups||[]).filter(g=>g.round_id===rd.id);
       const g=rdGroups[0]||{id:'group'};
-      const allRows=[...(scores||[]),...(publicScores||[]),...localScoreRowsForRound(rd.id)].filter(r=>r&&r.round_id===rd.id);
+      const allRows=[...(scores||[]),...(publicScores||[]),...foursomesScoreRowsFromGroupMeta(rd.id,g),...localScoreRowsForRound(rd.id)].filter(r=>r&&r.round_id===rd.id);
       const cfg=matchplayConfigFromRows(allRows,rd,g);
       if(!cfg||!cfg.enabled||cfg.mode!=='foursomes')return null;
       const course=(courses||[]).find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee)||{};
@@ -2179,6 +2184,85 @@ function foursomesFallbackGroup(round,cfg){
   ];
   return {id:'foursomes',round_id:round&&round.id,group_number:1,player_ids:parts.map(p=>p.id),participants:parts,playing_handicaps:{[MATCHPLAY_FOURSOMES_A]:0,[MATCHPLAY_FOURSOMES_B]:0},_foursomesFallback:true};
 }
+
+function foursomesConfigFromGroupMeta(group){
+  const ph=(group&&group.playing_handicaps)||{};
+  if(!ph.__foursomes_enabled)return null;
+  return {
+    enabled:true,
+    mode:'foursomes',
+    teamA:[],
+    teamB:[],
+    teamAName:String(ph.__foursomes_teamAName||'Team 1'),
+    teamBName:String(ph.__foursomes_teamBName||'Team 2'),
+    teamAShots:Math.max(0,parseInt(ph.__foursomes_teamAShots)||0),
+    teamBShots:Math.max(0,parseInt(ph.__foursomes_teamBShots)||0)
+  };
+}
+function foursomesScoresFromGroupMeta(group){
+  const ph=(group&&group.playing_handicaps)||{};
+  const raw=ph.__foursomes_scores||{};
+  return raw&&typeof raw==='object'?raw:{};
+}
+function foursomesScoreRowsFromGroupMeta(roundId,group){
+  const raw=foursomesScoresFromGroupMeta(group);
+  const rows=[];
+  Object.keys(raw||{}).forEach(h=>{
+    const hole=parseInt(h);
+    if(!hole)return;
+    const rec=raw[h]||{};
+    if(hasEnteredGross(rec.a))rows.push({round_id:roundId,player_id:MATCHPLAY_FOURSOMES_A,hole_number:hole,gross_score:parseInt(rec.a),stableford_points:0,par:4,stroke_index:hole});
+    if(hasEnteredGross(rec.b))rows.push({round_id:roundId,player_id:MATCHPLAY_FOURSOMES_B,hole_number:hole,gross_score:parseInt(rec.b),stableford_points:0,par:4,stroke_index:hole});
+  });
+  return rows;
+}
+function foursomesHoleScoresFromGroupMeta(group){
+  const raw=foursomesScoresFromGroupMeta(group);
+  const map={};
+  Object.keys(raw||{}).forEach(h=>{
+    const hole=parseInt(h);
+    if(!hole)return;
+    const rec=raw[h]||{};
+    if(!map[hole])map[hole]={};
+    if(hasEnteredGross(rec.a))map[hole][MATCHPLAY_FOURSOMES_A]=parseInt(rec.a);
+    if(hasEnteredGross(rec.b))map[hole][MATCHPLAY_FOURSOMES_B]=parseInt(rec.b);
+  });
+  return map;
+}
+async function saveFoursomesConfigToGroupMeta(sb,group,cfg){
+  if(!sb||!group||!group.id||!cfg||cfg.mode!=='foursomes')return {ok:false};
+  const ph={...((group&&group.playing_handicaps)||{})};
+  ph.__foursomes_enabled=1;
+  ph.__foursomes_teamAName=cfg.teamAName||'Team 1';
+  ph.__foursomes_teamBName=cfg.teamBName||'Team 2';
+  ph.__foursomes_teamAShots=Math.max(0,parseInt(cfg.teamAShots)||0);
+  ph.__foursomes_teamBShots=Math.max(0,parseInt(cfg.teamBShots)||0);
+  ph.__foursomes_scores=ph.__foursomes_scores||{};
+  const res=await sb.from('cup_groups').update({playing_handicaps:ph}).eq('id',group.id);
+  if(!res.error)group.playing_handicaps=ph;
+  return {ok:!res.error,error:res.error&&res.error.message};
+}
+async function saveFoursomesScoreToGroupMeta(sb,group,holeNum,pid,gross){
+  if(!sb||!group||!group.id||![MATCHPLAY_FOURSOMES_A,MATCHPLAY_FOURSOMES_B].includes(pid))return {ok:false};
+  let latest=group;
+  try{const r=await sb.from('cup_groups').select('*').eq('id',group.id).single();if(r&&r.data)latest=r.data;}catch(e){}
+  const ph={...((latest&&latest.playing_handicaps)||{})};
+  ph.__foursomes_enabled=1;
+  const cfg=foursomesConfigFromGroupMeta(group)||{};
+  ph.__foursomes_teamAName=ph.__foursomes_teamAName||cfg.teamAName||'Team 1';
+  ph.__foursomes_teamBName=ph.__foursomes_teamBName||cfg.teamBName||'Team 2';
+  ph.__foursomes_teamAShots=ph.__foursomes_teamAShots!=null?ph.__foursomes_teamAShots:(cfg.teamAShots||0);
+  ph.__foursomes_teamBShots=ph.__foursomes_teamBShots!=null?ph.__foursomes_teamBShots:(cfg.teamBShots||0);
+  const scores={...(ph.__foursomes_scores||{})};
+  const h=String(parseInt(holeNum));
+  scores[h]={...(scores[h]||{})};
+  if(pid===MATCHPLAY_FOURSOMES_A)scores[h].a=parseInt(gross);
+  if(pid===MATCHPLAY_FOURSOMES_B)scores[h].b=parseInt(gross);
+  ph.__foursomes_scores=scores;
+  const res=await sb.from('cup_groups').update({playing_handicaps:ph}).eq('id',group.id);
+  if(!res.error)group.playing_handicaps=ph;
+  return {ok:!res.error,error:res.error&&res.error.message};
+}
 function matchplayConfigFromRows(rows,round,group){
   const groupKey=normaliseId((group&&group.id)||(group&&group.group_number)||'group');
   const allParsed=(rows||[]).filter(r=>r&&(!round||r.round_id===round.id)).map(parseMatchplayScoreRow).filter(Boolean).filter(x=>x.enabled);
@@ -2188,8 +2272,9 @@ function matchplayConfigFromRows(rows,round,group){
     if(groupKeys.length===1)parsed=allParsed;
   }
   const meta=matchplayMetaFromRows(rows,round,groupKey);
-  const hasFoursomesScores=hasFoursomesScoreRows(rows,round);
-  const cloud={enabled:parsed.length>0||!!(meta&&meta.mode==='foursomes')||hasFoursomesScores,mode:(meta&&meta.mode)||(hasFoursomesScores?'foursomes':'doubles'),teamA:parsed.filter(x=>x.team==='A').map(x=>x.pid),teamB:parsed.filter(x=>x.team==='B').map(x=>x.pid),teamAName:(meta&&meta.teamAName)||'Team 1',teamBName:(meta&&meta.teamBName)||'Team 2',teamAShots:(meta&&meta.teamAShots)||0,teamBShots:(meta&&meta.teamBShots)||0};
+  const groupMeta=foursomesConfigFromGroupMeta(group);
+  const hasFoursomesScores=hasFoursomesScoreRows(rows,round)||foursomesScoreRowsFromGroupMeta(round&&round.id,group).length>0;
+  const cloud={enabled:parsed.length>0||!!(meta&&meta.mode==='foursomes')||!!groupMeta||hasFoursomesScores,mode:(meta&&meta.mode)||(groupMeta&&groupMeta.mode)||(hasFoursomesScores?'foursomes':'doubles'),teamA:parsed.filter(x=>x.team==='A').map(x=>x.pid),teamB:parsed.filter(x=>x.team==='B').map(x=>x.pid),teamAName:(meta&&meta.teamAName)||(groupMeta&&groupMeta.teamAName)||'Team 1',teamBName:(meta&&meta.teamBName)||(groupMeta&&groupMeta.teamBName)||'Team 2',teamAShots:(meta&&meta.teamAShots)||(groupMeta&&groupMeta.teamAShots)||0,teamBShots:(meta&&meta.teamBShots)||(groupMeta&&groupMeta.teamBShots)||0};
   const local=round&&round.id?loadLocalMatchplayConfig(round.id,groupKey):null;
   const fallback=round&&round._matchplay;
   const cfg=cloud.enabled?{...cloud,...(local&&local.enabled?{teamAName:local.teamAName,teamBName:local.teamBName}: {})}:(local&&local.enabled?local:(fallback&&fallback.enabled?fallback:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0}));
@@ -2638,6 +2723,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
           const mpSave=await saveMatchplayConfigToCloud(rd.id,primaryGroupKey,mp);
           // Also save a generic fallback key so spectator scorecards can show matchplay even before the real group id hydrates.
           if(primaryGroupKey!=='group')await saveMatchplayConfigToCloud(rd.id,'group',mp);
+          if(mp.mode==='foursomes')await saveFoursomesConfigToGroupMeta(sb,createdGroups[0],mp);
           if(!mpSave.ok)flash('Matchplay setting did not sync yet. Tap refresh if it is missing on another device.','error');
         }
       }
@@ -3895,6 +3981,9 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   // ---------------------------------------------------------
   function setScore(holeNum,pid,val){
     saveLocalScore(holeNum,pid,val);
+    if([MATCHPLAY_FOURSOMES_A,MATCHPLAY_FOURSOMES_B].includes(pid)){
+      saveFoursomesScoreToGroupMeta(sb,group,holeNum,pid,val).catch(e=>console.warn('Foursomes spectator sync failed',e));
+    }
     const row=buildScoreRow(holeNum,pid,val);
     setCloudStatus('');
     setCloudError('');
