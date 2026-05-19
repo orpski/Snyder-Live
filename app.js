@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.27
+// SNYDER LIVE v2.28
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -108,12 +108,11 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.27',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.28',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     const res=await fetch(`${SURL}/functions/v1/${SNYDER_NOTIFY_EDGE}`,{
       method:'POST',
       mode:'cors',
-      keepalive:true,
       headers:{'Content-Type':'application/json','apikey':SKEY,'Authorization':'Bearer '+SKEY},
       body:JSON.stringify(body)
     });
@@ -3344,7 +3343,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     }catch(e){/* never block the scorecard for a decorative marker */}
   }
 
-  function setSnakeFromHole(holeNum,pid,checked=true){
+  async function setSnakeFromHole(holeNum,pid,checked=true){
     const groupKey=snakeGroupKey();
     const next={...(currentSnakeMarks()||{})};
     const groupMarks={...((next[groupKey])||{})};
@@ -3352,11 +3351,14 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     else if(normaliseId(groupMarks[holeNum])===normaliseId(pid))delete groupMarks[holeNum];
     next[groupKey]=groupMarks;
     setSnakeMarksSafe(next);
-    saveSnakeMarkToCloud(groupKey,holeNum,pid,checked);
-    saveSnakeFlagsForHole(holeNum,pid,checked);
+    await Promise.allSettled([
+      saveSnakeMarkToCloud(groupKey,holeNum,pid,checked),
+      saveSnakeFlagsForHole(holeNum,pid,checked)
+    ]);
     if(checked&&pid){
       const name=notifyPlayerName(pid);
-      sendSnyderLiveNotification('snake_changed',{roundId:round&&round.id,groupId:groupKey,hole:holeNum,playerId:pid,title:'🐍 Snake is now with '+name,body:notifyRoundName()+' · Hole '+holeNum,playerName:name,roundName:notifyRoundName()});
+      const res=await sendSnyderLiveNotification('snake_changed',{roundId:round&&round.id,groupId:groupKey,hole:holeNum,playerId:pid,title:'🐍 Snake is now with '+name,body:notifyRoundName()+' · Hole '+holeNum,playerName:name,roundName:notifyRoundName()});
+      if(res&&!res.ok)console.warn('Snyder Live snake notification failed',res);
     }
   }
 
@@ -3398,23 +3400,30 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       return notifyPlayerName(p.id)+' '+pts+' pts';
     }).join(' · ');
   }
-  function notifyMaybeBirdie(holeNum,pid,gross){
-    if(!hasEnteredGross(gross)||gross<1)return;
+  async function notifyMaybeBirdie(holeNum,pid,gross){
+    if(!hasEnteredGross(gross)||gross<1)return {ok:true,skipped:true};
     const hd=getHole(holeNum);
     if(Number(gross)===Number(hd.par)-1){
       const name=notifyPlayerName(pid);
-      sendSnyderLiveNotification('birdie',{roundId:round&&round.id,groupId:snakeGroupKey(),hole:holeNum,playerId:pid,title:'🐦 '+name+' birdied '+holeNum,body:notifyRoundName()+' · '+notifyGroupName(),playerName:name,roundName:notifyRoundName()});
+      const res=await sendSnyderLiveNotification('birdie',{roundId:round&&round.id,groupId:snakeGroupKey(),hole:holeNum,playerId:pid,title:'🐦 '+name+' birdied '+holeNum,body:notifyRoundName()+' · '+notifyGroupName(),playerName:name,roundName:notifyRoundName()});
+      if(res&&!res.ok)console.warn('Snyder Live birdie notification failed',res);
+      return res;
     }
+    return {ok:true,skipped:true};
   }
-  function notifyFrontNineIfComplete(updatedScores){
+  async function notifyFrontNineIfComplete(updatedScores){
     const allFront9=Array.from({length:9},(_,i)=>i+1).every(h=>grpPlayers.every(p=>(updatedScores[h]||{})[p.id]!==undefined));
-    if(!allFront9)return;
+    if(!allFront9)return {ok:true,skipped:true};
     const frontHoles=holes.filter(h=>h.hole<=9);
-    sendSnyderLiveNotification('front9_scores',{roundId:round&&round.id,groupId:snakeGroupKey(),hole:9,status:'front9-complete',title:'📊 Front 9 scores are in',body:notifyScoresForHoles(frontHoles),roundName:notifyRoundName(),groupName:notifyGroupName()});
+    const res=await sendSnyderLiveNotification('front9_scores',{roundId:round&&round.id,groupId:snakeGroupKey(),hole:9,status:'front9-complete',title:'📊 Front 9 scores are in',body:notifyScoresForHoles(frontHoles),roundName:notifyRoundName(),groupName:notifyGroupName()});
+    if(res&&!res.ok)console.warn('Snyder Live front 9 notification failed',res);
+    return res;
   }
-  function notifyFinishedScores(){
+  async function notifyFinishedScores(){
     const allHoles=holes.filter(h=>h.hole>=1&&h.hole<=18);
-    sendSnyderLiveNotification('round_finished_scores',{roundId:round&&round.id,groupId:snakeGroupKey(),hole:18,status:'round-finished',title:'🏁 Finished scores are in',body:notifyScoresForHoles(allHoles),roundName:notifyRoundName(),groupName:notifyGroupName()});
+    const res=await sendSnyderLiveNotification('round_finished_scores',{roundId:round&&round.id,groupId:snakeGroupKey(),hole:18,status:'round-finished',title:'🏁 Finished scores are in',body:notifyScoresForHoles(allHoles),roundName:notifyRoundName(),groupName:notifyGroupName()});
+    if(res&&!res.ok)console.warn('Snyder Live finished-round notification failed',res);
+    return res;
   }
 
   async function saveCompletedHoleToCloud(holeNum,holeMap){
@@ -3453,7 +3462,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   function setScore(holeNum,pid,val){
     saveLocalScore(holeNum,pid,val);
     const row=buildScoreRow(holeNum,pid,val);
-    notifyMaybeBirdie(holeNum,pid,val);
     setCloudStatus('');
     setCloudError('');
     saveScoreRowToCloud(sb,row)
@@ -3478,6 +3486,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           return [...filtered,row];
         });
         setLastRefreshed(new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
+        notifyMaybeBirdie(holeNum,pid,val);
         if(load)setTimeout(()=>load(),300);
       })
       .catch(e=>{
@@ -3492,7 +3501,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           grpPlayers.every(p=>(updated[h]||{})[p.id]!==undefined)
         );
         if(allFront9){
-          notifyFrontNineIfComplete(updated);
+          notifyFrontNineIfComplete(updated).catch(e=>console.warn('Snyder Live front 9 notification error',e));
           setTimeout(()=>setShowReview(true),600);
         }
       }
@@ -3720,7 +3729,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(!synced&&!window.confirm('Scores did not sync to cloud. Finish anyway? Other players may not see them.'))return;
     const {error}=await sb.from('cup_rounds').update({status:'complete'}).eq('id',round.id);
     if(error){flash(error.message||'Could not finish round','error');return;}
-    notifyFinishedScores();
+    await notifyFinishedScores();
     round.status='complete';
     await load();
     setShowEnd(false);
@@ -4366,7 +4375,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           if(!synced&&!window.confirm('Scores did not sync to cloud. Finish anyway? Other players may not see them.'))return;
           const{error}=await sb.from('cup_rounds').update({status:'complete'}).eq('id',round.id);
           if(error){flash(error.message||'Could not finish round','error');return;}
-          notifyFinishedScores();
+          await notifyFinishedScores();
           round.status='complete';
           await load();
           setEndStep(1);setShowEnd(true);
