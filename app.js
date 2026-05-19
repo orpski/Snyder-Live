@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.44
+// SNYDER LIVE v2.45
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -110,7 +110,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.44',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.45',createdAt:new Date().toISOString(),...(payload||{})};
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const controller=new AbortController();
@@ -1787,6 +1787,49 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     }catch(e){}
     return Object.keys(totals).map(pid=>({id:pid,name:nameMap[pid]||getDisplayName(pid),total:totals[pid]||0,holes:holes[pid]?holes[pid].size:0,_holePoints:holePoints[pid]||{}})).sort(compareStablefordLeaderboardRows);
   }
+  function foursomesMatchplaySummaryForLiveRound(rd){
+    try{
+      const rdGroups=(groups||[]).filter(g=>g.round_id===rd.id);
+      const g=rdGroups[0]||{id:'group'};
+      const allRows=[...(scores||[]),...(publicScores||[])].filter(r=>r&&r.round_id===rd.id);
+      const cfg=matchplayConfigFromRows(allRows,rd,g);
+      if(!cfg||!cfg.enabled||cfg.mode!=='foursomes')return null;
+      const course=(courses||[]).find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee)||{};
+      const ch=Array.isArray(course.holes)?course.holes:[];
+      const holeList=ch.length?ch:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1}));
+      const map={};
+      allRows.filter(r=>!isMetaScoreRow(r)).forEach(r=>{
+        if(r.player_id!==MATCHPLAY_FOURSOMES_A&&r.player_id!==MATCHPLAY_FOURSOMES_B)return;
+        const h=parseInt(r.hole_number);
+        if(!map[h])map[h]={};
+        map[h][r.player_id]=r.gross_score;
+      });
+      let lead=0,played=0,lastHole=0;
+      holeList.filter(h=>parseInt(h.hole)>=1&&parseInt(h.hole)<=18).forEach(hd=>{
+        const h=parseInt(hd.hole);
+        const a=(map[h]||{})[MATCHPLAY_FOURSOMES_A];
+        const b=(map[h]||{})[MATCHPLAY_FOURSOMES_B];
+        if(!hasEnteredGross(a)||!hasEnteredGross(b))return;
+        const si=parseInt(hd.stroke_index)||h;
+        const aNet=(parseInt(a)||0)-((parseInt(cfg.teamAShots)||0)>=si?1:0);
+        const bNet=(parseInt(b)||0)-((parseInt(cfg.teamBShots)||0)>=si?1:0);
+        if(aNet<bNet)lead+=1;
+        else if(bNet<aNet)lead-=1;
+        played+=1;lastHole=h;
+      });
+      const aName=cfg.teamAName||'Team 1';
+      const bName=cfg.teamBName||'Team 2';
+      const remaining=Math.max(0,18-played);
+      const abs=Math.abs(lead);
+      let label='A/S',sub=played?'Thru '+lastHole:'Not started yet';
+      if(played&&lead!==0){
+        const leader=lead>0?aName:bName;
+        if(abs>remaining){label=leader+' win '+abs+'&'+remaining;sub='Match finished';}
+        else {label=leader+' '+abs+'UP';sub='Thru '+lastHole;}
+      }
+      return {mode:'foursomes',aName,bName,label,sub,lead,played,teamAShots:parseInt(cfg.teamAShots)||0,teamBShots:parseInt(cfg.teamBShots)||0};
+    }catch(e){return null;}
+  }
   function CompletedCard({rd}){
     return(
       <div style={{...S.card,...NO_SELECT,marginBottom:8,cursor:'pointer',opacity:0.9}} onClick={()=>openRound(rd)}>
@@ -1817,7 +1860,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
           </div>
           :liveRounds.map(rd=>{
             const rdGroups=groups.filter(g=>g.round_id===rd.id);
-            const mp=foursomesMatchplaySummaryForRound(rd);
+            const mp=foursomesMatchplaySummaryForLiveRound(rd);
             const board=mp?[]:leaderboardForRound(rd);
             return(
               <div key={rd.id} style={{...S.card,...NO_SELECT,marginBottom:16,cursor:'pointer',borderColor:'rgba(239,68,68,0.3)'}} onClick={()=>openRound(rd)}>
