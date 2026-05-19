@@ -1,31 +1,13 @@
-// SNYDER LIVE v2.61 service worker
-const CACHE_NAME = "snyder-live-v2-61";
+// SNYDER LIVE v2.55 service worker
+const CACHE_NAME = "snyder-live-v2-55";
 const ASSETS = ['./','./index.html','./styles.css','./app.js','./manifest-live.json','./icon-live-192.png','./icon-live-512.png','./notification-badge-v2.png','./course-whitley-bay.png','./course-tynemouth.svg','./course-quinta-do-lago.png','./course-ombria.png'];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.map(key => key !== CACHE_NAME ? caches.delete(key) : null))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', event => { if (event.request.method !== 'GET') return; event.respondWith(fetch(event.request).then(response => { const clone = response.clone(); caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone)); return response; }).catch(() => caches.match(event.request).then(cached => cached || caches.match('./index.html')))); });
-async function mutedRoundIds(){
-  try{
-    const cache=await caches.open(CACHE_NAME);
-    const res=await cache.match('./muted-scorecard-notifications.json');
-    if(!res)return [];
-    const data=await res.json();
-    return Array.isArray(data.roundIds)?data.roundIds.map(String):[];
-  }catch(e){return [];}
-}
-self.addEventListener('message', event => {
-  const data=event.data||{};
-  if(data.type!=='snyder-live-muted-rounds')return;
-  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.put('./muted-scorecard-notifications.json',new Response(JSON.stringify({roundIds:(data.roundIds||[]).map(String)}),{headers:{'Content-Type':'application/json'}}))));
-});
 
 self.addEventListener('push', event => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) { data = { title: 'Snyder Live', body: event.data ? event.data.text() : '' }; }
-  event.waitUntil((async()=>{
-  const roundId=(data.roundId)||(data.data&&data.data.roundId);
-  const muted=await mutedRoundIds();
-  if(roundId&&muted.includes(String(roundId)))return;
   const title = data.title || 'Snyder Live';
   const options = {
     body: data.body || '',
@@ -37,8 +19,7 @@ self.addEventListener('push', event => {
     timestamp: Date.now(),
     data: data.data || { url: './', app: 'snyder-live' }
   };
-  await self.registration.showNotification(title, options);
-  })());
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 self.addEventListener('notificationclick', event => {
   event.notification.close();
