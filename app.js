@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.65
+// SNYDER LIVE v2.66
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1858,34 +1858,45 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                 {mp? <>
                   {(()=>{
                     const leadTeam=mp.lead>0?'A':mp.lead<0?'B':'tie';
-                    const upText=mp.lead===0?'A/S':(mp.isFinished?mp.label:(Math.abs(mp.lead)+' UP'));
+                    const upText=mp.lead===0?'A/S':(mp.isFinished?mp.label.replace(mp.aName,'').replace(mp.bName,'').replace('win','').trim():(Math.abs(mp.lead)+' UP'));
                     const aPlayers=(mp.teamA&&mp.teamA.length?mp.teamA.map(getDisplayName):[mp.aName]).filter(Boolean);
                     const bPlayers=(mp.teamB&&mp.teamB.length?mp.teamB.map(getDisplayName):[mp.bName]).filter(Boolean);
-                    const bg=leadTeam==='A'?'linear-gradient(135deg,rgba(251,191,36,0.24),rgba(255,255,255,0.06))':leadTeam==='B'?'linear-gradient(135deg,rgba(0,112,187,0.32),rgba(255,255,255,0.06))':'linear-gradient(135deg,rgba(255,255,255,0.08),rgba(96,184,240,0.12))';
+                    const aScore=leadTeam==='A'?upText:'';
+                    const bScore=leadTeam==='B'?upText:'';
+                    const centerScore=leadTeam==='tie'?upText:'';
+                    const bg=leadTeam==='A'?'linear-gradient(90deg,rgba(251,191,36,0.28),rgba(255,255,255,0.06) 48%,rgba(0,112,187,0.10))':leadTeam==='B'?'linear-gradient(90deg,rgba(251,191,36,0.10),rgba(255,255,255,0.06) 52%,rgba(0,112,187,0.34))':'linear-gradient(135deg,rgba(255,255,255,0.08),rgba(96,184,240,0.12))';
                     return <>
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}>
                         <div style={{fontSize:10,color:'#fbbf24',letterSpacing:'0.14em',fontWeight:900}}>FOURSOMES MATCHPLAY</div>
                         <div style={{fontSize:10,color:'#d4af37',fontWeight:950,letterSpacing:'0.08em'}}>{mp.isFinished?'FINISHED':'LIVE'}</div>
                       </div>
-                      <div style={{marginBottom:10,padding:'12px',borderRadius:16,border:'1px solid '+(leadTeam==='A'?'rgba(251,191,36,0.42)':leadTeam==='B'?'rgba(96,184,240,0.46)':'rgba(255,255,255,0.14)'),background:bg,boxShadow:'inset 0 0 0 1px rgba(255,255,255,0.04)'}}>
-                        <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) 72px minmax(0,1fr)',gap:8,alignItems:'stretch'}}>
-                          <div style={{padding:'10px 9px',borderRadius:13,background:leadTeam==='A'?'rgba(251,191,36,0.18)':'rgba(255,255,255,0.055)',border:'1px solid '+(leadTeam==='A'?'rgba(251,191,36,0.34)':'rgba(255,255,255,0.08)'),minWidth:0}}>
-                            <div style={{fontSize:13,color:'#fbbf24',fontWeight:950,whiteSpace:'normal',overflowWrap:'anywhere',lineHeight:1.12}}>{mp.aName}</div>
-                            <div style={{display:'flex',flexDirection:'column',gap:3,marginTop:7}}>{aPlayers.map((nm,i)=><div key={i} style={{fontSize:11,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nm}</div>)}</div>
-                            <div style={{fontSize:10,color:'#90ccf0',fontWeight:800,marginTop:7}}>{mp.teamAShots?mp.teamAShots+' shots':'No shots'}</div>
+                      <div style={{marginBottom:10,padding:'12px',borderRadius:16,border:'1px solid '+(leadTeam==='A'?'rgba(251,191,36,0.48)':leadTeam==='B'?'rgba(96,184,240,0.50)':'rgba(255,255,255,0.14)'),background:bg,boxShadow:'inset 0 0 0 1px rgba(255,255,255,0.04)'}}>
+                        <div style={{display:'grid',gridTemplateColumns:'62px minmax(0,1fr) 62px',gap:8,alignItems:'center'}}>
+                          <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:14,background:leadTeam==='A'?'rgba(251,191,36,0.25)':'rgba(255,255,255,0.045)',border:'1px solid '+(leadTeam==='A'?'rgba(251,191,36,0.45)':'rgba(255,255,255,0.08)')}}>
+                            <div style={{fontSize:aScore?20:11,color:aScore?'#fff':'rgba(255,255,255,0.22)',fontWeight:950,lineHeight:0.95,textAlign:'center',letterSpacing:'-0.04em'}}>{aScore||'—'}</div>
                           </div>
-                          <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',textAlign:'center'}}>
-                            <div style={{fontSize:leadTeam==='tie'?24:25,color:'#fff',fontWeight:950,lineHeight:1,letterSpacing:'-0.03em'}}>{upText}</div>
-                            <div style={{fontSize:10,color:'#90ccf0',fontWeight:900,marginTop:5,lineHeight:1.1}}>{leadTeam==='tie'?mp.sub:(leadTeam==='A'?mp.aName:mp.bName)}</div>
-                            <div style={{fontSize:9,color:'rgba(255,255,255,0.42)',fontWeight:800,marginTop:6}}>v</div>
+                          <div style={{minWidth:0}}>
+                            <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) 28px minmax(0,1fr)',gap:8,alignItems:'stretch'}}>
+                              <div style={{padding:'9px 8px',borderRadius:13,background:leadTeam==='A'?'rgba(251,191,36,0.17)':'rgba(255,255,255,0.055)',border:'1px solid '+(leadTeam==='A'?'rgba(251,191,36,0.34)':'rgba(255,255,255,0.08)'),minWidth:0,textAlign:'center'}}>
+                                <div style={{fontSize:10,color:'#fbbf24',fontWeight:950,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginBottom:6}}>{mp.aName}</div>
+                                <div style={{display:'flex',flexDirection:'column',gap:3}}>{aPlayers.map((nm,i)=><div key={i} style={{fontSize:12,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nm}</div>)}</div>
+                              </div>
+                              <div style={{display:'flex',alignItems:'center',justifyContent:'center',textAlign:'center'}}>
+                                <div>
+                                  <div style={{fontSize:centerScore?20:10,color:centerScore?'#fff':'rgba(255,255,255,0.45)',fontWeight:950,lineHeight:1}}>{centerScore||'v'}</div>
+                                </div>
+                              </div>
+                              <div style={{padding:'9px 8px',borderRadius:13,background:leadTeam==='B'?'rgba(0,112,187,0.25)':'rgba(255,255,255,0.055)',border:'1px solid '+(leadTeam==='B'?'rgba(96,184,240,0.40)':'rgba(255,255,255,0.08)'),minWidth:0,textAlign:'center'}}>
+                                <div style={{fontSize:10,color:'#60b8f0',fontWeight:950,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginBottom:6}}>{mp.bName}</div>
+                                <div style={{display:'flex',flexDirection:'column',gap:3}}>{bPlayers.map((nm,i)=><div key={i} style={{fontSize:12,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nm}</div>)}</div>
+                              </div>
+                            </div>
                           </div>
-                          <div style={{padding:'10px 9px',borderRadius:13,background:leadTeam==='B'?'rgba(0,112,187,0.24)':'rgba(255,255,255,0.055)',border:'1px solid '+(leadTeam==='B'?'rgba(96,184,240,0.40)':'rgba(255,255,255,0.08)'),minWidth:0,textAlign:'right'}}>
-                            <div style={{fontSize:13,color:'#60b8f0',fontWeight:950,whiteSpace:'normal',overflowWrap:'anywhere',lineHeight:1.12}}>{mp.bName}</div>
-                            <div style={{display:'flex',flexDirection:'column',gap:3,marginTop:7}}>{bPlayers.map((nm,i)=><div key={i} style={{fontSize:11,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nm}</div>)}</div>
-                            <div style={{fontSize:10,color:'#90ccf0',fontWeight:800,marginTop:7}}>{mp.teamBShots?mp.teamBShots+' shots':'No shots'}</div>
+                          <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:14,background:leadTeam==='B'?'rgba(0,112,187,0.32)':'rgba(255,255,255,0.045)',border:'1px solid '+(leadTeam==='B'?'rgba(96,184,240,0.46)':'rgba(255,255,255,0.08)')}}>
+                            <div style={{fontSize:bScore?20:11,color:bScore?'#fff':'rgba(255,255,255,0.22)',fontWeight:950,lineHeight:0.95,textAlign:'center',letterSpacing:'-0.04em'}}>{bScore||'—'}</div>
                           </div>
                         </div>
-                        <div style={{marginTop:9,textAlign:'center',fontSize:11,color:'#90ccf0',fontWeight:850}}>{leadTeam==='tie'?mp.label+' · '+mp.sub:mp.sub}</div>
+                        <div style={{marginTop:8,textAlign:'center',fontSize:11,color:'#90ccf0',fontWeight:850}}>{mp.isFinished?'Match finished':mp.sub}</div>
                       </div>
                     </>;
                   })()}
