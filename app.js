@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.57
+// SNYDER LIVE v2.58
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -3260,9 +3260,31 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   function realCloudGroupForFoursomesSync(){
     return [activeScoreGroup,group,...(allGroups||[])].find(g=>g&&g.id&&g.id!=='foursomes'&&g.id!=='round_players'&&!g._foursomesFallback&&!g._roundPlayersFallback);
   }
+  function visibleFoursomesScoreRows(){
+    const rows=[];
+    Object.keys(holeScores||{}).forEach(h=>{
+      const holeNum=parseInt(h);
+      if(!holeNum)return;
+      Object.keys((holeScores||{})[h]||{}).forEach(pid=>{
+        const cleanPid=canonicalFoursomesPlayerId(pid);
+        const gross=(holeScores[h]||{})[pid];
+        if(!isFoursomesTeamPlayerId(cleanPid)||!hasEnteredGross(gross))return;
+        rows.push({round_id:round&&round.id,player_id:cleanPid,hole_number:holeNum,gross_score:gross,stableford_points:0,par:(getHole(holeNum).par||4),stroke_index:(getHole(holeNum).stroke_index||holeNum)});
+      });
+    });
+    return rows;
+  }
+  function foursomesRowsToSync(){
+    const byKey={};
+    [...localFoursomesScoreRowsForRound(round&&round.id),...visibleFoursomesScoreRows()].forEach(r=>{
+      if(!r||!r.round_id||!r.player_id||!r.hole_number)return;
+      byKey[normaliseId(r.player_id)+'_'+r.hole_number]={...r,player_id:canonicalFoursomesPlayerId(r.player_id),stableford_points:0};
+    });
+    return Object.values(byKey);
+  }
   async function syncLocalFoursomesScoresToCloud(reason){
     if(!round||!round.id||!canEdit||!isFoursomesScorecard)return;
-    const rows=localFoursomesScoreRowsForRound(round.id);
+    const rows=foursomesRowsToSync();
     if(!rows.length)return;
     const sig=rows.map(r=>[r.hole_number,r.player_id,r.gross_score].join(':')).sort().join('|');
     if(localFoursomesSyncRef.current===sig)return;
@@ -3402,6 +3424,12 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   useEffect(()=>{
     syncLocalFoursomesScoresToCloud('scorecard-open');
   },[round&&round.id,canEdit,isFoursomesScorecard,activeGroupId,allGroups&&allGroups.length]);
+
+  useEffect(()=>{
+    if(!isFoursomesScorecard||!canEdit)return;
+    const t=setTimeout(()=>syncLocalFoursomesScoresToCloud('visible-score-change'),700);
+    return()=>clearTimeout(t);
+  },[round&&round.id,canEdit,isFoursomesScorecard,JSON.stringify(holeScores||{})]);
 
   async function refreshScoresFromCloud(showMessage=true){
     if(!round||!round.id||refreshing)return;
@@ -4524,11 +4552,23 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       for(const[hNum,pMap]of Object.entries(holeScores)){
         for(const[pid,gross]of Object.entries(pMap)){
           if(gross===undefined||gross===null)continue;
-          rows.push(buildScoreRow(parseInt(hNum),pid,gross));
+          rows.push(buildScoreRow(parseInt(hNum),canonicalFoursomesPlayerId(pid),gross));
         }
       }
       const result=await saveScoreRowsToCloud(sb,rows);
       if(!result.ok)failed.push(result.error||'Unknown cloud save error');
+      if(isFoursomesScorecard){
+        const foursomesRows=foursomesRowsToSync();
+        const fr=await saveScoreRowsToCloud(sb,foursomesRows);
+        if(!fr.ok)failed.push(fr.error||'Foursomes cloud save error');
+        const cloudGroup=realCloudGroupForFoursomesSync();
+        if(cloudGroup){
+          for(const row of foursomesRows){
+            const gm=await saveFoursomesScoreToGroupMeta(sb,cloudGroup,row.hole_number,row.player_id,row.gross_score);
+            if(gm&&!gm.ok)failed.push(gm.error||'Foursomes group metadata save error');
+          }
+        }
+      }
       if(failed.length){
         const msg=failed[0];
         setCloudStatus('Some scores are only saved on this phone');
