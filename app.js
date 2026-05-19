@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.37
+// SNYDER LIVE v2.38
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -110,7 +110,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.37',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.38',createdAt:new Date().toISOString(),...(payload||{})};
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const controller=new AbortController();
@@ -2414,7 +2414,10 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       if(setup.matchplay&&setup.matchplay.enabled&&createdGroups&&createdGroups[0]){
         const mp=cleanMatchplaySetup(setup.matchplay,groupBuckets[0]||[]);
         if(mp.teamA.length&&mp.teamB.length){
-          const mpSave=await saveMatchplayConfigToCloud(rd.id,normaliseId(createdGroups[0].id||createdGroups[0].group_number||'group'),mp);
+          const primaryGroupKey=normaliseId(createdGroups[0].id||createdGroups[0].group_number||'group');
+          const mpSave=await saveMatchplayConfigToCloud(rd.id,primaryGroupKey,mp);
+          // Also save a generic fallback key so spectator scorecards can show matchplay even before the real group id hydrates.
+          if(primaryGroupKey!=='group')await saveMatchplayConfigToCloud(rd.id,'group',mp);
           if(!mpSave.ok)flash('Matchplay setting did not sync yet. Tap refresh if it is missing on another device.','error');
         }
       }
@@ -3774,6 +3777,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   }
 
   function sweepstakePlayerRows(opts={}){
+    const forceEnabled=!!(opts&&opts.forceEnabled);
     const amountPence=parseInt(sweepstakeConfig&&sweepstakeConfig.amountPence)||200;
     const scope=(sweepstakeConfig&&sweepstakeConfig.scope)==='group'?'group':'round';
     const throughHole=opts&&opts.throughHole!=null?parseInt(opts.throughHole):currentSweepstakeThroughHole();
@@ -3839,10 +3843,10 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       if(debtors[i].remaining<=0)i++;
       if(creditors[j].remaining<=0)j++;
     }
-    return {enabled:!!(sweepstakeConfig&&sweepstakeConfig.enabled)&&!round._cupScoring,amountPence,scope,pots:potRows,rows,payments,totalEntry:amountPence*3,playerCount:sweepPlayers.length,throughHole:safeThrough,final};
+    return {enabled:(!!(sweepstakeConfig&&sweepstakeConfig.enabled)||forceEnabled)&&!round._cupScoring,amountPence,scope,pots:potRows,rows,payments,totalEntry:amountPence*3,playerCount:sweepPlayers.length,throughHole:safeThrough,final};
   }
-  function SweepstakePanel({compact=false,throughHole=null,reviewTitle='',payUp=false}){
-    const sw=sweepstakePlayerRows({throughHole});
+  function SweepstakePanel({compact=false,throughHole=null,reviewTitle='',payUp=false,forceEnabled=false}){
+    const sw=sweepstakePlayerRows({throughHole,forceEnabled});
     if(!sw.enabled)return null;
     const title=reviewTitle||'💰 Sweepstake';
     return <div style={{...S.card,margin:compact?'0 0 10px':16,background:payUp?'linear-gradient(135deg,rgba(245,158,11,0.30),rgba(10,21,40,0.96))':'linear-gradient(135deg,rgba(245,158,11,0.18),rgba(255,255,255,0.05))',borderColor:'rgba(245,158,11,0.55)',boxShadow:payUp?'0 14px 36px rgba(245,158,11,0.18)':'none'}}>
@@ -3870,9 +3874,15 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   function matchplayTeamName(ids){return (ids||[]).map(matchplayPlayerName).filter(Boolean).join(' & ');}
   function matchplayState(){
     const cfg=matchplayConfig||{};
-    const teamA=(cfg.teamA||[]).map(normaliseId).filter(Boolean);
-    const teamB=(cfg.teamB||[]).map(normaliseId).filter(Boolean);
-    if(!cfg.enabled||!teamA.length||!teamB.length||round._cupScoring)return null;
+    let teamA=(cfg.teamA||[]).map(normaliseId).filter(Boolean);
+    let teamB=(cfg.teamB||[]).map(normaliseId).filter(Boolean);
+    // Spectator fallback: if the matchplay setup row is missing/late but this is a 4-ball spectator card,
+    // use the visible player order (first two vs last two) so the casual matchplay score is not hidden.
+    if((!cfg.enabled||!teamA.length||!teamB.length)&&round&&round._spectator&&!round._cupScoring&&(grpPlayers||[]).length===4){
+      teamA=[normaliseId(grpPlayers[0].id),normaliseId(grpPlayers[1].id)];
+      teamB=[normaliseId(grpPlayers[2].id),normaliseId(grpPlayers[3].id)];
+    }
+    if(!teamA.length||!teamB.length||round._cupScoring)return null;
     let lead=0,played=0,lastHole=0;
     const holeRows=[];
     holes.filter(h=>h.hole>=1&&h.hole<=18).forEach(hd=>{
@@ -3956,7 +3966,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           <div style={{fontSize:24,color:'#60b8f0',fontWeight:950,lineHeight:1}}>{r.total} <span style={{fontSize:10,color:'#90ccf0',fontWeight:900}}>pts</span></div>
         </div>)}
       </div>
-      <SweepstakePanel throughHole={18} reviewTitle="💰 SWEEPSTAKE - WHO PAYS WHO" payUp={true}/>
+      <SweepstakePanel throughHole={18} reviewTitle="💰 SWEEPSTAKE - WHO PAYS WHO" payUp={true} forceEnabled={!!round._spectator}/>
     </div>;
   }
 
@@ -4527,7 +4537,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
                 <div style={{fontSize:24,color:'#60b8f0',fontWeight:950,lineHeight:1}}>{r.total} <span style={{fontSize:10,color:'#90ccf0',fontWeight:900}}>pts</span></div>
               </div>)}
             </div>
-            <SweepstakePanel throughHole={18} reviewTitle="💰 SWEEPSTAKE - WHO PAYS WHO" payUp={true}/>
+            <SweepstakePanel throughHole={18} reviewTitle="💰 SWEEPSTAKE - WHO PAYS WHO" payUp={true} forceEnabled={!!round._spectator}/>
           </div>
         )}
       </div> : <>
