@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.31
+// SNYDER LIVE v2.34
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -110,7 +110,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.33',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.34',createdAt:new Date().toISOString(),...(payload||{})};
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const controller=new AbortController();
@@ -970,14 +970,9 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
 // Top-level state, routing, data loading and dashboard rendering
 // =========================================================
 function App(){
-  useEffect(()=>{
-    const el=document.getElementById('boot-splash');
-    if(el){
-      el.classList.add('boot-splash-hide');
-      setTimeout(()=>{try{el.remove();}catch(e){}},220);
-    }
-  },[]);
-  const[splash,setSplash]=useState(false);
+  // v2.34: no startup splash/loading gate. Render the app immediately.
+  const splash=false;
+  const setSplash=()=>{};
   const[view,setViewRaw]=useState('home');
   const[toast,setToast]=useState(null);
   const[notifPermission,setNotifPermission]=useState(('Notification' in window)?Notification.permission:'unsupported');
@@ -1368,16 +1363,6 @@ function App(){
         <span style={{fontSize:15}}>{homeRefreshing?'⟳':homePull>76?'↻':'↓'}</span>
         <span>{homeRefreshing?'Refreshing '+pullLabel:homePull>76?'Release to refresh':'Pull down to refresh'}</span>
       </div>
-    </div>
-  );
-
-  if(splash)return(
-    <div className="quick-splash">
-      <div className="quick-splash-ring">
-        <img src={LOGO} alt="Snyder Live" className="quick-splash-logo"/>
-      </div>
-      <div className="quick-splash-text">SNYDER LIVE</div>
-      <div className="quick-splash-sub">Live golf scoring</div>
     </div>
   );
 
