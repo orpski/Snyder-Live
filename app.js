@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.42
+// SNYDER LIVE v2.43
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -110,7 +110,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.42',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.43',createdAt:new Date().toISOString(),...(payload||{})};
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const controller=new AbortController();
@@ -2577,11 +2577,8 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   // ---------------------------------------------------------
   if(step==='playerCount'){
     const options=[
-      {key:'1-4',title:'1 group',sub:'Normal Stableford scoring for 1-4 players'},
-      {key:'5-8',title:'Groups',sub:'Multi-group round - choose 5-8 players first'},
-      {key:'9-12',title:'Groups - 9-12 players',sub:'Three live groups'},
-      {key:'more',title:'Groups - more',sub:'More than three groups'},
-      {key:'foursomes',title:'Foursomes matchplay',sub:'Alternate shots: 2 team scores only, optional team shots'},
+      {key:'1-4',title:'Round for 4',sub:'Single group scoring for 1-4 players. Choose normal, doubles matchplay side game, or foursomes on the next screen.'},
+      {key:'5-8',title:'Groups',sub:'Multi-group round. Choose this for more than one group.'},
     ];
     return(
       <div style={{minHeight:'100vh',paddingBottom:40}}>
@@ -2590,9 +2587,9 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
           <div style={{fontSize:16,color:'#fff'}}>Choose round mode</div>
         </div>
         <div style={{padding:16}}>
-          <div style={{fontSize:13,color:'#90ccf0',marginBottom:12}}>Choose a normal round, multi-group round, or foursomes matchplay.</div>
+          <div style={{fontSize:13,color:'#90ccf0',marginBottom:12}}>Choose a single group round or a multi-group round. Foursomes is available at the top of the single group setup screen.</div>
           {options.map(o=>(
-            <div key={o.key} onClick={()=>{if(o.key==='foursomes'){setPlayerRange('1-4');resetGroupsForRange('1-4');setSetup(q=>({...q,matchplay:{...(q.matchplay||{}),enabled:true,mode:'foursomes',teamAName:(q.matchplay&&q.matchplay.teamAName)||'Team 1',teamBName:(q.matchplay&&q.matchplay.teamBName)||'Team 2',teamAShots:(q.matchplay&&q.matchplay.teamAShots)||0,teamBShots:(q.matchplay&&q.matchplay.teamBShots)||0}}));}else{setPlayerRange(o.key);resetGroupsForRange(o.key);setSetup(q=>({...q,matchplay:{...(q.matchplay||{}),enabled:false,mode:'doubles'}}));}setStep('setup');}} style={{...S.card,marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,border:o.key==='foursomes'?'1px solid rgba(251,191,36,0.35)':'1px solid rgba(255,255,255,0.08)',background:o.key==='foursomes'?'rgba(251,191,36,0.10)':'rgba(255,255,255,0.05)'}}>
+            <div key={o.key} onClick={()=>{setPlayerRange(o.key);resetGroupsForRange(o.key);setSetup(q=>({...q,matchplay:{...(q.matchplay||{}),enabled:false,mode:'doubles'}}));setStep('setup');}} style={{...S.card,marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,border:'1px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.05)'}}>
               <div>
                 <div style={{fontSize:18,color:'#fff',fontWeight:800}}>{o.title}</div>
                 <div style={{fontSize:12,color:'#60b8f0',marginTop:2}}>{o.sub}</div>
@@ -2708,24 +2705,15 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
                 {(setup.matchplay&&setup.matchplay.mode)==='foursomes'&&<>
                   <input value={(setup.matchplay&&setup.matchplay.teamAName)||''} onChange={e=>updateMatchplayField('teamAName',e.target.value)} placeholder='Team 1 name, e.g. Paolo & James' style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}/>
                   <input value={(setup.matchplay&&setup.matchplay.teamBName)||''} onChange={e=>updateMatchplayField('teamBName',e.target.value)} placeholder="Team 2 name, e.g. The Reids" style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}/>
-                  <div style={{gridColumn:'1 / -1',display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:7}}>
-                    {[
-                      {key:'none',label:'No shots'},
-                      {key:'A',label:((setup.matchplay&&setup.matchplay.teamAName)||'Team 1')+' shots'},
-                      {key:'B',label:((setup.matchplay&&setup.matchplay.teamBName)||'Team 2')+' shots'}
-                    ].map(opt=>{
-                      const active=(parseInt(setup.matchplay&&setup.matchplay.teamAShots)||0)>0?'A':((parseInt(setup.matchplay&&setup.matchplay.teamBShots)||0)>0?'B':'none');
-                      return <button key={opt.key} onClick={()=>setSetup(q=>{const clean=cleanMatchplaySetup(q.matchplay||{},participants);const n=opt.key==='none'?0:Math.max(parseInt(clean.teamAShots)||0,parseInt(clean.teamBShots)||0,1);return {...q,matchplay:{...clean,enabled:true,mode:'foursomes',teamAShots:opt.key==='A'?n:0,teamBShots:opt.key==='B'?n:0}};})} style={{border:'1px solid '+(active===opt.key?'rgba(251,191,36,0.65)':'rgba(255,255,255,0.12)'),background:active===opt.key?'rgba(251,191,36,0.20)':'rgba(255,255,255,0.06)',color:active===opt.key?'#fbbf24':'#fff',borderRadius:10,padding:'9px 5px',fontSize:11,fontWeight:950}}>{opt.label}</button>;
-                    })}
-                  </div>
-                  <div style={{gridColumn:'1 / -1',display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:6,marginTop:2}}>
-                    {Array.from({length:19},(_,i)=>i).map(n=>{
-                      const activeShots=Math.max(parseInt(setup.matchplay&&setup.matchplay.teamAShots)||0,parseInt(setup.matchplay&&setup.matchplay.teamBShots)||0);
-                      const isActive=activeShots===n;
-                      return <button key={n} onClick={()=>setSetup(q=>{const clean=cleanMatchplaySetup(q.matchplay||{},participants);let receiver=(parseInt(clean.teamAShots)||0)>0?'A':((parseInt(clean.teamBShots)||0)>0?'B':'none');if(n===0)receiver='none';if(n>0&&receiver==='none')receiver='B';return {...q,matchplay:{...clean,enabled:true,mode:'foursomes',teamAShots:receiver==='A'?n:0,teamBShots:receiver==='B'?n:0}};})} style={{border:'1px solid '+(isActive?'rgba(96,184,240,0.70)':'rgba(255,255,255,0.12)'),background:isActive?'rgba(0,112,187,0.42)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:9,padding:'8px 0',fontSize:12,fontWeight:950}}>{n}</button>;
-                    })}
-                  </div>
-                  <div style={{gridColumn:'1 / -1',fontSize:11,color:'rgba(255,255,255,0.72)',lineHeight:1.35}}>Choose the team receiving shots, then tap the whole-number shot allowance. Use 0 for a scratch match.</div>
+                  <select value={(parseInt(setup.matchplay&&setup.matchplay.teamAShots)||0)>0?'A':((parseInt(setup.matchplay&&setup.matchplay.teamBShots)||0)>0?'B':'none')} onChange={e=>setSetup(q=>{const clean=cleanMatchplaySetup(q.matchplay||{},participants);const receiver=e.target.value;const current=Math.max(parseInt(clean.teamAShots)||0,parseInt(clean.teamBShots)||0,receiver==='none'?0:1);return {...q,matchplay:{...clean,enabled:true,mode:'foursomes',teamAShots:receiver==='A'?current:0,teamBShots:receiver==='B'?current:0}};})} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}>
+                    <option value="none">No shots given</option>
+                    <option value="A">{((setup.matchplay&&setup.matchplay.teamAName)||'Team 1')} get shots</option>
+                    <option value="B">{((setup.matchplay&&setup.matchplay.teamBName)||'Team 2')} get shots</option>
+                  </select>
+                  <select value={Math.max(parseInt(setup.matchplay&&setup.matchplay.teamAShots)||0,parseInt(setup.matchplay&&setup.matchplay.teamBShots)||0)} onChange={e=>setSetup(q=>{const clean=cleanMatchplaySetup(q.matchplay||{},participants);const n=parseInt(e.target.value)||0;let receiver=(parseInt(clean.teamAShots)||0)>0?'A':((parseInt(clean.teamBShots)||0)>0?'B':'none');if(n===0)receiver='none';if(n>0&&receiver==='none')receiver='B';return {...q,matchplay:{...clean,enabled:true,mode:'foursomes',teamAShots:receiver==='A'?n:0,teamBShots:receiver==='B'?n:0}};})} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}>
+                    {Array.from({length:19},(_,i)=>i).map(n=><option key={n} value={n}>{n} {n===1?'shot':'shots'}</option>)}
+                  </select>
+                  <div style={{gridColumn:'1 / -1',fontSize:11,color:'rgba(255,255,255,0.72)',lineHeight:1.35}}>Choose which team receives shots and scroll the whole-number shot allowance. Use 0 for a scratch match.</div>
                 </>}
                 {(setup.matchplay&&setup.matchplay.mode)!=='foursomes'&&participants.map(p=>{
                   const id=normaliseId(p.id);
@@ -4061,7 +4049,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return <div style={{marginTop:9,padding:'10px 11px',borderRadius:12,background:tone,border:'1px solid '+(leadTeam==='tie'?'rgba(255,255,255,0.13)':leadTeam==='A'?'rgba(251,191,36,0.34)':'rgba(96,184,240,0.36)'),display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center'}}>
       <div style={{minWidth:0,textAlign:'left'}}><div style={{fontSize:10,color:'#fbbf24',fontWeight:950,letterSpacing:'0.08em'}}>MATCHPLAY</div><div style={{fontSize:12,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div></div>
       <div style={{textAlign:'center',minWidth:88}}><div style={{fontSize:18,color:'#fff',fontWeight:950,lineHeight:1}}>{mp.label}</div><div style={{fontSize:10,color:'#90ccf0',fontWeight:850,marginTop:2}}>{mp.sub}</div></div>
-      <div style={{minWidth:0,textAlign:'right'}}><div style={{fontSize:10,color:'#90ccf0',fontWeight:950,letterSpacing:'0.08em'}}>DOUBLES</div><div style={{fontSize:12,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.bName}</div></div>
+      <div style={{minWidth:0,textAlign:'right'}}><div style={{fontSize:10,color:'#90ccf0',fontWeight:950,letterSpacing:'0.08em'}}>{mp.mode==='foursomes'?'TEAM B':'DOUBLES'}</div><div style={{fontSize:12,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.bName}</div></div>
     </div>;
   }
 
@@ -4091,8 +4079,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const canInput=canEdit;
     return <div style={{paddingBottom:40}}>
       <FoursomesScoreInput/>
-      <div style={{padding:'12px 14px',background:'rgba(0,0,0,0.20)',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
-        <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.15em',fontWeight:900,marginBottom:10}}>FOURSOMES SCORECARD</div>
+      <div style={{padding:'8px 14px 10px',background:'rgba(0,0,0,0.20)',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
         <MatchplayMiniStatus/>
       </div>
       {['FRONT 9','BACK 9'].map((label,sec)=>{const list=sec===0?front9:back9;return <div key={label}>
@@ -4720,7 +4707,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       </div>
 
       <FinalStablefordSweepstakeBlock topMargin={12}/>
-      <MatchplayScoreBanner/>
+      {!(matchplayConfig&&matchplayConfig.enabled&&matchplayConfig.mode==='foursomes')&&<MatchplayScoreBanner/>}
       <FoursomesScorecard/>
 
       {/* Spectator live leaderboard */}
