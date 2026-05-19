@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.63
+// SNYDER LIVE v2.65
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1856,14 +1856,39 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                   <div style={{fontSize:10,color:'#fff',background:'#ef4444',borderRadius:20,padding:'4px 8px',fontWeight:700,letterSpacing:'0.08em',flexShrink:0}}>LIVE</div>
                 </div>
                 {mp? <>
-                  <div style={{fontSize:10,color:'#fbbf24',letterSpacing:'0.14em',fontWeight:900,marginBottom:8}}>FOURSOMES MATCHPLAY</div>
-                  <div style={{marginBottom:10,padding:'12px',borderRadius:14,border:'1px solid rgba(96,184,240,0.36)',background:mp.lead>0?'linear-gradient(135deg,rgba(251,191,36,0.24),rgba(255,255,255,0.05))':mp.lead<0?'linear-gradient(135deg,rgba(0,112,187,0.30),rgba(255,255,255,0.05))':'linear-gradient(135deg,rgba(255,255,255,0.08),rgba(96,184,240,0.12))'}}>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:10,alignItems:'center'}}>
-                      <div style={{minWidth:0}}><div style={{fontSize:13,color:'#fbbf24',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div><div style={{fontSize:10,color:'#90ccf0'}}>{mp.teamAShots?mp.teamAShots+' shots':'No shots'}</div></div>
-                      <div style={{textAlign:'center'}}><div style={{fontSize:22,color:'#fff',fontWeight:950,lineHeight:1}}>{mp.label}</div><div style={{fontSize:11,color:'#90ccf0',fontWeight:850,marginTop:3}}>{mp.sub}</div></div>
-                      <div style={{minWidth:0,textAlign:'right'}}><div style={{fontSize:13,color:'#60b8f0',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.bName}</div><div style={{fontSize:10,color:'#90ccf0'}}>{mp.teamBShots?mp.teamBShots+' shots':'No shots'}</div></div>
-                    </div>
-                  </div>
+                  {(()=>{
+                    const leadTeam=mp.lead>0?'A':mp.lead<0?'B':'tie';
+                    const upText=mp.lead===0?'A/S':(mp.isFinished?mp.label:(Math.abs(mp.lead)+' UP'));
+                    const aPlayers=(mp.teamA&&mp.teamA.length?mp.teamA.map(getDisplayName):[mp.aName]).filter(Boolean);
+                    const bPlayers=(mp.teamB&&mp.teamB.length?mp.teamB.map(getDisplayName):[mp.bName]).filter(Boolean);
+                    const bg=leadTeam==='A'?'linear-gradient(135deg,rgba(251,191,36,0.24),rgba(255,255,255,0.06))':leadTeam==='B'?'linear-gradient(135deg,rgba(0,112,187,0.32),rgba(255,255,255,0.06))':'linear-gradient(135deg,rgba(255,255,255,0.08),rgba(96,184,240,0.12))';
+                    return <>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}>
+                        <div style={{fontSize:10,color:'#fbbf24',letterSpacing:'0.14em',fontWeight:900}}>FOURSOMES MATCHPLAY</div>
+                        <div style={{fontSize:10,color:'#d4af37',fontWeight:950,letterSpacing:'0.08em'}}>{mp.isFinished?'FINISHED':'LIVE'}</div>
+                      </div>
+                      <div style={{marginBottom:10,padding:'12px',borderRadius:16,border:'1px solid '+(leadTeam==='A'?'rgba(251,191,36,0.42)':leadTeam==='B'?'rgba(96,184,240,0.46)':'rgba(255,255,255,0.14)'),background:bg,boxShadow:'inset 0 0 0 1px rgba(255,255,255,0.04)'}}>
+                        <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) 72px minmax(0,1fr)',gap:8,alignItems:'stretch'}}>
+                          <div style={{padding:'10px 9px',borderRadius:13,background:leadTeam==='A'?'rgba(251,191,36,0.18)':'rgba(255,255,255,0.055)',border:'1px solid '+(leadTeam==='A'?'rgba(251,191,36,0.34)':'rgba(255,255,255,0.08)'),minWidth:0}}>
+                            <div style={{fontSize:13,color:'#fbbf24',fontWeight:950,whiteSpace:'normal',overflowWrap:'anywhere',lineHeight:1.12}}>{mp.aName}</div>
+                            <div style={{display:'flex',flexDirection:'column',gap:3,marginTop:7}}>{aPlayers.map((nm,i)=><div key={i} style={{fontSize:11,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nm}</div>)}</div>
+                            <div style={{fontSize:10,color:'#90ccf0',fontWeight:800,marginTop:7}}>{mp.teamAShots?mp.teamAShots+' shots':'No shots'}</div>
+                          </div>
+                          <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',textAlign:'center'}}>
+                            <div style={{fontSize:leadTeam==='tie'?24:25,color:'#fff',fontWeight:950,lineHeight:1,letterSpacing:'-0.03em'}}>{upText}</div>
+                            <div style={{fontSize:10,color:'#90ccf0',fontWeight:900,marginTop:5,lineHeight:1.1}}>{leadTeam==='tie'?mp.sub:(leadTeam==='A'?mp.aName:mp.bName)}</div>
+                            <div style={{fontSize:9,color:'rgba(255,255,255,0.42)',fontWeight:800,marginTop:6}}>v</div>
+                          </div>
+                          <div style={{padding:'10px 9px',borderRadius:13,background:leadTeam==='B'?'rgba(0,112,187,0.24)':'rgba(255,255,255,0.055)',border:'1px solid '+(leadTeam==='B'?'rgba(96,184,240,0.40)':'rgba(255,255,255,0.08)'),minWidth:0,textAlign:'right'}}>
+                            <div style={{fontSize:13,color:'#60b8f0',fontWeight:950,whiteSpace:'normal',overflowWrap:'anywhere',lineHeight:1.12}}>{mp.bName}</div>
+                            <div style={{display:'flex',flexDirection:'column',gap:3,marginTop:7}}>{bPlayers.map((nm,i)=><div key={i} style={{fontSize:11,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nm}</div>)}</div>
+                            <div style={{fontSize:10,color:'#90ccf0',fontWeight:800,marginTop:7}}>{mp.teamBShots?mp.teamBShots+' shots':'No shots'}</div>
+                          </div>
+                        </div>
+                        <div style={{marginTop:9,textAlign:'center',fontSize:11,color:'#90ccf0',fontWeight:850}}>{leadTeam==='tie'?mp.label+' · '+mp.sub:mp.sub}</div>
+                      </div>
+                    </>;
+                  })()}
                 </> : <>
                   <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.14em',fontWeight:600,marginBottom:8}}>LIVE LEADERBOARD</div>
                   <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:10}}>
@@ -2370,7 +2395,7 @@ function buildFoursomesMatchplaySummary(rd,rdGroups,rowSources,courseList){
       if(abs>remaining){label=leader+' win '+abs+'&'+remaining;sub='Match finished';}
       else {label=leader+' '+abs+'UP';sub='Thru '+lastHole;}
     }
-    return {mode:'foursomes',aName,bName,label,sub,lead,played,teamAShots:parseInt(cfg.teamAShots)||0,teamBShots:parseInt(cfg.teamBShots)||0};
+    return {mode:'foursomes',aName,bName,label,sub,lead,played,lastHole,remaining,abs,isFinished:played&&lead!==0&&abs>remaining,winningTeam:lead>0?'A':lead<0?'B':null,teamA:(cfg.teamA||[]).map(String).filter(Boolean),teamB:(cfg.teamB||[]).map(String).filter(Boolean),teamAShots:parseInt(cfg.teamAShots)||0,teamBShots:parseInt(cfg.teamBShots)||0};
   }catch(e){return null;}
 }
 function userCanScoreFoursomesRound(currentUser,round,realGroup,roundPlayers){
@@ -3267,6 +3292,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const foursomesNotifyStateRef=useRef(null);
   const suppressFoursomesNotifyRef=useRef(false);
   const foursomesAutoFinishRef=useRef('');
+  const foursomesScoreEditRef=useRef(false);
 
   useEffect(()=>{
     setScorecardNotificationsOff(scorecardNotificationsMuted(round&&round.id));
@@ -3274,6 +3300,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     foursomesNotifyStateRef.current=null;
     suppressFoursomesNotifyRef.current=false;
     foursomesAutoFinishRef.current='';
+    foursomesScoreEditRef.current=false;
     syncMutedScorecardsToServiceWorker();
   },[round&&round.id]);
 
@@ -4271,6 +4298,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(shouldClearOtherMarker)saveLocalScore(holeNum,otherFoursomesPid,undefined);
     saveLocalScore(holeNum,scorePid,val);
     if(isFoursomesTeamPlayerId(scorePid)){
+      foursomesScoreEditRef.current=true;
       ensureFoursomesCloudGroup().then(cloudGroup=>{
         if(cloudGroup){
           const tasks=[];
@@ -4357,6 +4385,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const loserVal=winnerPid?FOURSOMES_CONCEDED_MARKER:undefined;
     saveLocalScore(holeNum,MATCHPLAY_FOURSOMES_A,winner===MATCHPLAY_FOURSOMES_A?winnerVal:(winnerPid?loserVal:undefined));
     saveLocalScore(holeNum,MATCHPLAY_FOURSOMES_B,winner===MATCHPLAY_FOURSOMES_B?winnerVal:(winnerPid?loserVal:undefined));
+    foursomesScoreEditRef.current=true;
     setHoleScores(prev=>{
       const nextHole={...(prev[holeNum]||{})};
       if(winnerPid){
@@ -4596,8 +4625,10 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const abs=Math.abs(lead);
     const isFinished=played&&lead!==0&&abs>remaining;
     const isDormie=played&&lead!==0&&remaining>0&&abs===remaining;
-    const aName=mode==='foursomes'?(cfg.teamAName||'Team 1'):(matchplayTeamName(teamA)||'Team A');
-    const bName=mode==='foursomes'?(cfg.teamBName||'Team 2'):(matchplayTeamName(teamB)||'Team B');
+    const cfgTeamAName=String(cfg.teamAName||'').trim();
+    const cfgTeamBName=String(cfg.teamBName||'').trim();
+    const aName=mode==='foursomes'?((cfgTeamAName&&cfgTeamAName!=='Team 1')?cfgTeamAName:(matchplayTeamName(teamA)||'Team 1')):(matchplayTeamName(teamA)||'Team A');
+    const bName=mode==='foursomes'?((cfgTeamBName&&cfgTeamBName!=='Team 2')?cfgTeamBName:(matchplayTeamName(teamB)||'Team 2')):(matchplayTeamName(teamB)||'Team B');
     const winningTeam=lead>0?'A':lead<0?'B':null;
     const winningName=winningTeam==='A'?aName:winningTeam==='B'?bName:'';
     const finalScore=isFinished?(abs+'&'+remaining):'';
@@ -4613,11 +4644,15 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   useEffect(()=>{
     const mp=matchplayState();
     if(!mp||mp.mode!=='foursomes'){foursomesNotifyStateRef.current=null;return;}
-    if(!canEdit||suppressFoursomesNotifyRef.current){
+    const editTriggered=!!foursomesScoreEditRef.current;
+    if(!canEdit||suppressFoursomesNotifyRef.current||!editTriggered){
       foursomesNotifyStateRef.current={lead:mp.lead,played:mp.played,lastHole:mp.lastHole,holeRows:mp.holeRows||[],isFinished:mp.isFinished,isDormie:mp.isDormie};
       suppressFoursomesNotifyRef.current=false;
+      foursomesScoreEditRef.current=false;
+      if(canEdit&&mp.isFinished)finishFoursomesMatchAutomatically(mp);
       return;
     }
+    foursomesScoreEditRef.current=false;
     const prev=foursomesNotifyStateRef.current;
     if(!prev){
       foursomesNotifyStateRef.current={lead:mp.lead,played:mp.played,lastHole:mp.lastHole,holeRows:mp.holeRows||[],isFinished:mp.isFinished,isDormie:mp.isDormie};
