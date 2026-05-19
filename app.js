@@ -4670,11 +4670,54 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     </div>;
   }
 
+  function matchplayPlayerRecord(pid){
+    const key=normaliseId(pid);
+    return (grpPlayers||[]).find(p=>[p&&p.id,p&&p.user_id,p&&p.guest_id,p&&p.round_player_id,p&&p.cup_player_id].filter(Boolean).some(id=>normaliseId(id)===key));
+  }
   function matchplayPlayerName(pid){
-    const p=grpPlayers.find(x=>normaliseId(x.id)===normaliseId(pid));
-    return gameFirstName((p&&(p.display_name||p.name))||'Player');
+    const p=matchplayPlayerRecord(pid);
+    return gameFirstName((p&&(p.display_name||p.name))||getDisplayName(pid)||'Player');
   }
   function matchplayTeamName(ids){return (ids||[]).map(matchplayPlayerName).filter(Boolean).join(' & ');}
+  function matchplayIdCandidates(pid){
+    const out=[];
+    const add=v=>{if(v!==undefined&&v!==null&&v!==''&&!out.some(x=>normaliseId(x)===normaliseId(v)))out.push(String(v));};
+    add(pid);
+    const p=matchplayPlayerRecord(pid);
+    if(p){[p.id,p.user_id,p.guest_id,p.round_player_id,p.cup_player_id].forEach(add);}
+    return out;
+  }
+  function grossForMatchplayPlayer(pid,holeNum){
+    const obj=(holeScores&&holeScores[holeNum])||{};
+    const candidates=matchplayIdCandidates(pid);
+    for(const id of candidates){if(obj[id]!==undefined)return {value:obj[id],key:id};}
+    const keys=Object.keys(obj||{});
+    for(const id of candidates){const found=keys.find(k=>normaliseId(k)===normaliseId(id));if(found!==undefined)return {value:obj[found],key:found};}
+    return {value:undefined,key:candidates[0]||pid};
+  }
+  function savedStablefordForMatchplayPlayer(pid,holeNum){
+    const ids=new Set(matchplayIdCandidates(pid).map(normaliseId));
+    const h=parseInt(holeNum,10);
+    const source=(overallScores&&overallScores.length?overallScores:(cloudScoreRows||[])).filter(r=>r&&!isMetaScoreRow(r));
+    for(let i=source.length-1;i>=0;i--){
+      const r=source[i];
+      if(ids.has(normaliseId(r.player_id))&&parseInt(r.hole_number,10)===h)return stablefordPointsValue(r.stableford_points);
+    }
+    return null;
+  }
+  function getRunningMatchplayPlayer(pid,upTo){
+    let t=0;
+    for(let h=1;h<=upTo;h++){
+      const saved=savedStablefordForMatchplayPlayer(pid,h);
+      if(saved!==null&&saved!==undefined){t+=saved;continue;}
+      const found=grossForMatchplayPlayer(pid,h);
+      const g=found.value;
+      if(g===-1)continue;
+      const pts=getPts(g,h,found.key||pid);
+      if(pts!==null&&pts!==undefined)t+=pts;
+    }
+    return t;
+  }
   function matchplayState(){
     const cfg=matchplayConfig||{};
     const mode=normaliseMatchplayMode(cfg.mode);
@@ -4710,8 +4753,10 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       }else if(mode==='singles'){
         const aPid=teamA[0];
         const bPid=teamB[0];
-        const aGross=(holeScores[h]||{})[aPid];
-        const bGross=(holeScores[h]||{})[bPid];
+        const aFound=grossForMatchplayPlayer(aPid,h);
+        const bFound=grossForMatchplayPlayer(bPid,h);
+        const aGross=aFound.value;
+        const bGross=bFound.value;
         if(!hasEnteredGross(aGross)||!hasEnteredGross(bGross))return;
         const aShot=(parseInt(cfg.teamAShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
         const bShot=(parseInt(cfg.teamBShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
@@ -4817,8 +4862,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           <div style={{fontSize:11,color:'#90ccf0',fontWeight:800,marginTop:3}}>{leadTeam==='tie'?mp.label+' · '+mp.sub:mp.sub}</div>
           {mp.mode==='singles'&&<div style={{fontSize:10,color:'rgba(255,255,255,0.62)',fontWeight:850,marginTop:3}}>{(mp.teamAShots||mp.teamBShots)?((mp.teamAShots?mp.aName+' get '+mp.teamAShots+' shot'+(mp.teamAShots===1?'':'s'):mp.bName+' get '+mp.teamBShots+' shot'+(mp.teamBShots===1?'':'s'))):'No shots given'}</div>}
           {mp.mode==='singles'&&mp.keepStableford!==false&&<div style={{marginTop:7,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-            <div style={{background:'rgba(251,191,36,0.10)',border:'1px solid rgba(251,191,36,0.22)',borderRadius:10,padding:'6px 8px'}}><div style={{fontSize:10,color:'#fbbf24',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{getRunning((mp.teamA||[])[0],holes.length)} <span style={{fontSize:10,color:'#90ccf0'}}>pts</span></div></div>
-            <div style={{background:'rgba(96,184,240,0.10)',border:'1px solid rgba(96,184,240,0.22)',borderRadius:10,padding:'6px 8px'}}><div style={{fontSize:10,color:'#60b8f0',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.bName}</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{getRunning((mp.teamB||[])[0],holes.length)} <span style={{fontSize:10,color:'#90ccf0'}}>pts</span></div></div>
+            <div style={{background:'rgba(251,191,36,0.10)',border:'1px solid rgba(251,191,36,0.22)',borderRadius:10,padding:'6px 8px'}}><div style={{fontSize:10,color:'#fbbf24',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{getRunningMatchplayPlayer((mp.teamA||[])[0],holes.length)} <span style={{fontSize:10,color:'#90ccf0'}}>pts</span></div></div>
+            <div style={{background:'rgba(96,184,240,0.10)',border:'1px solid rgba(96,184,240,0.22)',borderRadius:10,padding:'6px 8px'}}><div style={{fontSize:10,color:'#60b8f0',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.bName}</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{getRunningMatchplayPlayer((mp.teamB||[])[0],holes.length)} <span style={{fontSize:10,color:'#90ccf0'}}>pts</span></div></div>
           </div>}
         </div>
         <div style={{textAlign:'right',fontSize:24,color:leadTeam==='B'?'#60b8f0':'rgba(255,255,255,0.18)',fontWeight:950,lineHeight:1}}>{leadTeam==='B'?upText:''}</div>
@@ -4839,8 +4884,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         <div style={{fontSize:10,color:'#90ccf0',fontWeight:850,marginTop:2}}>{leadTeam==='tie'?mp.label+' · '+mp.sub:mp.sub}</div>
         {mp.mode==='singles'&&<div style={{fontSize:10,color:'rgba(255,255,255,0.62)',fontWeight:850,marginTop:3}}>{(mp.teamAShots||mp.teamBShots)?((mp.teamAShots?mp.aName+' get '+mp.teamAShots+' shot'+(mp.teamAShots===1?'':'s'):mp.bName+' get '+mp.teamBShots+' shot'+(mp.teamBShots===1?'':'s'))):'No shots given'}</div>}
         {mp.mode==='singles'&&mp.keepStableford!==false&&<div style={{marginTop:7,display:'grid',gridTemplateColumns:'1fr 1fr',gap:7}}>
-          <div style={{background:'rgba(251,191,36,0.10)',border:'1px solid rgba(251,191,36,0.22)',borderRadius:9,padding:'5px 7px'}}><div style={{fontSize:9,color:'#fbbf24',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div><div style={{fontSize:16,color:'#fff',fontWeight:950}}>{getRunning((mp.teamA||[])[0],holes.length)} <span style={{fontSize:9,color:'#90ccf0'}}>pts</span></div></div>
-          <div style={{background:'rgba(96,184,240,0.10)',border:'1px solid rgba(96,184,240,0.22)',borderRadius:9,padding:'5px 7px'}}><div style={{fontSize:9,color:'#60b8f0',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.bName}</div><div style={{fontSize:16,color:'#fff',fontWeight:950}}>{getRunning((mp.teamB||[])[0],holes.length)} <span style={{fontSize:9,color:'#90ccf0'}}>pts</span></div></div>
+          <div style={{background:'rgba(251,191,36,0.10)',border:'1px solid rgba(251,191,36,0.22)',borderRadius:9,padding:'5px 7px'}}><div style={{fontSize:9,color:'#fbbf24',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div><div style={{fontSize:16,color:'#fff',fontWeight:950}}>{getRunningMatchplayPlayer((mp.teamA||[])[0],holes.length)} <span style={{fontSize:9,color:'#90ccf0'}}>pts</span></div></div>
+          <div style={{background:'rgba(96,184,240,0.10)',border:'1px solid rgba(96,184,240,0.22)',borderRadius:9,padding:'5px 7px'}}><div style={{fontSize:9,color:'#60b8f0',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.bName}</div><div style={{fontSize:16,color:'#fff',fontWeight:950}}>{getRunningMatchplayPlayer((mp.teamB||[])[0],holes.length)} <span style={{fontSize:9,color:'#90ccf0'}}>pts</span></div></div>
         </div>}
       </div>
       <div style={{minWidth:0,textAlign:'right',fontSize:20,color:leadTeam==='B'?'#60b8f0':'rgba(255,255,255,0.18)',fontWeight:950,lineHeight:1}}>{leadTeam==='B'?upText:''}</div>
