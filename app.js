@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.36
+// SNYDER LIVE v2.37
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -110,7 +110,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.36',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.37',createdAt:new Date().toISOString(),...(payload||{})};
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const controller=new AbortController();
@@ -2029,7 +2029,14 @@ function saveLocalMatchplayConfig(roundId,groupKey,cfg){
 }
 function matchplayConfigFromRows(rows,round,group){
   const groupKey=normaliseId((group&&group.id)||(group&&group.group_number)||'group');
-  const parsed=(rows||[]).filter(r=>r&&(!round||r.round_id===round.id)).map(parseMatchplayScoreRow).filter(Boolean).filter(x=>normaliseId(x.groupKey)===groupKey&&x.enabled);
+  const allParsed=(rows||[]).filter(r=>r&&(!round||r.round_id===round.id)).map(parseMatchplayScoreRow).filter(Boolean).filter(x=>x.enabled);
+  let parsed=allParsed.filter(x=>normaliseId(x.groupKey)===groupKey);
+  // Spectator views can briefly initialise before the real group id is available.
+  // If there is only one casual matchplay setup for the round, use it rather than hiding the bar.
+  if(!parsed.length){
+    const groupKeys=Array.from(new Set(allParsed.map(x=>normaliseId(x.groupKey)).filter(Boolean)));
+    if(groupKeys.length===1)parsed=allParsed;
+  }
   const cloud={enabled:parsed.length>0,teamA:parsed.filter(x=>x.team==='A').map(x=>x.pid),teamB:parsed.filter(x=>x.team==='B').map(x=>x.pid)};
   const local=round&&round.id?loadLocalMatchplayConfig(round.id,groupKey):null;
   const fallback=round&&round._matchplay;
@@ -2798,6 +2805,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const snakeMarksRef=useRef({});
   const[overallPlayers,setOverallPlayers]=useState([]);
   const[overallScores,setOverallScores]=useState([]);
+  const[cloudScoreRows,setCloudScoreRows]=useState(scores||[]);
   const[overallMode,setOverallMode]=useState('round');
   const[overallRefreshNote,setOverallRefreshNote]=useState('');
   const[cupOverallRoundPlayers,setCupOverallRoundPlayers]=useState([]);
@@ -2856,8 +2864,9 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           sb.from('cup_scores').select('*').eq('round_id',round.id)
         ]);
         if(!alive)return;
+        setCloudScoreRows(scs||[]);
         setSweepstakeConfig(sweepstakeConfigFromRows(scs||[],round));
-          setMatchplayConfig(matchplayConfigFromRows(scs||[],round,activeScoreGroup||group));
+        setMatchplayConfig(matchplayConfigFromRows(scs||[],round,activeScoreGroup||group));
         const initialParts=(group&&group.participants)||[];
         const byName={};initialParts.forEach(p=>{byName[String(p.display_name||p.name||'').trim().toLowerCase()]=p;});
         const people=(rps||[]).map((rp,idx)=>{
@@ -2910,6 +2919,11 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return()=>{alive=false;};
   },[round&&round.id,currentUser&&currentUser.id]);
 
+  useEffect(()=>{
+    if(!round||!round.id)return;
+    setMatchplayConfig(matchplayConfigFromRows(cloudScoreRows&&cloudScoreRows.length?cloudScoreRows:(scores||[]),round,activeScoreGroup||group));
+  },[round&&round.id,activeScoreGroup&&activeScoreGroup.id,cloudScoreRows&&cloudScoreRows.length]);
+
   async function refreshScoresFromCloud(showMessage=true){
     if(!round||!round.id||refreshing)return;
     setRefreshing(true);
@@ -2917,6 +2931,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       const {data,error}=await sb.from('cup_scores').select('*').eq('round_id',round.id);
       if(error)throw error;
       const rows=(data||[]);
+      setCloudScoreRows(rows);
       const scoreRows=rows.filter(r=>!isMetaScoreRow(r));
       const snakeRows=rows.filter(isSnakeScoreRow);
       const m={};
@@ -3610,6 +3625,12 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       rows.forEach(r=>{byKey[normaliseId(r.player_id)+'_'+r.hole_number]=r;});
       return Object.values(byKey);
     });
+    setCloudScoreRows(prev=>{
+      const byKey={};
+      (prev||[]).forEach(r=>{byKey[normaliseId(r.player_id)+'_'+r.hole_number]=r;});
+      rows.forEach(r=>{byKey[normaliseId(r.player_id)+'_'+r.hole_number]=r;});
+      return Object.values(byKey);
+    });
     setLastRefreshed(new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
     try{localStorage.removeItem('pending_scores_'+round.id);}catch(e){}
     // Pull latest public data after a successful cloud save.
@@ -3641,6 +3662,11 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         setCloudStatus('');
         setCloudError('');
         setOverallScores(prev=>{
+          const key=normaliseId(row.player_id)+'_'+row.hole_number;
+          const filtered=(prev||[]).filter(r=>normaliseId(r.player_id)+'_'+r.hole_number!==key);
+          return [...filtered,row];
+        });
+        setCloudScoreRows(prev=>{
           const key=normaliseId(row.player_id)+'_'+row.hole_number;
           const filtered=(prev||[]).filter(r=>normaliseId(r.player_id)+'_'+r.hole_number!==key);
           return [...filtered,row];
@@ -3686,10 +3712,31 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return calcStableford(gross,hd.par,hd.stroke_index,hcp);
   }
 
+  function savedStablefordForHole(pid,holeNum){
+    const key=normaliseId(pid);
+    const h=parseInt(holeNum,10);
+    const source=(overallScores&&overallScores.length?overallScores:(cloudScoreRows||[])).filter(r=>r&&!isMetaScoreRow(r));
+    for(let i=source.length-1;i>=0;i--){
+      const r=source[i];
+      if(normaliseId(r.player_id)===key&&parseInt(r.hole_number,10)===h){
+        return stablefordPointsValue(r.stableford_points);
+      }
+    }
+    return null;
+  }
+
+  function getLivePts(pid,holeNum,gross){
+    const saved=savedStablefordForHole(pid,holeNum);
+    if(saved!==null&&saved!==undefined)return saved;
+    return getPts(gross,holeNum,pid);
+  }
+
   function getRunning(pid,upTo){
     let t=0;
     for(let h=1;h<=upTo;h++){
       const g=(holeScores[h]||{})[pid];
+      const saved=savedStablefordForHole(pid,h);
+      if(saved!==null&&saved!==undefined){t+=saved;continue;}
       if(g===-1)continue;
       const pts=getPts(g,h,pid);
       if(pts!==null&&pts!==undefined)t+=pts;
@@ -3705,7 +3752,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   function getStablefordTotal(pid,holeList){
     return (holeList||[]).reduce((t,h)=>{
       const g=(holeScores[h.hole]||{})[pid];
-      return t+((g===-1||isGivenGross(g))?0:(getPts(g,h.hole,pid)||0));
+      const saved=savedStablefordForHole(pid,h.hole);
+      return t+(saved!==null&&saved!==undefined?saved:((g===-1||isGivenGross(g))?0:(getPts(g,h.hole,pid)||0)));
     },0);
   }
 
@@ -3831,8 +3879,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       const h=hd.hole;
       const scored=[...teamA,...teamB].every(pid=>hasEnteredGross((holeScores[h]||{})[pid]));
       if(!scored)return;
-      const aBest=Math.max(...teamA.map(pid=>stablefordPointsValue(getPts((holeScores[h]||{})[pid],h,pid)||0)));
-      const bBest=Math.max(...teamB.map(pid=>stablefordPointsValue(getPts((holeScores[h]||{})[pid],h,pid)||0)));
+      const aBest=Math.max(...teamA.map(pid=>stablefordPointsValue(getLivePts(pid,h,(holeScores[h]||{})[pid])||0)));
+      const bBest=Math.max(...teamB.map(pid=>stablefordPointsValue(getLivePts(pid,h,(holeScores[h]||{})[pid])||0)));
       let winner='halve';
       if(aBest>bBest){lead+=1;winner='A';}
       else if(bBest>aBest){lead-=1;winner='B';}
