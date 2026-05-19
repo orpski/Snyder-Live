@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.45
+// SNYDER LIVE v2.46
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -110,7 +110,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.45',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.46',createdAt:new Date().toISOString(),...(payload||{})};
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const controller=new AbortController();
@@ -1279,7 +1279,9 @@ function App(){
     if(userGroup){
       const canScore=userCanScoreRound(currentUser,userGroup,roundPlayers);
       await hydrateRoundScores(rd.id);
-      const selected={...rd,_spectator:!canScore,_group:{...userGroup,participants:po,playing_handicaps:hm,player_ids:(userGroup.player_ids&&userGroup.player_ids.length?userGroup.player_ids:po.map(p=>p.id))}};
+      const latestRows=[...(scores||[]),...(dbScores||[])].filter(r=>r&&r.round_id===rd.id);
+      const latestMatchplay=matchplayConfigFromRows(latestRows,rd,userGroup);
+      const selected={...rd,_spectator:!canScore,_extraScores:latestRows,_matchplay:latestMatchplay,_group:{...userGroup,participants:po,playing_handicaps:hm,player_ids:(userGroup.player_ids&&userGroup.player_ids.length?userGroup.player_ids:po.map(p=>p.id))}};
       if(isCupRound){
         const cup=(cupEvents||[])[0];
         const cupDay=cupRoundDayNumber(rd);
@@ -1677,7 +1679,9 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
       const cupDay=cupRoundDayNumber(rd);
       const cupGroup=cupRoundGroupNumber(rd);
       const cupDayRounds=isCup?(rounds||[]).filter(r=>cupRoundDayNumber(r)===cupDay&&isSnyderCupRound(r)):[];
-      const selected={...rd,_spectator:!canScore,_group:{...userGroup,participants:po,playing_handicaps:hm,player_ids:(userGroup.player_ids&&userGroup.player_ids.length?userGroup.player_ids:po.map(p=>p.id))}};
+      const latestRows=[...(scores||[]),...(publicScores||[]),...(dbScores||[])].filter(r=>r&&r.round_id===rd.id);
+      const latestMatchplay=matchplayConfigFromRows(latestRows,rd,userGroup);
+      const selected={...rd,_spectator:!canScore,_extraScores:latestRows,_matchplay:latestMatchplay,_group:{...userGroup,participants:po,playing_handicaps:hm,player_ids:(userGroup.player_ids&&userGroup.player_ids.length?userGroup.player_ids:po.map(p=>p.id))}};
       if(isCup){
         const dayGroups=cupGroupsForDay(cupMatches,cupDay);
         const groupData=dayGroups.find(g=>parseInt(g.idx)===cupGroup)||{day:cupDay,idx:cupGroup,players:po.map(p=>p.id),doubles:null,singles:[]};
@@ -3003,12 +3007,13 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const snakeMarksRef=useRef({});
   const[overallPlayers,setOverallPlayers]=useState([]);
   const[overallScores,setOverallScores]=useState([]);
-  const[cloudScoreRows,setCloudScoreRows]=useState(scores||[]);
+  const[cloudScoreRows,setCloudScoreRows]=useState([...(scores||[]),...((round&&round._extraScores)||[])]);
   const[overallMode,setOverallMode]=useState('round');
   const[overallRefreshNote,setOverallRefreshNote]=useState('');
   const[cupOverallRoundPlayers,setCupOverallRoundPlayers]=useState([]);
-  const[sweepstakeConfig,setSweepstakeConfig]=useState(sweepstakeConfigFromRows(scores,round));
-  const[matchplayConfig,setMatchplayConfig]=useState(matchplayConfigFromRows(scores,round,group));
+  const initialScoreRows=[...(scores||[]),...((round&&round._extraScores)||[])];
+  const[sweepstakeConfig,setSweepstakeConfig]=useState(sweepstakeConfigFromRows(initialScoreRows,round));
+  const[matchplayConfig,setMatchplayConfig]=useState(matchplayConfigFromRows(initialScoreRows,round,group));
   const[showSweepstake,setShowSweepstake]=useState(false);
 
   useEffect(()=>{
