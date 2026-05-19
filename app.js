@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.51
+// SNYDER LIVE v2.52
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1236,16 +1236,19 @@ function App(){
   const liveRoundIds=liveRounds.map(r=>r.id).filter(Boolean);
   const[publicScores,setPublicScores]=useState([]);
   const[publicRoundPlayers,setPublicRoundPlayers]=useState({});
+  const[publicGroups,setPublicGroups]=useState([]);
   useEffect(()=>{
     let alive=true;
     async function refreshLiveRoundData(){
-      if(!liveRoundIds.length){setPublicScores([]);setPublicRoundPlayers({});return;}
-      const[{data:scoreRows},{data:roundPlayers}]=await Promise.all([
+      if(!liveRoundIds.length){setPublicScores([]);setPublicRoundPlayers({});setPublicGroups([]);return;}
+      const[{data:scoreRows},{data:roundPlayers},{data:liveGroupsRows}]=await Promise.all([
         sb.from('cup_scores').select('*').in('round_id',liveRoundIds),
-        sb.from('cup_round_players').select('*').in('round_id',liveRoundIds)
+        sb.from('cup_round_players').select('*').in('round_id',liveRoundIds),
+        sb.from('cup_groups').select('*').in('round_id',liveRoundIds).order('group_number',{ascending:true})
       ]);
       if(!alive)return;
       setPublicScores(scoreRows||[]);
+      setPublicGroups(liveGroupsRows||[]);
       const byRound={};
       (roundPlayers||[]).forEach(rp=>{
         if(!byRound[rp.round_id])byRound[rp.round_id]=[];
@@ -1259,6 +1262,7 @@ function App(){
     window.addEventListener('snyderPullRefresh',onPullRefresh);
     return()=>{alive=false;clearInterval(timer);window.removeEventListener('snyderPullRefresh',onPullRefresh);};
   },[liveRoundIds.join('|')]);
+  const liveGroupsMerged=(()=>{const m=new Map();[...(groups||[]),...(publicGroups||[])].forEach(g=>{if(g&&g.id)m.set(g.id,g);});return Array.from(m.values());})();
   const completedRounds=sortRoundsNewestFirst(rounds.filter(isCompletedRound));
   const myRounds=myRoundsForUser(rounds,groups,currentUser);
   const thisWeekStart=startOfThisWeek();
@@ -1269,7 +1273,7 @@ function App(){
   // Round opening / scorecard hydration
   // ---------------------------------------------------------
   async function openRound(rd){
-    let rdGroups=groups.filter(g=>g.round_id===rd.id);
+    let rdGroups=liveGroupsMerged.filter(g=>g.round_id===rd.id);
     try{
       const{data:dbGroups}=await sb.from('cup_groups').select('*').eq('round_id',rd.id).order('group_number',{ascending:true});
       if(dbGroups&&dbGroups.length)rdGroups=dbGroups;
@@ -1327,7 +1331,7 @@ function App(){
   }
   function leaderboardForRound(rd){
     const totals={};const holes={};const holePoints={};const seen=new Set();
-    const rdGroups=groups.filter(g=>g.round_id===rd.id);
+    const rdGroups=liveGroupsMerged.filter(g=>g.round_id===rd.id);
     const hcpMap={};
     rdGroups.forEach(g=>{
       Object.assign(hcpMap,g.playing_handicaps||{});
@@ -1572,16 +1576,19 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
   const liveRoundIds=liveRounds.map(r=>r.id).filter(Boolean);
   const[publicScores,setPublicScores]=useState([]);
   const[publicRoundPlayers,setPublicRoundPlayers]=useState({});
+  const[publicGroups,setPublicGroups]=useState([]);
   useEffect(()=>{
     let alive=true;
     async function refreshLiveRoundData(){
-      if(!liveRoundIds.length){setPublicScores([]);setPublicRoundPlayers({});return;}
-      const[{data:scoreRows},{data:roundPlayers}]=await Promise.all([
+      if(!liveRoundIds.length){setPublicScores([]);setPublicRoundPlayers({});setPublicGroups([]);return;}
+      const[{data:scoreRows},{data:roundPlayers},{data:liveGroupsRows}]=await Promise.all([
         sb.from('cup_scores').select('*').in('round_id',liveRoundIds),
-        sb.from('cup_round_players').select('*').in('round_id',liveRoundIds)
+        sb.from('cup_round_players').select('*').in('round_id',liveRoundIds),
+        sb.from('cup_groups').select('*').in('round_id',liveRoundIds).order('group_number',{ascending:true})
       ]);
       if(!alive)return;
       setPublicScores(scoreRows||[]);
+      setPublicGroups(liveGroupsRows||[]);
       const byRound={};
       (roundPlayers||[]).forEach(rp=>{
         if(!byRound[rp.round_id])byRound[rp.round_id]=[];
@@ -1595,6 +1602,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     window.addEventListener('snyderPullRefresh',onPullRefresh);
     return()=>{alive=false;clearInterval(timer);window.removeEventListener('snyderPullRefresh',onPullRefresh);};
   },[liveRoundIds.join('|')]);
+  const liveGroupsMerged=(()=>{const m=new Map();[...(groups||[]),...(publicGroups||[])].forEach(g=>{if(g&&g.id)m.set(g.id,g);});return Array.from(m.values());})();
   const completedRounds=sortRoundsNewestFirst(rounds.filter(isCompletedRound));
   const thisWeekStart=startOfThisWeek();
   const thisWeeksCards=completedRounds.filter(r=>new Date(roundStartValue(r))>=thisWeekStart);
@@ -1670,7 +1678,11 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     return{gold,navy,goldName:(teams.gold&&teams.gold.name)||'Gold',navyName:(teams.navy&&teams.navy.name)||'Navy'};
   }
   async function openRound(rd){
-    const rdGroups=groups.filter(g=>g.round_id===rd.id);
+    let rdGroups=liveGroupsMerged.filter(g=>g.round_id===rd.id);
+    try{
+      const{data:dbGroups}=await sb.from('cup_groups').select('*').eq('round_id',rd.id).order('group_number',{ascending:true});
+      if(dbGroups&&dbGroups.length)rdGroups=dbGroups;
+    }catch(e){}
     const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
     const roundPlayers=(rps||[]);
     const isCup=isSnyderCupRound(rd);
@@ -1693,9 +1705,14 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
       const cupDay=cupRoundDayNumber(rd);
       const cupGroup=cupRoundGroupNumber(rd);
       const cupDayRounds=isCup?(rounds||[]).filter(r=>cupRoundDayNumber(r)===cupDay&&isSnyderCupRound(r)):[];
-      const latestRows=[...(scores||[]),...(publicScores||[]),...(dbScores||[]),...localScoreRowsForRound(rd.id)].filter(r=>r&&r.round_id===rd.id);
+      const groupMetaRows=(rdGroups||[]).flatMap(g=>foursomesScoreRowsFromGroupMeta(rd.id,g));
+      const latestRows=[...(scores||[]),...(publicScores||[]),...(dbScores||[]),...groupMetaRows,...localScoreRowsForRound(rd.id)].filter(r=>r&&r.round_id===rd.id);
       const latestMatchplay=matchplayConfigFromRows(latestRows,rd,rdGroups[0]||{id:'group',group_number:1});
       const fallbackGroup=(latestMatchplay&&latestMatchplay.enabled&&latestMatchplay.mode==='foursomes')?foursomesFallbackGroup(rd,latestMatchplay):null;
+      if(fallbackGroup){
+        const metaScores=foursomesHoleScoresFromGroupMeta(rdGroups[0]||{});
+        if(Object.keys(metaScores).length&&setHoleScores)setHoleScores(prev=>({...prev,...metaScores}));
+      }
       const userGroup=fallbackGroup||(rdGroups.find(g=>currentUser&&Array.isArray(g.player_ids)&&(g.player_ids||[]).some(pid=>normaliseId(pid)===normaliseId(currentUser.id)))||rdGroups[0]);
       if(!userGroup){flash('No scorecard group found for this round','error');return;}
       const canScore=(fallbackGroup&&userGroup===fallbackGroup)?!!currentUser:userCanScoreRound(currentUser,userGroup,roundPlayers);
@@ -1733,7 +1750,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
   }
   function leaderboardForRound(rd){
     const totals={};const holes={};const holePoints={};const seen=new Set();
-    const rdGroups=groups.filter(g=>g.round_id===rd.id);
+    const rdGroups=liveGroupsMerged.filter(g=>g.round_id===rd.id);
     const rdRoundPlayers=publicRoundPlayers[rd.id]||[];
     const isCupRound=isSnyderCupRound(rd);
     const cup=(cupEvents||[])[0];
@@ -1883,7 +1900,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
             <button onClick={()=>setView('play')} style={S.pri}>Play Golf</button>
           </div>
           :liveRounds.map(rd=>{
-            const rdGroups=groups.filter(g=>g.round_id===rd.id);
+            const rdGroups=liveGroupsMerged.filter(g=>g.round_id===rd.id);
             const mp=foursomesMatchplaySummaryForLiveRound(rd);
             const board=mp?[]:leaderboardForRound(rd);
             return(
@@ -2452,7 +2469,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
     if(before!==after)setSetup(q=>({...q,matchplay:current}));
   },[participants.length,participants.map(p=>normaliseId(p.id)).join('|')]);
   async function continueRound(rd){
-    const rdGroups=groups.filter(g=>g.round_id===rd.id);
+    const rdGroups=liveGroupsMerged.filter(g=>g.round_id===rd.id);
     const{data:rps}=await sb.from('cup_round_players').select('*').eq('round_id',rd.id);
     const po=(rps||[]).map(rp=>({id:rp.user_id||rp.guest_id||rp.id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0}));
     const hm={};(rps||[]).forEach(rp=>{hm[rp.user_id||rp.guest_id||rp.id]=rp.playing_handicap||0;});
@@ -3076,7 +3093,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
           <div>
             <div style={{fontSize:12,color:'#60b8f0',margin:'16px 0 8px',letterSpacing:'0.1em'}}>WATCH LIVE ROUND</div>
             {liveRounds.filter(rd=>!myRounds.some(m=>m.id===rd.id)).map(rd=>
-              groups.filter(g=>g.round_id===rd.id).map(grp=>(
+              liveGroupsMerged.filter(g=>g.round_id===rd.id).map(grp=>(
                 <div key={grp.id} style={{...S.card,marginBottom:6,cursor:'pointer',borderColor:'rgba(239,68,68,0.3)'}} onClick={()=>continueRound(rd)}>
                   <div style={{fontSize:14,color:'#ef4444',marginBottom:2}}>{rd.name||rd.course_name}</div>
                   <div style={{fontSize:12,color:'#60b8f0'}}>{rd.course_name} - Spectator view</div>
