@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.38
+// SNYDER LIVE v2.39
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -110,7 +110,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.38',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.39',createdAt:new Date().toISOString(),...(payload||{})};
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const controller=new AbortController();
@@ -2009,7 +2009,20 @@ async function saveSweepstakeConfigToCloud(roundId,cfg){
 }
 
 const MATCHPLAY_SCORE_PREFIX='__matchplay__|';
+const MATCHPLAY_META_PREFIX='__matchplay_meta__|';
+const MATCHPLAY_FOURSOMES_A='__foursomes_team_a';
+const MATCHPLAY_FOURSOMES_B='__foursomes_team_b';
 const MATCHPLAY_CONFIG_HOLE=960001;
+function makeMatchplayMetaPlayerId(groupKey,key){return MATCHPLAY_META_PREFIX+encodeURIComponent(normaliseId(groupKey||'group'))+'|'+encodeURIComponent(key||'config');}
+function parseMatchplayMetaRow(row){
+  const txt=String(row&&row.player_id||'');
+  if(!txt.startsWith(MATCHPLAY_META_PREFIX))return null;
+  const parts=txt.split('|');
+  if(parts.length<3)return null;
+  try{return {groupKey:decodeURIComponent(parts[1]||'group'),key:decodeURIComponent(parts.slice(2).join('|')||'config'),gross:parseInt(row&&row.gross_score)||0,stableford:parseInt(row&&row.stableford_points)||0};}
+  catch(e){return null;}
+}
+function isMatchplayMetaScoreRow(row){return !!parseMatchplayMetaRow(row);}
 function makeMatchplayScorePlayerId(groupKey,team,pid){return MATCHPLAY_SCORE_PREFIX+encodeURIComponent(normaliseId(groupKey||'group'))+'|'+encodeURIComponent(team||'A')+'|'+encodeURIComponent(normaliseId(pid));}
 function parseMatchplayScoreRow(row){
   const txt=String(row&&row.player_id||'');
@@ -2025,42 +2038,59 @@ function loadLocalMatchplayConfig(roundId,groupKey){
   try{const raw=localStorage.getItem(matchplayStorageKey(roundId,groupKey));return raw?JSON.parse(raw):null;}catch(e){return null;}
 }
 function saveLocalMatchplayConfig(roundId,groupKey,cfg){
-  try{if(roundId&&cfg)localStorage.setItem(matchplayStorageKey(roundId,groupKey),JSON.stringify({enabled:!!cfg.enabled,teamA:(cfg.teamA||[]).map(String),teamB:(cfg.teamB||[]).map(String)}));}catch(e){}
+  try{if(roundId&&cfg)localStorage.setItem(matchplayStorageKey(roundId,groupKey),JSON.stringify({enabled:!!cfg.enabled,mode:cfg.mode==='foursomes'?'foursomes':'doubles',teamA:(cfg.teamA||[]).map(String),teamB:(cfg.teamB||[]).map(String),teamAName:cfg.teamAName||'Team 1',teamBName:cfg.teamBName||'Team 2',teamAShots:Math.max(0,parseInt(cfg.teamAShots)||0),teamBShots:Math.max(0,parseInt(cfg.teamBShots)||0)}));}catch(e){}
+}
+function matchplayMetaFromRows(rows,round,groupKey){
+  const all=(rows||[]).filter(r=>r&&(!round||r.round_id===round.id)).map(parseMatchplayMetaRow).filter(Boolean);
+  let meta=all.filter(x=>normaliseId(x.groupKey)===normaliseId(groupKey||'group'));
+  if(!meta.length){const keys=Array.from(new Set(all.map(x=>normaliseId(x.groupKey)).filter(Boolean)));if(keys.length===1)meta=all;}
+  const get=k=>meta.find(x=>x.key===k);
+  if(!meta.length)return null;
+  const nameA=meta.find(x=>String(x.key||'').startsWith('teamAName:'));
+  const nameB=meta.find(x=>String(x.key||'').startsWith('teamBName:'));
+  return {mode:(get('mode')&&get('mode').gross===2)?'foursomes':'doubles',teamAName:nameA?decodeURIComponent(String(nameA.key).slice(10)):'',teamBName:nameB?decodeURIComponent(String(nameB.key).slice(10)):'',teamAShots:get('teamAShots')?get('teamAShots').gross:0,teamBShots:get('teamBShots')?get('teamBShots').gross:0};
 }
 function matchplayConfigFromRows(rows,round,group){
   const groupKey=normaliseId((group&&group.id)||(group&&group.group_number)||'group');
   const allParsed=(rows||[]).filter(r=>r&&(!round||r.round_id===round.id)).map(parseMatchplayScoreRow).filter(Boolean).filter(x=>x.enabled);
   let parsed=allParsed.filter(x=>normaliseId(x.groupKey)===groupKey);
-  // Spectator views can briefly initialise before the real group id is available.
-  // If there is only one casual matchplay setup for the round, use it rather than hiding the bar.
   if(!parsed.length){
     const groupKeys=Array.from(new Set(allParsed.map(x=>normaliseId(x.groupKey)).filter(Boolean)));
     if(groupKeys.length===1)parsed=allParsed;
   }
-  const cloud={enabled:parsed.length>0,teamA:parsed.filter(x=>x.team==='A').map(x=>x.pid),teamB:parsed.filter(x=>x.team==='B').map(x=>x.pid)};
+  const meta=matchplayMetaFromRows(rows,round,groupKey);
+  const cloud={enabled:parsed.length>0||!!(meta&&meta.mode==='foursomes'),mode:(meta&&meta.mode)||'doubles',teamA:parsed.filter(x=>x.team==='A').map(x=>x.pid),teamB:parsed.filter(x=>x.team==='B').map(x=>x.pid),teamAName:(meta&&meta.teamAName)||'Team 1',teamBName:(meta&&meta.teamBName)||'Team 2',teamAShots:(meta&&meta.teamAShots)||0,teamBShots:(meta&&meta.teamBShots)||0};
   const local=round&&round.id?loadLocalMatchplayConfig(round.id,groupKey):null;
   const fallback=round&&round._matchplay;
-  const cfg=cloud.enabled?cloud:(local&&local.enabled?local:(fallback&&fallback.enabled?fallback:{enabled:false,teamA:[],teamB:[]}));
+  const cfg=cloud.enabled?{...cloud,...(local&&local.enabled?{teamAName:local.teamAName,teamBName:local.teamBName}: {})}:(local&&local.enabled?local:(fallback&&fallback.enabled?fallback:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0}));
+  const mode=cfg.mode==='foursomes'?'foursomes':'doubles';
   const teamA=Array.from(new Set((cfg.teamA||[]).map(String).filter(Boolean)));
   const teamB=Array.from(new Set((cfg.teamB||[]).map(String).filter(Boolean)));
-  return {enabled:!!cfg.enabled&&teamA.length>0&&teamB.length>0,teamA,teamB};
+  const hasTeams=mode==='foursomes'||(teamA.length>0&&teamB.length>0);
+  return {enabled:!!cfg.enabled&&hasTeams,mode,teamA,teamB,teamAName:cfg.teamAName||'Team 1',teamBName:cfg.teamBName||'Team 2',teamAShots:Math.max(0,parseInt(cfg.teamAShots)||0),teamBShots:Math.max(0,parseInt(cfg.teamBShots)||0)};
 }
 async function saveMatchplayConfigToCloud(roundId,groupKey,cfg){
   if(!roundId||!cfg||!cfg.enabled)return {ok:true,count:0};
-  const clean={enabled:!!cfg.enabled,teamA:(cfg.teamA||[]).map(String).filter(Boolean),teamB:(cfg.teamB||[]).map(String).filter(Boolean)};
+  const clean={enabled:!!cfg.enabled,mode:cfg.mode==='foursomes'?'foursomes':'doubles',teamA:(cfg.teamA||[]).map(String).filter(Boolean),teamB:(cfg.teamB||[]).map(String).filter(Boolean),teamAName:cfg.teamAName||'Team 1',teamBName:cfg.teamBName||'Team 2',teamAShots:Math.max(0,parseInt(cfg.teamAShots)||0),teamBShots:Math.max(0,parseInt(cfg.teamBShots)||0)};
   saveLocalMatchplayConfig(roundId,groupKey,clean);
   const rows=[];
   clean.teamA.forEach(pid=>rows.push({round_id:roundId,player_id:makeMatchplayScorePlayerId(groupKey,'A',pid),hole_number:MATCHPLAY_CONFIG_HOLE,gross_score:1,stableford_points:1,par:4,stroke_index:1}));
   clean.teamB.forEach(pid=>rows.push({round_id:roundId,player_id:makeMatchplayScorePlayerId(groupKey,'B',pid),hole_number:MATCHPLAY_CONFIG_HOLE,gross_score:1,stableford_points:1,par:4,stroke_index:1}));
+  rows.push({round_id:roundId,player_id:makeMatchplayMetaPlayerId(groupKey,'mode'),hole_number:MATCHPLAY_CONFIG_HOLE,gross_score:clean.mode==='foursomes'?2:1,stableford_points:1,par:4,stroke_index:1});
+  rows.push({round_id:roundId,player_id:makeMatchplayMetaPlayerId(groupKey,'teamAShots'),hole_number:MATCHPLAY_CONFIG_HOLE,gross_score:clean.teamAShots,stableford_points:1,par:4,stroke_index:1});
+  rows.push({round_id:roundId,player_id:makeMatchplayMetaPlayerId(groupKey,'teamBShots'),hole_number:MATCHPLAY_CONFIG_HOLE,gross_score:clean.teamBShots,stableford_points:1,par:4,stroke_index:1});
+  rows.push({round_id:roundId,player_id:makeMatchplayMetaPlayerId(groupKey,'teamAName:'+encodeURIComponent(clean.teamAName)),hole_number:MATCHPLAY_CONFIG_HOLE,gross_score:1,stableford_points:1,par:4,stroke_index:1});
+  rows.push({round_id:roundId,player_id:makeMatchplayMetaPlayerId(groupKey,'teamBName:'+encodeURIComponent(clean.teamBName)),hole_number:MATCHPLAY_CONFIG_HOLE,gross_score:1,stableford_points:1,par:4,stroke_index:1});
   return rows.length?saveScoreRowsToCloud(sb,rows):{ok:true,count:0};
 }
 function cleanMatchplaySetup(matchplay,players){
   const ids=(players||[]).map(p=>normaliseId(p.id));
   const keep=(arr)=>(arr||[]).map(normaliseId).filter(id=>ids.includes(id));
+  const mode=(matchplay&&matchplay.mode)==='foursomes'?'foursomes':'doubles';
   let teamA=keep(matchplay&&matchplay.teamA);
   let teamB=keep(matchplay&&matchplay.teamB).filter(id=>!teamA.includes(id));
-  if((!teamA.length&&!teamB.length)&&ids.length>=4){teamA=[ids[0],ids[1]];teamB=[ids[2],ids[3]];}
-  return {enabled:!!(matchplay&&matchplay.enabled),teamA,teamB};
+  if(mode==='doubles'&&(!teamA.length&&!teamB.length)&&ids.length>=4){teamA=[ids[0],ids[1]];teamB=[ids[2],ids[3]];}
+  return {enabled:!!(matchplay&&matchplay.enabled),mode,teamA,teamB,teamAName:(matchplay&&matchplay.teamAName)||'Team 1',teamBName:(matchplay&&matchplay.teamBName)||'Team 2',teamAShots:Math.max(0,parseInt(matchplay&&matchplay.teamAShots)||0),teamBShots:Math.max(0,parseInt(matchplay&&matchplay.teamBShots)||0)};
 }
 
 function moneyFromPence(v){
@@ -2069,7 +2099,7 @@ function moneyFromPence(v){
   const abs=Math.abs(n);
   return sign+'£'+(abs/100).toFixed(abs%100?2:0);
 }
-function isMetaScoreRow(row){return isSnakeScoreRow(row)||isFineScoreRow(row)||isSweepstakeScoreRow(row)||isMatchplayScoreRow(row);}
+function isMetaScoreRow(row){return isSnakeScoreRow(row)||isFineScoreRow(row)||isSweepstakeScoreRow(row)||isMatchplayScoreRow(row)||isMatchplayMetaScoreRow(row);}
 function fineAmount(key,count){const def=fineDef(key);return def?(parseInt(count)||0)*(def.amount||0):0;}
 
 function cupFineTotalForRound(round,scores){
@@ -2133,7 +2163,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   const[step,setStep]=useState('menu');
   const[activeRound,setActiveRound]=useState(null);
   const[activeGroup,setActiveGroup]=useState(null);
-  const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:1,sweepstake:{enabled:false,amountPence:200,scope:'round'},matchplay:{enabled:false,teamA:[],teamB:[]}});
+  const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:1,sweepstake:{enabled:false,amountPence:200,scope:'round'},matchplay:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0}});
   const[participants,setParticipants]=useState([]);
   const[groupSetup,setGroupSetup]=useState([[]]);
   const[pickerGroup,setPickerGroup]=useState(0);
@@ -2302,6 +2332,21 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       return {...q,matchplay:{...clean,enabled}};
     });
   }
+
+  function setMatchplayMode(mode){
+    setSetup(q=>{
+      const clean=cleanMatchplaySetup(q.matchplay||{},participants);
+      return {...q,matchplay:{...clean,enabled:true,mode:mode==='foursomes'?'foursomes':'doubles'}};
+    });
+  }
+  function updateMatchplayField(key,value){
+    setSetup(q=>{
+      const clean=cleanMatchplaySetup(q.matchplay||{},participants);
+      const next={...clean,enabled:true,[key]:value};
+      if(key==='teamAShots'||key==='teamBShots')next[key]=Math.max(0,parseInt(value)||0);
+      return {...q,matchplay:next};
+    });
+  }
   function blockingLiveRound(){
     return myLiveRounds.find(r=>!clearedLiveRoundIds.some(id=>normaliseId(id)===normaliseId(r.id)))||null;
   }
@@ -2413,7 +2458,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
 
       if(setup.matchplay&&setup.matchplay.enabled&&createdGroups&&createdGroups[0]){
         const mp=cleanMatchplaySetup(setup.matchplay,groupBuckets[0]||[]);
-        if(mp.teamA.length&&mp.teamB.length){
+        if(mp.mode==='foursomes'||(mp.teamA.length&&mp.teamB.length)){
           const primaryGroupKey=normaliseId(createdGroups[0].id||createdGroups[0].group_number||'group');
           const mpSave=await saveMatchplayConfigToCloud(rd.id,primaryGroupKey,mp);
           // Also save a generic fallback key so spectator scorecards can show matchplay even before the real group id hydrates.
@@ -2620,7 +2665,18 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
                 </div>
               </div>
               {setup.matchplay&&setup.matchplay.enabled&&<div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                {participants.map(p=>{
+                <div style={{gridColumn:'1 / -1',display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:2}}>
+                  <button onClick={()=>setMatchplayMode('doubles')} style={{border:'1px solid '+(((setup.matchplay&&setup.matchplay.mode)||'doubles')==='doubles'?'rgba(96,184,240,0.6)':'rgba(255,255,255,0.12)'),background:(((setup.matchplay&&setup.matchplay.mode)||'doubles')==='doubles')?'rgba(96,184,240,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:10,padding:'9px 8px',fontSize:12,fontWeight:900}}>Doubles Stableford</button>
+                  <button onClick={()=>setMatchplayMode('foursomes')} style={{border:'1px solid '+((setup.matchplay&&setup.matchplay.mode)==='foursomes'?'rgba(251,191,36,0.6)':'rgba(255,255,255,0.12)'),background:(setup.matchplay&&setup.matchplay.mode)==='foursomes'?'rgba(251,191,36,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:10,padding:'9px 8px',fontSize:12,fontWeight:900}}>Foursomes</button>
+                </div>
+                {(setup.matchplay&&setup.matchplay.mode)==='foursomes'&&<>
+                  <input value={(setup.matchplay&&setup.matchplay.teamAName)||''} onChange={e=>updateMatchplayField('teamAName',e.target.value)} placeholder='Team 1 name' style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}/>
+                  <input value={(setup.matchplay&&setup.matchplay.teamBName)||''} onChange={e=>updateMatchplayField('teamBName',e.target.value)} placeholder='Team 2 name' style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}/>
+                  <input type='number' min='0' value={(setup.matchplay&&setup.matchplay.teamAShots)||0} onChange={e=>updateMatchplayField('teamAShots',e.target.value)} placeholder='Team 1 shots' style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}/>
+                  <input type='number' min='0' value={(setup.matchplay&&setup.matchplay.teamBShots)||0} onChange={e=>updateMatchplayField('teamBShots',e.target.value)} placeholder='Team 2 shots' style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}/>
+                  <div style={{gridColumn:'1 / -1',fontSize:11,color:'rgba(255,255,255,0.72)',lineHeight:1.35}}>Alternate shot: enter two team scores only. Shots are applied on the hardest SI holes. Use 0 if no shots.</div>
+                </>}
+                {(setup.matchplay&&setup.matchplay.mode)!=='foursomes'&&participants.map(p=>{
                   const id=normaliseId(p.id);
                   const teamA=(setup.matchplay.teamA||[]).map(normaliseId).includes(id);
                   const teamB=(setup.matchplay.teamB||[]).map(normaliseId).includes(id);
@@ -2632,7 +2688,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
                     </div>
                   </div>;
                 })}
-                <div style={{gridColumn:'1 / -1',fontSize:11,color:'rgba(255,255,255,0.72)',lineHeight:1.35}}>Team A: <b>{(setup.matchplay.teamA||[]).map(id=>gameFirstName((participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).display_name||(participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).name||'')).filter(Boolean).join(' & ')||'Pick 2'}</b> · Team B: <b>{(setup.matchplay.teamB||[]).map(id=>gameFirstName((participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).display_name||(participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).name||'')).filter(Boolean).join(' & ')||'Pick 2'}</b></div>
+                {(setup.matchplay&&setup.matchplay.mode)!=='foursomes'&&<div style={{gridColumn:'1 / -1',fontSize:11,color:'rgba(255,255,255,0.72)',lineHeight:1.35}}>Team A: <b>{(setup.matchplay.teamA||[]).map(id=>gameFirstName((participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).display_name||(participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).name||'')).filter(Boolean).join(' & ')||'Pick 2'}</b> · Team B: <b>{(setup.matchplay.teamB||[]).map(id=>gameFirstName((participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).display_name||(participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).name||'')).filter(Boolean).join(' & ')||'Pick 2'}</b></div>}
               </div>}
             </div>
           )}
@@ -3874,33 +3930,48 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   function matchplayTeamName(ids){return (ids||[]).map(matchplayPlayerName).filter(Boolean).join(' & ');}
   function matchplayState(){
     const cfg=matchplayConfig||{};
+    const mode=cfg.mode==='foursomes'?'foursomes':'doubles';
     let teamA=(cfg.teamA||[]).map(normaliseId).filter(Boolean);
     let teamB=(cfg.teamB||[]).map(normaliseId).filter(Boolean);
-    // Spectator fallback: if the matchplay setup row is missing/late but this is a 4-ball spectator card,
-    // use the visible player order (first two vs last two) so the casual matchplay score is not hidden.
-    if((!cfg.enabled||!teamA.length||!teamB.length)&&round&&round._spectator&&!round._cupScoring&&(grpPlayers||[]).length===4){
+    if(mode==='doubles'&&(!cfg.enabled||!teamA.length||!teamB.length)&&round&&round._spectator&&!round._cupScoring&&(grpPlayers||[]).length===4){
       teamA=[normaliseId(grpPlayers[0].id),normaliseId(grpPlayers[1].id)];
       teamB=[normaliseId(grpPlayers[2].id),normaliseId(grpPlayers[3].id)];
     }
-    if(!teamA.length||!teamB.length||round._cupScoring)return null;
+    if(round._cupScoring||!cfg.enabled)return null;
+    if(mode==='doubles'&&(!teamA.length||!teamB.length))return null;
     let lead=0,played=0,lastHole=0;
     const holeRows=[];
     holes.filter(h=>h.hole>=1&&h.hole<=18).forEach(hd=>{
       const h=hd.hole;
-      const scored=[...teamA,...teamB].every(pid=>hasEnteredGross((holeScores[h]||{})[pid]));
-      if(!scored)return;
-      const aBest=Math.max(...teamA.map(pid=>stablefordPointsValue(getLivePts(pid,h,(holeScores[h]||{})[pid])||0)));
-      const bBest=Math.max(...teamB.map(pid=>stablefordPointsValue(getLivePts(pid,h,(holeScores[h]||{})[pid])||0)));
-      let winner='halve';
-      if(aBest>bBest){lead+=1;winner='A';}
-      else if(bBest>aBest){lead-=1;winner='B';}
-      played+=1;lastHole=h;
-      holeRows.push({hole:h,aBest,bBest,winner,lead});
+      if(mode==='foursomes'){
+        const aGross=(holeScores[h]||{})[MATCHPLAY_FOURSOMES_A];
+        const bGross=(holeScores[h]||{})[MATCHPLAY_FOURSOMES_B];
+        if(!hasEnteredGross(aGross)||!hasEnteredGross(bGross))return;
+        const aShot=(parseInt(cfg.teamAShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
+        const bShot=(parseInt(cfg.teamBShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
+        const aNet=(parseInt(aGross)||0)-aShot;
+        const bNet=(parseInt(bGross)||0)-bShot;
+        let winner='halve';
+        if(aNet<bNet){lead+=1;winner='A';}
+        else if(bNet<aNet){lead-=1;winner='B';}
+        played+=1;lastHole=h;
+        holeRows.push({hole:h,aGross,bGross,aNet,bNet,winner,lead});
+      }else{
+        const scored=[...teamA,...teamB].every(pid=>hasEnteredGross((holeScores[h]||{})[pid]));
+        if(!scored)return;
+        const aBest=Math.max(...teamA.map(pid=>stablefordPointsValue(getLivePts(pid,h,(holeScores[h]||{})[pid])||0)));
+        const bBest=Math.max(...teamB.map(pid=>stablefordPointsValue(getLivePts(pid,h,(holeScores[h]||{})[pid])||0)));
+        let winner='halve';
+        if(aBest>bBest){lead+=1;winner='A';}
+        else if(bBest>aBest){lead-=1;winner='B';}
+        played+=1;lastHole=h;
+        holeRows.push({hole:h,aBest,bBest,winner,lead});
+      }
     });
     const remaining=Math.max(0,18-played);
     const abs=Math.abs(lead);
-    const aName=matchplayTeamName(teamA)||'Team A';
-    const bName=matchplayTeamName(teamB)||'Team B';
+    const aName=mode==='foursomes'?(cfg.teamAName||'Team 1'):(matchplayTeamName(teamA)||'Team A');
+    const bName=mode==='foursomes'?(cfg.teamBName||'Team 2'):(matchplayTeamName(teamB)||'Team B');
     let label='A/S';
     let sub=played?'Thru '+lastHole:'Not started yet';
     if(played&&lead!==0){
@@ -3908,7 +3979,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       if(abs>remaining) { label=leader+' win '+abs+'&'+remaining; sub='Match finished'; }
       else { label=leader+' '+abs+'UP'; sub='Thru '+lastHole; }
     } else if(played){ label='A/S'; sub='Thru '+lastHole; }
-    return {teamA,teamB,aName,bName,lead,played,lastHole,label,sub,holeRows};
+    return {mode,teamA,teamB,aName,bName,lead,played,lastHole,label,sub,holeRows,teamAShots:parseInt(cfg.teamAShots)||0,teamBShots:parseInt(cfg.teamBShots)||0};
   }
   function MatchplayScoreBanner(){
     const mp=matchplayState();
@@ -3918,8 +3989,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return <div style={{margin:'12px 16px 10px',...S.card,background:bg,borderColor:leadTeam==='A'?'rgba(251,191,36,0.38)':leadTeam==='B'?'rgba(96,184,240,0.42)':'rgba(255,255,255,0.13)'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:8}}>
         <div>
-          <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,letterSpacing:'0.12em'}}>DOUBLES MATCHPLAY</div>
-          <div style={{fontSize:13,color:'rgba(255,255,255,0.72)',marginTop:2}}>Best Stableford score wins each hole</div>
+          <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,letterSpacing:'0.12em'}}>{mp.mode==='foursomes'?'FOURSOMES MATCHPLAY':'DOUBLES MATCHPLAY'}</div>
+          <div style={{fontSize:13,color:'rgba(255,255,255,0.72)',marginTop:2}}>{mp.mode==='foursomes'?'Alternate shot · lowest net score wins each hole':'Best Stableford score wins each hole'}</div>
         </div>
         <div style={{fontSize:11,color:'#d4af37',fontWeight:950}}>LIVE</div>
       </div>
@@ -3939,6 +4010,54 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       <div style={{minWidth:0,textAlign:'left'}}><div style={{fontSize:10,color:'#fbbf24',fontWeight:950,letterSpacing:'0.08em'}}>MATCHPLAY</div><div style={{fontSize:12,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div></div>
       <div style={{textAlign:'center',minWidth:88}}><div style={{fontSize:18,color:'#fff',fontWeight:950,lineHeight:1}}>{mp.label}</div><div style={{fontSize:10,color:'#90ccf0',fontWeight:850,marginTop:2}}>{mp.sub}</div></div>
       <div style={{minWidth:0,textAlign:'right'}}><div style={{fontSize:10,color:'#90ccf0',fontWeight:950,letterSpacing:'0.08em'}}>DOUBLES</div><div style={{fontSize:12,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.bName}</div></div>
+    </div>;
+  }
+
+  function FoursomesScoreInput(){
+    if(!inputHole||![MATCHPLAY_FOURSOMES_A,MATCHPLAY_FOURSOMES_B].includes(inputHole.pid))return null;
+    const{holeNum,pid}=inputHole;
+    const hd=getHole(holeNum);
+    const mp=matchplayState();
+    const name=pid===MATCHPLAY_FOURSOMES_A?(mp&&mp.aName||'Team 1'):(mp&&mp.bName||'Team 2');
+    const dv=parseInt(inputVal)||hd.par;
+    const opts=Array.from({length:10},(_,i)=>Math.max(1,hd.par-2)+i);
+    const modal=(<div style={{position:'fixed',inset:0,width:'100vw',maxWidth:'100vw',overflow:'hidden',background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:16,boxSizing:'border-box'}} onClick={e=>{if(e.target===e.currentTarget)setInputHole(null);}}>
+      <div style={{background:'#0d2548',border:'1px solid rgba(255,255,255,0.2)',borderRadius:16,padding:16,width:'100%',maxWidth:'min(340px,calc(100vw - 32px))',boxSizing:'border-box'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}><div><div style={{fontSize:12,color:'#60b8f0',textTransform:'uppercase'}}>Hole {holeNum} · Par {hd.par}</div><div style={{fontSize:22,color:'#fff',fontWeight:900}}>{name}</div></div><button onClick={()=>setInputHole(null)} style={{background:'none',border:'none',color:'#fff',fontSize:24,cursor:'pointer'}}>×</button></div>
+        <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:10,marginBottom:10}}>{opts.map(s=>{const isSel=dv===s;return <button key={s} onClick={()=>setInputVal(String(s))} style={{minWidth:52,height:62,flexShrink:0,borderRadius:10,border:'2px solid '+(isSel?'#0070BB':'rgba(255,255,255,0.2)'),background:isSel?'#0070BB':'rgba(255,255,255,0.06)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,color:'#fff',fontWeight:900}}>{s}</button>;})}</div>
+        <button onClick={()=>{setScore(holeNum,pid,dv);setInputHole(null);}} style={{...S.pri,width:'100%',padding:13,fontSize:15}}>Save {dv}</button>
+      </div>
+    </div>);
+    return ReactDOM.createPortal(modal,document.body);
+  }
+  function FoursomesScorecard(){
+    const mp=matchplayState();
+    if(!mp||mp.mode!=='foursomes')return null;
+    const teamIds=[MATCHPLAY_FOURSOMES_A,MATCHPLAY_FOURSOMES_B];
+    const names=[mp.aName,mp.bName];
+    const shots=[mp.teamAShots,mp.teamBShots];
+    const canInput=canEdit;
+    return <div style={{paddingBottom:40}}>
+      <FoursomesScoreInput/>
+      <div style={{padding:'12px 14px',background:'rgba(0,0,0,0.20)',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
+        <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.15em',fontWeight:900,marginBottom:10}}>FOURSOMES SCORECARD</div>
+        <MatchplayMiniStatus/>
+      </div>
+      {['FRONT 9','BACK 9'].map((label,sec)=>{const list=sec===0?front9:back9;return <div key={label}>
+        <div style={{padding:'6px 12px',fontSize:11,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(0,0,0,0.3)'}}>{label}</div>
+        <div style={{display:'grid',gridTemplateColumns:'80px 1fr 1fr',padding:'8px 12px',borderBottom:'1px solid rgba(255,255,255,0.1)',background:'rgba(0,50,120,0.4)',gap:6,alignItems:'center'}}>
+          <div style={{fontSize:9,color:'#60b8f0',textTransform:'uppercase',letterSpacing:'0.08em'}}>Hole</div>
+          {names.map((n,i)=><div key={i} style={{textAlign:'center'}}><div style={{fontSize:18,color:'#fff',fontWeight:950,lineHeight:1}}>{n}</div><div style={{fontSize:10,color:'#90ccf0',fontWeight:800}}>{shots[i]?shots[i]+' shots':'No shots'}</div></div>)}
+        </div>
+        {list.map((hd,i)=>{const vals=teamIds.map(id=>(holeScores[hd.hole]||{})[id]);return <div key={hd.hole} style={{display:'grid',gridTemplateColumns:'80px 1fr 1fr',minHeight:74,borderBottom:'1px solid rgba(255,255,255,0.06)',background:i%2===0?'rgba(255,255,255,0.03)':'rgba(255,255,255,0.06)'}}>
+          <div style={{padding:'8px 12px',background:'rgba(0,0,0,0.18)'}}><div style={{fontSize:26,color:'#fff',fontWeight:300}}>{hd.hole}</div><div style={{fontSize:12,color:'#60b8f0'}}>Par {hd.par}</div><div style={{fontSize:11,color:'#d4af37',fontWeight:800}}>SI {hd.stroke_index}</div></div>
+          {teamIds.map((id,idx)=>{const g=vals[idx];const has=hasEnteredGross(g);const gets=(shots[idx]||0)>=parseInt(hd.stroke_index||99);return <div key={id} onClick={()=>canInput&&(setInputVal(has?String(Math.abs(parseInt(g)||0)):''),setInputHole({holeNum:hd.hole,pid:id}))} style={{display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:4,borderLeft:'1px solid rgba(255,255,255,0.06)',cursor:canInput?'pointer':'default',background:has?'rgba(0,112,187,0.16)':'transparent'}}>
+            <div style={{fontSize:34,color:has?'#fff':'rgba(255,255,255,0.25)',fontWeight:900}}>{has?grossDisplay(g):canInput?'TAP':'-'}</div>
+            {has&&<div style={{fontSize:11,color:'#90ccf0',fontWeight:900}}>{gets?'Net '+((parseInt(g)||0)-1):'Gross'}</div>}
+            {!has&&gets&&<div style={{fontSize:11,color:'#d4af37',fontWeight:900}}>shot</div>}
+          </div>;})}
+        </div>;})}
+      </div>;})}
     </div>;
   }
 
@@ -4049,6 +4168,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   // ---------------------------------------------------------
   function ScoreInput(){
     if(!inputHole)return null;
+    if([MATCHPLAY_FOURSOMES_A,MATCHPLAY_FOURSOMES_B].includes(inputHole.pid))return null;
     const{holeNum,pid}=inputHole;
     const shouldAutoAdvance=!!(inputHole&&inputHole.autoAdvance);
     const hd=getHole(holeNum);
@@ -4549,9 +4669,10 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
 
       <FinalStablefordSweepstakeBlock topMargin={12}/>
       <MatchplayScoreBanner/>
+      <FoursomesScorecard/>
 
       {/* Spectator live leaderboard */}
-      {!canEdit&&!isCompletedRound(round)&&(
+      {!(matchplayConfig&&matchplayConfig.enabled&&matchplayConfig.mode==='foursomes')&&!canEdit&&!isCompletedRound(round)&&(
         <div style={{padding:'12px 14px',background:'rgba(0,0,0,0.2)',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
           <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.15em',fontWeight:600,marginBottom:10}}>LIVE LEADERBOARD</div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
@@ -4584,7 +4705,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         </div>
       )}
 
-      {['FRONT 9','BACK 9'].map((label,sec)=>(
+      {!(matchplayConfig&&matchplayConfig.enabled&&matchplayConfig.mode==='foursomes')&&['FRONT 9','BACK 9'].map((label,sec)=>(
         <div key={label}>
           <div style={{padding:'4px 12px',fontSize:10,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
             <span>{label}</span>
