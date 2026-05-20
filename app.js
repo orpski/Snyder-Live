@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.76
+// SNYDER LIVE v2.77
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1832,13 +1832,17 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
           const aRow=rowMap[h]&&rowMap[h][aPid];
           const bRow=rowMap[h]&&rowMap[h][bPid];
           if(!aRow||!bRow||!hasEnteredGross(aRow.gross_score)||!hasEnteredGross(bRow.gross_score))return;
+          const markedAWon=isFoursomesWonMarker(aRow.gross_score)||isFoursomesConcededMarker(bRow.gross_score);
+          const markedBWon=isFoursomesWonMarker(bRow.gross_score)||isFoursomesConcededMarker(aRow.gross_score);
           const aShot=(parseInt(cfg.teamAShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
           const bShot=(parseInt(cfg.teamBShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
-          const aNet=(parseInt(aRow.gross_score)||0)-aShot;
-          const bNet=(parseInt(bRow.gross_score)||0)-bShot;
+          const aNet=isFoursomesOutcomeMarker(aRow.gross_score)?null:(parseInt(aRow.gross_score)||0)-aShot;
+          const bNet=isFoursomesOutcomeMarker(bRow.gross_score)?null:(parseInt(bRow.gross_score)||0)-bShot;
           let winner='halve';
-          if(aNet<bNet){lead+=1;winner='A';}
-          else if(bNet<aNet){lead-=1;winner='B';}
+          if(markedAWon&&!markedBWon){lead+=1;winner='A';}
+          else if(markedBWon&&!markedAWon){lead-=1;winner='B';}
+          else if(aNet!==null&&bNet!==null&&aNet<bNet){lead+=1;winner='A';}
+          else if(aNet!==null&&bNet!==null&&bNet<aNet){lead-=1;winner='B';}
           played+=1;lastHole=h;holeRows.push({hole:h,aNet,bNet,winner,lead});
           return;
         }
@@ -4422,7 +4426,12 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const otherFoursomesPid=scorePid===MATCHPLAY_FOURSOMES_A?MATCHPLAY_FOURSOMES_B:(scorePid===MATCHPLAY_FOURSOMES_B?MATCHPLAY_FOURSOMES_A:null);
     const otherFoursomesVal=otherFoursomesPid&&(holeScores[holeNum]||{})[otherFoursomesPid];
     const shouldClearOtherMarker=isFoursomesTeamPlayerId(scorePid)&&!isFoursomesOutcomeMarker(val)&&isFoursomesOutcomeMarker(otherFoursomesVal);
+    const singlesIds=singlesMatchplayOnlyIds();
+    const otherSinglesPid=singlesIds.length===2&&singlesIds.map(normaliseId).includes(normaliseId(scorePid))?(normaliseId(scorePid)===normaliseId(singlesIds[0])?singlesIds[1]:singlesIds[0]):null;
+    const otherSinglesVal=otherSinglesPid&&(holeScores[holeNum]||{})[otherSinglesPid];
+    const shouldClearOtherSinglesMarker=!!(otherSinglesPid&&!isFoursomesOutcomeMarker(val)&&isFoursomesOutcomeMarker(otherSinglesVal));
     if(shouldClearOtherMarker)saveLocalScore(holeNum,otherFoursomesPid,undefined);
+    if(shouldClearOtherSinglesMarker)saveLocalScore(holeNum,otherSinglesPid,undefined);
     saveLocalScore(holeNum,scorePid,val);
     if(isFoursomesTeamPlayerId(scorePid)){
       foursomesScoreEditRef.current=true;
@@ -4476,6 +4485,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           return [...filtered,row];
         });
         setLastRefreshed(new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
+        if(shouldClearOtherSinglesMarker)sb.from('cup_scores').delete().eq('round_id',round.id).eq('hole_number',holeNum).eq('player_id',otherSinglesPid).catch(()=>{});
         notifyMaybeBirdie(holeNum,scorePid,val);
         if(load)setTimeout(()=>load(),300);
       })
@@ -4485,7 +4495,9 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         flash('Score saved on this phone only: '+(e.message||String(e)),'error');
       });
     setHoleScores(prev=>{
-      const updated={...prev,[holeNum]:{...(prev[holeNum]||{}),[scorePid]:val}};
+      const updatedHole={...(prev[holeNum]||{}),[scorePid]:val};
+      if(shouldClearOtherSinglesMarker)delete updatedHole[otherSinglesPid];
+      const updated={...prev,[holeNum]:updatedHole};
       if(holeNum===9){
         const allFront9=Array.from({length:9},(_,i)=>i+1).every(h=>
           grpPlayers.every(p=>(updated[h]||{})[p.id]!==undefined)
@@ -4534,6 +4546,55 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       if(res&&!res.ok){setCloudError(res.error||'Foursomes hole result did not sync');flash('Foursomes result saved on this phone only: '+(res.error||'No cloud group found'),'error');}
       else setCloudError('');
     }).catch(e=>{setCloudError(e.message||String(e));flash('Foursomes result saved on this phone only: '+(e.message||String(e)),'error');});
+  }
+
+  function singlesMatchplayOnlyIds(){
+    const cfg=matchplayConfig||{};
+    if(!cfg.enabled||cfg.mode!=='singles'||cfg.keepStableford!==false)return [];
+    return [(cfg.teamA||[])[0],(cfg.teamB||[])[0]].filter(Boolean).map(String);
+  }
+  function isSinglesMatchplayOnlyScorecard(){
+    return singlesMatchplayOnlyIds().length===2;
+  }
+  function isSinglesMatchplayOnlyPlayer(pid){
+    const ids=singlesMatchplayOnlyIds().map(normaliseId);
+    return ids.includes(normaliseId(pid));
+  }
+  function setSinglesMatchplayHoleOutcome(holeNum,winnerPid){
+    const ids=singlesMatchplayOnlyIds();
+    if(ids.length!==2)return;
+    const winner=winnerPid?String(winnerPid):null;
+    const loser=winner===ids[0]?ids[1]:ids[0];
+    const winnerVal=winner?FOURSOMES_WON_MARKER:undefined;
+    const loserVal=winner?FOURSOMES_CONCEDED_MARKER:undefined;
+    saveLocalScore(holeNum,ids[0],winner===ids[0]?winnerVal:(winner?loserVal:undefined));
+    saveLocalScore(holeNum,ids[1],winner===ids[1]?winnerVal:(winner?loserVal:undefined));
+    setHoleScores(prev=>{
+      const nextHole={...(prev[holeNum]||{})};
+      if(winner){
+        nextHole[winner]=FOURSOMES_WON_MARKER;
+        nextHole[loser]=FOURSOMES_CONCEDED_MARKER;
+      }else{
+        delete nextHole[ids[0]];
+        delete nextHole[ids[1]];
+      }
+      return {...prev,[holeNum]:nextHole};
+    });
+    if(winner){
+      Promise.all([
+        saveScoreRowToCloud(sb,buildScoreRow(holeNum,winner,FOURSOMES_WON_MARKER)),
+        saveScoreRowToCloud(sb,buildScoreRow(holeNum,loser,FOURSOMES_CONCEDED_MARKER))
+      ]).then(results=>{
+        const bad=results.find(r=>r&&!r.ok);
+        if(bad){setCloudError(bad.error||'Singles matchplay result did not sync');flash('Matchplay result saved on this phone only: '+(bad.error||'Cloud save failed'),'error');}
+        else setCloudError('');
+      }).catch(e=>{setCloudError(e.message||String(e));flash('Matchplay result saved on this phone only: '+(e.message||String(e)),'error');});
+    }else{
+      sb.from('cup_scores').delete().eq('round_id',round.id).eq('hole_number',holeNum).in('player_id',ids).then(res=>{
+        if(res&&res.error)setCloudError(res.error.message||'Could not clear singles matchplay result');
+        else setCloudError('');
+      }).catch(e=>setCloudError(e.message||String(e)));
+    }
   }
 
     // ---------------------------------------------------------
@@ -4787,13 +4848,17 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         const aGross=aFound.value;
         const bGross=bFound.value;
         if(!hasEnteredGross(aGross)||!hasEnteredGross(bGross))return;
+        const markedAWon=isFoursomesWonMarker(aGross)||isFoursomesConcededMarker(bGross);
+        const markedBWon=isFoursomesWonMarker(bGross)||isFoursomesConcededMarker(aGross);
         const aShot=(parseInt(cfg.teamAShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
         const bShot=(parseInt(cfg.teamBShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
-        const aNet=(parseInt(aGross)||0)-aShot;
-        const bNet=(parseInt(bGross)||0)-bShot;
+        const aNet=isFoursomesOutcomeMarker(aGross)?null:(parseInt(aGross)||0)-aShot;
+        const bNet=isFoursomesOutcomeMarker(bGross)?null:(parseInt(bGross)||0)-bShot;
         let winner='halve';
-        if(aNet<bNet){lead+=1;winner='A';}
-        else if(bNet<aNet){lead-=1;winner='B';}
+        if(markedAWon&&!markedBWon){lead+=1;winner='A';}
+        else if(markedBWon&&!markedAWon){lead-=1;winner='B';}
+        else if(aNet!==null&&bNet!==null&&aNet<bNet){lead+=1;winner='A';}
+        else if(aNet!==null&&bNet!==null&&bNet<aNet){lead-=1;winner='B';}
         played+=1;lastHole=h;
         holeRows.push({hole:h,aGross,bGross,aNet,bNet,winner,lead});
       }else{
@@ -4946,6 +5011,33 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     </div>);
     return ReactDOM.createPortal(modal,document.body);
   }
+  function SinglesMatchplayScoreInput(){
+    if(!inputHole||!isSinglesMatchplayOnlyPlayer(inputHole.pid))return null;
+    const{holeNum,pid}=inputHole;
+    const hd=getHole(holeNum);
+    const mp=matchplayState();
+    if(!mp||mp.mode!=='singles'||mp.keepStableford!==false)return null;
+    const ids=singlesMatchplayOnlyIds();
+    const name=normaliseId(pid)===normaliseId(ids[0])?mp.aName:mp.bName;
+    const otherPid=normaliseId(pid)===normaliseId(ids[0])?ids[1]:ids[0];
+    const otherName=normaliseId(otherPid)===normaliseId(ids[0])?mp.aName:mp.bName;
+    const dv=parseInt(inputVal)||hd.par;
+    const opts=Array.from({length:10},(_,i)=>Math.max(1,hd.par-2)+i);
+    const modal=(<div style={{position:'fixed',inset:0,width:'100vw',maxWidth:'100vw',overflow:'hidden',background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:16,boxSizing:'border-box'}} onClick={e=>{if(e.target===e.currentTarget)setInputHole(null);}}>
+      <div style={{background:'#0d2548',border:'1px solid rgba(255,255,255,0.2)',borderRadius:16,padding:16,width:'100%',maxWidth:'min(340px,calc(100vw - 32px))',boxSizing:'border-box'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}><div><div style={{fontSize:12,color:'#60b8f0',textTransform:'uppercase'}}>Hole {holeNum} · Par {hd.par}</div><div style={{fontSize:22,color:'#fff',fontWeight:900}}>{name}</div></div><button onClick={()=>setInputHole(null)} style={{background:'none',border:'none',color:'#fff',fontSize:24,cursor:'pointer'}}>×</button></div>
+        <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:10,marginBottom:10}}>{opts.map(s=>{const isSel=dv===s;return <button key={s} onClick={()=>setInputVal(String(s))} style={{minWidth:52,height:62,flexShrink:0,borderRadius:10,border:'2px solid '+(isSel?'#0070BB':'rgba(255,255,255,0.2)'),background:isSel?'#0070BB':'rgba(255,255,255,0.06)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,color:'#fff',fontWeight:900}}>{s}</button>;})}</div>
+        <button onClick={()=>{setScore(holeNum,pid,dv);setInputHole(null);}} style={{...S.pri,width:'100%',padding:13,fontSize:15}}>Save {dv}</button>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:8}}>
+          <button onClick={()=>{setSinglesMatchplayHoleOutcome(holeNum,pid);setInputHole(null);}} style={{border:'1px solid rgba(34,197,94,0.45)',background:'rgba(34,197,94,0.16)',color:'#86efac',borderRadius:10,padding:'10px 8px',fontSize:12,fontWeight:950,cursor:'pointer'}}>Won hole</button>
+          <button onClick={()=>{setSinglesMatchplayHoleOutcome(holeNum,otherPid);setInputHole(null);}} style={{border:'1px solid rgba(239,68,68,0.45)',background:'rgba(239,68,68,0.14)',color:'#fecaca',borderRadius:10,padding:'10px 8px',fontSize:12,fontWeight:950,cursor:'pointer'}}>Concede</button>
+        </div>
+        <button onClick={()=>{setSinglesMatchplayHoleOutcome(holeNum,null);setInputHole(null);}} style={{...S.gho,width:'100%',padding:9,fontSize:12,marginTop:8}}>Clear hole</button>
+        <div style={{fontSize:10,color:'rgba(255,255,255,0.48)',textAlign:'center',marginTop:8}}>Concede gives the hole to {otherName}</div>
+      </div>
+    </div>);
+    return ReactDOM.createPortal(modal,document.body);
+  }
   function FoursomesScorecard(){
     const mp=matchplayState();
     if(!mp||mp.mode!=='foursomes')return null;
@@ -4969,6 +5061,39 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         {list.map((hd,i)=>{const vals=teamIds.map(id=>(holeScores[hd.hole]||{})[id]);return <div key={hd.hole} style={{display:'grid',gridTemplateColumns:'80px 1fr 1fr',minHeight:74,borderBottom:'1px solid rgba(255,255,255,0.06)',background:i%2===0?'rgba(255,255,255,0.03)':'rgba(255,255,255,0.06)'}}>
           <div style={{padding:'8px 12px',background:'rgba(0,0,0,0.18)'}}><div style={{fontSize:26,color:'#fff',fontWeight:300}}>{hd.hole}</div><div style={{fontSize:12,color:'#60b8f0'}}>Par {hd.par}</div><div style={{fontSize:11,color:'#d4af37',fontWeight:800}}>SI {hd.stroke_index}</div></div>
           {teamIds.map((id,idx)=>{const g=vals[idx];const marker=isFoursomesOutcomeMarker(g);const has=hasEnteredGross(g);const gets=(shots[idx]||0)>=parseInt(hd.stroke_index||99);const other=vals[idx===0?1:0];const otherMarker=isFoursomesOutcomeMarker(other);const both=hasEnteredGross(g)&&hasEnteredGross(other);const net=marker?null:(parseInt(g)||0)-(gets?1:0);const otherGets=(shots[idx===0?1:0]||0)>=parseInt(hd.stroke_index||99);const otherNet=otherMarker?null:(parseInt(other)||0)-(otherGets?1:0);const markedWon=isFoursomesWonMarker(g)||isFoursomesConcededMarker(other);const markedLost=isFoursomesConcededMarker(g)||isFoursomesWonMarker(other);const won=both&&(markedWon||(!markedLost&&net!==null&&otherNet!==null&&net<otherNet));const lost=both&&(markedLost||(!markedWon&&net!==null&&otherNet!==null&&net>otherNet));const bg=won?'linear-gradient(135deg,rgba(34,197,94,0.34),rgba(34,197,94,0.12))':lost?'linear-gradient(135deg,rgba(239,68,68,0.22),rgba(255,255,255,0.04))':has?'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(96,184,240,0.08))':'transparent';return <div key={id} onClick={()=>canInput&&(setInputVal(has&&!marker?String(Math.abs(parseInt(g)||0)):''),setInputHole({holeNum:hd.hole,pid:id}))} style={{display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:4,borderLeft:'1px solid rgba(255,255,255,0.06)',cursor:canInput?'pointer':'default',background:bg,boxShadow:won?'inset 0 0 0 1px rgba(34,197,94,0.30)':lost?'inset 0 0 0 1px rgba(239,68,68,0.18)':'none'}}>
+            <div style={{fontSize:marker?18:34,color:has?'#fff':'rgba(255,255,255,0.25)',fontWeight:900,letterSpacing:marker?'0.04em':0}}>{marker?(isFoursomesWonMarker(g)?'WON':'CON'):has?grossDisplay(g):canInput?'TAP':'-'}</div>
+            {has&&<div style={{fontSize:11,color:won?'#86efac':lost?'#fecaca':'#90ccf0',fontWeight:950}}>{marker?(won?'hole won':'conceded'):(gets?'Net '+net:'Gross')}{won&&!marker?' - won hole':''}</div>}
+            {!has&&gets&&<div style={{fontSize:11,color:'#d4af37',fontWeight:900}}>shot</div>}
+          </div>;})}
+        </div>;})}
+      </div>;})}
+      {matchFinished&&<div style={{padding:'14px 16px 24px'}}><button onClick={()=>setView('home')} style={{...S.pri,width:'100%',padding:15,fontSize:16,background:'#0a8a4a'}}>Home</button></div>}
+    </div>;
+  }
+  function SinglesMatchplayOnlyScorecard(){
+    const mp=matchplayState();
+    if(!mp||mp.mode!=='singles'||mp.keepStableford!==false)return null;
+    const ids=singlesMatchplayOnlyIds();
+    if(ids.length!==2)return null;
+    const names=[mp.aName,mp.bName];
+    const shots=[mp.teamAShots,mp.teamBShots];
+    const matchFinished=!!(mp.isFinished||!isLiveRound(round));
+    const canInput=canEdit&&!matchFinished;
+    return <div style={{paddingBottom:40}}>
+      <SinglesMatchplayScoreInput/>
+      <div style={{padding:'10px 14px 12px',background:'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(251,191,36,0.10))',borderBottom:'1px solid rgba(96,184,240,0.18)'}}>
+        <MatchplayMiniStatus/>
+        {matchFinished&&<div style={{marginTop:10,padding:'10px 12px',borderRadius:12,background:'rgba(34,197,94,0.16)',border:'1px solid rgba(34,197,94,0.35)',color:'#bbf7d0',fontSize:13,fontWeight:950,textAlign:'center'}}>Match finished · {mp.label}</div>}
+      </div>
+      {['FRONT 9','BACK 9'].map((label,sec)=>{const list=sec===0?front9:back9;return <div key={label}>
+        <div style={{padding:'6px 12px',fontSize:11,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(0,0,0,0.3)'}}>{label}</div>
+        <div style={{display:'grid',gridTemplateColumns:'80px 1fr 1fr',padding:'8px 12px',borderBottom:'1px solid rgba(255,255,255,0.1)',background:'linear-gradient(135deg,rgba(0,50,120,0.72),rgba(0,112,187,0.32))',gap:6,alignItems:'center'}}>
+          <div style={{fontSize:9,color:'#60b8f0',textTransform:'uppercase',letterSpacing:'0.08em'}}>Hole</div>
+          {names.map((n,i)=><div key={i} style={{textAlign:'center',minWidth:0}}><div style={{fontSize:16,color:'#fff',fontWeight:950,lineHeight:1.08,whiteSpace:'normal',overflowWrap:'anywhere'}}>{n}</div><div style={{fontSize:10,color:'#90ccf0',fontWeight:800}}>{shots[i]?shots[i]+' shots':'No shots'}</div></div>)}
+        </div>
+        {list.map((hd,i)=>{const vals=ids.map(id=>(holeScores[hd.hole]||{})[id]);return <div key={hd.hole} style={{display:'grid',gridTemplateColumns:'80px 1fr 1fr',minHeight:74,borderBottom:'1px solid rgba(255,255,255,0.06)',background:i%2===0?'rgba(255,255,255,0.03)':'rgba(255,255,255,0.06)'}}>
+          <div style={{padding:'8px 12px',background:'rgba(0,0,0,0.18)'}}><div style={{fontSize:26,color:'#fff',fontWeight:300}}>{hd.hole}</div><div style={{fontSize:12,color:'#60b8f0'}}>Par {hd.par}</div><div style={{fontSize:11,color:'#d4af37',fontWeight:800}}>SI {hd.stroke_index}</div></div>
+          {ids.map((id,idx)=>{const g=vals[idx];const marker=isFoursomesOutcomeMarker(g);const has=hasEnteredGross(g);const gets=(shots[idx]||0)>=parseInt(hd.stroke_index||99);const other=vals[idx===0?1:0];const otherMarker=isFoursomesOutcomeMarker(other);const both=hasEnteredGross(g)&&hasEnteredGross(other);const net=marker?null:(parseInt(g)||0)-(gets?1:0);const otherGets=(shots[idx===0?1:0]||0)>=parseInt(hd.stroke_index||99);const otherNet=otherMarker?null:(parseInt(other)||0)-(otherGets?1:0);const markedWon=isFoursomesWonMarker(g)||isFoursomesConcededMarker(other);const markedLost=isFoursomesConcededMarker(g)||isFoursomesWonMarker(other);const won=both&&(markedWon||(!markedLost&&net!==null&&otherNet!==null&&net<otherNet));const lost=both&&(markedLost||(!markedWon&&net!==null&&otherNet!==null&&net>otherNet));const bg=won?'linear-gradient(135deg,rgba(34,197,94,0.34),rgba(34,197,94,0.12))':lost?'linear-gradient(135deg,rgba(239,68,68,0.22),rgba(255,255,255,0.04))':has?'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(96,184,240,0.08))':'transparent';return <div key={id} onClick={()=>canInput&&(setInputVal(has&&!marker?String(Math.abs(parseInt(g)||0)):''),setInputHole({holeNum:hd.hole,pid:id}))} style={{display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:4,borderLeft:'1px solid rgba(255,255,255,0.06)',cursor:canInput?'pointer':'default',background:bg,boxShadow:won?'inset 0 0 0 1px rgba(34,197,94,0.30)':lost?'inset 0 0 0 1px rgba(239,68,68,0.18)':'none'}}>
             <div style={{fontSize:marker?18:34,color:has?'#fff':'rgba(255,255,255,0.25)',fontWeight:900,letterSpacing:marker?'0.04em':0}}>{marker?(isFoursomesWonMarker(g)?'WON':'CON'):has?grossDisplay(g):canInput?'TAP':'-'}</div>
             {has&&<div style={{fontSize:11,color:won?'#86efac':lost?'#fecaca':'#90ccf0',fontWeight:950}}>{marker?(won?'hole won':'conceded'):(gets?'Net '+net:'Gross')}{won&&!marker?' - won hole':''}</div>}
             {!has&&gets&&<div style={{fontSize:11,color:'#d4af37',fontWeight:900}}>shot</div>}
@@ -5109,6 +5234,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   function ScoreInput(){
     if(!inputHole)return null;
     if([MATCHPLAY_FOURSOMES_A,MATCHPLAY_FOURSOMES_B].includes(inputHole.pid))return null;
+    if(isSinglesMatchplayOnlyPlayer(inputHole.pid))return null;
     const{holeNum,pid}=inputHole;
     const shouldAutoAdvance=!!(inputHole&&inputHole.autoAdvance);
     const hd=getHole(holeNum);
@@ -5609,11 +5735,12 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       </div>
 
       <FinalStablefordSweepstakeBlock topMargin={12}/>
-      {!(matchplayConfig&&matchplayConfig.enabled&&matchplayConfig.mode==='foursomes')&&<MatchplayScoreBanner/>}
+      {!(matchplayConfig&&matchplayConfig.enabled&&(matchplayConfig.mode==='foursomes'||(matchplayConfig.mode==='singles'&&matchplayConfig.keepStableford===false)))&&<MatchplayScoreBanner/>}
       <FoursomesScorecard/>
+      <SinglesMatchplayOnlyScorecard/>
 
       {/* Spectator live leaderboard */}
-      {!(matchplayConfig&&matchplayConfig.enabled&&(matchplayConfig.mode==='foursomes'||matchplayConfig.mode==='singles'))&&!canEdit&&!isCompletedRound(round)&&(
+      {!(matchplayConfig&&matchplayConfig.enabled&&(matchplayConfig.mode==='foursomes'||(matchplayConfig.mode==='singles'&&matchplayConfig.keepStableford===false)))&&!canEdit&&!isCompletedRound(round)&&(
         <div style={{padding:'12px 14px',background:'rgba(0,0,0,0.2)',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
           <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.15em',fontWeight:600,marginBottom:10}}>LIVE LEADERBOARD</div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
@@ -5646,7 +5773,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         </div>
       )}
 
-      {!(matchplayConfig&&matchplayConfig.enabled&&matchplayConfig.mode==='foursomes')&&['FRONT 9','BACK 9'].map((label,sec)=>(
+      {!(matchplayConfig&&matchplayConfig.enabled&&(matchplayConfig.mode==='foursomes'||(matchplayConfig.mode==='singles'&&matchplayConfig.keepStableford===false)))&&['FRONT 9','BACK 9'].map((label,sec)=>(
         <div key={label}>
           <div style={{padding:'4px 12px',fontSize:10,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
             <span>{label}</span>
