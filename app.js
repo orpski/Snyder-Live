@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.81
+// SNYDER LIVE v2.82
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1425,6 +1425,10 @@ function App(){
   );
 
   if(view==='play')return <>{pullIndicator}<PlayGolf {...props}/></>;
+  if(view==='league'){
+    const LeagueSection=window.LeagueView;
+    return LeagueSection?<LeagueSection onExit={()=>setView('home')}/>:<div style={{minHeight:'100vh',background:'#0a1528',color:'#fff',padding:18}}><button onClick={()=>setView('home')} style={{...S.gho,padding:'7px 12px'}}>Back</button><div style={{marginTop:18,fontWeight:900}}>League is still loading. Try again in a moment.</div></div>;
+  }
   if(view==='admin')return <AdminPanel {...props}/>;
   if(view==='profile')return <ProfileView {...props} setCurrentUser={setCurrentUser}/>;
   if(view==='live')return <>{pullIndicator}<LiveScoringView {...props} selectedComp={selectedComp} activeComp={activeComp}/></>;
@@ -1488,6 +1492,12 @@ function App(){
             <div style={{fontSize:21,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Snyder Cup</div>
             <div style={{fontSize:12,color:'rgba(255,255,255,0.72)',marginTop:5,lineHeight:1.25}}>Team score, singles, fines</div>
           </button>
+
+          <button onClick={()=>setView('league')} style={{...NO_SELECT,gridColumn:'1 / -1',border:'1px solid rgba(96,184,240,0.30)',borderRadius:24,background:'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(13,37,72,0.96))',padding:'18px 14px',minHeight:104,textAlign:'left',cursor:'pointer',color:'#fff',boxShadow:'0 14px 30px rgba(0,112,187,0.12)'}}>
+            <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(96,184,240,0.16)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:25,fontWeight:950,color:'#60b8f0',marginBottom:14}}>L</div>
+            <div style={{fontSize:21,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Snyder League</div>
+            <div style={{fontSize:12,color:'rgba(255,255,255,0.72)',marginTop:5,lineHeight:1.25}}>League table, scores, money, rules</div>
+          </button>
         </div>
 
         {currentUser&&myRounds.length>0&&(
@@ -1528,6 +1538,10 @@ function App(){
         <button onClick={()=>setView('tournaments')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
           <div style={{fontSize:18,marginBottom:1,color:'#D4AF37',fontWeight:900}}>{EMOJI.trophy}</div>
           <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em'}}>SNYDER CUP</div>
+        </button>
+        <button onClick={()=>setView('league')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
+          <div style={{fontSize:18,marginBottom:1,color:'#60b8f0',fontWeight:900}}>L</div>
+          <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em'}}>LEAGUE</div>
         </button>
         <button onClick={()=>currentUser?setView('profile'):(setAuthPrompt(null),setShowAuth(true))} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
           <div style={{fontSize:18,marginBottom:1}}>{EMOJI.profile}</div>
