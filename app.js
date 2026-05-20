@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.79
+// SNYDER LIVE v2.80
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -2315,10 +2315,12 @@ function inferSinglesMatchplayConfig(round,group,rows,force=false){
   const list=Object.values(byKey);
   if(list.length!==2)return null;
   const scoreRows=(rows||[]).filter(r=>r&&(!round||r.round_id===round.id)&&!isMetaScoreRow(r));
+  let keepStableford=false;
   if(scoreRows.length){
     const known=list.flatMap(scoreAliasesForPerson).map(normaliseId);
     const unknown=scoreRows.some(r=>!known.includes(normaliseId(r.player_id)));
     if(unknown)return null;
+    keepStableford=scoreRows.some(r=>stablefordPointsValue(r.stableford_points)>0);
   }
   const ph=(group&&group.playing_handicaps)||{};
   const hcpFor=p=>parseInt(ph[p.id]??ph[normaliseId(p.id)]??p.playing_handicap??p.current_handicap??p.handicap??0)||0;
@@ -2326,7 +2328,7 @@ function inferSinglesMatchplayConfig(round,group,rows,force=false){
   const bH=hcpFor(list[1]);
   const diff=Math.abs(aH-bH);
   const nameFor=p=>gameFirstName((p&&p.display_name)||(p&&p.name)||'Player');
-  return {enabled:true,mode:'singles',teamA:[String(list[0].id)],teamB:[String(list[1].id)],teamAName:nameFor(list[0]),teamBName:nameFor(list[1]),teamAShots:aH>bH?diff:0,teamBShots:bH>aH?diff:0,keepStableford:true,_inferred:true};
+  return {enabled:true,mode:'singles',teamA:[String(list[0].id)],teamB:[String(list[1].id)],teamAName:nameFor(list[0]),teamBName:nameFor(list[1]),teamAShots:aH>bH?diff:0,teamBShots:bH>aH?diff:0,keepStableford,_inferred:true};
 }
 
 function foursomesConfigFromGroupMeta(group){
