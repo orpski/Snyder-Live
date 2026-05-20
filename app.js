@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.78
+// SNYDER LIVE v2.79
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1829,13 +1829,14 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     if(foursomes)return foursomes;
     try{
       const g=(rdGroups&&rdGroups[0])||{id:'group',group_number:1,participants:[]};
-      const cfg=matchplayConfigFromRows(allRows,rd,g);
+      const publicParts=(publicRoundPlayers[rd.id]||[]).map(rp=>mapRoundPlayerForScorecard(rp,isSnyderCupRound(rd)));
+      const savedCfg=matchplayConfigFromRows(allRows,rd,g);
+      const cfg=(savedCfg&&savedCfg.enabled)?savedCfg:inferSinglesMatchplayConfig(rd,{...g,participants:[...((g&&g.participants)||[]),...publicParts]},allRows,true);
       if(!cfg||!cfg.enabled||cfg.mode==='foursomes')return null;
       const mode=normaliseMatchplayMode(cfg.mode);
       const teamA=(cfg.teamA||[]).map(normaliseId).filter(Boolean);
       const teamB=(cfg.teamB||[]).map(normaliseId).filter(Boolean);
       if(!teamA.length||!teamB.length)return null;
-      const publicParts=(publicRoundPlayers[rd.id]||[]).map(rp=>mapRoundPlayerForScorecard(rp,isSnyderCupRound(rd)));
       const parts=[...((g&&g.participants)||[]),...((rd&&rd._allParticipants)||[]),...publicParts];
       const nameFor=id=>{const p=parts.find(x=>scoreAliasesForPerson(x).some(alias=>normaliseId(alias)===normaliseId(id)));return gameFirstName((p&&(p.display_name||p.name))||getDisplayName(id)||'Player');};
       const teamName=ids=>ids.map(nameFor).filter(Boolean).join(' & ');
@@ -2299,6 +2300,35 @@ function groupFromRoundPlayers(round,roundPlayers,isCupRound){
   }:null;
 }
 
+function inferSinglesMatchplayConfig(round,group,rows,force=false){
+  if(!group||round&&round._cupScoring)return null;
+  if(!force&&!(round&&round._spectator))return null;
+  const people=[
+    ...((group&&group.participants)||[]),
+    ...((group&&group.player_ids)||[]).map(id=>({id,name:'Player'}))
+  ].filter(p=>p&&p.id&&!isFoursomesTeamPlayerId(p.id));
+  const byKey={};
+  people.forEach(p=>{
+    const key=normaliseId(p.id);
+    if(key&&!byKey[key])byKey[key]=p;
+  });
+  const list=Object.values(byKey);
+  if(list.length!==2)return null;
+  const scoreRows=(rows||[]).filter(r=>r&&(!round||r.round_id===round.id)&&!isMetaScoreRow(r));
+  if(scoreRows.length){
+    const known=list.flatMap(scoreAliasesForPerson).map(normaliseId);
+    const unknown=scoreRows.some(r=>!known.includes(normaliseId(r.player_id)));
+    if(unknown)return null;
+  }
+  const ph=(group&&group.playing_handicaps)||{};
+  const hcpFor=p=>parseInt(ph[p.id]??ph[normaliseId(p.id)]??p.playing_handicap??p.current_handicap??p.handicap??0)||0;
+  const aH=hcpFor(list[0]);
+  const bH=hcpFor(list[1]);
+  const diff=Math.abs(aH-bH);
+  const nameFor=p=>gameFirstName((p&&p.display_name)||(p&&p.name)||'Player');
+  return {enabled:true,mode:'singles',teamA:[String(list[0].id)],teamB:[String(list[1].id)],teamAName:nameFor(list[0]),teamBName:nameFor(list[1]),teamAShots:aH>bH?diff:0,teamBShots:bH>aH?diff:0,keepStableford:true,_inferred:true};
+}
+
 function foursomesConfigFromGroupMeta(group){
   const ph=(group&&group.playing_handicaps)||{};
   const foursomesEmbedded=parseMaybeJsonObject(group&&group.foursomesConfig)||parseMaybeJsonObject(group&&group.foursomes_config);
@@ -2434,7 +2464,8 @@ function matchplayConfigFromRows(rows,round,group){
   const cloud={enabled:parsed.length>0||!!(meta&&meta.mode)||!!groupMeta||hasFoursomesScores,mode:cloudMode,teamA:inferSingles?[uniqueGroupIds[0]]:parsedA,teamB:inferSingles?[uniqueGroupIds[1]]:parsedB,teamAName:(meta&&meta.teamAName)||(groupMeta&&groupMeta.teamAName)||'Team 1',teamBName:(meta&&meta.teamBName)||(groupMeta&&groupMeta.teamBName)||'Team 2',teamAShots:(meta&&meta.teamAShots)||(groupMeta&&groupMeta.teamAShots)||0,teamBShots:(meta&&meta.teamBShots)||(groupMeta&&groupMeta.teamBShots)||0,keepStableford:meta&&meta.keepStableford!==undefined?meta.keepStableford:true};
   const local=round&&round.id?loadLocalMatchplayConfig(round.id,groupKey):null;
   const fallback=round&&round._matchplay;
-  const cfg=cloud.enabled?{...cloud,...(local&&local.enabled?{teamAName:local.teamAName,teamBName:local.teamBName,keepStableford:local.keepStableford}: {})}:(local&&local.enabled?local:(fallback&&fallback.enabled?fallback:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,keepStableford:true}));
+  const inferred=(!cloud.enabled&&!(local&&local.enabled)&&!(fallback&&fallback.enabled))?inferSinglesMatchplayConfig(round,group,rows,false):null;
+  const cfg=cloud.enabled?{...cloud,...(local&&local.enabled?{teamAName:local.teamAName,teamBName:local.teamBName,keepStableford:local.keepStableford}: {})}:(local&&local.enabled?local:(fallback&&fallback.enabled?fallback:(inferred||{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,keepStableford:true})));
   const mode=normaliseMatchplayMode(cfg.mode);
   const teamA=Array.from(new Set((cfg.teamA||[]).map(String).filter(Boolean)));
   const teamB=Array.from(new Set((cfg.teamB||[]).map(String).filter(Boolean)));
@@ -5770,7 +5801,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       <SinglesMatchplayOnlyScorecard/>
 
       {/* Spectator live leaderboard */}
-      {!(matchplayConfig&&matchplayConfig.enabled&&(matchplayConfig.mode==='foursomes'||(matchplayConfig.mode==='singles'&&matchplayConfig.keepStableford===false)))&&!canEdit&&!isCompletedRound(round)&&(
+      {!(matchplayConfig&&matchplayConfig.enabled)&&!canEdit&&!isCompletedRound(round)&&(
         <div style={{padding:'12px 14px',background:'rgba(0,0,0,0.2)',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
           <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.15em',fontWeight:600,marginBottom:10}}>LIVE LEADERBOARD</div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
