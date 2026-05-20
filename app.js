@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.77
+// SNYDER LIVE v2.78
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -408,6 +408,14 @@ function mapRoundPlayerForScorecard(rp,isCup){
   const id=roundPlayerPrimaryId(rp,isCup);
   return {id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0,user_id:rp.user_id,guest_id:rp.guest_id,cup_player_id:rp.cup_player_id,round_player_id:rp.id};
 }
+function scoreAliasesForPerson(person){
+  return [person&&person.id,person&&person.user_id,person&&person.guest_id,person&&person.cup_player_id,person&&person.round_player_id].filter(Boolean).map(String);
+}
+function aliasesForSavedScoreId(savedId,people){
+  const key=normaliseId(savedId);
+  const person=(people||[]).find(p=>scoreAliasesForPerson(p).some(id=>normaliseId(id)===key));
+  return person?scoreAliasesForPerson(person):[savedId];
+}
 function addRoundPlayerHandicaps(map,rp,isCup){
   const ids=isCup?[rp.id,rp.user_id,rp.guest_id,rp.cup_player_id]:[rp.user_id,rp.guest_id,rp.id];
   ids.filter(Boolean).forEach(id=>{map[id]=rp.playing_handicap||0;});
@@ -620,11 +628,22 @@ async function saveScoreRowToCloud(sb,row){
 function roundStartValue(round){
   return round&&round.started_at||round&&round.round_started_at||round&&round.created_at||Date.now();
 }
+function parseRoundDateValue(value){
+  if(value instanceof Date)return value;
+  if(typeof value==='string'){
+    const s=value.trim();
+    if(/^\d{4}-\d{2}-\d{2}T/.test(s)&&!/(Z|[+-]\d{2}:?\d{2})$/i.test(s))return new Date(s+'Z');
+  }
+  return value?new Date(value):new Date();
+}
+function roundStartDate(round){
+  return parseRoundDateValue(roundStartValue(round));
+}
 function formatRoundStart(round){
-  return new Date(roundStartValue(round)).toLocaleString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  return roundStartDate(round).toLocaleString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Europe/London'});
 }
 function startOfLocalDay(value){
-  const d=value?new Date(value):new Date();
+  const d=value?parseRoundDateValue(value):new Date();
   d.setHours(0,0,0,0);
   return d;
 }
@@ -632,7 +651,7 @@ function isSameLocalDay(a,b){
   return startOfLocalDay(a).getTime()===startOfLocalDay(b).getTime();
 }
 function monthKey(dateValue){
-  return new Date(dateValue).toLocaleString('en-GB',{month:'long',year:'numeric'});
+  return parseRoundDateValue(dateValue).toLocaleString('en-GB',{month:'long',year:'numeric',timeZone:'Europe/London'});
 }
 function startOfThisWeek(){
   const d=new Date();
@@ -649,7 +668,7 @@ function isCompletedRound(round){
   return round&&(round.status==='complete'||round.status==='completed');
 }
 function sortRoundsNewestFirst(list){
-  return [...list].sort((a,b)=>new Date(roundStartValue(b))-new Date(roundStartValue(a)));
+  return [...list].sort((a,b)=>roundStartDate(b)-roundStartDate(a));
 }
 function groupRoundsByMonth(list){
   return list.reduce((acc,r)=>{const key=monthKey(roundStartValue(r));if(!acc[key])acc[key]=[];acc[key].push(r);return acc;},{});
@@ -1285,8 +1304,8 @@ function App(){
   const completedRounds=sortRoundsNewestFirst(rounds.filter(isCompletedRound));
   const myRounds=myRoundsForUser(rounds,groups,currentUser);
   const thisWeekStart=startOfThisWeek();
-  const thisWeeksCards=completedRounds.filter(r=>new Date(roundStartValue(r))>=thisWeekStart);
-  const olderCards=completedRounds.filter(r=>new Date(roundStartValue(r))<thisWeekStart);
+  const thisWeeksCards=completedRounds.filter(r=>roundStartDate(r)>=thisWeekStart);
+  const olderCards=completedRounds.filter(r=>roundStartDate(r)<thisWeekStart);
   const olderCardsByMonth=groupRoundsByMonth(olderCards);
     // ---------------------------------------------------------
   // Round opening / scorecard hydration
@@ -1584,8 +1603,8 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
   },[liveRoundIds.join('|')]);
   const completedRounds=sortRoundsNewestFirst(rounds.filter(isCompletedRound));
   const thisWeekStart=startOfThisWeek();
-  const thisWeeksCards=completedRounds.filter(r=>new Date(roundStartValue(r))>=thisWeekStart);
-  const olderCards=completedRounds.filter(r=>new Date(roundStartValue(r))<thisWeekStart);
+  const thisWeeksCards=completedRounds.filter(r=>roundStartDate(r)>=thisWeekStart);
+  const olderCards=completedRounds.filter(r=>roundStartDate(r)<thisWeekStart);
   const olderCardsByMonth=groupRoundsByMonth(olderCards);
   async function buildCupSummaryForLiveOpen(cup,teams,currentRound){
     const cupRounds=(rounds||[]).filter(isSnyderCupRound);
@@ -1673,7 +1692,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
       const dbMap={};
       normaliseFoursomesScoreRows(dbScores||[]).filter(r=>!isMetaScoreRow(r)).forEach(s=>{
         if(!dbMap[s.hole_number])dbMap[s.hole_number]={};
-        dbMap[s.hole_number][s.player_id]=s.gross_score;
+        aliasesForSavedScoreId(s.player_id,po).forEach(pid=>{dbMap[s.hole_number][pid]=s.gross_score;});
       });
       const merged={...local,...dbMap};
       if(setHoleScores)setHoleScores(merged);
@@ -1816,13 +1835,14 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
       const teamA=(cfg.teamA||[]).map(normaliseId).filter(Boolean);
       const teamB=(cfg.teamB||[]).map(normaliseId).filter(Boolean);
       if(!teamA.length||!teamB.length)return null;
-      const parts=[...((g&&g.participants)||[]),...((rd&&rd._allParticipants)||[])];
-      const nameFor=id=>{const p=parts.find(x=>normaliseId(x.id)===normaliseId(id));return gameFirstName((p&&(p.display_name||p.name))||getDisplayName(id)||'Player');};
+      const publicParts=(publicRoundPlayers[rd.id]||[]).map(rp=>mapRoundPlayerForScorecard(rp,isSnyderCupRound(rd)));
+      const parts=[...((g&&g.participants)||[]),...((rd&&rd._allParticipants)||[]),...publicParts];
+      const nameFor=id=>{const p=parts.find(x=>scoreAliasesForPerson(x).some(alias=>normaliseId(alias)===normaliseId(id)));return gameFirstName((p&&(p.display_name||p.name))||getDisplayName(id)||'Player');};
       const teamName=ids=>ids.map(nameFor).filter(Boolean).join(' & ');
       const course=(courses||[]).find(co=>co.id===(rd&&rd.course_id))||findCourseForTee(courses||[],rd&&rd.course_name,rd&&rd.tee)||{};
       const holeList=(course&&Array.isArray(course.holes)&&course.holes.length)?course.holes:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1}));
       const rowMap={};
-      (allRows||[]).filter(r=>r&&r.round_id===rd.id&&!isMetaScoreRow(r)).forEach(r=>{const h=parseInt(r.hole_number);const id=normaliseId(r.player_id);if(!rowMap[h])rowMap[h]={};rowMap[h][id]=r;});
+      (allRows||[]).filter(r=>r&&r.round_id===rd.id&&!isMetaScoreRow(r)).forEach(r=>{const h=parseInt(r.hole_number);if(!rowMap[h])rowMap[h]={};aliasesForSavedScoreId(r.player_id,parts).forEach(pid=>{rowMap[h][normaliseId(pid)]=r;});});
       let lead=0,played=0,lastHole=0;const holeRows=[];
       holeList.filter(h=>parseInt(h.hole)>=1&&parseInt(h.hole)<=18).forEach(hd=>{
         const h=parseInt(hd.hole);
@@ -2210,7 +2230,7 @@ function parseMatchplayScoreRow(row){
   if(!txt.startsWith(MATCHPLAY_SCORE_PREFIX))return null;
   const parts=txt.split('|');
   if(parts.length<4)return null;
-  try{return {groupKey:decodeURIComponent(parts[1]||'group'),team:decodeURIComponent(parts[2]||'A'),pid:decodeURIComponent(parts.slice(3).join('|')||''),enabled:(parseInt(row&&row.stableford_points)||0)>0};}
+  try{return {groupKey:decodeURIComponent(parts[1]||'group'),team:decodeURIComponent(parts[2]||'A'),pid:decodeURIComponent(parts.slice(3).join('|')||''),enabled:(parseInt(row&&row.stableford_points)||0)>0||(parseInt(row&&row.gross_score)||0)>0};}
   catch(e){return null;}
 }
 function isMatchplayScoreRow(row){return !!parseMatchplayScoreRow(row);}
@@ -2402,7 +2422,16 @@ function matchplayConfigFromRows(rows,round,group){
   const meta=matchplayMetaFromRows(rows,round,groupKey);
   const groupMeta=foursomesConfigFromGroupMeta(group);
   const hasFoursomesScores=hasFoursomesScoreRows(rows,round)||foursomesScoreRowsFromGroupMeta(round&&round.id,group).length>0;
-  const cloud={enabled:parsed.length>0||!!(meta&&meta.mode==='foursomes')||!!groupMeta||hasFoursomesScores,mode:(meta&&meta.mode)||(groupMeta&&groupMeta.mode)||(hasFoursomesScores?'foursomes':'doubles'),teamA:parsed.filter(x=>x.team==='A').map(x=>x.pid),teamB:parsed.filter(x=>x.team==='B').map(x=>x.pid),teamAName:(meta&&meta.teamAName)||(groupMeta&&groupMeta.teamAName)||'Team 1',teamBName:(meta&&meta.teamBName)||(groupMeta&&groupMeta.teamBName)||'Team 2',teamAShots:(meta&&meta.teamAShots)||(groupMeta&&groupMeta.teamAShots)||0,teamBShots:(meta&&meta.teamBShots)||(groupMeta&&groupMeta.teamBShots)||0,keepStableford:meta&&meta.keepStableford!==undefined?meta.keepStableford:true};
+  const cloudMode=normaliseMatchplayMode((meta&&meta.mode)||(groupMeta&&groupMeta.mode)||(hasFoursomesScores?'foursomes':'doubles'));
+  const parsedA=parsed.filter(x=>x.team==='A').map(x=>x.pid);
+  const parsedB=parsed.filter(x=>x.team==='B').map(x=>x.pid);
+  const groupIds=[
+    ...((group&&group.player_ids)||[]),
+    ...((group&&group.participants)||[]).map(p=>p&&p.id)
+  ].map(normaliseId).filter(Boolean);
+  const uniqueGroupIds=Array.from(new Set(groupIds));
+  const inferSingles=cloudMode==='singles'&&!parsedA.length&&!parsedB.length&&uniqueGroupIds.length===2;
+  const cloud={enabled:parsed.length>0||!!(meta&&meta.mode)||!!groupMeta||hasFoursomesScores,mode:cloudMode,teamA:inferSingles?[uniqueGroupIds[0]]:parsedA,teamB:inferSingles?[uniqueGroupIds[1]]:parsedB,teamAName:(meta&&meta.teamAName)||(groupMeta&&groupMeta.teamAName)||'Team 1',teamBName:(meta&&meta.teamBName)||(groupMeta&&groupMeta.teamBName)||'Team 2',teamAShots:(meta&&meta.teamAShots)||(groupMeta&&groupMeta.teamAShots)||0,teamBShots:(meta&&meta.teamBShots)||(groupMeta&&groupMeta.teamBShots)||0,keepStableford:meta&&meta.keepStableford!==undefined?meta.keepStableford:true};
   const local=round&&round.id?loadLocalMatchplayConfig(round.id,groupKey):null;
   const fallback=round&&round._matchplay;
   const cfg=cloud.enabled?{...cloud,...(local&&local.enabled?{teamAName:local.teamAName,teamBName:local.teamBName,keepStableford:local.keepStableford}: {})}:(local&&local.enabled?local:(fallback&&fallback.enabled?fallback:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,keepStableford:true}));
@@ -3650,9 +3679,10 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       const scoreRows=allScoreRows.filter(r=>!isMetaScoreRow(r));
       const snakeRows=rows.filter(isSnakeScoreRow);
       const m={};
+      const scorePeople=(allRoundPlayers&&allRoundPlayers.length?allRoundPlayers:((group&&group.participants)||[]));
       scoreRows.forEach(s=>{
         if(!m[s.hole_number])m[s.hole_number]={};
-        m[s.hole_number][canonicalFoursomesPlayerId(s.player_id)]=s.gross_score;
+        aliasesForSavedScoreId(canonicalFoursomesPlayerId(s.player_id),scorePeople).forEach(pid=>{m[s.hole_number][pid]=s.gross_score;});
       });
       const cloudSnakes=rowsToSnakeMarks(rows);
       setSweepstakeConfig(sweepstakeConfigFromRows(rows,round));
