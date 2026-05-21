@@ -1,6 +1,6 @@
-// SNYDER GOLF v2.87 service worker
-const CACHE_NAME = "snyder-live-v2-87";
-const ASSETS = ['./','./index.html','./styles.css','./league-section.js','./app.js','./manifest-live.json','./icon-live-192.png','./icon-live-512.png','./notification-badge-v2.png','./course-whitley-bay.png','./course-tynemouth.svg','./course-quinta-do-lago.png','./course-ombria.png'];
+// SNYDER GOLF v2.88 service worker
+const CACHE_NAME = "snyder-golf-v2-88";
+const ASSETS = ['./','./index.html','./styles.css','./league-section.js','./app.js','./manifest-live.json','./snyder-golf-logo.png','./icon-golf-192.png','./icon-golf-512.png','./icon-live-192.png','./icon-live-512.png','./notification-badge-v2.png','./course-whitley-bay.png','./course-tynemouth.svg','./course-quinta-do-lago.png','./course-ombria.png'];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.map(key => key !== CACHE_NAME ? caches.delete(key) : null))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', event => { if (event.request.method !== 'GET') return; event.respondWith(fetch(event.request).then(response => { const clone = response.clone(); caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone)); return response; }).catch(() => caches.match(event.request).then(cached => cached || caches.match('./index.html')))); });
@@ -29,7 +29,7 @@ self.addEventListener('push', event => {
   const title = data.title || 'Snyder Golf';
   const options = {
     body: data.body || '',
-    icon: data.icon || './icon-live-192.png',
+    icon: data.icon || './icon-golf-192.png',
     badge: './notification-badge-v2.png',
     tag: data.tag || data.type || 'snyder-live',
     renotify: true,

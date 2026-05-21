@@ -1,4 +1,4 @@
-// SNYDER GOLF v2.87
+// SNYDER GOLF v2.88
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
@@ -136,8 +136,8 @@ async function sendSnyderLiveNotification(type,payload){
     }
     if(localStorage.getItem('liveNotificationsMuted')!=='true'&&'Notification' in window&&Notification.permission==='granted'&&document.visibilityState!=='visible'){
       const reg=await registerSnyderServiceWorker();
-      const title=body.title||'Snyder Live';
-      const options={body:body.body||body.message||'',icon:'./icon-live-192.png',badge:'./notification-badge-v2.png',tag:'snyder-live-'+(key||type),renotify:true,vibrate:[120,70,120],timestamp:Date.now(),data:{url:'./',type,roundId:body.roundId,app:'snyder-live'}};
+      const title=body.title||'Snyder Golf';
+      const options={body:body.body||body.message||'',icon:'./icon-golf-192.png',badge:'./notification-badge-v2.png',tag:'snyder-golf-'+(key||type),renotify:true,vibrate:[120,70,120],timestamp:Date.now(),data:{url:'./',type,roundId:body.roundId,app:'snyder-golf'}};
       if(reg&&reg.showNotification)reg.showNotification(title,options);
       else new Notification(title,options);
     }
@@ -3068,7 +3068,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       }));
 
       const starterName=((currentUser&&currentUser.display_name)||'Someone').split(' ')[0];
-      const notifyResult=await sendSnyderLiveNotification('round_started',{excludeUserId:currentUser&&currentUser.id||null,excludePlayerId:currentUser&&currentUser.id||null,excludeUserIds:currentUser&&currentUser.id?[String(currentUser.id)]:[],roundId:rd&&rd.id,status:'created',title:'🏌️ '+starterName+' is LIVE!',body:'Tap for live scores · '+(courseBaseName||roundName||'Snyder Live'),roundName:roundName,courseName:courseBaseName,createdBy:currentUser&&currentUser.id});
+      const notifyResult=await sendSnyderLiveNotification('round_started',{excludeUserId:currentUser&&currentUser.id||null,excludePlayerId:currentUser&&currentUser.id||null,excludeUserIds:currentUser&&currentUser.id?[String(currentUser.id)]:[],roundId:rd&&rd.id,status:'created',title:'🏌️ '+starterName+' is LIVE!',body:'Tap for live scores · '+(courseBaseName||roundName||'Snyder Golf'),roundName:roundName,courseName:courseBaseName,createdBy:currentUser&&currentUser.id});
       if(notifyResult&&!notifyResult.ok)console.warn('Snyder Live notification failed',notifyResult);
       await load();
       const scorerGroup=(createdGroups||[]).find(g=>currentUser&&Array.isArray(g.player_ids)&&g.player_ids.includes(currentUser.id))||(createdGroups||[])[0];
@@ -7770,7 +7770,7 @@ function BreakingNewsModal(){
         </div>
         <div style={{padding:26,textAlign:'center'}}>
           <div style={{fontSize:30,lineHeight:1.12,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',marginBottom:18,textTransform:'uppercase'}}>{BREAKING_NEWS_MESSAGE}</div>
-          <div style={{fontSize:13,lineHeight:1.45,color:'rgba(255,255,255,0.72)',marginBottom:22}}>You must close this announcement before entering Snyder Live.</div>
+          <div style={{fontSize:13,lineHeight:1.45,color:'rgba(255,255,255,0.72)',marginBottom:22}}>You must close this announcement before entering Snyder Golf.</div>
           <button onClick={()=>setOpen(false)} style={{width:'100%',border:'none',borderRadius:16,padding:'15px 18px',background:'linear-gradient(135deg,#ffffff,#e5e7eb)',color:'#7f1d1d',fontSize:16,fontWeight:950,cursor:'pointer',boxShadow:'0 12px 32px rgba(0,0,0,0.26)'}}>Close</button>
         </div>
       </div>
