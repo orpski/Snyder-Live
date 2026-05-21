@@ -1,4 +1,4 @@
-// SNYDER GOLF v2.88
+// SNYDER GOLF v2.89
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
