@@ -1,7 +1,7 @@
 {
-  "name": "Snyder Live",
-  "short_name": "Snyder Live",
-  "description": "Live golf scoring for the Snyder Cup",
+  "name": "Snyder Golf",
+  "short_name": "Snyder Golf",
+  "description": "Live golf scoring, league and Snyder Cup",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a1628",

@@ -1,4 +1,6 @@
-// SNYDER LIVE v2.85
+// SNYDER GOLF v2.86
+const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
+
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1443,8 +1445,8 @@ function App(){
       {pullIndicator}
       {/* Top nav */}
       <div style={{background:'#0d2548',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
-        <img src={LOGO} alt="Snyder Live" style={{width:36,height:36,objectFit:'contain',background:'transparent',borderRadius:0,display:'block'}}/>
-        <div style={{fontSize:15,color:'#fff',fontWeight:700,letterSpacing:'0.15em',fontFamily:"'Barlow Condensed',sans-serif"}}>SNYDER LIVE</div>
+        <img src={SNYDER_GOLF_LOGO} onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src=LOGO;}} alt="Snyder Golf" style={{width:38,height:38,objectFit:'contain',background:'transparent',borderRadius:0,display:'block'}}/>
+        <div style={{fontSize:15,color:'#fff',fontWeight:700,letterSpacing:'0.15em',fontFamily:"'Barlow Condensed',sans-serif"}}>SNYDER GOLF</div>
         <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:8,minWidth:74}}>
           {notifPermission!=='unsupported'&&(
             <button onClick={toggleNotificationsFromHome} aria-label={notificationsEnabled?'Turn notifications off':'Enable notifications'} title={notificationsEnabled?'Turn notifications off':'Enable notifications'} style={{...NO_SELECT,width:34,height:34,borderRadius:'50%',border:notificationsEnabled?'1px solid rgba(34,197,94,0.55)':'1px solid rgba(212,175,55,0.40)',background:notificationsEnabled?'linear-gradient(135deg,rgba(34,197,94,0.22),rgba(15,23,42,0.88))':'rgba(255,255,255,0.06)',color:notificationsEnabled?'#86efac':'#f5d76e',display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,cursor:'pointer',boxShadow:notificationsEnabled?'0 0 0 3px rgba(34,197,94,0.08)':'none',position:'relative'}}>
@@ -1462,45 +1464,56 @@ function App(){
       </div>
 
       <div style={{padding:'18px 16px 0'}}>
-        {/* Cleaner home dashboard */}
-        <div style={{marginBottom:16}}>
-          <div style={{fontSize:11,color:'#60b8f0',fontWeight:900,letterSpacing:'0.16em',textTransform:'uppercase',marginBottom:6}}>Home</div>
-          <div style={{fontSize:28,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Snyder Live</div>
-          <div style={{fontSize:13,color:'rgba(255,255,255,0.58)',marginTop:6}}>Pick what you need and get straight in.</div>
+        <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:18}}>
+          <div style={{width:74,height:74,borderRadius:18,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(96,184,240,0.20)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flex:'0 0 auto'}}>
+            <img src={SNYDER_GOLF_LOGO} onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src=LOGO;}} alt="Snyder Golf" style={{width:'100%',height:'100%',objectFit:'contain',padding:4,boxSizing:'border-box'}}/>
+          </div>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:11,color:'#60b8f0',fontWeight:900,letterSpacing:'0.16em',textTransform:'uppercase',marginBottom:5}}>Home</div>
+            <div style={{fontSize:30,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Snyder Golf</div>
+            <div style={{fontSize:13,color:'rgba(255,255,255,0.60)',marginTop:6,lineHeight:1.3}}>Live scoring, league and Cup in one place.</div>
+          </div>
         </div>
 
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:18}}>
-          <button onClick={()=>currentUser?setView('play'):promptStartRoundAuth()} style={{...NO_SELECT,border:'1px solid rgba(96,184,240,0.22)',borderRadius:24,background:'linear-gradient(135deg,#0070BB 0%,#123d73 100%)',padding:'18px 14px',minHeight:132,textAlign:'left',cursor:'pointer',boxShadow:'0 14px 32px rgba(0,112,187,0.22)',color:'#fff'}}>
-            <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(255,255,255,0.16)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,fontWeight:900,marginBottom:14}}>{EMOJI.plus}</div>
-            <div style={{fontSize:21,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Start Round</div>
-            <div style={{fontSize:12,color:'rgba(255,255,255,0.72)',marginTop:5,lineHeight:1.25}}>Create a card and go live</div>
-          </button>
-
-          <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{...NO_SELECT,border:'1px solid rgba(255,255,255,0.11)',borderRadius:24,background:'rgba(255,255,255,0.075)',padding:'18px 14px',minHeight:132,textAlign:'left',cursor:'pointer',color:'#fff',position:'relative',overflow:'hidden'}}>
-            <div style={{position:'absolute',inset:0,background:homeLiveCount?'linear-gradient(135deg,rgba(239,68,68,0.18),rgba(0,112,187,0.22))':'linear-gradient(135deg,rgba(96,184,240,0.08),rgba(255,255,255,0.03))',pointerEvents:'none'}}/>
-            <div style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-              <div style={{width:48,height:48,borderRadius:'50%',background:homeLiveCount?'rgba(239,68,68,0.22)':'rgba(96,184,240,0.12)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,fontWeight:950,color:homeLiveCount?'#fff':'#60b8f0'}}>{EMOJI.scores}</div>
-              <div style={{fontSize:24,fontWeight:900,color:homeLiveCount?'#ef4444':'#60b8f0'}}>{homeLiveCount}</div>
+        <div style={{display:'grid',gap:12,marginBottom:18}}>
+          <section style={{border:'1px solid rgba(96,184,240,0.24)',borderRadius:22,background:'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(13,37,72,0.96))',padding:14,boxShadow:'0 14px 32px rgba(0,112,187,0.16)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+              <div style={{width:50,height:50,borderRadius:14,background:'rgba(255,255,255,0.10)',border:'1px solid rgba(96,184,240,0.24)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flex:'0 0 auto'}}>
+                <img src={LOGO} alt="Snyder Live" style={{width:'100%',height:'100%',objectFit:'contain',padding:4,boxSizing:'border-box'}}/>
+              </div>
+              <div style={{minWidth:0,flex:1}}>
+                <div style={{fontSize:23,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1,color:'#fff'}}>Snyder Live</div>
+                <div style={{fontSize:12,color:'rgba(255,255,255,0.70)',marginTop:4}}>Start rounds, follow live scoreboards and view scorecards.</div>
+              </div>
+              <div style={{fontSize:24,fontWeight:950,color:homeLiveCount?'#ef4444':'#60b8f0',minWidth:26,textAlign:'right'}}>{homeLiveCount}</div>
             </div>
-            <div style={{position:'relative',fontSize:21,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Live Scorecards</div>
-            <div style={{position:'relative',fontSize:12,color:'rgba(255,255,255,0.72)',marginTop:5,lineHeight:1.25}}>{homeLiveCount?'Watch or continue scoring':'View live and saved cards'}</div>
-          </button>
-
-          <button onClick={()=>setView('tournaments')} style={{...NO_SELECT,gridColumn:'1 / -1',border:'1px solid rgba(212,175,55,0.34)',borderRadius:24,background:'linear-gradient(135deg,rgba(212,175,55,0.18),rgba(11,31,77,0.92))',padding:'18px 14px',minHeight:104,textAlign:'left',cursor:'pointer',color:'#fff',boxShadow:'0 14px 30px rgba(212,175,55,0.10)'}}>
-            <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(212,175,55,0.18)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,fontWeight:950,color:'#F5E6A3',marginBottom:14}}>{EMOJI.trophy}</div>
-            <div style={{fontSize:21,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Snyder Cup</div>
-            <div style={{fontSize:12,color:'rgba(255,255,255,0.72)',marginTop:5,lineHeight:1.25}}>Team score, singles, fines</div>
-          </button>
-
-          <button onClick={()=>setView('league')} style={{...NO_SELECT,gridColumn:'1 / -1',border:'1px solid rgba(96,184,240,0.30)',borderRadius:24,background:'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(13,37,72,0.96))',padding:'18px 14px',minHeight:104,textAlign:'left',cursor:'pointer',color:'#fff',boxShadow:'0 14px 30px rgba(0,112,187,0.12)'}}>
-            <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(255,255,255,0.10)',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:14,overflow:'hidden',border:'1px solid rgba(96,184,240,0.24)'}}>
-              <img src={window.SUMMER_LEAGUE_LOGO||LOGO} alt="" style={{width:'100%',height:'100%',objectFit:'contain',padding:4,boxSizing:'border-box'}}/>
+            {homeLatestLive&&<div style={{fontSize:12,color:'rgba(255,255,255,0.62)',margin:'0 0 12px 62px',lineHeight:1.35}}>Latest live: {homeLatestLive.name||"Live round"}{homeLatestCourse?' at '+homeLatestCourse.name:''}</div>}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <button onClick={()=>currentUser?setView('play'):promptStartRoundAuth()} style={{...NO_SELECT,...S.pri,padding:'13px 10px',fontSize:13,fontWeight:900}}>Start Round</button>
+              <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{...NO_SELECT,...S.gho,padding:'13px 10px',fontSize:13,fontWeight:900}}>Live Scoreboards</button>
             </div>
-            <div style={{fontSize:21,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Snyder League</div>
-            <div style={{fontSize:12,color:'rgba(255,255,255,0.72)',marginTop:5,lineHeight:1.25}}>League table, scores, money, rules</div>
+          </section>
+
+          <button onClick={()=>setView('league')} style={{...NO_SELECT,border:'1px solid rgba(96,184,240,0.24)',borderRadius:22,background:'rgba(255,255,255,0.065)',padding:14,textAlign:'left',cursor:'pointer',color:'#fff',display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:50,height:50,borderRadius:14,background:'rgba(255,255,255,0.10)',border:'1px solid rgba(96,184,240,0.24)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flex:'0 0 auto'}}>
+              <img src={window.SUMMER_LEAGUE_LOGO||LOGO} alt="Snyder League" style={{width:'100%',height:'100%',objectFit:'contain',padding:4,boxSizing:'border-box'}}/>
+            </div>
+            <div style={{minWidth:0,flex:1}}>
+              <div style={{fontSize:23,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Snyder League</div>
+              <div style={{fontSize:12,color:'rgba(255,255,255,0.70)',marginTop:5,lineHeight:1.3}}>League table, scores, money and rules.</div>
+            </div>
+            <div style={{fontSize:22,color:'#60b8f0',fontWeight:900}}>{'>'}</div>
+          </button>
+
+          <button onClick={()=>setView('tournaments')} style={{...NO_SELECT,border:'1px solid rgba(212,175,55,0.34)',borderRadius:22,background:'linear-gradient(135deg,rgba(212,175,55,0.16),rgba(11,31,77,0.92))',padding:14,textAlign:'left',cursor:'pointer',color:'#fff',display:'flex',alignItems:'center',gap:12,boxShadow:'0 14px 30px rgba(212,175,55,0.08)'}}>
+            <div style={{width:50,height:50,borderRadius:14,background:'rgba(212,175,55,0.18)',border:'1px solid rgba(212,175,55,0.26)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,fontWeight:950,color:'#F5E6A3',flex:'0 0 auto'}}>{EMOJI.trophy}</div>
+            <div style={{minWidth:0,flex:1}}>
+              <div style={{fontSize:23,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Snyder Cup</div>
+              <div style={{fontSize:12,color:'rgba(255,255,255,0.70)',marginTop:5,lineHeight:1.3}}>Team score, singles, fines and events.</div>
+            </div>
+            <div style={{fontSize:22,color:'#D4AF37',fontWeight:900}}>{'>'}</div>
           </button>
         </div>
-
       </div>
 
       {/* Bottom tab bar */}

@@ -1,5 +1,5 @@
-// SNYDER LIVE v2.85 service worker
-const CACHE_NAME = "snyder-live-v2-85";
+// SNYDER GOLF v2.86 service worker
+const CACHE_NAME = "snyder-live-v2-86";
 const ASSETS = ['./','./index.html','./styles.css','./league-section.js','./app.js','./manifest-live.json','./icon-live-192.png','./icon-live-512.png','./notification-badge-v2.png','./course-whitley-bay.png','./course-tynemouth.svg','./course-quinta-do-lago.png','./course-ombria.png'];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.map(key => key !== CACHE_NAME ? caches.delete(key) : null))).then(() => self.clients.claim())); });
@@ -21,12 +21,12 @@ self.addEventListener('message', event => {
 
 self.addEventListener('push', event => {
   let data = {};
-  try { data = event.data ? event.data.json() : {}; } catch (e) { data = { title: 'Snyder Live', body: event.data ? event.data.text() : '' }; }
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = { title: 'Snyder Golf', body: event.data ? event.data.text() : '' }; }
   event.waitUntil((async()=>{
   const roundId=(data.roundId)||(data.data&&data.data.roundId);
   const muted=await mutedRoundIds();
   if(roundId&&muted.includes(String(roundId)))return;
-  const title = data.title || 'Snyder Live';
+  const title = data.title || 'Snyder Golf';
   const options = {
     body: data.body || '',
     icon: data.icon || './icon-live-192.png',
