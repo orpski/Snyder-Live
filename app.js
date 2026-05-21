@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.82
+// SNYDER LIVE v2.83
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1435,7 +1435,6 @@ function App(){
   if(view==='tournaments')return <TournamentsView {...props} activeComp={activeComp} selectedComp={selectedComp} setSelectedComp={setSelectedComp}/>;
 
   const homeLiveCount=liveRounds.length;
-  const homeMyRoundsCount=currentUser?myRounds.length:0;
   const homeLatestLive=homeLiveCount?liveRounds[0]:null;
   const homeLatestCourse=homeLatestLive?courses.find(co=>co.id===homeLatestLive.course_id):null;
 
@@ -1494,34 +1493,13 @@ function App(){
           </button>
 
           <button onClick={()=>setView('league')} style={{...NO_SELECT,gridColumn:'1 / -1',border:'1px solid rgba(96,184,240,0.30)',borderRadius:24,background:'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(13,37,72,0.96))',padding:'18px 14px',minHeight:104,textAlign:'left',cursor:'pointer',color:'#fff',boxShadow:'0 14px 30px rgba(0,112,187,0.12)'}}>
-            <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(96,184,240,0.16)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:25,fontWeight:950,color:'#60b8f0',marginBottom:14}}>L</div>
+            <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(255,255,255,0.10)',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:14,overflow:'hidden',border:'1px solid rgba(96,184,240,0.24)'}}>
+              <img src={SUMMER_LEAGUE_LOGO} alt="" style={{width:'100%',height:'100%',objectFit:'contain',padding:4,boxSizing:'border-box'}}/>
+            </div>
             <div style={{fontSize:21,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Snyder League</div>
             <div style={{fontSize:12,color:'rgba(255,255,255,0.72)',marginTop:5,lineHeight:1.25}}>League table, scores, money, rules</div>
           </button>
         </div>
-
-        {currentUser&&myRounds.length>0&&(
-          <div style={{borderRadius:22,border:'1px solid rgba(255,255,255,0.10)',background:'rgba(255,255,255,0.045)',padding:12,marginBottom:18}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-              <div style={{fontSize:13,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>MY ROUNDS</div>
-              <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{background:'none',border:'none',color:'#60b8f0',fontWeight:800,fontSize:12,cursor:'pointer'}}>See all</button>
-            </div>
-            {myRounds.slice(0,3).map(rd=>{
-              const course=courses.find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee);
-              const live=isLiveRound(rd);
-              return(
-                <button key={rd.id} onClick={()=>openRound(rd)} style={{...NO_SELECT,width:'100%',background:'rgba(13,37,72,0.72)',border:'1px solid rgba(96,184,240,0.16)',borderRadius:18,padding:10,display:'flex',alignItems:'center',gap:10,cursor:'pointer',color:'#fff',textAlign:'left'}}>
-                  <CourseBadge course={course} round={rd} size={36}/>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:14,fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||getCourseDisplayName(course,rd)||'Round'}</div>
-                    <div style={{fontSize:11,color:'#60b8f0'}}>{live?'Continue scoring':'Completed'} - {formatRoundStart(rd)}</div>
-                  </div>
-                  <div style={{fontSize:10,color:live?'#fff':'#60b8f0',background:live?'#ef4444':'rgba(96,184,240,0.12)',borderRadius:20,padding:'4px 8px',fontWeight:900}}>{live?'LIVE':'DONE'}</div>
-                </button>
-              );
-            })}
-          </div>
-        )}
 
       </div>
 
@@ -1540,7 +1518,7 @@ function App(){
           <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em'}}>SNYDER CUP</div>
         </button>
         <button onClick={()=>setView('league')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
-          <div style={{fontSize:18,marginBottom:1,color:'#60b8f0',fontWeight:900}}>L</div>
+          <img src={SUMMER_LEAGUE_LOGO} alt="" style={{width:20,height:20,objectFit:'contain',marginBottom:0}}/>
           <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em'}}>LEAGUE</div>
         </button>
         <button onClick={()=>currentUser?setView('profile'):(setAuthPrompt(null),setShowAuth(true))} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
