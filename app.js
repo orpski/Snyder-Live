@@ -1,4 +1,4 @@
-// SNYDER LIVE v2.83
+// SNYDER LIVE v2.84
 // =========================================================
 // React hooks / runtime aliases
 // =========================================================
@@ -1494,7 +1494,7 @@ function App(){
 
           <button onClick={()=>setView('league')} style={{...NO_SELECT,gridColumn:'1 / -1',border:'1px solid rgba(96,184,240,0.30)',borderRadius:24,background:'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(13,37,72,0.96))',padding:'18px 14px',minHeight:104,textAlign:'left',cursor:'pointer',color:'#fff',boxShadow:'0 14px 30px rgba(0,112,187,0.12)'}}>
             <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(255,255,255,0.10)',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:14,overflow:'hidden',border:'1px solid rgba(96,184,240,0.24)'}}>
-              <img src={SUMMER_LEAGUE_LOGO} alt="" style={{width:'100%',height:'100%',objectFit:'contain',padding:4,boxSizing:'border-box'}}/>
+              <img src={LOGO} alt="" style={{width:'100%',height:'100%',objectFit:'contain',padding:4,boxSizing:'border-box'}}/>
             </div>
             <div style={{fontSize:21,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Snyder League</div>
             <div style={{fontSize:12,color:'rgba(255,255,255,0.72)',marginTop:5,lineHeight:1.25}}>League table, scores, money, rules</div>
@@ -1518,7 +1518,7 @@ function App(){
           <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em'}}>SNYDER CUP</div>
         </button>
         <button onClick={()=>setView('league')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
-          <img src={SUMMER_LEAGUE_LOGO} alt="" style={{width:20,height:20,objectFit:'contain',marginBottom:0}}/>
+          <img src={LOGO} alt="" style={{width:20,height:20,objectFit:'contain',marginBottom:0}}/>
           <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em'}}>LEAGUE</div>
         </button>
         <button onClick={()=>currentUser?setView('profile'):(setAuthPrompt(null),setShowAuth(true))} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
