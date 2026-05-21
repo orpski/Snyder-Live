@@ -1,4 +1,4 @@
-// SNYDER GOLF v2.86
+// SNYDER GOLF v2.87
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
@@ -1464,17 +1464,6 @@ function App(){
       </div>
 
       <div style={{padding:'18px 16px 0'}}>
-        <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:18}}>
-          <div style={{width:74,height:74,borderRadius:18,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(96,184,240,0.20)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flex:'0 0 auto'}}>
-            <img src={SNYDER_GOLF_LOGO} onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src=LOGO;}} alt="Snyder Golf" style={{width:'100%',height:'100%',objectFit:'contain',padding:4,boxSizing:'border-box'}}/>
-          </div>
-          <div style={{minWidth:0}}>
-            <div style={{fontSize:11,color:'#60b8f0',fontWeight:900,letterSpacing:'0.16em',textTransform:'uppercase',marginBottom:5}}>Home</div>
-            <div style={{fontSize:30,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em',lineHeight:1}}>Snyder Golf</div>
-            <div style={{fontSize:13,color:'rgba(255,255,255,0.60)',marginTop:6,lineHeight:1.3}}>Live scoring, league and Cup in one place.</div>
-          </div>
-        </div>
-
         <div style={{display:'grid',gap:12,marginBottom:18}}>
           <section style={{border:'1px solid rgba(96,184,240,0.24)',borderRadius:22,background:'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(13,37,72,0.96))',padding:14,boxShadow:'0 14px 32px rgba(0,112,187,0.16)'}}>
             <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
