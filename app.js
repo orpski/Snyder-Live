@@ -1,4 +1,4 @@
-// SNYDER GOLF v2.98
+// SNYDER GOLF v2.99
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
@@ -1480,7 +1480,7 @@ function App(){
             {homeLatestLive&&<div style={{fontSize:12,color:'rgba(255,255,255,0.62)',margin:'0 0 12px 62px',lineHeight:1.35}}>Latest live: {homeLatestLive.name||"Live round"}{homeLatestCourse?' at '+homeLatestCourse.name:''}</div>}
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
               <button onClick={()=>currentUser?setView('play'):promptStartRoundAuth()} style={{...NO_SELECT,...S.pri,padding:'15px 10px',fontSize:14,fontWeight:950}}><span className="sg-pop-button">Start Round</span></button>
-              <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{...NO_SELECT,...S.gho,padding:'15px 10px',fontSize:14,fontWeight:950}}><span className="sg-pop-button">Live Scoreboards ({homeLiveCount})</span></button>
+              <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{...NO_SELECT,border:'1px solid rgba(248,113,113,0.52)',borderRadius:12,background:'linear-gradient(135deg,rgba(239,68,68,0.92),rgba(127,29,29,0.88))',color:'#fff',boxShadow:'0 10px 22px rgba(239,68,68,0.22), inset 0 1px 0 rgba(255,255,255,0.18)',padding:'15px 10px',fontSize:14,fontWeight:950,cursor:'pointer'}}><span className="sg-pop-button">Live Scoreboards ({homeLiveCount})</span></button>
             </div>
           </section>
 
@@ -1530,7 +1530,7 @@ function App(){
           <div style={{fontSize:18,marginBottom:1}}>{EMOJI.admin}</div>
           <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:1,lineHeight:1}}>
             <span style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>ADMIN</span>
-            <span aria-label="App version v2.98" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',color:'rgba(255,255,255,0.32)'}}>v2.98</span>
+            <span aria-label="App version v2.99" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',color:'rgba(255,255,255,0.32)'}}>v2.99</span>
           </div>
         </button>
       </div>
