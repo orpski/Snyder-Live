@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.00
+// SNYDER GOLF v3.01
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
@@ -1439,6 +1439,10 @@ function App(){
   const homeLiveCount=liveRounds.length;
   const homeLatestLive=homeLiveCount?liveRounds[0]:null;
   const homeLatestCourse=homeLatestLive?courses.find(co=>co.id===homeLatestLive.course_id):null;
+  const bottomTabStyle=color=>({flex:1,background:'none',border:'none',cursor:'pointer',display:'grid',gridTemplateRows:'24px 12px 9px',justifyItems:'center',alignItems:'center',rowGap:2,color,padding:0,minWidth:0});
+  const bottomIconStyle={height:24,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,lineHeight:1};
+  const bottomLabelStyle={fontSize:10,fontWeight:700,letterSpacing:'0.08em',lineHeight:'12px'};
+  const bottomSpacer=<span aria-hidden="true" style={{height:9,lineHeight:'9px',fontSize:8}}></span>;
 
   return(
     <div style={{minHeight:'100vh',paddingBottom:60,background:'linear-gradient(180deg,#0d2548 0%,#0a1f3d 100%)'}}>
@@ -1506,34 +1510,37 @@ function App(){
 
       {/* Bottom tab bar */}
       <div style={{position:'fixed',bottom:0,left:0,right:0,background:'#0d2548',borderTop:'1px solid rgba(255,255,255,0.1)',display:'flex',padding:'8px 0 20px'}}>
-        <button onClick={()=>setView('play')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'#0070BB'}}>
-          <div style={{fontSize:18,marginBottom:1}}>{EMOJI.golf}</div>
-          <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>PLAY</div>
+        <button onClick={()=>setView('play')} style={bottomTabStyle('#0070BB')}>
+          <div style={bottomIconStyle}>{EMOJI.golf}</div>
+          <div style={bottomLabelStyle}>PLAY</div>
+          {bottomSpacer}
         </button>
-        <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
-          <div style={{fontSize:18,marginBottom:1}}>{EMOJI.scores}</div>
-          <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>SCORES</div>
+        <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
+          <div style={bottomIconStyle}>{EMOJI.scores}</div>
+          <div style={bottomLabelStyle}>SCORES</div>
+          {bottomSpacer}
         </button>
-        <button onClick={()=>setView('tournaments')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
-          <div style={{fontSize:18,marginBottom:1,color:'#D4AF37',fontWeight:900}}>{EMOJI.trophy}</div>
-          <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em'}}>CUP</div>
+        <button onClick={()=>setView('tournaments')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
+          <div style={{...bottomIconStyle,color:'#D4AF37',fontWeight:900}}>{EMOJI.trophy}</div>
+          <div style={{...bottomLabelStyle,fontWeight:800}}>CUP</div>
+          {bottomSpacer}
         </button>
-        <button onClick={()=>setView('league')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
-          <div style={{height:24,marginBottom:1,display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <button onClick={()=>setView('league')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
+          <div style={bottomIconStyle}>
             <img src={window.SUMMER_LEAGUE_LOGO||LOGO} alt="" style={{width:20,height:20,objectFit:'contain',display:'block'}}/>
           </div>
-          <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em'}}>LEAGUE</div>
+          <div style={{...bottomLabelStyle,fontWeight:800}}>LEAGUE</div>
+          {bottomSpacer}
         </button>
-        <button onClick={()=>currentUser?setView('profile'):(setAuthPrompt(null),setShowAuth(true))} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
-          <div style={{fontSize:18,marginBottom:1}}>{EMOJI.profile}</div>
-          <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>PROFILE</div>
+        <button onClick={()=>currentUser?setView('profile'):(setAuthPrompt(null),setShowAuth(true))} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
+          <div style={bottomIconStyle}>{EMOJI.profile}</div>
+          <div style={bottomLabelStyle}>PROFILE</div>
+          {bottomSpacer}
         </button>
-        <button onClick={()=>setView('admin')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
-          <div style={{fontSize:18,marginBottom:1}}>{EMOJI.admin}</div>
-          <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:1,lineHeight:1}}>
-            <span style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>ADMIN</span>
-            <span aria-label="App version v3.00" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',color:'rgba(255,255,255,0.32)'}}>v3.00</span>
-          </div>
+        <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
+          <div style={bottomIconStyle}>{EMOJI.admin}</div>
+          <div style={bottomLabelStyle}>ADMIN</div>
+          <span aria-label="App version v3.01" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.01</span>
         </button>
       </div>
 
