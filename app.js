@@ -1,4 +1,4 @@
-// SNYDER GOLF v2.97
+// SNYDER GOLF v2.98
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
@@ -1476,12 +1476,11 @@ function App(){
                 <div className="sg-pop-heading" style={{fontSize:23,lineHeight:1}}>Live</div>
                 <div style={{fontSize:12,color:'rgba(255,255,255,0.70)',marginTop:4}}>Start rounds, follow live scoreboards and view scorecards.</div>
               </div>
-              <div style={{fontSize:24,fontWeight:950,color:homeLiveCount?'#ef4444':'#60b8f0',minWidth:26,textAlign:'right'}}>{homeLiveCount}</div>
             </div>
             {homeLatestLive&&<div style={{fontSize:12,color:'rgba(255,255,255,0.62)',margin:'0 0 12px 62px',lineHeight:1.35}}>Latest live: {homeLatestLive.name||"Live round"}{homeLatestCourse?' at '+homeLatestCourse.name:''}</div>}
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
               <button onClick={()=>currentUser?setView('play'):promptStartRoundAuth()} style={{...NO_SELECT,...S.pri,padding:'15px 10px',fontSize:14,fontWeight:950}}><span className="sg-pop-button">Start Round</span></button>
-              <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{...NO_SELECT,...S.gho,padding:'15px 10px',fontSize:14,fontWeight:950}}><span className="sg-pop-button">Live Scoreboards</span></button>
+              <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{...NO_SELECT,...S.gho,padding:'15px 10px',fontSize:14,fontWeight:950}}><span className="sg-pop-button">Live Scoreboards ({homeLiveCount})</span></button>
             </div>
           </section>
 
@@ -1531,7 +1530,7 @@ function App(){
           <div style={{fontSize:18,marginBottom:1}}>{EMOJI.admin}</div>
           <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:1,lineHeight:1}}>
             <span style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>ADMIN</span>
-            <span aria-label="App version v2.97" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',color:'rgba(255,255,255,0.32)'}}>v2.97</span>
+            <span aria-label="App version v2.98" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',color:'rgba(255,255,255,0.32)'}}>v2.98</span>
           </div>
         </button>
       </div>
