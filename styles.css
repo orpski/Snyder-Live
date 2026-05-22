@@ -1,4 +1,4 @@
-/* SNYDER GOLF v2.91 styles */
+/* SNYDER GOLF v2.94 styles */
 /* Base reset and global element defaults */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{font-family:'Inter',sans-serif;background:linear-gradient(160deg,#0a1528 0%,#0d2040 40%,#0a1830 100%);min-height:100vh;color:#fff;}
@@ -6,6 +6,17 @@ input,button,select{font-family:'Inter',sans-serif;}
 input:focus{outline:2px solid #0070BB;}
 ::-webkit-scrollbar{display:none;}
 h1,h2,.heading{font-family:'Barlow Condensed',sans-serif;}
+.sg-silver-title,.sg-silver-heading,.sg-silver-button{
+  color:#eef3f7;
+  background:linear-gradient(180deg,#ffffff 0%,#d7dde4 34%,#89939d 50%,#f5f7f9 72%,#b9c1ca 100%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+  text-shadow:0 1px 0 rgba(255,255,255,0.32),0 3px 0 rgba(0,0,0,0.36),0 8px 18px rgba(0,0,0,0.48);
+}
+.sg-silver-title{font-family:'Barlow Condensed',sans-serif;font-weight:950;letter-spacing:0.16em;}
+.sg-silver-heading{font-family:'Barlow Condensed',sans-serif;font-weight:950;letter-spacing:0.04em;}
+.sg-silver-button{font-weight:950;}
 /* v2.34: startup splash/loading screen removed. */
 @keyframes snyderLeagueTicker {
   0% { transform: translateX(0); }
