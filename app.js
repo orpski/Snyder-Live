@@ -1,4 +1,4 @@
-// SNYDER GOLF v2.94
+// SNYDER GOLF v2.95
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
@@ -1529,7 +1529,10 @@ function App(){
         </button>
         <button onClick={()=>setView('admin')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
           <div style={{fontSize:18,marginBottom:1}}>{EMOJI.admin}</div>
-          <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}>ADMIN <span aria-label="App version v2.94" style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em',color:'inherit'}}>v2.94</span></div>
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:1,lineHeight:1}}>
+            <span style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>ADMIN</span>
+            <span aria-label="App version v2.95" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',color:'rgba(255,255,255,0.32)'}}>v2.95</span>
+          </div>
         </button>
       </div>
 
