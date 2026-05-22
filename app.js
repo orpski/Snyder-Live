@@ -1,4 +1,4 @@
-// SNYDER GOLF v2.96
+// SNYDER GOLF v2.97
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
@@ -1466,29 +1466,29 @@ function App(){
       <div style={{padding:'18px 16px 0',minHeight:'calc(100vh - 140px)',display:'flex',flexDirection:'column'}}>
         <div style={{textAlign:'center',padding:'8px 0 18px'}}>
           <img src={SNYDER_GOLF_LOGO} onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src=LOGO;}} alt="Snyder Golf" style={{width:'min(132px,36vw)',height:'auto',objectFit:'contain',filter:'drop-shadow(0 8px 20px rgba(96,184,240,0.26))'}}/>
-          <div className="sg-cream-title" style={{fontSize:28,lineHeight:1,marginTop:8}}>SNYDER GOLF</div>
+          <div className="sg-pop-title" style={{fontSize:28,lineHeight:1,marginTop:8}}>SNYDER GOLF</div>
         </div>
         <div style={{display:'grid',gap:14,marginBottom:18,flex:1,gridTemplateRows:'1.25fr 1fr 1fr'}}>
           <section style={{border:'1px solid rgba(96,184,240,0.24)',borderRadius:22,background:'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(13,37,72,0.96))',padding:16,boxShadow:'0 16px 34px rgba(0,112,187,0.18)',display:'flex',flexDirection:'column',justifyContent:'space-between',minHeight:150}}>
             <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
               <img src={LOGO} alt="Live" style={{width:50,height:50,objectFit:'contain',flex:'0 0 auto',filter:'drop-shadow(0 4px 10px rgba(0,0,0,0.24))'}}/>
               <div style={{minWidth:0,flex:1}}>
-                <div className="sg-cream-heading" style={{fontSize:23,lineHeight:1}}>Live</div>
+                <div className="sg-pop-heading" style={{fontSize:23,lineHeight:1}}>Live</div>
                 <div style={{fontSize:12,color:'rgba(255,255,255,0.70)',marginTop:4}}>Start rounds, follow live scoreboards and view scorecards.</div>
               </div>
               <div style={{fontSize:24,fontWeight:950,color:homeLiveCount?'#ef4444':'#60b8f0',minWidth:26,textAlign:'right'}}>{homeLiveCount}</div>
             </div>
             {homeLatestLive&&<div style={{fontSize:12,color:'rgba(255,255,255,0.62)',margin:'0 0 12px 62px',lineHeight:1.35}}>Latest live: {homeLatestLive.name||"Live round"}{homeLatestCourse?' at '+homeLatestCourse.name:''}</div>}
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-              <button onClick={()=>currentUser?setView('play'):promptStartRoundAuth()} style={{...NO_SELECT,...S.pri,padding:'15px 10px',fontSize:14,fontWeight:950}}><span className="sg-cream-button">Start Round</span></button>
-              <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{...NO_SELECT,...S.gho,padding:'15px 10px',fontSize:14,fontWeight:950}}><span className="sg-cream-button">Live Scoreboards</span></button>
+              <button onClick={()=>currentUser?setView('play'):promptStartRoundAuth()} style={{...NO_SELECT,...S.pri,padding:'15px 10px',fontSize:14,fontWeight:950}}><span className="sg-pop-button">Start Round</span></button>
+              <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{...NO_SELECT,...S.gho,padding:'15px 10px',fontSize:14,fontWeight:950}}><span className="sg-pop-button">Live Scoreboards</span></button>
             </div>
           </section>
 
           <button onClick={()=>setView('league')} style={{...NO_SELECT,border:'1px solid rgba(96,184,240,0.24)',borderRadius:22,background:'rgba(255,255,255,0.065)',padding:16,textAlign:'left',cursor:'pointer',color:'#fff',display:'flex',alignItems:'center',gap:13,minHeight:116,boxShadow:'0 12px 28px rgba(0,0,0,0.12)'}}>
             <img src={window.SUMMER_LEAGUE_LOGO||LOGO} alt="League" style={{width:50,height:50,objectFit:'contain',flex:'0 0 auto',filter:'drop-shadow(0 4px 10px rgba(0,0,0,0.24))'}}/>
             <div style={{minWidth:0,flex:1}}>
-              <div className="sg-cream-heading" style={{fontSize:23,lineHeight:1}}>League</div>
+              <div className="sg-pop-heading" style={{fontSize:23,lineHeight:1}}>League</div>
               <div style={{fontSize:12,color:'rgba(255,255,255,0.70)',marginTop:5,lineHeight:1.3}}>League table, scores, money and rules.</div>
             </div>
             <div style={{fontSize:22,color:'#60b8f0',fontWeight:900}}>{'>'}</div>
@@ -1497,7 +1497,7 @@ function App(){
           <button onClick={()=>setView('tournaments')} style={{...NO_SELECT,border:'1px solid rgba(212,175,55,0.34)',borderRadius:22,background:'linear-gradient(135deg,rgba(212,175,55,0.16),rgba(11,31,77,0.92))',padding:16,textAlign:'left',cursor:'pointer',color:'#fff',display:'flex',alignItems:'center',gap:13,minHeight:116,boxShadow:'0 14px 30px rgba(212,175,55,0.10)'}}>
             <div style={{width:50,height:50,display:'flex',alignItems:'center',justifyContent:'center',fontSize:30,fontWeight:950,color:'#F5E6A3',flex:'0 0 auto',filter:'drop-shadow(0 4px 10px rgba(0,0,0,0.24))'}}>{EMOJI.trophy}</div>
             <div style={{minWidth:0,flex:1}}>
-              <div className="sg-cream-heading" style={{fontSize:23,lineHeight:1}}>Cup</div>
+              <div className="sg-pop-heading" style={{fontSize:23,lineHeight:1}}>Cup</div>
               <div style={{fontSize:12,color:'rgba(255,255,255,0.70)',marginTop:5,lineHeight:1.3}}>Team score, singles, fines and events.</div>
             </div>
             <div style={{fontSize:22,color:'#D4AF37',fontWeight:900}}>{'>'}</div>
@@ -1531,7 +1531,7 @@ function App(){
           <div style={{fontSize:18,marginBottom:1}}>{EMOJI.admin}</div>
           <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:1,lineHeight:1}}>
             <span style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>ADMIN</span>
-            <span aria-label="App version v2.96" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',color:'rgba(255,255,255,0.32)'}}>v2.96</span>
+            <span aria-label="App version v2.97" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',color:'rgba(255,255,255,0.32)'}}>v2.97</span>
           </div>
         </button>
       </div>
