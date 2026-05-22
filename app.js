@@ -1535,6 +1535,7 @@ function App(){
           <div style={{fontSize:18,marginBottom:1}}>{EMOJI.admin}</div>
           <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>ADMIN</div>
         </button>
+        <div aria-label="App version v2.91" style={{position:'absolute',right:8,bottom:6,fontSize:10,fontWeight:700,letterSpacing:'0.08em',color:'rgba(255,255,255,0.4)'}}>v2.91</div>
       </div>
 
       {showAuth&&<UserAuth
