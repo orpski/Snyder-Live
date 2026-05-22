@@ -7,7 +7,9 @@
   "background_color": "#0a1628",
   "theme_color": "#0a1628",
   "icons": [
-    {"src": "/icon-golf-192.png","sizes": "192x192","type": "image/png","purpose": "any maskable"},
-    {"src": "/icon-golf-512.png","sizes": "512x512","type": "image/png","purpose": "any maskable"}
+    {"src": "/icon-golf-192.png","sizes": "192x192","type": "image/png","purpose": "any"},
+    {"src": "/icon-golf-512.png","sizes": "512x512","type": "image/png","purpose": "any"},
+    {"src": "/icon-golf-maskable-192.png","sizes": "192x192","type": "image/png","purpose": "maskable"},
+    {"src": "/icon-golf-maskable-512.png","sizes": "512x512","type": "image/png","purpose": "maskable"}
   ]
 }
