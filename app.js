@@ -1,4 +1,4 @@
-// SNYDER GOLF v2.92
+// SNYDER GOLF v2.93
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
@@ -1529,7 +1529,7 @@ function App(){
         </button>
         <button onClick={()=>setView('admin')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
           <div style={{fontSize:18,marginBottom:1}}>{EMOJI.admin}</div>
-          <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}>ADMIN <span aria-label="App version v2.92" style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em',color:'inherit'}}>v2.92</span></div>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}>ADMIN <span aria-label="App version v2.93" style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em',color:'inherit'}}>v2.93</span></div>
         </button>
       </div>
 
@@ -3190,13 +3190,13 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
             <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,letterSpacing:'0.12em',marginBottom:8}}>HOW ARE YOU PLAYING?</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr',gap:8}}>
               <button onClick={()=>setRoundMode('normal')} style={{border:'1px solid '+(!isFoursomesSetup()&&!isSinglesMatchplaySetup()?'rgba(96,184,240,0.55)':'rgba(255,255,255,0.12)'),background:!isFoursomesSetup()&&!isSinglesMatchplaySetup()?'rgba(96,184,240,0.18)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'12px 11px',fontSize:14,fontWeight:950,textAlign:'left'}}>Normal golf <span style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.62)',fontWeight:700,marginTop:2}}>Stableford points and gross scores</span></button>
-              <button onClick={()=>setRoundMode('singles')} style={{border:'1px solid '+(isSinglesMatchplaySetup()?'rgba(96,184,240,0.6)':'rgba(255,255,255,0.12)'),background:isSinglesMatchplaySetup()?'rgba(96,184,240,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'12px 11px',fontSize:14,fontWeight:950,textAlign:'left'}}>Singles match <span style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.62)',fontWeight:700,marginTop:2}}>Head-to-head for 2 players</span></button>
+              <button onClick={()=>setRoundMode('singles')} style={{border:'1px solid '+(isSinglesMatchplaySetup()?'rgba(96,184,240,0.6)':'rgba(255,255,255,0.12)'),background:isSinglesMatchplaySetup()?'rgba(96,184,240,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'12px 11px',fontSize:14,fontWeight:950,textAlign:'left'}}>Singles matchplay <span style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.62)',fontWeight:700,marginTop:2}}>Head-to-head for 2 players</span></button>
               <button onClick={()=>setRoundMode('foursomes')} style={{border:'1px solid '+(isFoursomesSetup()?'rgba(251,191,36,0.58)':'rgba(255,255,255,0.12)'),background:isFoursomesSetup()?'rgba(251,191,36,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'12px 11px',fontSize:14,fontWeight:950,textAlign:'left'}}>Foursomes <span style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.62)',fontWeight:700,marginTop:2}}>Two teams, one ball each</span></button>
             </div>
             <div style={{fontSize:11,color:isFoursomesSetup()?'#fbbf24':isSinglesMatchplaySetup()?'#90ccf0':'rgba(255,255,255,0.62)',marginTop:8,lineHeight:1.35}}>{isFoursomesSetup()?'Team scorecard only.':isSinglesMatchplaySetup()?'Choose points as well, or matchplay only.':'Classic live scoring.'}</div>
             {isSinglesMatchplaySetup()&&<div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-              <button onClick={()=>setSetup(q=>({...q,matchplay:{...cleanMatchplaySetup(q.matchplay||{},participants),enabled:true,mode:'singles',keepStableford:true}}))} style={{border:'1px solid '+(setup.matchplay&&setup.matchplay.keepStableford!==false?'rgba(96,184,240,0.6)':'rgba(255,255,255,0.12)'),background:setup.matchplay&&setup.matchplay.keepStableford!==false?'rgba(96,184,240,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:10,padding:'10px 8px',fontSize:12,fontWeight:900}}>Match + points</button>
-              <button onClick={()=>setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),enabled:false},matchplay:{...cleanMatchplaySetup(q.matchplay||{},participants),enabled:true,mode:'singles',keepStableford:false}}))} style={{border:'1px solid '+(setup.matchplay&&setup.matchplay.keepStableford===false?'rgba(251,191,36,0.55)':'rgba(255,255,255,0.12)'),background:setup.matchplay&&setup.matchplay.keepStableford===false?'rgba(251,191,36,0.16)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:10,padding:'10px 8px',fontSize:12,fontWeight:900}}>Match only</button>
+              <button onClick={()=>setSetup(q=>({...q,matchplay:{...cleanMatchplaySetup(q.matchplay||{},participants),enabled:true,mode:'singles',keepStableford:true}}))} style={{border:'1px solid '+(setup.matchplay&&setup.matchplay.keepStableford!==false?'rgba(96,184,240,0.6)':'rgba(255,255,255,0.12)'),background:setup.matchplay&&setup.matchplay.keepStableford!==false?'rgba(96,184,240,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:10,padding:'10px 8px',fontSize:12,fontWeight:900}}>Matchplay + points</button>
+              <button onClick={()=>setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),enabled:false},matchplay:{...cleanMatchplaySetup(q.matchplay||{},participants),enabled:true,mode:'singles',keepStableford:false}}))} style={{border:'1px solid '+(setup.matchplay&&setup.matchplay.keepStableford===false?'rgba(251,191,36,0.55)':'rgba(255,255,255,0.12)'),background:setup.matchplay&&setup.matchplay.keepStableford===false?'rgba(251,191,36,0.16)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:10,padding:'10px 8px',fontSize:12,fontWeight:900}}>Matchplay only</button>
             </div>}
           </div>
           {!isSingleGroupDay&&<div style={{...S.card,marginBottom:12,background:'rgba(0,112,187,0.12)',borderColor:'rgba(0,112,187,0.25)'}}>
