@@ -1,4 +1,4 @@
-/* SNYDER GOLF v2.89 styles */
+/* SNYDER GOLF v2.90 styles */
 /* Base reset and global element defaults */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{font-family:'Inter',sans-serif;background:linear-gradient(160deg,#0a1528 0%,#0d2040 40%,#0a1830 100%);min-height:100vh;color:#fff;}
@@ -7,3 +7,7 @@ input:focus{outline:2px solid #0070BB;}
 ::-webkit-scrollbar{display:none;}
 h1,h2,.heading{font-family:'Barlow Condensed',sans-serif;}
 /* v2.34: startup splash/loading screen removed. */
+@keyframes snyderLeagueTicker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}

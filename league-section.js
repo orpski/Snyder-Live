@@ -109,6 +109,7 @@ function LeagueView({onExit}){
   const[showLog,setShowLog]=useState(false);
   const[notifyStatus,setNotifyStatus]=useState('idle');
   const[notifySupported,setNotifySupported]=useState(false);
+  const[tickerText,setTickerText]=useState('League news loading...');
 
   useEffect(()=>{
     let cancelled=false;
@@ -256,8 +257,8 @@ function LeagueView({onExit}){
       if(snk.length>0)lines.push(`🐍 Curry pot at £${curryPot} — snake has struck ${snk.length} times`);
       const cu=players.filter(p=>p.double_chip_used);
       if(cu.length>0)lines.push(`🍟🍟 ${cu.map(p=>p.name).join(' and ')} used their double chip`);
-      if(lines.length>0)window.__tickerText=lines.join('     ⚽     ');
-    }catch(e){}
+      setTickerText(lines.length>0?lines.join('     ⚽     '):'No league scores yet - submit a card to get the ticker moving.');
+    }catch(e){setTickerText('League news will appear here once scores are loaded.');}
   },[needsTickerUpdate,scores,players,snakeLog]);
 
   const flash=useCallback((msg,type='success')=>{setToast({msg,type});setTimeout(()=>setToast(null),3000);},[]);
@@ -652,7 +653,16 @@ function LeagueView({onExit}){
 
         {/* Nav tabs */}
         {/* NEWS TICKER */}
-        {scores.length>0&&<div id="news-ticker" style={{marginBottom:16,background:'rgba(0,0,0,0.3)',border:'1px solid rgba(255,255,255,0.10)',borderRadius:8,overflow:'hidden'}}><div style={{display:'flex',alignItems:'center'}}><div style={{background:'#0070BB',padding:'10px 14px',fontSize:12,color:'#fff',fontWeight:'bold',letterSpacing:'0.08em',textTransform:'uppercase',whiteSpace:'nowrap',flexShrink:0}}>⚡ LATEST</div><div style={{overflow:'hidden',flex:1}}><div id="ticker-inner" style={{display:'inline-block',whiteSpace:'nowrap',fontSize:14,color:'#dbeafe',padding:'12px 0'}}></div></div></div></div>}
+        <div id="news-ticker" style={{marginBottom:16,background:'rgba(0,0,0,0.3)',border:'1px solid rgba(255,255,255,0.10)',borderRadius:8,overflow:'hidden'}}>
+          <div style={{display:'flex',alignItems:'center'}}>
+            <div style={{background:'#0070BB',padding:'10px 14px',fontSize:12,color:'#fff',fontWeight:'bold',letterSpacing:'0.08em',textTransform:'uppercase',whiteSpace:'nowrap',flexShrink:0}}>⚡ LATEST</div>
+            <div style={{overflow:'hidden',flex:1}}>
+              <div style={{display:'inline-block',whiteSpace:'nowrap',fontSize:14,color:'#dbeafe',padding:'12px 0',animation:'snyderLeagueTicker 42s linear infinite'}}>
+                {tickerText+'     ⚽     '+tickerText+'     ⚽     '}
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div style={{display:'flex',gap:8,marginBottom:24,justifyContent:'center',flexWrap:'wrap'}}>
           {[['standings','🏆 League Table'],['scores','📊 Scores'],['potm','🏅 Player of the Month'],['highscore','⭐ High Scores'],['playoffs','🎯 Playoffs'],['money','💰 Money'],['rules','📖 Rules'],['submit','✏️ Submit Score']].map(([k,label])=>(
@@ -1952,23 +1962,6 @@ function LeagueView({onExit}){
     </div>
   );
 }
-
-
-// Vanilla JS ticker - runs outside React, no stutter
-(function(){
-  let curText='';
-  function run(text){
-    const el=document.getElementById('ticker-inner');
-    if(!el||text===curText)return;
-    curText=text;
-    el.textContent=text+'     -     '+text;
-    el.style.animation='none';
-    void el.offsetHeight;
-    const offset=Math.floor(Math.random()*60);
-    el.style.animation=`ticker 60s linear -${offset}s infinite`;
-  }
-  setInterval(function(){if(window.__tickerText)run(window.__tickerText);},500);
-})();
 
 return LeagueView;
 })();
