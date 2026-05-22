@@ -1,4 +1,4 @@
-// SNYDER GOLF v2.99
+// SNYDER GOLF v3.00
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
@@ -1519,7 +1519,9 @@ function App(){
           <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em'}}>CUP</div>
         </button>
         <button onClick={()=>setView('league')} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
-          <img src={window.SUMMER_LEAGUE_LOGO||LOGO} alt="" style={{width:20,height:20,objectFit:'contain',marginBottom:0}}/>
+          <div style={{height:24,marginBottom:1,display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <img src={window.SUMMER_LEAGUE_LOGO||LOGO} alt="" style={{width:20,height:20,objectFit:'contain',display:'block'}}/>
+          </div>
           <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em'}}>LEAGUE</div>
         </button>
         <button onClick={()=>currentUser?setView('profile'):(setAuthPrompt(null),setShowAuth(true))} style={{flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:'rgba(255,255,255,0.4)'}}>
@@ -1530,7 +1532,7 @@ function App(){
           <div style={{fontSize:18,marginBottom:1}}>{EMOJI.admin}</div>
           <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:1,lineHeight:1}}>
             <span style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em'}}>ADMIN</span>
-            <span aria-label="App version v2.99" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',color:'rgba(255,255,255,0.32)'}}>v2.99</span>
+            <span aria-label="App version v3.00" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',color:'rgba(255,255,255,0.32)'}}>v3.00</span>
           </div>
         </button>
       </div>
