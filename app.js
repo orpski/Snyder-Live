@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.09
+// SNYDER GOLF v3.10
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
@@ -1541,7 +1541,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.09" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.09</span>
+          <span aria-label="App version v3.10" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.10</span>
         </button>
       </div>
 
@@ -6846,7 +6846,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     await load();
     flash('Snyder Cup reset. Teams and squad players kept.');
   }
-  function TeamAdminCard({teamKey,team,rows}){
+  function renderTeamAdminCard(teamKey,team,rows){
     const slotMeta=CUP_SLOT_TEAMS.find(t=>t.key===teamKey)||{code:'?'};
     const slotRows=cupSlotRows(teamKey);
     const usedUsers=cupPlayers.filter(p=>p.user_id).map(p=>p.user_id);
@@ -6885,9 +6885,9 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       </div>
       <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'0 0 8px'}}>TEAMS & PLAYERS</div>
       <div style={{display:'grid',gridTemplateColumns:'1fr',gap:10,marginBottom:14}}>
-        <TeamAdminCard teamKey="gold" team={teams.gold} rows={goldPlayers}/>
-        <TeamAdminCard teamKey="navy" team={teams.navy} rows={navyPlayers}/>
-        <TeamAdminCard teamKey="red" team={teams.red} rows={redPlayers}/>
+        {renderTeamAdminCard('gold',teams.gold,goldPlayers)}
+        {renderTeamAdminCard('navy',teams.navy,navyPlayers)}
+        {renderTeamAdminCard('red',teams.red,redPlayers)}
       </div>
       <div style={{...S.card,marginBottom:14}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}><div style={{fontSize:14,color:'#fff',fontWeight:800}}>Cup Days</div><div style={{fontSize:11,color:'#9fb6c9',fontWeight:800}}>3 fixed days</div></div>
