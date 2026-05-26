@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.10
+// SNYDER GOLF v3.11
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
@@ -1541,7 +1541,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.10" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.10</span>
+          <span aria-label="App version v3.11" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.11</span>
         </button>
       </div>
 
@@ -6491,7 +6491,6 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   const[sideBTeam,setSideBTeam]=useState('navy');
   const[goldPick,setGoldPick]=useState([]);
   const[navyPick,setNavyPick]=useState([]);
-  const[newPlayer,setNewPlayer]=useState({gold:{name:'',handicap:''},navy:{name:'',handicap:''},red:{name:'',handicap:''}});
   const[cupSlotNameDrafts,setCupSlotNameDrafts]=useState({});
   const[cupEmptySlotDrafts,setCupEmptySlotDrafts]=useState({});
   const[courseFixDay,setCourseFixDay]=useState(null);
@@ -6522,7 +6521,6 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   const cupDayNumbers=Array.from(new Set([1,2,3,...days.map(d=>parseInt(d.day_number)||1),...matches.map(m=>parseInt(m.day_number)||1)])).filter(Boolean).sort((a,b)=>a-b);
   const adminDays=cupDayNumbers.map(n=>days.find(d=>(parseInt(d.day_number)||1)===n)||{day_number:n,_synthetic:true});
   const matchesByDay=groupCupMatchesByDay(matches,adminDays).filter(group=>group.matches.length);
-  const availableUsers=(cupUsers||[]);
   const cupCourseOptions=(courses||[]).filter(c=>hasCourseHoles(c));
   const selectedCourseForDay=day=>resolveCupDayCourse(courses,days,cup&&cup.id,day);
   async function createCup(){
@@ -6532,34 +6530,6 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       await sb.from('snyder_cup_teams').insert([{cup_id:data.id,team_key:'gold',name:goldName.trim()||'Team A',colour:'#D4AF37'},{cup_id:data.id,team_key:'navy',name:navyName.trim()||'Team B',colour:'#2563EB'},{cup_id:data.id,team_key:'red',name:redName.trim()||'Team C',colour:'#DC2626'}]);
       flash('Cup created');await load();setSelectedCupId(data.id);
     }catch(e){flash('Cup tables missing or save failed. Run the v66 SQL first. '+(e.message||''),'error');}
-  }
-  async function addExistingPlayer(teamKey,u){
-    if(!cup||!u)return;
-    if(cupPlayers.some(p=>p.user_id&&p.user_id===u.id)){flash('Player already in this cup','error');return;}
-    const displayName=u.display_name||u.username||u.name||'Player';
-    const hcp=parseFloat(u.handicap||0)||0;
-    const{error}=await sb.from('snyder_cup_players').insert({cup_id:cup.id,user_id:u.id,team_key:teamKey,display_name:displayName,handicap:hcp});
-    if(error){flash(error.message,'error');return;}
-    flash(displayName+' added');await load();
-  }
-  async function addManualPlayer(teamKey){
-    if(!cup)return;
-    const form=newPlayer[teamKey]||{};
-    const displayName=(form.name||'').trim();
-    if(!displayName){flash('Add a player name first','error');return;}
-    const hcp=parseFloat(form.handicap||0)||0;
-    const{error}=await sb.from('snyder_cup_players').insert({cup_id:cup.id,user_id:null,team_key:teamKey,display_name:displayName,handicap:hcp});
-    if(error){flash(error.message,'error');return;}
-    setNewPlayer(v=>({...v,[teamKey]:{name:'',handicap:''}}));
-    flash(displayName+' added');await load();
-  }
-  async function updateCupPlayer(p,patch){
-    const data={...patch};
-    if(Object.prototype.hasOwnProperty.call(data,'handicap'))data.handicap=parseFloat(data.handicap||0)||0;
-    const{error}=await sb.from('snyder_cup_players').update(data).eq('id',p.id);
-    if(error){flash(error.message,'error');return;}
-    if(p.user_id&&Object.prototype.hasOwnProperty.call(data,'handicap'))await sb.from('cup_users').update({handicap:data.handicap}).eq('id',p.user_id);
-    await load();
   }
   async function saveCupPlayer(p,patch,{reload=true}={}){
     const data={...patch};
@@ -6607,11 +6577,12 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center'}}><label style={{fontSize:11,color:'#9fb6c9'}}>EG Handicap</label><HandicapPicker value={player.handicap??0} onChange={v=>saveCupPlayer(player,{handicap:v},{reload:false})} style={{width:76,fontSize:13,padding:'7px 8px'}} label={(nameDraft||'Player')+' EG handicap'} step={0.1} min={0} max={54} defaultValue={parseFloat(player.handicap)||18}/></div>
     </>;
   }
-  function renderCupEmptySlotEditor(teamKey,slotLabel,usedUsers){
+  function renderCupEmptySlotEditor(teamKey,slotLabel){
     const draft=emptySlotDraft(teamKey,slotLabel);
     async function addManual(){
       if(!cup)return;
-      const displayName=(draft.name||'').trim()||slotLabel;
+      const displayName=(draft.name||'').trim();
+      if(!displayName){flash('Add a name for '+slotLabel,'error');return;}
       const hcp=parseFloat(draft.handicap||0)||0;
       const{error}=await sb.from('snyder_cup_players').insert({cup_id:cup.id,user_id:null,team_key:teamKey,display_name:displayName,handicap:hcp});
       if(error){flash(error.message,'error');return;}
@@ -6619,11 +6590,8 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       flash(slotLabel+' assigned');await load();
     }
     return <div style={{display:'grid',gap:7}}>
-      <select style={{...S.inp,fontSize:12}} value="" onChange={e=>{const u=availableUsers.find(x=>x.id===e.target.value);if(u)addExistingPlayer(teamKey,u);}}>
-        <option value="">Assign existing user to {slotLabel}...</option>{availableUsers.filter(u=>!usedUsers.includes(u.id)).map(u=><option key={u.id} value={u.id}>{u.display_name||u.username} - EG {u.handicap||0}</option>)}
-      </select>
-      <input style={{...S.inp,fontSize:12}} value={draft.name} onChange={e=>updateEmptySlotDraft(teamKey,slotLabel,{name:e.target.value})} placeholder={'Or type '+slotLabel+' name'}/>
-      <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:7}}><HandicapPicker value={draft.handicap} onChange={hcp=>updateEmptySlotDraft(teamKey,slotLabel,{handicap:hcp})} style={{fontSize:12}} label={slotLabel+' EG handicap'} step={0.1} min={0} max={54} defaultValue={18}/><button onClick={addManual} style={{...S.pri,padding:'8px 10px',fontSize:12}}>Assign</button></div>
+      <input style={{...S.inp,fontSize:13,padding:'8px 9px'}} value={draft.name} onChange={e=>updateEmptySlotDraft(teamKey,slotLabel,{name:e.target.value})} placeholder={slotLabel+' player name'}/>
+      <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:7}}><HandicapPicker value={draft.handicap} onChange={hcp=>updateEmptySlotDraft(teamKey,slotLabel,{handicap:hcp})} style={{fontSize:12}} label={slotLabel+' EG handicap'} step={0.1} min={0} max={54} defaultValue={18}/><button type="button" onClick={addManual} style={{...S.pri,padding:'8px 12px',fontSize:12}}>Assign</button></div>
     </div>;
   }
   async function ensureFixedCupSlots({reload=true}={}){
@@ -6849,14 +6817,13 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   function renderTeamAdminCard(teamKey,team,rows){
     const slotMeta=CUP_SLOT_TEAMS.find(t=>t.key===teamKey)||{code:'?'};
     const slotRows=cupSlotRows(teamKey);
-    const usedUsers=cupPlayers.filter(p=>p.user_id).map(p=>p.user_id);
     return <div style={{...S.card,...cupTeamStyle(teamKey),padding:12}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><CupTeamBadge teamKey={teamKey} label={team.name}/><div style={{fontSize:20,color:'#fff',fontWeight:900}}>{slotRows.length}/4</div></div>
       <div style={{fontSize:11,color:'#9fb6c9',marginBottom:8}}>Assign the fixed Cup positions. The matchups use these slots automatically: {slotMeta.code}1, {slotMeta.code}2, {slotMeta.code}3 and {slotMeta.code}4.</div>
       {Array.from({length:4},(_,i)=>({slot:i+1,player:slotRows[i]})).map(({slot,player})=>(
         <div key={teamKey+'-slot-'+slot} style={{borderTop:'1px solid rgba(255,255,255,0.08)',padding:'9px 0'}}>
           <div style={{fontSize:11,color:(CUP_THEME[teamKey]||CUP_THEME.gold).accent,fontWeight:950,letterSpacing:'0.10em',marginBottom:6}}>{(team&&team.name)||CUP_THEME[teamKey].name} - {slot} ({slotMeta.code}{slot})</div>
-          {player?renderCupSlotPlayerEditor(player):renderCupEmptySlotEditor(teamKey,slotMeta.code+slot,usedUsers)}
+          {player?renderCupSlotPlayerEditor(player):renderCupEmptySlotEditor(teamKey,slotMeta.code+slot)}
         </div>
       ))}
     </div>;
