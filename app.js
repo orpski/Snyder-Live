@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.04
+// SNYDER GOLF v3.05
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
@@ -1038,10 +1038,11 @@ function App(){
   function pullRefreshLabel(v){
     if(v==='play')return 'scorecard';
     if(v==='live')return 'live scores';
+    if(v==='league')return 'league';
     return 'home';
   }
   function canPullRefreshView(v){
-    return v==='home'||v==='play'||v==='live';
+    return v==='home'||v==='play'||v==='live'||v==='league';
   }
 
   useEffect(()=>{viewRef.current=view;},[view]);
@@ -1429,7 +1430,7 @@ function App(){
   if(view==='play')return <>{pullIndicator}<PlayGolf {...props}/></>;
   if(view==='league'){
     const LeagueSection=window.LeagueView;
-    return LeagueSection?<LeagueSection onExit={()=>setView('home')}/>:<div style={{minHeight:'100vh',background:'#0a1528',color:'#fff',padding:18}}><button onClick={()=>setView('home')} style={{...S.gho,padding:'7px 12px'}}>Back</button><div style={{marginTop:18,fontWeight:900}}>League is still loading. Try again in a moment.</div></div>;
+    return <>{pullIndicator}{LeagueSection?<LeagueSection onExit={()=>setView('home')}/>:<div style={{minHeight:'100vh',background:'#0a1528',color:'#fff',padding:18}}><button onClick={()=>setView('home')} style={{...S.gho,padding:'7px 12px'}}>Back</button><div style={{marginTop:18,fontWeight:900}}>League is still loading. Try again in a moment.</div></div>}</>;
   }
   if(view==='admin')return <AdminPanel {...props}/>;
   if(view==='profile')return <ProfileView {...props} setCurrentUser={setCurrentUser}/>;
@@ -1540,7 +1541,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.04" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.04</span>
+          <span aria-label="App version v3.05" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.05</span>
         </button>
       </div>
 
