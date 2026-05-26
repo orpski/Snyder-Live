@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.01
+// SNYDER GOLF v3.02
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
@@ -1540,7 +1540,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.01" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.01</span>
+          <span aria-label="App version v3.02" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.02</span>
         </button>
       </div>
 
@@ -4366,6 +4366,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return (round&&round.name)||(round&&round.course_name)||'Round';
   }
   function notifyGroupName(){
+    const realGroups=(allGroups||[]).filter(g=>g&&g.id&&!g._foursomesFallback&&!g._roundPlayersFallback);
+    if(realGroups.length<=1)return '';
     const n=(activeScoreGroup&&activeScoreGroup.group_number)||(group&&group.group_number)||null;
     return n?('Group '+groupLetter(n)):'';
   }
