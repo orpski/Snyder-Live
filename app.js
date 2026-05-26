@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.08
+// SNYDER GOLF v3.09
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
@@ -1541,7 +1541,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.08" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.08</span>
+          <span aria-label="App version v3.09" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.09</span>
         </button>
       </div>
 
@@ -6597,6 +6597,35 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     const key=emptySlotDraftKey(teamKey,slotLabel);
     setCupEmptySlotDrafts(prev=>{const next={...prev};delete next[key];return next;});
   }
+  function renderCupSlotPlayerEditor(player){
+    const nameDraft=cupSlotDraftValue(player);
+    return <>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:6}}>
+        <input style={{...S.inp,fontSize:13,padding:'8px 9px',flex:1}} value={nameDraft} onChange={e=>updateCupSlotNameDraft(player,e.target.value)} onBlur={()=>saveCupSlotName(player)} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();}} placeholder="Player name"/>
+        <button onClick={()=>removeCupPlayer(player)} style={{...S.dan,padding:'7px 9px',fontSize:11}}>Remove</button>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center'}}><label style={{fontSize:11,color:'#9fb6c9'}}>EG Handicap</label><HandicapPicker value={player.handicap??0} onChange={v=>saveCupPlayer(player,{handicap:v},{reload:false})} style={{width:76,fontSize:13,padding:'7px 8px'}} label={(nameDraft||'Player')+' EG handicap'} step={0.1} min={0} max={54} defaultValue={parseFloat(player.handicap)||18}/></div>
+    </>;
+  }
+  function renderCupEmptySlotEditor(teamKey,slotLabel,usedUsers){
+    const draft=emptySlotDraft(teamKey,slotLabel);
+    async function addManual(){
+      if(!cup)return;
+      const displayName=(draft.name||'').trim()||slotLabel;
+      const hcp=parseFloat(draft.handicap||0)||0;
+      const{error}=await sb.from('snyder_cup_players').insert({cup_id:cup.id,user_id:null,team_key:teamKey,display_name:displayName,handicap:hcp});
+      if(error){flash(error.message,'error');return;}
+      clearEmptySlotDraft(teamKey,slotLabel);
+      flash(slotLabel+' assigned');await load();
+    }
+    return <div style={{display:'grid',gap:7}}>
+      <select style={{...S.inp,fontSize:12}} value="" onChange={e=>{const u=availableUsers.find(x=>x.id===e.target.value);if(u)addExistingPlayer(teamKey,u);}}>
+        <option value="">Assign existing user to {slotLabel}...</option>{availableUsers.filter(u=>!usedUsers.includes(u.id)).map(u=><option key={u.id} value={u.id}>{u.display_name||u.username} - EG {u.handicap||0}</option>)}
+      </select>
+      <input style={{...S.inp,fontSize:12}} value={draft.name} onChange={e=>updateEmptySlotDraft(teamKey,slotLabel,{name:e.target.value})} placeholder={'Or type '+slotLabel+' name'}/>
+      <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:7}}><HandicapPicker value={draft.handicap} onChange={hcp=>updateEmptySlotDraft(teamKey,slotLabel,{handicap:hcp})} style={{fontSize:12}} label={slotLabel+' EG handicap'} step={0.1} min={0} max={54} defaultValue={18}/><button onClick={addManual} style={{...S.pri,padding:'8px 10px',fontSize:12}}>Assign</button></div>
+    </div>;
+  }
   async function ensureFixedCupSlots({reload=true}={}){
     if(!cup)return false;
     const inserts=[];
@@ -6827,38 +6856,9 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       {Array.from({length:4},(_,i)=>({slot:i+1,player:slotRows[i]})).map(({slot,player})=>(
         <div key={teamKey+'-slot-'+slot} style={{borderTop:'1px solid rgba(255,255,255,0.08)',padding:'9px 0'}}>
           <div style={{fontSize:11,color:(CUP_THEME[teamKey]||CUP_THEME.gold).accent,fontWeight:950,letterSpacing:'0.10em',marginBottom:6}}>{(team&&team.name)||CUP_THEME[teamKey].name} - {slot} ({slotMeta.code}{slot})</div>
-          {player?<CupSlotPlayerEditor player={player}/>:<CupEmptySlotEditor teamKey={teamKey} slotLabel={slotMeta.code+slot} usedUsers={usedUsers}/>}
+          {player?renderCupSlotPlayerEditor(player):renderCupEmptySlotEditor(teamKey,slotMeta.code+slot,usedUsers)}
         </div>
       ))}
-    </div>;
-  }
-  function CupSlotPlayerEditor({player}){
-    const nameDraft=cupSlotDraftValue(player);
-    return <>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:6}}>
-        <input style={{...S.inp,fontSize:13,padding:'8px 9px',flex:1}} value={nameDraft} onChange={e=>updateCupSlotNameDraft(player,e.target.value)} onBlur={()=>saveCupSlotName(player)} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();}} placeholder="Player name"/>
-        <button onClick={()=>removeCupPlayer(player)} style={{...S.dan,padding:'7px 9px',fontSize:11}}>Remove</button>
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center'}}><label style={{fontSize:11,color:'#9fb6c9'}}>EG Handicap</label><HandicapPicker value={player.handicap??0} onChange={v=>saveCupPlayer(player,{handicap:v},{reload:false})} style={{width:76,fontSize:13,padding:'7px 8px'}} label={(nameDraft||'Player')+' EG handicap'} step={0.1} min={0} max={54} defaultValue={parseFloat(player.handicap)||18}/></div>
-    </>;
-  }
-  function CupEmptySlotEditor({teamKey,slotLabel,usedUsers}){
-    const draft=emptySlotDraft(teamKey,slotLabel);
-    async function addManual(){
-      if(!cup)return;
-      const displayName=(draft.name||'').trim()||slotLabel;
-      const hcp=parseFloat(draft.handicap||0)||0;
-      const{error}=await sb.from('snyder_cup_players').insert({cup_id:cup.id,user_id:null,team_key:teamKey,display_name:displayName,handicap:hcp});
-      if(error){flash(error.message,'error');return;}
-      clearEmptySlotDraft(teamKey,slotLabel);
-      flash(slotLabel+' assigned');await load();
-    }
-    return <div style={{display:'grid',gap:7}}>
-      <select style={{...S.inp,fontSize:12}} value="" onChange={e=>{const u=availableUsers.find(x=>x.id===e.target.value);if(u)addExistingPlayer(teamKey,u);}}>
-        <option value="">Assign existing user to {slotLabel}...</option>{availableUsers.filter(u=>!usedUsers.includes(u.id)).map(u=><option key={u.id} value={u.id}>{u.display_name||u.username} - EG {u.handicap||0}</option>)}
-      </select>
-      <input style={{...S.inp,fontSize:12}} value={draft.name} onChange={e=>updateEmptySlotDraft(teamKey,slotLabel,{name:e.target.value})} placeholder={'Or type '+slotLabel+' name'}/>
-      <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:7}}><HandicapPicker value={draft.handicap} onChange={hcp=>updateEmptySlotDraft(teamKey,slotLabel,{handicap:hcp})} style={{fontSize:12}} label={slotLabel+' EG handicap'} step={0.1} min={0} max={54} defaultValue={18}/><button onClick={addManual} style={{...S.pri,padding:'8px 10px',fontSize:12}}>Assign</button></div>
     </div>;
   }
   return <div>
