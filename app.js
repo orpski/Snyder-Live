@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.11
+// SNYDER GOLF v3.12
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 
 // =========================================================
@@ -1541,7 +1541,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.11" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.11</span>
+          <span aria-label="App version v3.12" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.12</span>
         </button>
       </div>
 
@@ -6540,6 +6540,22 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     if(reload)await load();
     return true;
   }
+  async function ensureCupTeamRow(teamKey){
+    if(!cup||!teamKey)return true;
+    if((cupTeams||[]).some(t=>t.cup_id===cup.id&&t.team_key===teamKey))return true;
+    const theme=CUP_THEME[teamKey]||CUP_THEME.gold;
+    const teamName=(teams&&teams[teamKey]&&teams[teamKey].name)||theme.name;
+    const{error}=await sb.from('snyder_cup_teams').insert({cup_id:cup.id,team_key:teamKey,name:teamName,colour:theme.primary});
+    if(error&&String(error.message||'').toLowerCase().includes('duplicate'))return true;
+    if(error){flash('Could not create '+teamName+' team row: '+error.message,'error');return false;}
+    return true;
+  }
+  async function insertCupPlayer(teamKey,displayName,hcp){
+    if(!cup)return {error:{message:'No Cup selected'}};
+    const ok=await ensureCupTeamRow(teamKey);
+    if(!ok)return {error:{message:'Team setup failed'}};
+    return sb.from('snyder_cup_players').insert({cup_id:cup.id,user_id:null,team_key:teamKey,display_name:displayName,handicap:hcp});
+  }
   function cupSlotDraftKey(player){return String(player&&player.id||'');}
   function cupSlotDraftValue(player){
     const key=cupSlotDraftKey(player);
@@ -6584,7 +6600,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       const displayName=(draft.name||'').trim();
       if(!displayName){flash('Add a name for '+slotLabel,'error');return;}
       const hcp=parseFloat(draft.handicap||0)||0;
-      const{error}=await sb.from('snyder_cup_players').insert({cup_id:cup.id,user_id:null,team_key:teamKey,display_name:displayName,handicap:hcp});
+      const{error}=await insertCupPlayer(teamKey,displayName,hcp);
       if(error){flash(error.message,'error');return;}
       clearEmptySlotDraft(teamKey,slotLabel);
       flash(slotLabel+' assigned');await load();
@@ -6596,16 +6612,16 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   }
   async function ensureFixedCupSlots({reload=true}={}){
     if(!cup)return false;
-    const inserts=[];
-    CUP_SLOT_TEAMS.forEach(t=>{
+    for(const t of CUP_SLOT_TEAMS){
+      const ok=await ensureCupTeamRow(t.key);
+      if(!ok)return false;
       const rows=cupSlotRows(t.key);
-      for(let i=rows.length+1;i<=4;i++)inserts.push({cup_id:cup.id,user_id:null,team_key:t.key,display_name:t.code+i,handicap:0});
-    });
-    if(inserts.length){
-      const{error}=await sb.from('snyder_cup_players').insert(inserts);
-      if(error){flash(error.message,'error');return false;}
-      if(reload)await load();
+      for(let i=rows.length+1;i<=4;i++){
+        const{error}=await sb.from('snyder_cup_players').insert({cup_id:cup.id,user_id:null,team_key:t.key,display_name:t.code+i,handicap:0});
+        if(error){flash(error.message,'error');return false;}
+      }
     }
+    if(reload)await load();
     return true;
   }
   function fixedScheduleRows(sourcePlayers=cupPlayers){
