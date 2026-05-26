@@ -1,5 +1,6 @@
-// SNYDER GOLF v3.12
+// SNYDER GOLF v3.13
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
+const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
 // =========================================================
 // React hooks / runtime aliases
@@ -387,8 +388,29 @@ function cupMatchesDayReleased(cupMatches,day){
   const rows=(cupMatches||[]).filter(m=>(parseInt(m.day_number)||1)===(parseInt(day)||1));
   return rows.length>0&&rows.some(m=>String(m.status||'locked').toLowerCase()==='live'||String(m.status||'').toLowerCase()==='released');
 }
+function cleanCupStoredDisplayName(name){
+  const text=String(name||'');
+  return text.startsWith(CUP_TEAM_C_STORAGE_PREFIX)?text.slice(CUP_TEAM_C_STORAGE_PREFIX.length):text;
+}
+function markCupTeamCDisplayName(name){
+  const text=String(name||'').trim();
+  return text.startsWith(CUP_TEAM_C_STORAGE_PREFIX)?text:CUP_TEAM_C_STORAGE_PREFIX+text;
+}
+function normaliseCupPlayerRow(row){
+  if(!row)return row;
+  const storedName=String(row.display_name||'');
+  const legacyTeamC=storedName.startsWith(CUP_TEAM_C_STORAGE_PREFIX);
+  return {...row,_stored_team_key:row.team_key,team_key:legacyTeamC?'red':row.team_key,display_name:cleanCupStoredDisplayName(storedName)};
+}
+function normaliseCupPlayerRows(rows){
+  return (rows||[]).map(normaliseCupPlayerRow);
+}
+function isCupTeamKeyConstraintError(error){
+  const msg=String(error&&error.message||'').toLowerCase();
+  return (error&&String(error.code)==='23514')||msg.includes('team_key')&&msg.includes('check constraint');
+}
 function cupPlayerDisplayName(p){
-  return (p&&(p.display_name||p.name||p.username||p.full_name))||'Player';
+  return cleanCupStoredDisplayName((p&&(p.display_name||p.name||p.username||p.full_name))||'Player');
 }
 function cupPlayersForGroupData(group,cupPlayers){
   const ids=[
@@ -1136,7 +1158,7 @@ function App(){
             selected._cupDayNumber=cupDay;
             selected._cupDayReleased=cupMatchesDayReleased(matchRows||[],cupDay);
             selected._cupGroupData=groupData;
-            selected._cupDayAllPlayers=(cupPlayerRows||[]).filter(p=>!cup||p.cup_id===cup.id);
+            selected._cupDayAllPlayers=normaliseCupPlayerRows(cupPlayerRows||[]).filter(p=>!cup||p.cup_id===cup.id);
             selected._cupDayRounds=(roundRows||[]).filter(r=>isSnyderCupRound(r)&&cupRoundDayNumber(r)===cupDay);
             selected._cupDayGroups=dayGroups.length?dayGroups:[groupData];
             try{sessionStorage.setItem('cupReturnDay',String(cupDay));}catch(e){}
@@ -1240,7 +1262,7 @@ function App(){
       sb.from('cup_guests').select('*').then(r=>r.data||[]),
       sb.from('snyder_cups').select('*').order('created_at',{ascending:false}).then(r=>r.data||[]).catch(()=>[]),
       sb.from('snyder_cup_teams').select('*').then(r=>r.data||[]).catch(()=>[]),
-      sb.from('snyder_cup_players').select('*').then(r=>r.data||[]).catch(()=>[]),
+      sb.from('snyder_cup_players').select('*').then(r=>normaliseCupPlayerRows(r.data||[])).catch(()=>[]),
       sb.from('snyder_cup_days').select('*').then(r=>r.data||[]).catch(()=>[]),
       sb.from('snyder_cup_matches').select('*').then(r=>r.data||[]).catch(()=>[]),
     ]);
@@ -1541,7 +1563,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.12" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.12</span>
+          <span aria-label="App version v3.13" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.13</span>
         </button>
       </div>
 
@@ -3841,7 +3863,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     }
   }
   function cupPlayerDisplayName(cp){
-    return (cp&&(cp.display_name||cp.name||cp.username||cp.full_name))||'Player';
+    return cleanCupStoredDisplayName((cp&&(cp.display_name||cp.name||cp.username||cp.full_name))||'Player');
   }
 
   function cupOverallBaseName(){
@@ -6534,6 +6556,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   async function saveCupPlayer(p,patch,{reload=true}={}){
     const data={...patch};
     if(Object.prototype.hasOwnProperty.call(data,'handicap'))data.handicap=parseFloat(data.handicap||0)||0;
+    if(Object.prototype.hasOwnProperty.call(data,'display_name')&&p.team_key==='red'&&p._stored_team_key==='navy')data.display_name=markCupTeamCDisplayName(data.display_name);
     const{error}=await sb.from('snyder_cup_players').update(data).eq('id',p.id);
     if(error){flash(error.message,'error');return false;}
     if(p.user_id&&Object.prototype.hasOwnProperty.call(data,'handicap'))await sb.from('cup_users').update({handicap:data.handicap}).eq('id',p.user_id);
@@ -6547,6 +6570,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     const teamName=(teams&&teams[teamKey]&&teams[teamKey].name)||theme.name;
     const{error}=await sb.from('snyder_cup_teams').insert({cup_id:cup.id,team_key:teamKey,name:teamName,colour:theme.primary});
     if(error&&String(error.message||'').toLowerCase().includes('duplicate'))return true;
+    if(teamKey==='red'&&isCupTeamKeyConstraintError(error))return true;
     if(error){flash('Could not create '+teamName+' team row: '+error.message,'error');return false;}
     return true;
   }
@@ -6554,7 +6578,11 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     if(!cup)return {error:{message:'No Cup selected'}};
     const ok=await ensureCupTeamRow(teamKey);
     if(!ok)return {error:{message:'Team setup failed'}};
-    return sb.from('snyder_cup_players').insert({cup_id:cup.id,user_id:null,team_key:teamKey,display_name:displayName,handicap:hcp});
+    const result=await sb.from('snyder_cup_players').insert({cup_id:cup.id,user_id:null,team_key:teamKey,display_name:displayName,handicap:hcp});
+    if(teamKey==='red'&&isCupTeamKeyConstraintError(result.error)){
+      return sb.from('snyder_cup_players').insert({cup_id:cup.id,user_id:null,team_key:'navy',display_name:markCupTeamCDisplayName(displayName),handicap:hcp});
+    }
+    return result;
   }
   function cupSlotDraftKey(player){return String(player&&player.id||'');}
   function cupSlotDraftValue(player){
@@ -6617,7 +6645,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       if(!ok)return false;
       const rows=cupSlotRows(t.key);
       for(let i=rows.length+1;i<=4;i++){
-        const{error}=await sb.from('snyder_cup_players').insert({cup_id:cup.id,user_id:null,team_key:t.key,display_name:t.code+i,handicap:0});
+        const{error}=await insertCupPlayer(t.key,t.code+i,0);
         if(error){flash(error.message,'error');return false;}
       }
     }
@@ -6654,8 +6682,9 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     if(cupRoundExists&&!confirm('Cup scorecards already exist. Rebuilding matchups can disconnect old scorecards from the schedule. Continue?'))return;
     const ok=await ensureFixedCupSlots({reload:false});
     if(!ok)return;
-    const{data:freshPlayers,error:playerLoadError}=await sb.from('snyder_cup_players').select('*').eq('cup_id',cup.id);
+    const{data:freshPlayerRows,error:playerLoadError}=await sb.from('snyder_cup_players').select('*').eq('cup_id',cup.id);
     if(playerLoadError){flash(playerLoadError.message,'error');return;}
+    const freshPlayers=normaliseCupPlayerRows(freshPlayerRows||[]);
     for(const dayNum of [1,2,3]){
       if(!days.some(d=>(parseInt(d.day_number)||1)===dayNum))await sb.from('snyder_cup_days').insert({cup_id:cup.id,day_number:dayNum});
     }
