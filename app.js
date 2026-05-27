@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.18
+// SNYDER GOLF v3.19
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -1575,7 +1575,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.18" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.18</span>
+          <span aria-label="App version v3.19" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.19</span>
         </button>
       </div>
 
@@ -4046,6 +4046,10 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const playerMap={};
     (overallPlayers.length?overallPlayers:grpPlayers).forEach(p=>{const key=normaliseId(p&&p.id); if(key&&!playerMap[key])playerMap[key]={...p,id:key};});
     (allGroups||[]).forEach((g,idx)=>{(g.player_ids||[]).forEach(pid=>{const key=normaliseId(pid); if(playerMap[key])playerMap[key]={...playerMap[key],groupNumber:g.group_number||idx+1};});});
+    const playerAliasMap={};
+    Object.values(playerMap).forEach(p=>{
+      scoreAliasesForPerson(p).forEach(alias=>{playerAliasMap[normaliseId(alias)]=p.id;});
+    });
     const scoreRows=(overallScores.length?overallScores.filter(r=>!isMetaScoreRow(r)):Object.keys(holeScores||{}).flatMap(h=>Object.keys(holeScores[h]||{}).map(pid=>{
       const gross=holeScores[h][pid];
       const hd=getHole(parseInt(h));
@@ -4055,7 +4059,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const totals={}; const holesPlayed={}; const holePoints={};
     Object.keys(playerMap).forEach(pid=>{totals[pid]=0;holesPlayed[pid]=new Set();});
     scoreRows.forEach(s=>{
-      const pid=normaliseId(s.player_id);
+      const pid=playerAliasMap[normaliseId(s.player_id)]||normaliseId(s.player_id);
       if(!pid)return;
       if(Object.keys(playerMap).length&&!playerMap[pid])return;
       if(totals[pid]==null)totals[pid]=0;
@@ -4255,7 +4259,11 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return tied.length===1?leader:'tie';
   }
   function cupProjectedBg(){
-    return 'linear-gradient(135deg,rgba(6,78,59,0.96),rgba(4,47,46,0.94))';
+    const lead=cupProjectedLeader();
+    if(lead==='gold')return 'linear-gradient(135deg,rgba(212,175,55,0.96),rgba(146,96,10,0.95))';
+    if(lead==='navy')return 'linear-gradient(135deg,rgba(11,31,77,0.98),rgba(0,112,187,0.92))';
+    if(lead==='red')return 'linear-gradient(135deg,rgba(220,38,38,0.96),rgba(127,29,29,0.94))';
+    return 'linear-gradient(135deg,rgba(212,175,55,0.38),rgba(37,99,235,0.36),rgba(220,38,38,0.32))';
   }
   function getHole(n){return holes.find(h=>h.hole===n)||{hole:n,par:4,stroke_index:n,yards:0};}
   function checkSkipped(targetHole){
@@ -7253,6 +7261,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   const[selectedCupPlayerDetail,setSelectedCupPlayerDetail]=useState(null);
   const[activeFinesGroup,setActiveFinesGroup]=useState(null);
   const[cupRoundPlayers,setCupRoundPlayers]=useState([]);
+  const[cupRefreshing,setCupRefreshing]=useState(false);
   useEffect(()=>{
     function handleCupBack(){
       if(activeFinesGroup){setActiveFinesGroup(null);return;}
@@ -7325,6 +7334,18 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     setShowCupSummary(false);
     setShowCupFinesSummary(false);
     setShowCupHandicaps(false);
+  }
+  async function refreshCupPage(){
+    if(cupRefreshing)return;
+    setCupRefreshing(true);
+    try{
+      if(load)await load();
+      flash&&flash('Snyder Cup refreshed');
+    }catch(e){
+      flash&&flash('Cup refresh failed: '+(e&&e.message?e.message:String(e)),'error');
+    }finally{
+      setCupRefreshing(false);
+    }
   }
   function goBackOnePage(){
     if(window.history&&window.history.length>1)window.history.back();
@@ -8053,6 +8074,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,margin:'2px 0 14px'}}>
             <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cupTitle}</div>
             <div aria-label="Portugal" title="Portugal" style={{width:36,height:36,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',flex:'0 0 auto',fontSize:24,background:'rgba(255,255,255,0.10)',border:'1px solid rgba(255,255,255,0.20)',boxShadow:'0 8px 18px rgba(0,0,0,0.22)',overflow:'hidden'}}>{EMOJI.portugalFlag}</div>
+            <button onClick={refreshCupPage} disabled={cupRefreshing} style={{flex:'0 0 auto',border:'1px solid rgba(96,184,240,0.32)',borderRadius:999,background:'rgba(0,112,187,0.16)',padding:'7px 10px',display:'inline-flex',alignItems:'center',gap:6,cursor:cupRefreshing?'default':'pointer',color:'#90ccf0',fontSize:11,fontWeight:950,opacity:cupRefreshing?0.65:1}}>Refresh</button>
             <button onClick={openCupFinesSummary} aria-label={'Open fines table, total '+EMOJI.pound+cupFineGrandTotal} style={{flex:'0 0 auto',border:'1px solid rgba(212,175,55,0.38)',borderRadius:999,background:'linear-gradient(135deg,rgba(212,175,55,0.22),rgba(15,23,42,0.80))',padding:'7px 11px',display:'inline-flex',alignItems:'center',gap:7,cursor:'pointer',boxShadow:'0 8px 20px rgba(0,0,0,0.20)'}}>
               <span style={{fontSize:14,lineHeight:1,color:'#F5E6A3',fontWeight:950}}>{EMOJI.moneyWings}</span>
               <span style={{fontSize:11,lineHeight:1,color:'#F5E6A3',fontWeight:950}}>{EMOJI.pound}</span>
