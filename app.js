@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.24
+// SNYDER GOLF v3.25
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -1587,7 +1587,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.24" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.24</span>
+          <span aria-label="App version v3.25" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.25</span>
         </button>
       </div>
 
@@ -5995,7 +5995,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       <SinglesMatchplayOnlyScorecard/>
 
       {/* Spectator live leaderboard */}
-      {!(matchplayConfig&&matchplayConfig.enabled)&&!canEdit&&!isCompletedRound(round)&&(
+      {!(matchplayConfig&&matchplayConfig.enabled)&&!canEdit&&!isCompletedRound(round)&&!(round._cupScoring&&round._spectator)&&(
         <div style={{padding:'12px 14px',background:'rgba(0,0,0,0.2)',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
           <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.15em',fontWeight:600,marginBottom:10}}>LIVE LEADERBOARD</div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
