@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.21
+// SNYDER GOLF v3.22
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -1587,7 +1587,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.21" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.21</span>
+          <span aria-label="App version v3.22" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.22</span>
         </button>
       </div>
 
@@ -3903,8 +3903,18 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       return n.startsWith(base+' Day ')||n.startsWith('Synder Cup Day ');
     });
     if(!list.some(r=>r&&round&&r.id===round.id))list.push(round);
-    const seen=new Set();
-    return list.filter(r=>r&&r.id&&!seen.has(r.id)&&seen.add(r.id));
+    const byDayGroup={};
+    list.filter(r=>r&&r.id).forEach(r=>{
+      const n=String(r.name||'');
+      const m=n.match(/Day\s+(\d+)\s+Group\s+(\d+)/i);
+      const key=m?(m[1]+'-'+m[2]):r.id;
+      const existing=byDayGroup[key];
+      const score=r.id===(round&&round.id)?3:(n.startsWith(base+' Day ')?2:1);
+      const existingName=String(existing&&existing.name||'');
+      const existingScore=existing&&existing.id===(round&&round.id)?3:(existingName.startsWith(base+' Day ')?2:1);
+      if(!existing||score>=existingScore)byDayGroup[key]=r;
+    });
+    return Object.values(byDayGroup);
   }
   function cupOverallPlayerKeys(cp){
     return [cp&&cp.id,cp&&cp.user_id,cp&&cp.guest_id,cp&&cp.round_player_id,cp&&cp.cup_player_id].filter(Boolean).map(normaliseId);
@@ -4058,10 +4068,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const playerMap={};
     (overallPlayers.length?overallPlayers:grpPlayers).forEach(p=>{const key=normaliseId(p&&p.id); if(key&&!playerMap[key])playerMap[key]={...p,id:key};});
     (allGroups||[]).forEach((g,idx)=>{(g.player_ids||[]).forEach(pid=>{const key=normaliseId(pid); if(playerMap[key])playerMap[key]={...playerMap[key],groupNumber:g.group_number||idx+1};});});
-    const playerAliasMap={};
-    Object.values(playerMap).forEach(p=>{
-      scoreAliasesForPerson(p).forEach(alias=>{playerAliasMap[normaliseId(alias)]=p.id;});
-    });
     const scoreRows=(overallScores.length?overallScores.filter(r=>!isMetaScoreRow(r)):Object.keys(holeScores||{}).flatMap(h=>Object.keys(holeScores[h]||{}).map(pid=>{
       const gross=holeScores[h][pid];
       const hd=getHole(parseInt(h));
@@ -4072,7 +4078,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     Object.keys(playerMap).forEach(pid=>{totals[pid]=0;holesPlayed[pid]=new Set();});
     const scoreByPlayerHole={};
     scoreRows.forEach((s,idx)=>{
-      const pid=playerAliasMap[normaliseId(s.player_id)]||normaliseId(s.player_id);
+      const pid=normaliseId(s.player_id);
       if(!pid)return;
       if(Object.keys(playerMap).length&&!playerMap[pid])return;
       const holeNum=Number(s.hole_number);
@@ -5895,10 +5901,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
               <span style={{fontSize:12,color:'#fff',fontWeight:950,letterSpacing:'0.1em'}}>{'DAY '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)+' SINGLES'}</span>
               <span style={{fontSize:15,color:'#fff',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l?gameName(l.name)+' - '+l.total+' PTS':'NO SINGLES SCORES YET'}</span>
             </button>;})()}
-            {(()=>{const state=cupDoublesMatchState(round&&round._cupGroupData&&round._cupGroupData.doubles);return state?<div style={{marginTop:6,border:'1px solid rgba(255,255,255,0.16)',background:'rgba(255,255,255,0.07)',borderRadius:10,padding:'7px 10px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,color:'#fff'}}>
-              <span style={{fontSize:10,color:'#90ccf0',fontWeight:950,letterSpacing:'0.1em',whiteSpace:'nowrap'}}>DOUBLES</span>
-              <span style={{fontSize:12,color:'#fff',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textTransform:'uppercase'}}>{state.label}</span>
-            </div>:null;})()}
           </div>
         )}
         {allGroups.length>1&&<>
