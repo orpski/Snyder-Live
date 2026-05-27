@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.26
+// SNYDER GOLF v3.27
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -1587,7 +1587,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.26" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.26</span>
+          <span aria-label="App version v3.27" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.27</span>
         </button>
       </div>
 
@@ -3516,6 +3516,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const course=courses.find(co=>co.id===round.course_id)||findCourseForTee(courses,round.course_name,round.tee);
   const holes=course&&course.holes&&course.holes.length>0?course.holes:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1,yards:0}));
   const[allGroups,setAllGroups]=useState(group?[group]:[]);
+  const groups=allGroups||[];
   const[allRoundPlayers,setAllRoundPlayers]=useState((group&&group.participants)||[]);
   const[activeGroupId,setActiveGroupId]=useState(group&&group.id?group.id:'leaderboard');
   const activeScoreGroup=activeGroupId==='leaderboard'?null:(allGroups.find(g=>normaliseId(g.id)===normaliseId(activeGroupId))||group||allGroups[0]||{});
