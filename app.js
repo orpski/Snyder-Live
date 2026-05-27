@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.23
+// SNYDER GOLF v3.24
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -1587,7 +1587,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.23" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.23</span>
+          <span aria-label="App version v3.24" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.24</span>
         </button>
       </div>
 
@@ -5901,9 +5901,13 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
               <span style={{fontSize:12,color:'#fff',fontWeight:950,letterSpacing:'0.1em'}}>{'DAY '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)+' SINGLES'}</span>
               <span style={{fontSize:15,color:'#fff',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l?gameName(l.name)+' - '+l.total+' PTS':'NO SINGLES SCORES YET'}</span>
             </button>;})()}
+            {(()=>{const state=cupDoublesMatchState(round&&round._cupGroupData&&round._cupGroupData.doubles);return state?<div style={{marginTop:6,border:'1px solid rgba(216,180,254,0.36)',background:'linear-gradient(135deg,rgba(88,28,135,0.96),rgba(112,26,117,0.92))',boxShadow:'0 10px 24px rgba(88,28,135,0.18)',borderRadius:12,padding:'8px 11px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,color:'#fff'}}>
+              <span style={{fontSize:11,color:'#f5d0fe',fontWeight:950,letterSpacing:'0.1em',whiteSpace:'nowrap'}}>DOUBLES MATCH</span>
+              <span style={{fontSize:13,color:'#fff',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textTransform:'uppercase'}}>{state.label}</span>
+            </div>:null;})()}
           </div>
         )}
-        {allGroups.length>1&&<>
+        {allGroups.length>1&&!(round._cupScoring&&round._spectator)&&<>
           {(()=>{const leader=overallLeaderboardRows()[0];return (
             <button onClick={()=>{setActiveGroupId('leaderboard');openOverallLeaderboard(false);}} style={{width:'calc(100% - 24px)',margin:'8px 12px 6px',padding:'10px 12px',borderRadius:12,border:'1px solid rgba(245,158,11,0.55)',background:'linear-gradient(135deg,rgba(245,158,11,0.95),rgba(180,83,9,0.9))',boxShadow:'0 8px 22px rgba(180,83,9,0.22)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,cursor:'pointer',textAlign:'left'}}>
               <div style={{display:'flex',flexDirection:'column',lineHeight:1.05}}>
