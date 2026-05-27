@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.17
+// SNYDER GOLF v3.18
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -1502,14 +1502,14 @@ function App(){
         </div>
       </div>
 
-      <div style={{padding:'18px 16px 0',minHeight:'calc(100vh - 140px)',display:'flex',flexDirection:'column'}}>
-        <div style={{textAlign:'center',padding:'8px 0 18px'}}>
-          <img src={SNYDER_GOLF_LOGO} onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src=LOGO;}} alt="Snyder Golf" style={{width:'min(132px,36vw)',height:'auto',objectFit:'contain',filter:'drop-shadow(0 8px 20px rgba(96,184,240,0.26))'}}/>
-          <div className="sg-pop-title" style={{fontSize:28,lineHeight:1,marginTop:8}}>SNYDER GOLF</div>
+      <div style={{padding:'14px 16px 0',minHeight:'calc(100vh - 132px)',display:'flex',flexDirection:'column'}}>
+        <div style={{textAlign:'center',padding:'4px 0 12px'}}>
+          <img src={SNYDER_GOLF_LOGO} onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src=LOGO;}} alt="Snyder Golf" style={{width:'min(122px,34vw)',height:'auto',objectFit:'contain',filter:'drop-shadow(0 8px 20px rgba(96,184,240,0.26))'}}/>
+          <div className="sg-pop-title" style={{fontSize:27,lineHeight:1,marginTop:7}}>SNYDER GOLF</div>
         </div>
-        <div style={{display:'grid',gap:14,marginBottom:18,flex:1,gridTemplateRows:'1.25fr 1fr 1fr'}}>
-          <section style={{border:'1px solid rgba(96,184,240,0.24)',borderRadius:22,background:'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(13,37,72,0.96))',padding:16,boxShadow:'0 16px 34px rgba(0,112,187,0.18)',display:'flex',flexDirection:'column',justifyContent:'space-between',minHeight:150}}>
-            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+        <div style={{display:'grid',gap:11,marginBottom:14,flex:1,gridTemplateRows:'1.2fr 1fr 1fr'}}>
+          <section style={{border:'1px solid rgba(96,184,240,0.24)',borderRadius:22,background:'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(13,37,72,0.96))',padding:14,boxShadow:'0 16px 34px rgba(0,112,187,0.18)',display:'flex',flexDirection:'column',justifyContent:'space-between',minHeight:142}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
               <img src={LOGO} alt="Live" style={{width:50,height:50,objectFit:'contain',flex:'0 0 auto',filter:'drop-shadow(0 4px 10px rgba(0,0,0,0.24))'}}/>
               <div style={{minWidth:0,flex:1}}>
                 <div className="sg-pop-heading" style={{fontSize:23,lineHeight:1}}>Live</div>
@@ -1518,12 +1518,12 @@ function App(){
             </div>
             {homeLatestLive&&<div style={{fontSize:12,color:'rgba(255,255,255,0.62)',margin:'0 0 12px 62px',lineHeight:1.35}}>Latest live: {homeLatestLive.name||"Live round"}{homeLatestCourse?' at '+homeLatestCourse.name:''}</div>}
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-              <button onClick={()=>currentUser?setView('play'):promptStartRoundAuth()} style={{...NO_SELECT,...S.pri,padding:'15px 10px',fontSize:14,fontWeight:950}}><span className="sg-pop-button">Start Round</span></button>
-              <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{...NO_SELECT,border:'1px solid rgba(248,113,113,0.52)',borderRadius:12,background:'linear-gradient(135deg,rgba(239,68,68,0.92),rgba(127,29,29,0.88))',color:'#fff',boxShadow:'0 10px 22px rgba(239,68,68,0.22), inset 0 1px 0 rgba(255,255,255,0.18)',padding:'15px 10px',fontSize:14,fontWeight:950,cursor:'pointer'}}><span className="sg-pop-button">Live Scoreboards ({homeLiveCount})</span></button>
+              <button onClick={()=>currentUser?setView('play'):promptStartRoundAuth()} style={{...NO_SELECT,...S.pri,padding:'13px 10px',fontSize:14,fontWeight:950}}><span className="sg-pop-button">Start Round</span></button>
+              <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{...NO_SELECT,border:'1px solid rgba(248,113,113,0.52)',borderRadius:12,background:'linear-gradient(135deg,rgba(239,68,68,0.92),rgba(127,29,29,0.88))',color:'#fff',boxShadow:'0 10px 22px rgba(239,68,68,0.22), inset 0 1px 0 rgba(255,255,255,0.18)',padding:'13px 10px',fontSize:14,fontWeight:950,cursor:'pointer'}}><span className="sg-pop-button">Live Scoreboards ({homeLiveCount})</span></button>
             </div>
           </section>
 
-          <button onClick={()=>setView('league')} style={{...NO_SELECT,border:'1px solid rgba(96,184,240,0.24)',borderRadius:22,background:'rgba(255,255,255,0.065)',padding:16,textAlign:'left',cursor:'pointer',color:'#fff',display:'flex',alignItems:'center',gap:13,minHeight:116,boxShadow:'0 12px 28px rgba(0,0,0,0.12)'}}>
+          <button onClick={()=>setView('league')} style={{...NO_SELECT,border:'1px solid rgba(96,184,240,0.24)',borderRadius:22,background:'rgba(255,255,255,0.065)',padding:14,textAlign:'left',cursor:'pointer',color:'#fff',display:'flex',alignItems:'center',gap:13,minHeight:108,boxShadow:'0 12px 28px rgba(0,0,0,0.12)'}}>
             <img src={window.SUMMER_LEAGUE_LOGO||LOGO} alt="League" style={{width:50,height:50,objectFit:'contain',flex:'0 0 auto',filter:'drop-shadow(0 4px 10px rgba(0,0,0,0.24))'}}/>
             <div style={{minWidth:0,flex:1}}>
               <div className="sg-pop-heading" style={{fontSize:23,lineHeight:1}}>League</div>
@@ -1532,7 +1532,7 @@ function App(){
             <div style={{fontSize:22,color:'#60b8f0',fontWeight:900}}>{'>'}</div>
           </button>
 
-          <button onClick={()=>setView('tournaments')} style={{...NO_SELECT,border:'1px solid rgba(212,175,55,0.34)',borderRadius:22,background:'linear-gradient(135deg,rgba(212,175,55,0.16),rgba(11,31,77,0.92))',padding:16,textAlign:'left',cursor:'pointer',color:'#fff',display:'flex',alignItems:'center',gap:13,minHeight:116,boxShadow:'0 14px 30px rgba(212,175,55,0.10)'}}>
+          <button onClick={()=>setView('tournaments')} style={{...NO_SELECT,border:'1px solid rgba(212,175,55,0.34)',borderRadius:22,background:'linear-gradient(135deg,rgba(212,175,55,0.16),rgba(11,31,77,0.92))',padding:14,textAlign:'left',cursor:'pointer',color:'#fff',display:'flex',alignItems:'center',gap:13,minHeight:108,boxShadow:'0 14px 30px rgba(212,175,55,0.10)'}}>
             <div style={{width:50,height:50,display:'flex',alignItems:'center',justifyContent:'center',fontSize:30,fontWeight:950,color:'#F5E6A3',flex:'0 0 auto',filter:'drop-shadow(0 4px 10px rgba(0,0,0,0.24))'}}>{EMOJI.trophy}</div>
             <div style={{minWidth:0,flex:1}}>
               <div className="sg-pop-heading" style={{fontSize:23,lineHeight:1}}>Cup</div>
@@ -1575,7 +1575,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.17" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.17</span>
+          <span aria-label="App version v3.18" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.18</span>
         </button>
       </div>
 
@@ -4255,11 +4255,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return tied.length===1?leader:'tie';
   }
   function cupProjectedBg(){
-    const lead=cupProjectedLeader();
-    if(lead==='gold')return 'linear-gradient(135deg,rgba(212,175,55,0.96),rgba(146,96,10,0.95))';
-    if(lead==='navy')return 'linear-gradient(135deg,rgba(11,31,77,0.98),rgba(0,112,187,0.92))';
-    if(lead==='red')return 'linear-gradient(135deg,rgba(220,38,38,0.96),rgba(127,29,29,0.94))';
-    return 'linear-gradient(135deg,rgba(212,175,55,0.38),rgba(37,99,235,0.36),rgba(220,38,38,0.32))';
+    return 'linear-gradient(135deg,rgba(6,78,59,0.96),rgba(4,47,46,0.94))';
   }
   function getHole(n){return holes.find(h=>h.hole===n)||{hole:n,par:4,stroke_index:n,yards:0};}
   function checkSkipped(targetHole){
@@ -5800,7 +5796,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
                 </div>
               );})()}
             </button>
-            {(()=>{const l=activeCupLeader();return <button onClick={()=>openCupDaySinglesLeaderboard(true)} style={{width:'100%',marginTop:6,border:'1px solid rgba(248,113,113,0.78)',background:'linear-gradient(135deg,rgba(185,28,28,0.98),rgba(127,29,29,0.94))',boxShadow:'0 10px 24px rgba(185,28,28,0.24)',borderRadius:12,padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,color:'#fff',textAlign:'left'}}>
+            {(()=>{const l=activeCupLeader();return <button onClick={()=>openCupDaySinglesLeaderboard(true)} style={{width:'100%',marginTop:6,border:'1px solid rgba(94,234,212,0.34)',background:'linear-gradient(135deg,rgba(6,78,59,0.96),rgba(4,47,46,0.94))',boxShadow:'0 10px 24px rgba(6,78,59,0.22)',borderRadius:12,padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,color:'#fff',textAlign:'left'}}>
               <span style={{fontSize:12,color:'#fff',fontWeight:950,letterSpacing:'0.1em'}}>{'DAY '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)+' SINGLES'}</span>
               <span style={{fontSize:15,color:'#fff',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l?gameName(l.name)+' - '+l.total+' PTS':'NO SINGLES SCORES YET'}</span>
             </button>;})()}
@@ -6526,21 +6522,17 @@ const CUP_RANK_TONES=[
   {label:'🥇',bg:'linear-gradient(135deg,rgba(212,175,55,0.38),rgba(120,74,7,0.34))',border:'rgba(245,230,163,0.58)',color:'#F5E6A3',chip:'rgba(212,175,55,0.20)'},
   {label:'🥈',bg:'linear-gradient(135deg,rgba(203,213,225,0.30),rgba(71,85,105,0.26))',border:'rgba(226,232,240,0.46)',color:'#e2e8f0',chip:'rgba(203,213,225,0.16)'},
   {label:'🥉',bg:'linear-gradient(135deg,rgba(180,83,9,0.31),rgba(92,45,10,0.27))',border:'rgba(251,146,60,0.46)',color:'#fed7aa',chip:'rgba(251,146,60,0.15)'},
-  {bg:'linear-gradient(135deg,rgba(234,179,8,0.21),rgba(113,63,18,0.22))',border:'rgba(253,224,71,0.34)',color:'#fef08a',chip:'rgba(234,179,8,0.11)'},
-  {bg:'linear-gradient(135deg,rgba(132,204,22,0.18),rgba(63,98,18,0.22))',border:'rgba(190,242,100,0.30)',color:'#d9f99d',chip:'rgba(132,204,22,0.10)'},
-  {bg:'linear-gradient(135deg,rgba(34,197,94,0.17),rgba(20,83,45,0.21))',border:'rgba(134,239,172,0.28)',color:'#bbf7d0',chip:'rgba(34,197,94,0.10)'},
-  {bg:'linear-gradient(135deg,rgba(20,184,166,0.16),rgba(19,78,74,0.21))',border:'rgba(94,234,212,0.26)',color:'#99f6e4',chip:'rgba(20,184,166,0.09)'},
-  {bg:'linear-gradient(135deg,rgba(148,163,184,0.15),rgba(51,65,85,0.20))',border:'rgba(203,213,225,0.24)',color:'#cbd5e1',chip:'rgba(148,163,184,0.09)'},
-  {bg:'linear-gradient(135deg,rgba(251,146,60,0.16),rgba(124,45,18,0.21))',border:'rgba(253,186,116,0.27)',color:'#fed7aa',chip:'rgba(251,146,60,0.09)'},
-  {bg:'linear-gradient(135deg,rgba(249,115,22,0.18),rgba(124,45,18,0.24))',border:'rgba(251,146,60,0.32)',color:'#fdba74',chip:'rgba(249,115,22,0.10)'},
-  {bg:'linear-gradient(135deg,rgba(239,68,68,0.20),rgba(127,29,29,0.26))',border:'rgba(252,165,165,0.36)',color:'#fecaca',chip:'rgba(239,68,68,0.11)'},
-  {bg:'linear-gradient(135deg,rgba(185,28,28,0.32),rgba(69,10,10,0.34))',border:'rgba(248,113,113,0.52)',color:'#fecaca',chip:'rgba(185,28,28,0.18)'}
+  {bg:'rgba(255,255,255,0.055)',border:'rgba(96,184,240,0.18)',color:'#90ccf0',chip:'rgba(0,0,0,0.16)'},
+  {bg:'linear-gradient(135deg,rgba(239,68,68,0.13),rgba(127,29,29,0.18))',border:'rgba(252,165,165,0.28)',color:'#fecaca',chip:'rgba(239,68,68,0.09)'},
+  {bg:'linear-gradient(135deg,rgba(185,28,28,0.30),rgba(69,10,10,0.34))',border:'rgba(248,113,113,0.52)',color:'#fecaca',chip:'rgba(185,28,28,0.18)'}
 ];
 function cupRankTone(idx,total=12){
   const count=Math.max(1,parseInt(total)||12);
   const pos=Math.min(Math.max(parseInt(idx)||0,0),count-1);
-  const scaleIdx=count<=1?0:Math.round((pos/(count-1))*(CUP_RANK_TONES.length-1));
-  return CUP_RANK_TONES[Math.min(scaleIdx,CUP_RANK_TONES.length-1)]||CUP_RANK_TONES[CUP_RANK_TONES.length-1];
+  if(pos<=2)return CUP_RANK_TONES[pos]||CUP_RANK_TONES[3];
+  if(count>4&&pos===count-2)return CUP_RANK_TONES[4];
+  if(count>3&&pos===count-1)return CUP_RANK_TONES[5];
+  return CUP_RANK_TONES[3];
 }
 function cupRankLabel(idx,total=12){
   const n=parseInt(idx)||0;
