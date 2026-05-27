@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.29
+// SNYDER GOLF v3.30
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -1595,7 +1595,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.29" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.29</span>
+          <span aria-label="App version v3.30" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.30</span>
         </button>
       </div>
 
@@ -7554,10 +7554,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     // The day-of +/- singles adjustment is handled when the round players/shots are set up;
     // do not re-score from gross here, otherwise the home summary can drift from the card.
     if(!round||!p)return 0;
-    const ids=new Set(cupScoreIdsForRound(round,p));
-    return (scores||[])
-      .filter(s=>s&&s.round_id===round.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id)))
-      .reduce((t,s)=>t+stablefordPointsValue(s.stableford_points),0);
+    return cupPlayerScoreRowsForRound(round,p).reduce((t,s)=>t+stablefordPointsValue(s.stableford_points),0);
   }
   function formatMatchplayShortLabel(winner,diff,remaining){
     const d=Math.abs(parseInt(diff)||0);
@@ -7825,7 +7822,14 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   function cupPlayerScoreRowsForRound(rd,p){
     if(!rd||!p)return[];
     const ids=new Set(cupScoreIdsForRound(rd,p));
-    return (scores||[]).filter(s=>rd&&s.round_id===rd.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id)));
+    const byHole={};
+    (scores||[]).forEach((s,idx)=>{
+      if(!s||s.round_id!==rd.id||isMetaScoreRow(s)||!ids.has(normaliseId(s.player_id)))return;
+      const h=parseInt(s.hole_number);
+      if(h<1||h>18)return;
+      byHole[h]={...s,_idx:idx};
+    });
+    return Object.values(byHole).sort((a,b)=>(parseInt(a.hole_number)||0)-(parseInt(b.hole_number)||0)).map(({_idx,...row})=>row);
   }
   function cupPlayerDayScoreSummary(p,day){
     const dayRounds=cupRoundsForDay(day);
