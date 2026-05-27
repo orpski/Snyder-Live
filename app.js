@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.22
+// SNYDER GOLF v3.23
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -1587,7 +1587,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.22" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.22</span>
+          <span aria-label="App version v3.23" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.23</span>
         </button>
       </div>
 
@@ -4165,7 +4165,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const map=holeScores[holeNum]||{};
     const gross=map[p.id]!==undefined?map[p.id]:map[normaliseId(p.id)];
     const g=grossScoreValue(gross);
-    if(g<=0||isGivenGross(gross))return null;
+    if(g<=0)return null;
     const hd=getHole(holeNum);
     const aliases=scoreAliasesForPerson(p).concat([cupId]).filter(Boolean);
     let hcp=null;
@@ -4257,7 +4257,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const row=savedCupScoreRowFor(rd,cupId,holeNum);
     const p=[...(round&&round._cupDayAllPlayers||[]),...(grpPlayers||[])].find(cp=>scoreAliasesForPerson(cp).some(id=>normaliseId(id)===normaliseId(cupId)))||{id:cupId};
     const g=grossScoreValue(row&&row.gross_score);
-    if(!row||g<=0||isGivenGross(row.gross_score))return null;
+    if(!row||g<=0)return null;
     const hd=getHole(holeNum);
     const rdGroup=(groups||[]).find(g=>g&&rd&&g.round_id===rd.id);
     const hmap=(rdGroup&&rdGroup.playing_handicaps)||{};
@@ -7184,19 +7184,19 @@ function CupDayView({day,course,groups,teams,playersInCup,released,roundForGroup
     const centreText=finished?'F':(res.isDoubles?(res.winner==='tie'?'A/S':(res.holes?('THRU '+res.holes):'MATCHPLAY')):(res.winner==='tie'?'A/S':'')).toUpperCase();
     const leftOutside=res.isDoubles?(isLeft&&res.shortLabel?res.shortLabel.toUpperCase():''):String(res.gold||0).toUpperCase();
     const rightOutside=res.isDoubles?(isRight&&res.shortLabel?res.shortLabel.toUpperCase():''):String(res.navy||0).toUpperCase();
-    const scoreColWidth=res.isDoubles?58:62;
-    const centreColWidth=res.isDoubles?96:54;
-    const playerFontSize=res.isDoubles?14:13;
+    const scoreColWidth=res.isDoubles?46:62;
+    const centreColWidth=res.isDoubles?54:54;
+    const playerFontSize=res.isDoubles?12:13;
     return <div style={{border:matchBorder,borderRadius:12,background:matchBg,padding:10,boxShadow:matchTone?'0 12px 30px rgba(0,0,0,0.34), inset 0 0 0 1px rgba(255,255,255,0.17)':(finished?'0 10px 24px rgba(0,0,0,0.24)':'none')}}>
       {finished&&<div style={{fontSize:10,color:matchTone?'#fff':'#f8fafc',fontWeight:950,letterSpacing:'0.16em',textAlign:'center',marginBottom:7}}>FINISHED</div>}
       <div style={{display:'grid',gridTemplateColumns:`${scoreColWidth}px minmax(0,1fr) ${centreColWidth}px minmax(0,1fr) ${scoreColWidth}px`,gap:6,alignItems:'center'}}>
-        <div style={{fontSize:res.isDoubles?15:20,color:isLeft?'#fff':(res.isDoubles?'rgba(255,255,255,0.22)':CUP_THEME[leftKey].accent),fontWeight:950,textAlign:'left',whiteSpace:'nowrap'}}>{leftOutside}</div>
-        <div style={{display:'grid',gap:5,textAlign:'right',minWidth:0}}>{goldIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME[leftKey].accent,fontSize:playerFontSize,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
+        <div style={{fontSize:res.isDoubles?14:20,color:isLeft?'#fff':(res.isDoubles?'rgba(255,255,255,0.22)':CUP_THEME[leftKey].accent),fontWeight:950,textAlign:'left',whiteSpace:'nowrap',lineHeight:1}}>{leftOutside}</div>
+        <div style={{display:'grid',gap:4,textAlign:'right',minWidth:0}}>{goldIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME[leftKey].accent,fontSize:playerFontSize,fontWeight:950,whiteSpace:'normal',overflowWrap:'anywhere',lineHeight:1.05}}>{playerName(id)}</div>)}</div>
         <div style={{textAlign:'center',display:'grid',gap:3,justifyItems:'center',alignItems:'center',minWidth:centreColWidth}}>
-          <div style={{fontSize:finished?24:(res.isDoubles?11:13),color:finished?(matchTone?'#fff':'#f8fafc'):(matchTone?'rgba(255,255,255,0.84)':'#8ea0ad'),fontWeight:950,whiteSpace:'nowrap',lineHeight:1}}>{centreText}</div>
+          <div style={{fontSize:finished?22:(res.isDoubles?10:13),color:finished?(matchTone?'#fff':'#f8fafc'):(matchTone?'rgba(255,255,255,0.84)':'#8ea0ad'),fontWeight:950,whiteSpace:'nowrap',lineHeight:1}}>{centreText}</div>
         </div>
-        <div style={{display:'grid',gap:5,textAlign:'left',minWidth:0}}>{navyIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME[rightKey].accent,fontSize:playerFontSize,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
-        <div style={{fontSize:res.isDoubles?15:20,color:isRight?'#fff':(res.isDoubles?'rgba(255,255,255,0.22)':CUP_THEME[rightKey].accent),fontWeight:950,textAlign:'right',whiteSpace:'nowrap'}}>{rightOutside}</div>
+        <div style={{display:'grid',gap:4,textAlign:'left',minWidth:0}}>{navyIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME[rightKey].accent,fontSize:playerFontSize,fontWeight:950,whiteSpace:'normal',overflowWrap:'anywhere',lineHeight:1.05}}>{playerName(id)}</div>)}</div>
+        <div style={{fontSize:res.isDoubles?14:20,color:isRight?'#fff':(res.isDoubles?'rgba(255,255,255,0.22)':CUP_THEME[rightKey].accent),fontWeight:950,textAlign:'right',whiteSpace:'nowrap',lineHeight:1}}>{rightOutside}</div>
       </div>
     </div>;
   }
@@ -7579,7 +7579,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
       const row=scoreRowForHole(id,h);
       const p=findCupPlayer(id)||{id};
       const g=grossScoreValue(row&&row.gross_score);
-      if(!row||g<=0||isGivenGross(row.gross_score))return null;
+      if(!row||g<=0)return null;
       const day=parseInt(match.day_number)||cupDayFromRound(round)||1;
       const matchCourse=resolveCupDayCourse(courses,days,cup&&cup.id,day);
       const courseHoles=(matchCourse&&Array.isArray(matchCourse.holes))?matchCourse.holes:[];
