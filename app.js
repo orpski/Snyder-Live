@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.20
+// SNYDER GOLF v3.21
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -1587,7 +1587,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.20" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.20</span>
+          <span aria-label="App version v3.21" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.21</span>
         </button>
       </div>
 
@@ -4070,20 +4070,25 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     })));
     const totals={}; const holesPlayed={}; const holePoints={};
     Object.keys(playerMap).forEach(pid=>{totals[pid]=0;holesPlayed[pid]=new Set();});
-    scoreRows.forEach(s=>{
+    const scoreByPlayerHole={};
+    scoreRows.forEach((s,idx)=>{
       const pid=playerAliasMap[normaliseId(s.player_id)]||normaliseId(s.player_id);
       if(!pid)return;
       if(Object.keys(playerMap).length&&!playerMap[pid])return;
+      const holeNum=Number(s.hole_number);
+      if(!holeNum)return;
+      scoreByPlayerHole[pid+'-'+holeNum]={...s,_pid:pid,_holeNum:holeNum,_idx:idx};
+    });
+    Object.values(scoreByPlayerHole).sort((a,b)=>(a._idx||0)-(b._idx||0)).forEach(s=>{
+      const pid=s._pid;
       if(totals[pid]==null)totals[pid]=0;
       const points=stablefordPointsValue(s.stableford_points);
       totals[pid]+=points;
       if(!holesPlayed[pid])holesPlayed[pid]=new Set();
-      if(s.hole_number){
-        const holeNum=Number(s.hole_number);
-        holesPlayed[pid].add(holeNum);
-        if(!holePoints[pid])holePoints[pid]={};
-        holePoints[pid][holeNum]=points;
-      }
+      const holeNum=s._holeNum;
+      holesPlayed[pid].add(holeNum);
+      if(!holePoints[pid])holePoints[pid]={};
+      holePoints[pid][holeNum]=points;
     });
     return Object.keys(totals).map(pid=>({
       id:pid,
@@ -4156,7 +4161,14 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const g=grossScoreValue(gross);
     if(g<=0||isGivenGross(gross))return null;
     const hd=getHole(holeNum);
-    const hcp=parseFloat(playingHcps[p.id]??playingHcps[normaliseId(p.id)]??p.playing_handicap??p.current_handicap??p.handicap??0)||0;
+    const aliases=scoreAliasesForPerson(p).concat([cupId]).filter(Boolean);
+    let hcp=null;
+    for(const alias of aliases){
+      if(playingHcps[alias]!=null&&playingHcps[alias]!==''){hcp=parseFloat(playingHcps[alias]);break;}
+      const key=normaliseId(alias);
+      if(playingHcps[key]!=null&&playingHcps[key]!==''){hcp=parseFloat(playingHcps[key]);break;}
+    }
+    if(hcp===null||Number.isNaN(hcp))hcp=parseFloat(p.playing_handicap??p.current_handicap??p.handicap??0)||0;
     return g-shotsOnHole(hcp,hd.stroke_index);
   }
   function doublesBestNet(ids,holeNum){
@@ -4241,8 +4253,19 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const g=grossScoreValue(row&&row.gross_score);
     if(!row||g<=0||isGivenGross(row.gross_score))return null;
     const hd=getHole(holeNum);
-    const baseHcp=(p.playing_handicap!=null&&p.playing_handicap!=='')?parseFloat(p.playing_handicap):calcPlayingHandicap(parseFloat(p.handicap??p.eg_handicap??p.current_handicap??0)||0,course,1);
-    const hcp=parseFloat(baseHcp)||0;
+    const rdGroup=(groups||[]).find(g=>g&&rd&&g.round_id===rd.id);
+    const hmap=(rdGroup&&rdGroup.playing_handicaps)||{};
+    const aliases=scoreAliasesForPerson(p).concat([cupId]).filter(Boolean);
+    let hcp=null;
+    for(const alias of aliases){
+      if(hmap[alias]!=null&&hmap[alias]!==''&&!Number.isNaN(parseFloat(hmap[alias]))){hcp=parseFloat(hmap[alias]);break;}
+      const key=normaliseId(alias);
+      if(hmap[key]!=null&&hmap[key]!==''&&!Number.isNaN(parseFloat(hmap[key]))){hcp=parseFloat(hmap[key]);break;}
+    }
+    if(hcp===null||Number.isNaN(hcp)){
+      const baseHcp=(p.playing_handicap!=null&&p.playing_handicap!==''&&parseFloat(p.playing_handicap)>0)?parseFloat(p.playing_handicap):calcPlayingHandicap(parseFloat(p.handicap??p.eg_handicap??p.current_handicap??0)||0,course,1);
+      hcp=parseFloat(baseHcp)||0;
+    }
     return g-shotsOnHole(hcp,hd.stroke_index);
   }
   function savedStablefordForCupPlayer(rd,cupId){
@@ -7156,19 +7179,14 @@ function CupDayView({day,course,groups,teams,playersInCup,released,roundForGroup
       ? (res.winner==='gold'?'linear-gradient(135deg,rgba(212,175,55,0.98),rgba(120,74,7,0.96))':res.winner==='red'?'linear-gradient(135deg,rgba(220,38,38,0.98),rgba(69,10,10,0.96))':'linear-gradient(135deg,rgba(37,99,235,0.98),rgba(8,24,61,0.97))')
       : 'linear-gradient(135deg,rgba(255,255,255,0.060),rgba(255,255,255,0.025))';
     const matchBorder=matchTone?`2px solid ${matchTone.accent}`:'1px solid rgba(255,255,255,0.10)';
-    const leftNames=goldIds.map(playerName).filter(Boolean).join(' / ');
-    const rightNames=navyIds.map(playerName).filter(Boolean).join(' / ');
-    const leaderNames=res.winner===leftKey?leftNames:res.winner===rightKey?rightNames:'';
-    const doublesScoreLine=res.isDoubles&&res.holes?(res.winner==='tie'?('A/S THRU '+res.holes):(leaderNames+' '+(res.shortLabel||''))):'';
     const centreText=finished?'F':(res.isDoubles?(res.winner==='tie'?'A/S':(res.holes?('THRU '+res.holes):'MATCHPLAY')):(res.winner==='tie'?'A/S':'')).toUpperCase();
-    const leftOutside=res.isDoubles?'':String(res.gold||0).toUpperCase();
-    const rightOutside=res.isDoubles?'':String(res.navy||0).toUpperCase();
-    const scoreColWidth=res.isDoubles?38:62;
+    const leftOutside=res.isDoubles?(isLeft&&res.shortLabel?res.shortLabel.toUpperCase():''):String(res.gold||0).toUpperCase();
+    const rightOutside=res.isDoubles?(isRight&&res.shortLabel?res.shortLabel.toUpperCase():''):String(res.navy||0).toUpperCase();
+    const scoreColWidth=res.isDoubles?58:62;
     const centreColWidth=res.isDoubles?96:54;
     const playerFontSize=res.isDoubles?14:13;
     return <div style={{border:matchBorder,borderRadius:12,background:matchBg,padding:10,boxShadow:matchTone?'0 12px 30px rgba(0,0,0,0.34), inset 0 0 0 1px rgba(255,255,255,0.17)':(finished?'0 10px 24px rgba(0,0,0,0.24)':'none')}}>
-      {finished&&<div style={{fontSize:10,color:matchTone?'#fff':'#f8fafc',fontWeight:950,letterSpacing:'0.16em',textAlign:'center',marginBottom:res.isDoubles&&doublesScoreLine?4:7}}>FINISHED</div>}
-      {res.isDoubles&&doublesScoreLine&&<div style={{fontSize:playerFontSize,color:matchTone?'#fff':'#f8fafc',fontWeight:950,letterSpacing:'0.03em',whiteSpace:'nowrap',textTransform:'uppercase',lineHeight:1.05,textAlign:'center',marginBottom:7,overflow:'hidden',textOverflow:'ellipsis'}}>{doublesScoreLine}</div>}
+      {finished&&<div style={{fontSize:10,color:matchTone?'#fff':'#f8fafc',fontWeight:950,letterSpacing:'0.16em',textAlign:'center',marginBottom:7}}>FINISHED</div>}
       <div style={{display:'grid',gridTemplateColumns:`${scoreColWidth}px minmax(0,1fr) ${centreColWidth}px minmax(0,1fr) ${scoreColWidth}px`,gap:6,alignItems:'center'}}>
         <div style={{fontSize:res.isDoubles?15:20,color:isLeft?'#fff':(res.isDoubles?'rgba(255,255,255,0.22)':CUP_THEME[leftKey].accent),fontWeight:950,textAlign:'left',whiteSpace:'nowrap'}}>{leftOutside}</div>
         <div style={{display:'grid',gap:5,textAlign:'right',minWidth:0}}>{goldIds.map(id=><div key={id} style={{color:matchTone?'#fff':CUP_THEME[leftKey].accent,fontSize:playerFontSize,fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{playerName(id)}</div>)}</div>
@@ -7497,6 +7515,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   function cupRoundBasePlayingShots(round,p,course){
     if(!round||!p)return cupPlayerBasePlayingShotsForCourse(p,course);
     const ids=new Set(cupScoreIds(cupStablePlayerId(p)));
+    cupScoreIdsForRound(round,p).forEach(id=>ids.add(normaliseId(id)));
     ids.add(normaliseId(p.id));
     ids.add(normaliseId(p.user_id));
     ids.add(normaliseId(p.guest_id));
@@ -7507,8 +7526,8 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     for(const id of ids){
       if(id&&hmap[id]!=null&&hmap[id]!==''&&!Number.isNaN(parseFloat(hmap[id])))return parseFloat(hmap[id])||0;
     }
-    if(p.playing_handicap!=null&&p.playing_handicap!==''&&!Number.isNaN(parseFloat(p.playing_handicap)))return parseFloat(p.playing_handicap)||0;
-    if(p.current_handicap!=null&&p.current_handicap!==''&&!Number.isNaN(parseFloat(p.current_handicap)))return parseFloat(p.current_handicap)||0;
+    if(p.playing_handicap!=null&&p.playing_handicap!==''&&!Number.isNaN(parseFloat(p.playing_handicap))&&parseFloat(p.playing_handicap)>0)return parseFloat(p.playing_handicap)||0;
+    if(p.current_handicap!=null&&p.current_handicap!==''&&!Number.isNaN(parseFloat(p.current_handicap))&&parseFloat(p.current_handicap)>0)return parseFloat(p.current_handicap)||0;
     return cupPlayerBasePlayingShotsForCourse(p,course);
   }
   function cupAdjustedStablefordForScore(row,p,day,course,singlesPlayingShots){
