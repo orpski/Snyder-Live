@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.27
+// SNYDER GOLF v3.28
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -1587,7 +1587,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.27" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.27</span>
+          <span aria-label="App version v3.28" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.28</span>
         </button>
       </div>
 
@@ -3546,6 +3546,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   );
   const cupDayOpenForScoring=!round._cupScoring||round._cupDayReleased!==false;
   const canEdit=activeGroupId!=='leaderboard'&&!round._spectator&&isLiveRound(round)&&currentUserIsAssignedToGroup&&cupDayOpenForScoring;
+  const isCupSpectatorScorecard=!!(round._cupScoring&&(round._spectator||!canEdit));
   const localFoursomesSyncRef=useRef('');
 
   const[saving,setSaving]=useState(false);
@@ -5996,7 +5997,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       <SinglesMatchplayOnlyScorecard/>
 
       {/* Spectator live leaderboard */}
-      {!(matchplayConfig&&matchplayConfig.enabled)&&!canEdit&&!isCompletedRound(round)&&!(round._cupScoring&&round._spectator)&&(
+      {!(matchplayConfig&&matchplayConfig.enabled)&&!canEdit&&!isCompletedRound(round)&&!isCupSpectatorScorecard&&(
         <div style={{padding:'12px 14px',background:'rgba(0,0,0,0.2)',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
           <div style={{fontSize:10,color:'#60b8f0',letterSpacing:'0.15em',fontWeight:600,marginBottom:10}}>LIVE LEADERBOARD</div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
