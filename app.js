@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.14
+// SNYDER GOLF v3.15
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -1575,7 +1575,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.14" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.14</span>
+          <span aria-label="App version v3.15" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.15</span>
         </button>
       </div>
 
@@ -5739,6 +5739,15 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
     },120);
   }
+  function leaveScorecard(){
+    if(round._cupScoring){
+      const cupDay=(round&&round._cupDayNumber)||(round&&round._cupGroupData&&round._cupGroupData.day)||cupDayFromRound(round)||1;
+      try{sessionStorage.setItem('cupReturnDay',String(cupDay));}catch(e){}
+      setView('tournaments');
+      return;
+    }
+    setView('home');
+  }
 
   return(
     <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)',overflowX:'hidden',touchAction:inputHole?'none':'auto'}}>
@@ -5750,7 +5759,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           </div>
         )}
         <div style={{padding:'10px 14px',display:'flex',alignItems:'center',gap:8}}>
-          <button onClick={()=>setView('home')} style={{...S.gho,padding:'6px 10px',fontSize:12}}>Exit</button>
+          <button onClick={leaveScorecard} style={{...S.gho,padding:'6px 10px',fontSize:12}}>{round._cupScoring?'Back':'Exit'}</button>
           <CourseBadge course={course} round={round} size={38}/>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:13,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{getCourseDisplayName(course,round)||'Scorecard'}</div>
@@ -8035,7 +8044,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
             <div style={{fontSize:10,color:'#90ccf0',fontWeight:900,textAlign:'center',letterSpacing:'0.08em',marginTop:5}}>TAP FOR RESULTS SUMMARY</div>
           </button>
           <div style={{fontSize:11,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'12px 0 7px'}}>OVERALL SINGLES</div>
-          <div style={{...S.card,marginBottom:12,padding:7,overflow:'hidden',display:'grid',gap:6}}>{singlesLeaderboard().slice(0,8).map((p,i)=>{const prize=i<3?EMOJI.trophy+' '+(i+1):'';const prizeBg=i===0?'linear-gradient(135deg,rgba(212,175,55,0.32),rgba(120,74,7,0.38))':i===1?'linear-gradient(135deg,rgba(203,213,225,0.22),rgba(71,85,105,0.28))':i===2?'linear-gradient(135deg,rgba(180,83,9,0.24),rgba(92,45,10,0.28))':'rgba(255,255,255,0.055)';const prizeBorder=i<3?'rgba(212,175,55,0.42)':'rgba(96,184,240,0.22)';const playedDays=(p.dayScores||[]).filter(d=>(parseInt(d.holes)||0)>0||(parseInt(d.points)||0)>0);return <button key={p.id} onClick={()=>openCupPlayerSummary(p)} style={{width:'100%',border:'1px solid '+prizeBorder,display:'grid',gridTemplateColumns:'44px 1fr auto',gap:8,alignItems:'center',padding:'9px 10px',borderRadius:11,background:prizeBg,textAlign:'left',cursor:'pointer',boxShadow:i<3?'0 10px 22px rgba(0,0,0,0.20)':'0 6px 14px rgba(0,0,0,0.12)'}}><div style={{fontSize:i<3?13:15,color:i<3?'#F5E6A3':'#60b8f0',fontWeight:950,textAlign:'center',lineHeight:1.05}}>{prize||i+1}</div><div style={{display:'grid',gap:6,minWidth:0}}><div style={{fontSize:13,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||'Player'}</div><div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{playedDays.length?playedDays.map(d=><span key={(p.id||p.display_name)+'-d'+d.day} style={{fontSize:10,color:i<3?'#F5E6A3':'#90ccf0',fontWeight:950,border:'1px solid rgba(255,255,255,0.14)',background:'rgba(0,0,0,0.16)',borderRadius:999,padding:'2px 6px'}}>D{d.day}: {d.points} pts</span>):<span style={{fontSize:10,color:'#8ea0ad',fontWeight:850}}>No day scores yet</span>}</div></div><div style={{display:'grid',gap:2,justifyItems:'end'}}><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{p.total}</div><div style={{fontSize:10,color:i<3?'#F5E6A3':'#8ea0ad',fontWeight:900}}>{p.holes} holes</div></div></button>;})}</div>
+          <div style={{...S.card,marginBottom:12,padding:7,overflow:'hidden',display:'grid',gap:6}}>{singlesLeaderboard().slice(0,12).map((p,i)=>{const prize=i<3?EMOJI.trophy+' '+(i+1):'';const prizeBg=i===0?'linear-gradient(135deg,rgba(212,175,55,0.32),rgba(120,74,7,0.38))':i===1?'linear-gradient(135deg,rgba(203,213,225,0.22),rgba(71,85,105,0.28))':i===2?'linear-gradient(135deg,rgba(180,83,9,0.24),rgba(92,45,10,0.28))':'rgba(255,255,255,0.055)';const prizeBorder=i<3?'rgba(212,175,55,0.42)':'rgba(96,184,240,0.22)';const playedDays=(p.dayScores||[]).filter(d=>(parseInt(d.holes)||0)>0||(parseInt(d.points)||0)>0);return <button key={p.id} onClick={()=>openCupPlayerSummary(p)} style={{width:'100%',border:'1px solid '+prizeBorder,display:'grid',gridTemplateColumns:'44px 1fr auto',gap:8,alignItems:'center',padding:'9px 10px',borderRadius:11,background:prizeBg,textAlign:'left',cursor:'pointer',boxShadow:i<3?'0 10px 22px rgba(0,0,0,0.20)':'0 6px 14px rgba(0,0,0,0.12)'}}><div style={{fontSize:i<3?13:15,color:i<3?'#F5E6A3':'#60b8f0',fontWeight:950,textAlign:'center',lineHeight:1.05}}>{prize||i+1}</div><div style={{display:'grid',gap:6,minWidth:0}}><div style={{fontSize:13,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||'Player'}</div><div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{playedDays.length?playedDays.map(d=><span key={(p.id||p.display_name)+'-d'+d.day} style={{fontSize:10,color:i<3?'#F5E6A3':'#90ccf0',fontWeight:950,border:'1px solid rgba(255,255,255,0.14)',background:'rgba(0,0,0,0.16)',borderRadius:999,padding:'2px 6px'}}>D{d.day}: {d.points} pts</span>):<span style={{fontSize:10,color:'#8ea0ad',fontWeight:850}}>No day scores yet</span>}</div></div><div style={{display:'grid',gap:2,justifyItems:'end'}}><div style={{fontSize:17,color:'#fff',fontWeight:950}}>{p.total}</div><div style={{fontSize:10,color:i<3?'#F5E6A3':'#8ea0ad',fontWeight:900}}>{p.holes} holes</div></div></button>;})}</div>
         </>:<CupDayView day={selectedDay} course={resolveCupDayCourse(courses,days,cup&&cup.id,selectedDay)} groups={cupDayGroups(selectedDay)} teams={teams} playersInCup={playersInCup} released={dayReleased(selectedDay)} roundForGroup={roundForGroup} matchResult={matchResult} openCupGroup={openCupGroup} openingGroup={openingGroup} isAdmin={isAdmin} openFinesGroup={openCupFinesGroup} scores={scores}/>}
         <CupBottomNav/>
       </>}
