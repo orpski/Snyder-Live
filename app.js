@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.30
+// SNYDER GOLF v3.31
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -1595,7 +1595,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.30" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.30</span>
+          <span aria-label="App version v3.31" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.31</span>
         </button>
       </div>
 
@@ -4276,7 +4276,12 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   }
   function savedStablefordForCupPlayer(rd,cupId){
     if(!rd||!cupId)return 0;
-    return (scores||[]).filter(sc=>sc.round_id===rd.id&&!isMetaScoreRow(sc)&&normaliseId(sc.player_id)===normaliseId(cupId)).reduce((t,sc)=>t+(stablefordPointsValue(sc.stableford_points)),0);
+    let total=0;
+    for(let h=1;h<=holes.length;h++){
+      const row=savedCupScoreRowFor(rd,cupId,h);
+      if(row)total+=stablefordPointsValue(row.stableford_points);
+    }
+    return total;
   }
   function savedMatchLeader(match,rd){
     if(!match||!rd)return 'tie';
@@ -7508,8 +7513,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   function playerPointsFromRound(round,playerId){
     if(!round)return 0;
     const p=findCupPlayer(playerId);
-    const ids=new Set(cupScoreIdsForRound(round,p||{id:playerId}));
-    return (scores||[]).filter(s=>s.round_id===round.id&&!isMetaScoreRow(s)&&ids.has(normaliseId(s.player_id))).reduce((t,s)=>t+(stablefordPointsValue(s.stableford_points)),0);
+    return cupPlayerScoreRowsForRound(round,p||{id:playerId}).reduce((t,s)=>t+stablefordPointsValue(s.stableford_points),0);
   }
   function cupDayFromRound(round){
     if(!round)return 1;
@@ -7610,7 +7614,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     }
     const gold=goldIds.reduce((t,id)=>t+playerPointsFromRound(round,id),0);
     const navy=navyIds.reduce((t,id)=>t+playerPointsFromRound(round,id),0);
-    const holes=new Set(roundScores.map(s=>s.hole_number)).size;
+    const holes=Math.max(...[...goldIds,...navyIds].map(id=>cupPlayerScoreRowsForRound(round,findCupPlayer(id)||{id}).length),0);
     const winner=!holes?'tie':gold===navy?'tie':gold>navy?leftTeamKey:rightTeamKey;
     const label=!holes?'A/S':winner==='tie'?'A/S':cupTeamName(winner)+' +'+Math.abs(gold-navy)+' pts';
     return{gold,navy,leftTeamKey,rightTeamKey,leftTeamName:cupTeamName(leftTeamKey),rightTeamName:cupTeamName(rightTeamKey),holes,complete:!!complete,label,winner,pointsByTeam:winner==='tie'?{[leftTeamKey]:0.5,[rightTeamKey]:0.5}:{[winner]:1},isDoubles:false};
