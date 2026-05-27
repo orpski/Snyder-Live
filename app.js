@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.28
+// SNYDER GOLF v3.29
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -711,6 +711,19 @@ function startOfThisWeek(){
 function isLiveRound(round){
   return round&&round.status==='live';
 }
+function uniqueVisibleLiveRounds(rounds,currentUser){
+  const visible=(rounds||[]).filter(r=>{
+    if(!isLiveRound(r))return false;
+    if(!r.is_private)return true;
+    return currentUser!=null;
+  });
+  const byKey=new Map();
+  sortRoundsNewestFirst(visible).forEach(r=>{
+    const key=isSnyderCupRound(r)?('cup-day-'+cupRoundDayNumber(r)+'-group-'+cupRoundGroupNumber(r)):(r.id||('round-'+roundStartValue(r)+'-'+(r.name||r.course_name||'')));
+    if(!byKey.has(key))byKey.set(key,r);
+  });
+  return Array.from(byKey.values());
+}
 function isCompletedRound(round){
   return round&&(round.status==='complete'||round.status==='completed');
 }
@@ -1318,12 +1331,7 @@ function App(){
     // ---------------------------------------------------------
   // Live vs completed round grouping
   // ---------------------------------------------------------
-  const liveRounds=rounds.filter(r=>{
-    if(!isLiveRound(r))return false;
-    if(!r.is_private)return true;
-    // Private - only show if current user is logged in (players will see it in their profile)
-    return currentUser!=null;
-  });
+  const liveRounds=uniqueVisibleLiveRounds(rounds,currentUser);
   const liveRoundIds=liveRounds.map(r=>r.id).filter(Boolean);
   const[publicScores,setPublicScores]=useState([]);
   const[publicRoundPlayers,setPublicRoundPlayers]=useState({});
@@ -1587,7 +1595,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.28" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.28</span>
+          <span aria-label="App version v3.29" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.29</span>
         </button>
       </div>
 
@@ -1611,12 +1619,7 @@ function App(){
 // Lists active rounds, this week's cards and older monthly cards
 // =========================================================
 function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,sb,flash,setView,selectedComp,activeComp,setSelectedRound,currentUser,setHoleScores,holeScores}){
-  const liveRounds=rounds.filter(r=>{
-    if(!isLiveRound(r))return false;
-    if(!r.is_private)return true;
-    // Private - only show if current user is logged in (players will see it in their profile)
-    return currentUser!=null;
-  });
+  const liveRounds=uniqueVisibleLiveRounds(rounds,currentUser);
   const liveRoundIds=liveRounds.map(r=>r.id).filter(Boolean);
   const[publicScores,setPublicScores]=useState([]);
   const[publicRoundPlayers,setPublicRoundPlayers]=useState({});
@@ -2771,12 +2774,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   const[openRoundBlock,setOpenRoundBlock]=useState(null);
   const[openRoundBlockCanDelete,setOpenRoundBlockCanDelete]=useState(false);
   const[clearedLiveRoundIds,setClearedLiveRoundIds]=useState([]);
-  const liveRounds=rounds.filter(r=>{
-    if(!isLiveRound(r))return false;
-    if(!r.is_private)return true;
-    // Private - only show if current user is logged in (players will see it in their profile)
-    return currentUser!=null;
-  });
+  const liveRounds=uniqueVisibleLiveRounds(rounds,currentUser);
   const myRounds=myRoundsForUser(rounds,groups,currentUser);
   const myLiveRounds=myRounds.filter(isLiveRound);
   const courseOptions=getCourseOptions(courses);
