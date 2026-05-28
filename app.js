@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.31
+// SNYDER GOLF v3.32
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -57,6 +57,15 @@ const snyderNotifySent=new Set();
 function snyderNotifyKey(type,payload){
   return [type,payload&&payload.roundId,payload&&payload.groupId,payload&&payload.hole,payload&&payload.playerId,payload&&payload.status].filter(v=>v!==undefined&&v!==null).join('|');
 }
+function snyderNotifyStorageKey(type,payload){
+  return 'snyder_notify_'+snyderNotifyKey(type,payload||{});
+}
+function snyderNotifyAlreadyStored(type,payload){
+  try{return !!localStorage.getItem(snyderNotifyStorageKey(type,payload));}catch(e){return false;}
+}
+function storeSnyderNotifySent(type,payload){
+  try{localStorage.setItem(snyderNotifyStorageKey(type,payload),new Date().toISOString());}catch(e){}
+}
 function urlBase64ToUint8Array(base64String){
   const padding='='.repeat((4-base64String.length%4)%4);
   const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
@@ -113,7 +122,8 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v2.62',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.32',createdAt:new Date().toISOString(),...(payload||{})};
+    delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
     const controller=new AbortController();
@@ -387,6 +397,11 @@ function cupGroupsForDay(cupMatches,day){
 function cupMatchesDayReleased(cupMatches,day){
   const rows=(cupMatches||[]).filter(m=>(parseInt(m.day_number)||1)===(parseInt(day)||1));
   return rows.length>0&&rows.some(m=>String(m.status||'locked').toLowerCase()==='live'||String(m.status||'').toLowerCase()==='released');
+}
+async function refreshSnyderLiveNotificationSubscription(user){
+  if(!('Notification' in window)||Notification.permission!=='granted')return {ok:false,skipped:true};
+  if(localStorage.getItem('liveNotificationsMuted')==='true')return {ok:false,skipped:true};
+  return enableSnyderLiveNotifications(user);
 }
 function cleanCupStoredDisplayName(name){
   const text=String(name||'');
@@ -1104,6 +1119,20 @@ function App(){
   }
 
   useEffect(()=>{viewRef.current=view;},[view]);
+  useEffect(()=>{
+    let alive=true;
+    const permission=('Notification' in window)?Notification.permission:'unsupported';
+    setNotifPermission(permission);
+    if(permission==='granted'&&localStorage.getItem('liveNotificationsMuted')!=='true'){
+      localStorage.setItem('liveNotificationsEnabled','true');
+      setNotificationsEnabled(true);
+      refreshSnyderLiveNotificationSubscription(currentUser).then(res=>{
+        if(!alive)return;
+        if(res&&res.ok)setNotificationsEnabled(true);
+      }).catch(()=>{});
+    }
+    return()=>{alive=false;};
+  },[currentUser&&currentUser.id]);
 
   function setView(v){
     if(v!=='home')window.history.pushState({view:v},'',null);
@@ -1595,7 +1624,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.31" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.31</span>
+          <span aria-label="App version v3.32" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.32</span>
         </button>
       </div>
 
@@ -4554,7 +4583,10 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const hd=getHole(holeNum);
     if(Number(gross)===Number(hd.par)-1){
       const name=notifyPlayerName(pid);
-      const res=await sendSnyderLiveNotification('birdie',{...notifyPayload(),roundId:round&&round.id,groupId:snakeGroupKey(),hole:holeNum,playerId:pid,title:'🐦 '+name+' birdied '+notifyHoleOrdinal(holeNum)+'!',body:'🔥 What a dart · '+notifyRoundName()+(notifyGroupName()?' · '+notifyGroupName():''),playerName:name,roundName:notifyRoundName()});
+      const payload={...notifyPayload(),roundId:round&&round.id,groupId:snakeGroupKey(),hole:holeNum,playerId:pid,title:'🐦 '+name+' birdied '+notifyHoleOrdinal(holeNum)+'!',body:'🔥 What a dart · '+notifyRoundName()+(notifyGroupName()?' · '+notifyGroupName():''),playerName:name,roundName:notifyRoundName()};
+      if(snyderNotifyAlreadyStored('birdie',payload))return {ok:true,skipped:true};
+      const res=await sendSnyderLiveNotification('birdie',payload);
+      if(res&&res.ok)storeSnyderNotifySent('birdie',payload);
       if(res&&!res.ok)console.warn('Snyder Live birdie notification failed',res);
       return res;
     }
@@ -4683,6 +4715,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(shouldClearOtherMarker)saveLocalScore(holeNum,otherFoursomesPid,undefined);
     if(shouldClearOtherSinglesMarker)saveLocalScore(holeNum,otherSinglesPid,undefined);
     saveLocalScore(holeNum,scorePid,val);
+    notifyMaybeBirdie(holeNum,scorePid,val).catch(e=>console.warn('Snyder Live birdie notification error',e));
     if(isFoursomesTeamPlayerId(scorePid)){
       foursomesScoreEditRef.current=true;
       ensureFoursomesCloudGroup().then(cloudGroup=>{
@@ -4736,7 +4769,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         });
         setLastRefreshed(new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
         if(shouldClearOtherSinglesMarker)sb.from('cup_scores').delete().eq('round_id',round.id).eq('hole_number',holeNum).eq('player_id',otherSinglesPid).catch(()=>{});
-        notifyMaybeBirdie(holeNum,scorePid,val);
         if(load)setTimeout(()=>load(),300);
       })
       .catch(e=>{
