@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.39
+// SNYDER GOLF v3.40
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.39',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.40',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1612,7 +1612,6 @@ function App(){
                 <div style={{fontSize:12,color:'rgba(255,255,255,0.70)',marginTop:4}}>Start rounds, follow live scoreboards and view scorecards.</div>
               </div>
             </div>
-            {homeLatestLive&&<div style={{fontSize:12,color:'rgba(255,255,255,0.62)',margin:'0 0 12px 62px',lineHeight:1.35}}>Latest live: {homeLatestLive.name||"Live round"}{homeLatestCourse?' at '+homeLatestCourse.name:''}</div>}
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
               <button onClick={()=>currentUser?setView('play'):promptStartRoundAuth()} style={{...NO_SELECT,...S.pri,padding:'13px 10px',fontSize:14,fontWeight:950}}><span className="sg-pop-button">Start Round</span></button>
               <button onClick={()=>{window.history.replaceState({view:'home'},'',null);setView('live');}} style={{...NO_SELECT,border:'1px solid rgba(248,113,113,0.52)',borderRadius:12,background:'linear-gradient(135deg,rgba(239,68,68,0.92),rgba(127,29,29,0.88))',color:'#fff',boxShadow:'0 10px 22px rgba(239,68,68,0.22), inset 0 1px 0 rgba(255,255,255,0.18)',padding:'13px 10px',fontSize:14,fontWeight:950,cursor:'pointer'}}><span className="sg-pop-button">Live Scoreboards ({homeLiveCount})</span></button>
@@ -1671,7 +1670,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.39" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.39</span>
+          <span aria-label="App version v3.40" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.40</span>
         </button>
       </div>
 
