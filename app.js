@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.38
+// SNYDER GOLF v3.39
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.38',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.39',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1671,7 +1671,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.38" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.38</span>
+          <span aria-label="App version v3.39" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.39</span>
         </button>
       </div>
 
@@ -2880,6 +2880,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   const[activeRound,setActiveRound]=useState(null);
   const[activeGroup,setActiveGroup]=useState(null);
   const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:1,dayCompMode:'none',dayCompKey:'',sweepstake:{enabled:false,amountPence:200,scope:'round'},matchplay:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,keepStableford:true}});
+  const[dayJoinPromptDone,setDayJoinPromptDone]=useState(false);
   const[participants,setParticipants]=useState([]);
   const[groupSetup,setGroupSetup]=useState([[]]);
   const[pickerGroup,setPickerGroup]=useState(0);
@@ -2898,6 +2899,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   const selectedCourse=courses.find(co=>co.id===setup.course_id)||findCourseForTee(courses,setup.course_name,setup.tee);
   const isSingleGroupDay=(playerRange==='1-4'||groupSetup.length<=1);
   const activeDayBoards=Array.from((rounds||[]).filter(r=>dayCompKeyFromRound(r)&&isSameLocalDay(roundStartValue(r),Date.now())).reduce((map,r)=>{const key=dayCompKeyFromRound(r);if(key&&(!map.has(key)||isDayCompBoardRound(r)))map.set(key,r);return map;},new Map()).values());
+  const promptDayBoard=activeDayBoards.find(isDayCompBoardRound)||activeDayBoards[0]||null;
   function withPlayingHandicap(person,course=selectedCourse,allowance=setup.allowance){
     const handicapIndex=parseFloat(person.handicap_index!=null?person.handicap_index:person.current_handicap!=null?person.current_handicap:person.handicap)||0;
     if(person.is_casual){
@@ -3333,6 +3335,24 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   // Player count screen
   // ---------------------------------------------------------
   if(step==='playerCount'){
+    if(promptDayBoard&&!dayJoinPromptDone&&(setup.dayCompMode||'none')==='none'){
+      return(
+        <div style={{minHeight:'100vh',paddingBottom:40}}>
+          <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
+            <button onClick={()=>setStep('menu')} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button>
+            <div style={{fontSize:16,color:'#fff'}}>Start a Round</div>
+          </div>
+          <div style={{padding:16}}>
+            <div style={{...S.card,borderColor:'rgba(96,184,240,0.35)',background:'rgba(96,184,240,0.10)',marginBottom:12}}>
+              <div style={{fontSize:20,color:'#fff',fontWeight:950,marginBottom:6}}>Are you joining the day&apos;s bonanza?</div>
+              <div style={{fontSize:13,color:'#90ccf0',lineHeight:1.4}}>{dayCompDisplayName(rounds,promptDayBoard)}</div>
+            </div>
+            <button onClick={()=>{setSetup(q=>({...q,dayCompMode:'join',dayCompKey:dayCompKeyFromRound(promptDayBoard)||''}));setDayJoinPromptDone(true);}} style={{...S.pri,width:'100%',padding:14,fontSize:15,marginBottom:10}}>Yes, join it</button>
+            <button onClick={()=>setDayJoinPromptDone(true)} style={{...S.gho,width:'100%',padding:12,fontSize:13}}>No, normal round</button>
+          </div>
+        </div>
+      );
+    }
     const options=[
       {key:'normal',range:'1-4',title:'🏌️ Normal',sub:'Stableford points and gross scores',mode:'normal'},
       {key:'singles',range:'1-4',title:'⚔️ Singles',sub:'2-player matchplay',mode:'singles'},
@@ -4666,7 +4686,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return ((player&&(player.display_name||player.name))||'Player').split(' ')[0];
   }
   function notifyRoundName(){
-    return roundDisplayName(round);
+    return dayCompKeyFromRound(round)?dayCompDisplayName(rounds,round):roundDisplayName(round);
   }
   function notifyGroupName(){
     const realGroups=(allGroups||[]).filter(g=>g&&g.id&&!g._foursomesFallback&&!g._roundPlayersFallback);
@@ -4679,17 +4699,28 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const suffix=(n%100>=11&&n%100<=13)?'th':({1:'st',2:'nd',3:'rd'}[n%10]||'th');
     return n+suffix;
   }
-  function notifyStablefordTotalFromScores(pid,holeList,scoreMap){
+  function notifyGrossFromScores(player,holeNum,scoreMap){
+    const row=(scoreMap&&scoreMap[holeNum])||{};
+    const aliases=scoreAliasesForPerson(player).concat([player&&player.id,normaliseId(player&&player.id)]).filter(Boolean);
+    for(const alias of aliases){
+      if(row[alias]!==undefined)return row[alias];
+      const key=normaliseId(alias);
+      if(row[key]!==undefined)return row[key];
+    }
+    return undefined;
+  }
+  function notifyStablefordTotalFromScores(player,holeList,scoreMap){
     return (holeList||[]).reduce((t,h)=>{
-      const live=(scoreMap&&scoreMap[h.hole]||{})[pid];
-      if(live!==undefined)return t+((live===-1||isGivenGross(live))?0:(getPts(live,h.hole,pid)||0));
-      const saved=savedStablefordForHole(pid,h.hole);
-      return t+(saved!==null&&saved!==undefined?saved:0);
+      const live=notifyGrossFromScores(player,h.hole,scoreMap);
+      if(live===undefined)return t;
+      if(live===-1||isGivenGross(live))return t;
+      const hcp=parseFloat(playingHcps[player.id]!=null?playingHcps[player.id]:(player.current_handicap||player.playing_handicap||0));
+      return t+(calcStableford(live,h.par,h.stroke_index,hcp)||0);
     },0);
   }
   function notifyScoresForHoles(holeList,scoreMap){
     return grpPlayers.map(p=>{
-      const pts=scoreMap?notifyStablefordTotalFromScores(p.id,holeList,scoreMap):getStablefordTotal(p.id,holeList);
+      const pts=scoreMap?notifyStablefordTotalFromScores(p,holeList,scoreMap):getStablefordTotal(p.id,holeList);
       return notifyPlayerName(p.id)+' '+pts+' pts';
     }).join(' · ');
   }
@@ -4708,7 +4739,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return {ok:true,skipped:true};
   }
   async function notifyFrontNineIfComplete(updatedScores){
-    const allFront9=Array.from({length:9},(_,i)=>i+1).every(h=>grpPlayers.every(p=>(updatedScores[h]||{})[p.id]!==undefined));
+    const allFront9=Array.from({length:9},(_,i)=>i+1).every(h=>grpPlayers.every(p=>notifyGrossFromScores(p,h,updatedScores)!==undefined));
     if(!allFront9)return {ok:true,skipped:true};
     const frontHoles=holes.filter(h=>h.hole<=9);
     const res=await sendSnyderLiveNotification('front9_scores',{...notifyPayload(),roundId:round&&round.id,groupId:snakeGroupKey(),hole:9,status:'front9-complete',title:'📊 Front 9 is in!',body:notifyScoresForHoles(frontHoles,updatedScores),roundName:notifyRoundName(),groupName:notifyGroupName()});
@@ -6011,7 +6042,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           <button onClick={leaveScorecard} style={{...S.gho,padding:'6px 10px',fontSize:12}}>{round._cupScoring?'Back':'Exit'}</button>
           <CourseBadge course={course} round={round} size={38}/>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:13,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{getCourseDisplayName(course,round)||'Scorecard'}</div>
+            <div style={{fontSize:13,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{dayCompKeyFromRound(round)?dayCompDisplayName(rounds,round):(getCourseDisplayName(course,round)||'Scorecard')}</div>
             <div style={{fontSize:10,color:'#60b8f0'}}>Round start: {roundStartText}</div>
           </div>
           {!round._cupScoring&&<SweepstakeMoneyButton/>}
