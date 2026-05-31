@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.35
+// SNYDER GOLF v3.36
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.35',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.36',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -702,6 +702,28 @@ function roundStartDate(round){
 function formatRoundStart(round){
   return roundStartDate(round).toLocaleString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Europe/London'});
 }
+const DAY_COMP_RE=/\s*\[DAY:([A-Z0-9]{5,8})\]\s*$/;
+function dayCompKeyFromRound(round){
+  const m=String(round&&round.name||'').match(DAY_COMP_RE);
+  return m&&m[1]?m[1]:null;
+}
+function stripDayCompMarker(name){
+  return String(name||'').replace(DAY_COMP_RE,'').trim();
+}
+function roundDisplayName(round){
+  return stripDayCompMarker((round&&round.name)||'')||(round&&round.course_name)||'Round';
+}
+function makeDayCompKey(){
+  return Math.random().toString(36).replace(/[^a-z0-9]/gi,'').substring(2,7).toUpperCase();
+}
+function appendDayCompMarker(name,key){
+  return stripDayCompMarker(name)+' [DAY:'+key+']';
+}
+function dayCompRoundsFor(rounds,round){
+  const key=dayCompKeyFromRound(round);
+  if(!key)return [round].filter(Boolean);
+  return (rounds||[]).filter(r=>dayCompKeyFromRound(r)===key);
+}
 function startOfLocalDay(value){
   const d=value?parseRoundDateValue(value):new Date();
   d.setHours(0,0,0,0);
@@ -732,7 +754,8 @@ function uniqueVisibleLiveRounds(rounds,currentUser){
   });
   const byKey=new Map();
   sortRoundsNewestFirst(visible).forEach(r=>{
-    const key=isSnyderCupRound(r)?('cup-day-'+cupRoundDayNumber(r)+'-group-'+cupRoundGroupNumber(r)):(r.id||('round-'+roundStartValue(r)+'-'+(r.name||r.course_name||'')));
+    const dayKey=dayCompKeyFromRound(r);
+    const key=dayKey?('day-comp-'+dayKey):(isSnyderCupRound(r)?('cup-day-'+cupRoundDayNumber(r)+'-group-'+cupRoundGroupNumber(r)):(r.id||('round-'+roundStartValue(r)+'-'+(r.name||r.course_name||''))));
     if(!byKey.has(key))byKey.set(key,r);
   });
   return Array.from(byKey.values());
@@ -1446,7 +1469,9 @@ function App(){
   }
   function leaderboardForRound(rd){
     const totals={};const holes={};const holePoints={};const seen=new Set();
-    const rdGroups=groups.filter(g=>g.round_id===rd.id);
+    const boardRounds=dayCompKeyFromRound(rd)?dayCompRoundsFor(rounds,rd):[rd];
+    const boardRoundIds=new Set(boardRounds.map(r=>r&&r.id).filter(Boolean));
+    const rdGroups=groups.filter(g=>boardRoundIds.has(g.round_id));
     const hcpMap={};
     rdGroups.forEach(g=>{
       Object.assign(hcpMap,g.playing_handicaps||{});
@@ -1455,21 +1480,23 @@ function App(){
     function addScore(pid,holeNum,pts){
       addLeaderboardScore(totals,holes,holePoints,seen,pid,holeNum,pts);
     }
-    normaliseFoursomesScoreRows(scores||[]).filter(sc=>sc.round_id===rd.id&&!isMetaScoreRow(sc)&&!isFoursomesTeamPlayerId(sc.player_id)).forEach(sc=>{
+    normaliseFoursomesScoreRows(scores||[]).filter(sc=>boardRoundIds.has(sc.round_id)&&!isMetaScoreRow(sc)&&!isFoursomesTeamPlayerId(sc.player_id)).forEach(sc=>{
       addScore(sc.player_id,sc.hole_number,sc.stableford_points);
     });
     // Scores saved in this browser are instant; appData.scores may not have refreshed yet after exiting a round.
     try{
-      const local=JSON.parse(localStorage.getItem('scores_'+rd.id)||'{}');
-      const course=courses.find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee);
-      const courseHoles=(course&&Array.isArray(course.holes))?course.holes:[];
-      Object.keys(local||{}).forEach(h=>{
-        const holeNum=parseInt(h);
-        const hd=courseHoles.find(x=>parseInt(x.hole)===holeNum)||{par:4,stroke_index:holeNum};
-        Object.keys(local[h]||{}).forEach(pid=>{
-          const gross=parseInt(local[h][pid]);
-          const pts=calcStableford(gross,parseInt(hd.par)||4,parseInt(hd.stroke_index)||holeNum,parseFloat(hcpMap[pid]||0));
-          addScore(pid,holeNum,pts);
+      boardRounds.forEach(boardRound=>{
+        const local=JSON.parse(localStorage.getItem('scores_'+boardRound.id)||'{}');
+        const course=courses.find(co=>co.id===boardRound.course_id)||findCourseForTee(courses,boardRound.course_name,boardRound.tee);
+        const courseHoles=(course&&Array.isArray(course.holes))?course.holes:[];
+        Object.keys(local||{}).forEach(h=>{
+          const holeNum=parseInt(h);
+          const hd=courseHoles.find(x=>parseInt(x.hole)===holeNum)||{par:4,stroke_index:holeNum};
+          Object.keys(local[h]||{}).forEach(pid=>{
+            const gross=parseInt(local[h][pid]);
+            const pts=calcStableford(gross,parseInt(hd.par)||4,parseInt(hd.stroke_index)||holeNum,parseFloat(hcpMap[pid]||0));
+            addScore(pid,holeNum,pts);
+          });
         });
       });
     }catch(e){}
@@ -1487,7 +1514,7 @@ function App(){
           <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
             <CourseBadge course={courses.find(co=>co.id===rd.course_id)} round={rd} size={34}/>
             <div style={{minWidth:0}}>
-              <div style={{fontSize:14,color:'#fff',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||rd.course_name}</div>
+              <div style={{fontSize:14,color:'#fff',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{roundDisplayName(rd)}</div>
               <div style={{fontSize:11,color:'#60b8f0'}}>Round started: {formatRoundStart(rd)}</div>
             </div>
           </div>
@@ -1622,7 +1649,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.35" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.35</span>
+          <span aria-label="App version v3.36" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.36</span>
         </button>
       </div>
 
@@ -1851,8 +1878,10 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
   }
   function leaderboardForRound(rd){
     const totals={};const holes={};const holePoints={};const seen=new Set();
-    const rdGroups=groupsForRound(rd);
-    const rdRoundPlayers=publicRoundPlayers[rd.id]||[];
+    const boardRounds=dayCompKeyFromRound(rd)?dayCompRoundsFor(rounds,rd):[rd];
+    const boardRoundIds=new Set(boardRounds.map(r=>r&&r.id).filter(Boolean));
+    const rdGroups=boardRounds.flatMap(r=>groupsForRound(r));
+    const rdRoundPlayers=boardRounds.flatMap(r=>(publicRoundPlayers[r&&r.id]||[]));
     const isCupRound=isSnyderCupRound(rd);
     const cup=(cupEvents||[])[0];
     const cupDay=cupRoundDayNumber(rd);
@@ -1908,22 +1937,24 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     function addScore(pid,holeNum,pts){
       addLeaderboardScore(totals,holes,holePoints,seen,canonicalId(pid),holeNum,pts);
     }
-    normaliseFoursomesScoreRows([...(scores||[]),...(publicScores||[])]).filter(sc=>sc.round_id===rd.id&&!isMetaScoreRow(sc)&&!isFoursomesTeamPlayerId(sc.player_id)).forEach(sc=>{
+    normaliseFoursomesScoreRows([...(scores||[]),...(publicScores||[])]).filter(sc=>boardRoundIds.has(sc.round_id)&&!isMetaScoreRow(sc)&&!isFoursomesTeamPlayerId(sc.player_id)).forEach(sc=>{
       addScore(sc.player_id,sc.hole_number,sc.stableford_points);
     });
     // Scores saved in this browser are instant; appData.scores may not have refreshed yet after exiting a round.
     try{
-      const local=JSON.parse(localStorage.getItem('scores_'+rd.id)||'{}');
-      const course=courses.find(co=>co.id===rd.course_id)||findCourseForTee(courses,rd.course_name,rd.tee);
-      const courseHoles=(course&&Array.isArray(course.holes))?course.holes:[];
-      Object.keys(local||{}).forEach(h=>{
-        const holeNum=parseInt(h);
-        const hd=courseHoles.find(x=>parseInt(x.hole)===holeNum)||{par:4,stroke_index:holeNum};
-        Object.keys(local[h]||{}).forEach(pid=>{
-          const gross=parseInt(local[h][pid]);
-          const id=canonicalId(pid);
-          const pts=calcStableford(gross,parseInt(hd.par)||4,parseInt(hd.stroke_index)||holeNum,parseFloat(hcpMap[id]||0));
-          addScore(pid,holeNum,pts);
+      boardRounds.forEach(boardRound=>{
+        const local=JSON.parse(localStorage.getItem('scores_'+boardRound.id)||'{}');
+        const course=courses.find(co=>co.id===boardRound.course_id)||findCourseForTee(courses,boardRound.course_name,boardRound.tee);
+        const courseHoles=(course&&Array.isArray(course.holes))?course.holes:[];
+        Object.keys(local||{}).forEach(h=>{
+          const holeNum=parseInt(h);
+          const hd=courseHoles.find(x=>parseInt(x.hole)===holeNum)||{par:4,stroke_index:holeNum};
+          Object.keys(local[h]||{}).forEach(pid=>{
+            const gross=parseInt(local[h][pid]);
+            const id=canonicalId(pid);
+            const pts=calcStableford(gross,parseInt(hd.par)||4,parseInt(hd.stroke_index)||holeNum,parseFloat(hcpMap[id]||0));
+            addScore(pid,holeNum,pts);
+          });
         });
       });
     }catch(e){}
@@ -1998,7 +2029,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
           <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
             <CourseBadge course={courses.find(co=>co.id===rd.course_id)} round={rd} size={34}/>
             <div style={{minWidth:0}}>
-              <div style={{fontSize:14,color:'#fff',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||rd.course_name}</div>
+              <div style={{fontSize:14,color:'#fff',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{roundDisplayName(rd)}</div>
               <div style={{fontSize:11,color:'#60b8f0'}}>Round started: {formatRoundStart(rd)}</div>
             </div>
           </div>
@@ -2029,7 +2060,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                   <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
                     <CourseBadge course={courses.find(co=>co.id===rd.course_id)} round={rd} size={38}/>
                     <div style={{minWidth:0}}>
-                      <div style={{fontSize:16,color:'#fff',fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||rd.course_name}</div>
+                      <div style={{fontSize:16,color:'#fff',fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{roundDisplayName(rd)}</div>
                       <div style={{fontSize:11,color:'#60b8f0'}}>Round started: {formatRoundStart(rd)}</div>
                       <div style={{display:'flex',alignItems:'center',gap:5,marginTop:4,minWidth:0}}>
                         <CourseBadge course={courses.find(co=>co.id===rd.course_id)} round={rd} size={20}/>
@@ -2088,7 +2119,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                   </div>
                 </>}
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',borderTop:'1px solid rgba(255,255,255,0.08)',paddingTop:10}}>
-                  <div style={{fontSize:11,color:'rgba(255,255,255,0.5)'}}>{mp?((mp.mode==='foursomes'?'Foursomes matchplay':mp.mode==='singles'?'Singles matchplay':'Matchplay')+' - Tap to view'):rdGroups.length+' group'+(rdGroups.length!==1?'s':'')+' live - Tap to view'}</div>
+                  <div style={{fontSize:11,color:'rgba(255,255,255,0.5)'}}>{mp?((mp.mode==='foursomes'?'Foursomes matchplay':mp.mode==='singles'?'Singles matchplay':'Matchplay')+' - Tap to view'):(dayCompKeyFromRound(rd)?(dayCompRoundsFor(rounds,rd).length+' rounds on day board - Tap to view'):(rdGroups.length+' group'+(rdGroups.length!==1?'s':'')+' live - Tap to view'))}</div>
                   <button onClick={e=>{e.stopPropagation();openRound(rd);}} style={{...S.pri,padding:'7px 10px',fontSize:11}}>Check Scorecard</button>
                 </div>
               </div>
@@ -2791,7 +2822,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   const[step,setStep]=useState('playerCount');
   const[activeRound,setActiveRound]=useState(null);
   const[activeGroup,setActiveGroup]=useState(null);
-  const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:1,sweepstake:{enabled:false,amountPence:200,scope:'round'},matchplay:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,keepStableford:true}});
+  const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:1,dayCompMode:'none',dayCompKey:'',sweepstake:{enabled:false,amountPence:200,scope:'round'},matchplay:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,keepStableford:true}});
   const[participants,setParticipants]=useState([]);
   const[groupSetup,setGroupSetup]=useState([[]]);
   const[pickerGroup,setPickerGroup]=useState(0);
@@ -2809,6 +2840,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   const availableTees=selectedCourseOption?Object.keys(selectedCourseOption.tees):['White','Yellow','Red','Orange'];
   const selectedCourse=courses.find(co=>co.id===setup.course_id)||findCourseForTee(courses,setup.course_name,setup.tee);
   const isSingleGroupDay=(playerRange==='1-4'||groupSetup.length<=1);
+  const activeDayBoards=Array.from((rounds||[]).filter(r=>dayCompKeyFromRound(r)&&isSameLocalDay(roundStartValue(r),Date.now())).reduce((map,r)=>{const key=dayCompKeyFromRound(r);if(key&&!map.has(key))map.set(key,r);return map;},new Map()).values());
   function withPlayingHandicap(person,course=selectedCourse,allowance=setup.allowance){
     const handicapIndex=parseFloat(person.handicap_index!=null?person.handicap_index:person.current_handicap!=null?person.current_handicap:person.handicap)||0;
     if(person.is_casual){
@@ -3088,7 +3120,9 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       const today=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
       const creatorName=currentUser&&currentUser.display_name?currentUser.display_name.split(' ')[0]+"'s Round":null;
       const courseBaseName=getCourseDisplayName(course)||setup.course_name;
-      const roundName=setup.name||creatorName||(courseBaseName+' - '+today)||'Round';
+      let roundName=setup.name||creatorName||(courseBaseName+' - '+today)||'Round';
+      const dayCompKey=setup.dayCompMode==='create'?makeDayCompKey():(setup.dayCompMode==='join'?setup.dayCompKey:'');
+      if(dayCompKey)roundName=appendDayCompMarker(roundName,dayCompKey);
       const joinCode=Math.random().toString(36).substring(2,6).toUpperCase();
       const playerIds=allParticipants.map(p=>p.id);
       const playingHcps={};
@@ -3183,7 +3217,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       const scorerIds=foursomesMode?playerIds:((scorerGroup&&scorerGroup.player_ids)||playerIds);
       const scorerParticipants=foursomesMode?po:po.filter(p=>scorerIds.includes(p.id));
       const activeMatchplay=(cleanMatchplaySetup(setup.matchplay||{},scorerParticipants).mode==='singles'?applySinglesMatchplayShots(setup.matchplay||{},scorerParticipants):cleanMatchplaySetup(setup.matchplay||{},scorerParticipants));
-      setActiveRound({...rd,join_code:joinCode,_allParticipants:po,_sweepstake:{enabled:!!(setup.sweepstake&&setup.sweepstake.enabled),amountPence:parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||200,scope:(setup.sweepstake&&setup.sweepstake.scope)==='group'?'group':'round'},_matchplay:activeMatchplay});
+      setActiveRound({...rd,join_code:joinCode,_allParticipants:po,_dayCompKey:dayCompKey||null,_sweepstake:{enabled:!!(setup.sweepstake&&setup.sweepstake.enabled),amountPence:parseInt(setup.sweepstake.amountPence)||200,scope:(setup.sweepstake&&setup.sweepstake.scope)==='group'?'group':'round'},_matchplay:activeMatchplay});
       setActiveGroup({...scorerGroup,playing_handicaps:foursomesMode?playingHcps:((scorerGroup&&scorerGroup.playing_handicaps)||playingHcps),participants:scorerParticipants,player_ids:scorerIds});
       setHoleScores({}); // Fresh scores for new round
       setStep('scorecard');
@@ -3314,6 +3348,20 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
           </div>}
           <label style={S.lbl}>Round Name (optional)</label>
           <input style={{...S.inp,marginBottom:12}} value={setup.name} onChange={e=>setSetup(q=>({...q,name:e.target.value}))} placeholder={"e.g. "+(currentUser?currentUser.display_name.split(' ')[0]+"'s Round":"Saturday Morning")}/>
+          {!isMatchplayOnlySetup()&&<div style={{padding:'12px 14px',background:setup.dayCompMode&&setup.dayCompMode!=='none'?'rgba(96,184,240,0.13)':'rgba(255,255,255,0.06)',borderRadius:10,marginBottom:16,border:'1px solid '+(setup.dayCompMode&&setup.dayCompMode!=='none'?'rgba(96,184,240,0.38)':'rgba(255,255,255,0.12)')}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+              <div>
+                <div style={{fontSize:14,color:'#fff',fontWeight:800}}>Day leaderboard</div>
+                <div style={{fontSize:11,color:'#90ccf0',marginTop:2}}>For separate tee times that all count on one Saturday board.</div>
+              </div>
+              <select value={setup.dayCompMode==='join'?setup.dayCompKey:setup.dayCompMode||'none'} onChange={e=>{const v=e.target.value;setSetup(q=>v==='create'?{...q,dayCompMode:'create',dayCompKey:''}:v==='none'?{...q,dayCompMode:'none',dayCompKey:''}:{...q,dayCompMode:'join',dayCompKey:v});}} style={{...S.inp,width:150,marginBottom:0,padding:'8px 9px',fontSize:12}}>
+                <option value="none">No day board</option>
+                <option value="create">Create today</option>
+                {activeDayBoards.map(r=><option key={dayCompKeyFromRound(r)} value={dayCompKeyFromRound(r)}>{roundDisplayName(r)}</option>)}
+              </select>
+            </div>
+            {setup.dayCompMode&&setup.dayCompMode!=='none'&&<div style={{fontSize:11,color:'rgba(255,255,255,0.70)',marginTop:9,lineHeight:1.35}}>{setup.dayCompMode==='create'?'This round starts a shared leaderboard. Later players can choose it when they start.':'This round will appear on the selected shared leaderboard.'}</div>}
+          </div>}
           <label style={S.lbl}>Course</label>
           <select style={{...S.inp,marginBottom:12}} value={setup.course_name} onChange={e=>chooseCourse(e.target.value)}>
             <option value="">Select course...</option>
@@ -3466,7 +3514,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
           {openRoundBlock&&(
             <div style={{...S.card,marginTop:12,borderColor:isSameLocalDay(roundStartValue(openRoundBlock),Date.now())?'rgba(239,68,68,0.45)':'rgba(245,158,11,0.45)',background:isSameLocalDay(roundStartValue(openRoundBlock),Date.now())?'rgba(239,68,68,0.12)':'rgba(245,158,11,0.12)'}}>
               <div style={{fontSize:15,color:'#fff',fontWeight:900,marginBottom:5}}>{isSameLocalDay(roundStartValue(openRoundBlock),Date.now())?'You already have a live round open today':'You have an unfinished round from a previous day'}</div>
-              <div style={{fontSize:12,color:'#90ccf0',marginBottom:10}}>{openRoundBlock.name||openRoundBlock.course_name||'Round'} - {formatRoundStart(openRoundBlock)}</div>
+              <div style={{fontSize:12,color:'#90ccf0',marginBottom:10}}>{roundDisplayName(openRoundBlock)} - {formatRoundStart(openRoundBlock)}</div>
               <div style={{display:'grid',gridTemplateColumns:openRoundBlockCanDelete?'1fr 1fr':'1fr',gap:8,marginBottom:8}}>
                 <button onClick={finishBlockedRound} style={{...S.pri,padding:'10px 8px',fontSize:13,background:'#0a8a4a'}}>Finish Round</button>
                 {openRoundBlockCanDelete&&<button onClick={deleteBlockedRound} style={{...S.dan,padding:'10px 8px',fontSize:13}}>Delete Round</button>}
@@ -3505,7 +3553,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
                   <div style={{display:'flex',alignItems:'center',gap:10}}>
                     <CourseBadge course={course} round={rd} size={32}/>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:14,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rd.name||getCourseDisplayName(course,rd)||'Round'}</div>
+                      <div style={{fontSize:14,color:'#fff',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{roundDisplayName(rd)||getCourseDisplayName(course,rd)||'Round'}</div>
                       <div style={{fontSize:12,color:'#60b8f0'}}>{live?'Continue scoring':'Completed'} - {rd.tee||'White'} tee</div>
                     </div>
                     <div style={{fontSize:10,color:live?'#fff':'#60b8f0',background:live?'#ef4444':'rgba(96,184,240,0.12)',borderRadius:20,padding:'4px 8px',fontWeight:700}}>{live?'LIVE':'DONE'}</div>
@@ -3521,7 +3569,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
             {liveRounds.filter(rd=>!myRounds.some(m=>m.id===rd.id)).map(rd=>
               groups.filter(g=>g.round_id===rd.id).map(grp=>(
                 <div key={grp.id} style={{...S.card,marginBottom:6,cursor:'pointer',borderColor:'rgba(239,68,68,0.3)'}} onClick={()=>continueRound(rd)}>
-                  <div style={{fontSize:14,color:'#ef4444',marginBottom:2}}>{rd.name||rd.course_name}</div>
+                  <div style={{fontSize:14,color:'#ef4444',marginBottom:2}}>{roundDisplayName(rd)}</div>
                   <div style={{fontSize:12,color:'#60b8f0'}}>{rd.course_name} - Spectator view</div>
                 </div>
               ))
@@ -3873,10 +3921,12 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
 
   async function openOverallLeaderboard(openModal=true){
     try{
+      const boardRounds=dayCompKeyFromRound(round)?dayCompRoundsFor(rounds,round):[round];
+      const boardRoundIds=boardRounds.map(r=>r&&r.id).filter(Boolean);
       const [{data:rps,error:rpErr},{data:scs,error:scErr},{data:grps,error:gErr}]=await Promise.all([
-        sb.from('cup_round_players').select('*').eq('round_id',round.id),
-        sb.from('cup_scores').select('*').eq('round_id',round.id),
-        sb.from('cup_groups').select('*').eq('round_id',round.id).order('group_number',{ascending:true})
+        boardRoundIds.length>1?sb.from('cup_round_players').select('*').in('round_id',boardRoundIds):sb.from('cup_round_players').select('*').eq('round_id',round.id),
+        boardRoundIds.length>1?sb.from('cup_scores').select('*').in('round_id',boardRoundIds):sb.from('cup_scores').select('*').eq('round_id',round.id),
+        boardRoundIds.length>1?sb.from('cup_groups').select('*').in('round_id',boardRoundIds).order('group_number',{ascending:true}):sb.from('cup_groups').select('*').eq('round_id',round.id).order('group_number',{ascending:true})
       ]);
       if(rpErr)throw rpErr;
       if(scErr)throw scErr;
@@ -3893,7 +3943,10 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       });
       const groupsForBoard=(grps&&grps.length?grps:allGroups)||[];
       const wantedIds=new Set();
-      if(groupsForBoard.length>1){
+      if(dayCompKeyFromRound(round)){
+        (rps||[]).forEach(rp=>wantedIds.add(normaliseId(rp.user_id||rp.guest_id||rp.id)));
+        groupsForBoard.forEach(g=>(g.player_ids||[]).forEach(pid=>wantedIds.add(normaliseId(pid))));
+      }else if(groupsForBoard.length>1){
         groupsForBoard.forEach(g=>(g.player_ids||[]).forEach(pid=>wantedIds.add(normaliseId(pid))));
       }else if(group&&group.player_ids&&group.player_ids.length){
         (group.player_ids||[]).forEach(pid=>wantedIds.add(normaliseId(pid)));
@@ -4556,7 +4609,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return ((player&&(player.display_name||player.name))||'Player').split(' ')[0];
   }
   function notifyRoundName(){
-    return (round&&round.name)||(round&&round.course_name)||'Round';
+    return roundDisplayName(round);
   }
   function notifyGroupName(){
     const realGroups=(allGroups||[]).filter(g=>g&&g.id&&!g._foursomesFallback&&!g._roundPlayersFallback);
@@ -5990,7 +6043,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       {activeGroupId==='leaderboard' ? <div style={{padding:16}}>
         <div style={{...S.card,background:'rgba(0,112,187,0.10)',borderColor:'rgba(96,184,240,0.24)',marginBottom:12}}>
           <div style={{fontSize:22,color:'#fff',fontWeight:900}}>Live Leaderboard</div>
-          <div style={{fontSize:12,color:'#90ccf0',marginTop:3}}>All groups in this round</div>
+          <div style={{fontSize:12,color:'#90ccf0',marginTop:3}}>{dayCompKeyFromRound(round)?'All rounds on this day leaderboard':'All groups in this round'}</div>
         </div>
         <button onClick={async()=>{setOverallRefreshNote('Refreshing...'); overallMode==='cupOverall'?await openCupOverallSummary(false):(overallMode==='cupDay'?await openCupDaySinglesLeaderboard(false):await openOverallLeaderboard(false));}} style={{...S.pri,width:'100%',marginBottom:6,fontSize:13}}>Refresh leaderboard</button>
         {overallRefreshNote&&<div style={{fontSize:11,color:'#90ccf0',textAlign:'center',marginBottom:12}}>{overallRefreshNote}</div>}
@@ -6197,7 +6250,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
               <div>
                 <div style={{fontSize:18,color:'#fff',fontWeight:800}}>{overallMode==='cupOverall'?'Overall Cup':(overallMode==='cupDay'?('Day '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)+' Singles Leaderboard'):'Overall Leaderboard')}</div>
-                {overallMode!=='cupOverall'&&<div style={{fontSize:12,color:'#60b8f0'}}>{overallMode==='cupDay'?('All singles scores for Day '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)):'All groups in this round'}</div>}
+                {overallMode!=='cupOverall'&&<div style={{fontSize:12,color:'#60b8f0'}}>{overallMode==='cupDay'?('All singles scores for Day '+((round&&round._cupDayNumber)||cupDayFromRound(round)||1)):(dayCompKeyFromRound(round)?'All rounds on this day leaderboard':'All groups in this round')}</div>}
               </div>
               <button onClick={()=>setShowOverall(false)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Close</button>
             </div>
@@ -6542,7 +6595,7 @@ function RoundsTab({rounds,groups,sb,flash,load}){
           <div style={{fontSize:12,color:'#ef4444',marginBottom:8,letterSpacing:'0.1em'}}>LIVE ROUNDS</div>
           {live.map(rd=>(
             <div key={rd.id} style={{...S.card,marginBottom:8,borderColor:'rgba(239,68,68,0.3)'}}>
-              <div style={{fontSize:14,color:'#fff',marginBottom:6}}>{rd.name||rd.course_name}</div>
+              <div style={{fontSize:14,color:'#fff',marginBottom:6}}>{roundDisplayName(rd)}</div>
               <div style={{display:'flex',gap:6}}>
                 <button onClick={()=>endRound(rd)} style={{...S.gho,flex:1,fontSize:12,padding:'6px'}}>End Round</button>
                 <button onClick={()=>deleteRound(rd)} style={{...S.dan,flex:1,fontSize:12,padding:'6px'}}>Delete</button>
@@ -6556,7 +6609,7 @@ function RoundsTab({rounds,groups,sb,flash,load}){
         <div key={rd.id} style={{...S.card,marginBottom:6}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
             <div>
-              <div style={{fontSize:13,color:'#fff'}}>{rd.name||rd.course_name}</div>
+              <div style={{fontSize:13,color:'#fff'}}>{roundDisplayName(rd)}</div>
               <div style={{fontSize:11,color:'#60b8f0'}}>{new Date(rd.created_at).toLocaleDateString()} - {rd.status}</div>
             </div>
             <button onClick={()=>deleteRound(rd)} style={{...S.dan,padding:'4px 10px',fontSize:12}}>Del</button>
