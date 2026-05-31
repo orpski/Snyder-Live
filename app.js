@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.34
+// SNYDER GOLF v3.35
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -114,15 +114,13 @@ async function enableSnyderLiveNotifications(user){
 }
 async function sendSnyderLiveNotification(type,payload){
   try{
-    const excluded=(payload&&Array.isArray(payload.excludeUserIds)?payload.excludeUserIds:[]).map(String);
-    const currentLocalUser=(payload&&payload.excludeUserId)||null;
     const key=snyderNotifyKey(type,payload||{});
     if(key&&snyderNotifySent.has(key))return {ok:true,skipped:true};
     if(key){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.32',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.35',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1624,7 +1622,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.34" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.34</span>
+          <span aria-label="App version v3.35" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.35</span>
         </button>
       </div>
 
@@ -3178,7 +3176,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       }));
 
       const starterName=((currentUser&&currentUser.display_name)||'Someone').split(' ')[0];
-      const notifyResult=await sendSnyderLiveNotification('round_started',{excludeUserId:currentUser&&currentUser.id||null,excludePlayerId:currentUser&&currentUser.id||null,excludeUserIds:currentUser&&currentUser.id?[String(currentUser.id)]:[],roundId:rd&&rd.id,status:'created',title:'🏌️ '+starterName+' is LIVE!',body:'Tap for live scores · '+(courseBaseName||roundName||'Snyder Golf'),roundName:roundName,courseName:courseBaseName,createdBy:currentUser&&currentUser.id});
+      const notifyResult=await sendSnyderLiveNotification('round_started',{roundId:rd&&rd.id,status:'created',title:'🏌️ '+starterName+' is LIVE!',body:'Tap for live scores · '+(courseBaseName||roundName||'Snyder Golf'),roundName:roundName,courseName:courseBaseName,createdBy:currentUser&&currentUser.id});
       if(notifyResult&&!notifyResult.ok)console.warn('Snyder Live notification failed',notifyResult);
       await load();
       const scorerGroup=(createdGroups||[]).find(g=>currentUser&&Array.isArray(g.player_ids)&&g.player_ids.includes(currentUser.id))||(createdGroups||[])[0];
@@ -4550,8 +4548,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return Array.from(new Set(ids.filter(Boolean).map(String)));
   }
   function notifyPayload(){
-    const currentId=currentUser&&currentUser.id||null;
-    return {excludeUserId:currentId,excludePlayerId:currentId,excludeUserIds:currentNotifyExcludeIds(),mutedRoundIds:mutedScorecardNotificationIds()};
+    return {excludeUserIds:[],mutedRoundIds:mutedScorecardNotificationIds()};
   }
 
   function notifyPlayerName(pid){
@@ -4572,9 +4569,17 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const suffix=(n%100>=11&&n%100<=13)?'th':({1:'st',2:'nd',3:'rd'}[n%10]||'th');
     return n+suffix;
   }
-  function notifyScoresForHoles(holeList){
+  function notifyStablefordTotalFromScores(pid,holeList,scoreMap){
+    return (holeList||[]).reduce((t,h)=>{
+      const live=(scoreMap&&scoreMap[h.hole]||{})[pid];
+      if(live!==undefined)return t+((live===-1||isGivenGross(live))?0:(getPts(live,h.hole,pid)||0));
+      const saved=savedStablefordForHole(pid,h.hole);
+      return t+(saved!==null&&saved!==undefined?saved:0);
+    },0);
+  }
+  function notifyScoresForHoles(holeList,scoreMap){
     return grpPlayers.map(p=>{
-      const pts=getStablefordTotal(p.id,holeList);
+      const pts=scoreMap?notifyStablefordTotalFromScores(p.id,holeList,scoreMap):getStablefordTotal(p.id,holeList);
       return notifyPlayerName(p.id)+' '+pts+' pts';
     }).join(' · ');
   }
@@ -4596,7 +4601,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const allFront9=Array.from({length:9},(_,i)=>i+1).every(h=>grpPlayers.every(p=>(updatedScores[h]||{})[p.id]!==undefined));
     if(!allFront9)return {ok:true,skipped:true};
     const frontHoles=holes.filter(h=>h.hole<=9);
-    const res=await sendSnyderLiveNotification('front9_scores',{...notifyPayload(),roundId:round&&round.id,groupId:snakeGroupKey(),hole:9,status:'front9-complete',title:'📊 Front 9 is in!',body:notifyScoresForHoles(frontHoles),roundName:notifyRoundName(),groupName:notifyGroupName()});
+    const res=await sendSnyderLiveNotification('front9_scores',{...notifyPayload(),roundId:round&&round.id,groupId:snakeGroupKey(),hole:9,status:'front9-complete',title:'📊 Front 9 is in!',body:notifyScoresForHoles(frontHoles,updatedScores),roundName:notifyRoundName(),groupName:notifyGroupName()});
     if(res&&!res.ok)console.warn('Snyder Live front 9 notification failed',res);
     return res;
   }
