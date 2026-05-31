@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.36
+// SNYDER GOLF v3.37
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.36',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.37',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -723,6 +723,14 @@ function dayCompRoundsFor(rounds,round){
   const key=dayCompKeyFromRound(round);
   if(!key)return [round].filter(Boolean);
   return (rounds||[]).filter(r=>dayCompKeyFromRound(r)===key);
+}
+function liveDataRoundIds(rounds,visibleRounds){
+  const ids=new Set();
+  (visibleRounds||[]).forEach(r=>{
+    if(r&&r.id)ids.add(r.id);
+    if(dayCompKeyFromRound(r))dayCompRoundsFor(rounds,r).forEach(x=>{if(x&&x.id)ids.add(x.id);});
+  });
+  return Array.from(ids);
 }
 function startOfLocalDay(value){
   const d=value?parseRoundDateValue(value):new Date();
@@ -1382,7 +1390,7 @@ function App(){
   // Live vs completed round grouping
   // ---------------------------------------------------------
   const liveRounds=uniqueVisibleLiveRounds(rounds,currentUser);
-  const liveRoundIds=liveRounds.map(r=>r.id).filter(Boolean);
+  const liveRoundIds=liveDataRoundIds(rounds,liveRounds);
   const[publicScores,setPublicScores]=useState([]);
   const[publicRoundPlayers,setPublicRoundPlayers]=useState({});
   useEffect(()=>{
@@ -1418,6 +1426,7 @@ function App(){
   // Round opening / scorecard hydration
   // ---------------------------------------------------------
   async function openRound(rd){
+    setDayScorecardRound(null);
     try{const{data:dbRound}=await sb.from('cup_rounds').select('*').eq('id',rd.id).single();if(dbRound)rd={...rd,...dbRound};}catch(e){}
     let rdGroups=(groups||[]).filter(g=>g.round_id===rd.id);
     try{const{data:dbGroups}=await sb.from('cup_groups').select('*').eq('round_id',rd.id).order('group_number',{ascending:true});if(dbGroups&&dbGroups.length)rdGroups=dbGroups;}catch(e){}
@@ -1649,7 +1658,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.36" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.36</span>
+          <span aria-label="App version v3.37" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.37</span>
         </button>
       </div>
 
@@ -1674,10 +1683,11 @@ function App(){
 // =========================================================
 function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,sb,flash,setView,selectedComp,activeComp,setSelectedRound,currentUser,setHoleScores,holeScores}){
   const liveRounds=uniqueVisibleLiveRounds(rounds,currentUser);
-  const liveRoundIds=liveRounds.map(r=>r.id).filter(Boolean);
+  const liveRoundIds=liveDataRoundIds(rounds,liveRounds);
   const[publicScores,setPublicScores]=useState([]);
   const[publicRoundPlayers,setPublicRoundPlayers]=useState({});
   const[publicGroups,setPublicGroups]=useState([]);
+  const[dayScorecardRound,setDayScorecardRound]=useState(null);
   const groupsForRound=rd=>{
     const rid=rd&&rd.id;
     const merged=[...(groups||[]),...(publicGroups||[])].filter(g=>g&&g.round_id===rid);
@@ -2022,6 +2032,17 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
       return {mode,aName,bName,label,sub,lead,played,lastHole,remaining,abs,isFinished,isDormie,winningTeam,winningName,finalScore,holeRows,teamA,teamB,teamAShots:parseInt(cfg.teamAShots)||0,teamBShots:parseInt(cfg.teamBShots)||0,keepStableford:cfg.keepStableford!==false};
     }catch(e){return null;}
   }
+  function dayRoundSummary(rd){
+    const rps=publicRoundPlayers[rd&&rd.id]||[];
+    if(rps.length)return rps.map(rp=>rp.display_name).filter(Boolean).join(', ');
+    const grps=groupsForRound(rd);
+    const ids=grps.flatMap(g=>g.player_ids||[]);
+    if(ids.length)return ids.map(id=>{
+      const p=(cupUsers||[]).find(u=>normaliseId(u.id)===normaliseId(id))||(players||[]).find(x=>normaliseId(x.id)===normaliseId(id));
+      return p&&(p.display_name||p.name||p.username);
+    }).filter(Boolean).join(', ');
+    return rd&&rd.course_name||'Scorecard';
+  }
   function CompletedCard({rd}){
     return(
       <div style={{...S.card,...NO_SELECT,marginBottom:8,cursor:'pointer',opacity:0.9}} onClick={()=>openRound(rd)}>
@@ -2055,7 +2076,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
             const mp=foursomesMatchplaySummaryForLiveRound(rd);
             const board=mp?[]:leaderboardForRound(rd);
             return(
-              <div key={rd.id} style={{...S.card,...NO_SELECT,marginBottom:16,cursor:'pointer',borderColor:'rgba(239,68,68,0.3)'}} onClick={()=>openRound(rd)}>
+              <div key={rd.id} style={{...S.card,...NO_SELECT,marginBottom:16,cursor:'pointer',borderColor:'rgba(239,68,68,0.3)'}} onClick={()=>dayCompKeyFromRound(rd)?setDayScorecardRound(rd):openRound(rd)}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:10}}>
                   <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
                     <CourseBadge course={courses.find(co=>co.id===rd.course_id)} round={rd} size={38}/>
@@ -2120,12 +2141,34 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                 </>}
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',borderTop:'1px solid rgba(255,255,255,0.08)',paddingTop:10}}>
                   <div style={{fontSize:11,color:'rgba(255,255,255,0.5)'}}>{mp?((mp.mode==='foursomes'?'Foursomes matchplay':mp.mode==='singles'?'Singles matchplay':'Matchplay')+' - Tap to view'):(dayCompKeyFromRound(rd)?(dayCompRoundsFor(rounds,rd).length+' rounds on day board - Tap to view'):(rdGroups.length+' group'+(rdGroups.length!==1?'s':'')+' live - Tap to view'))}</div>
-                  <button onClick={e=>{e.stopPropagation();openRound(rd);}} style={{...S.pri,padding:'7px 10px',fontSize:11}}>Check Scorecard</button>
+                  <button onClick={e=>{e.stopPropagation();dayCompKeyFromRound(rd)?setDayScorecardRound(rd):openRound(rd);}} style={{...S.pri,padding:'7px 10px',fontSize:11}}>{dayCompKeyFromRound(rd)?'Scorecards':'Check Scorecard'}</button>
                 </div>
               </div>
             );
           })
         }
+        {dayScorecardRound&&(
+          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',zIndex:1200,padding:'max(24px,8vh) 14px 14px',overflowY:'auto'}}>
+            <div style={{maxWidth:520,margin:'0 auto'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,marginBottom:12}}>
+                <div>
+                  <div style={{fontSize:20,color:'#fff',fontWeight:950}}>Day Scorecards</div>
+                  <div style={{fontSize:12,color:'#90ccf0'}}>{roundDisplayName(dayScorecardRound)}</div>
+                </div>
+                <button onClick={()=>setDayScorecardRound(null)} style={{...S.gho,padding:'7px 12px',fontSize:12}}>Close</button>
+              </div>
+              {dayCompRoundsFor(rounds,dayScorecardRound).sort((a,b)=>roundStartDate(a)-roundStartDate(b)).map(r=>(
+                <button key={r.id} onClick={()=>openRound(r)} style={{...S.card,width:'100%',textAlign:'left',marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:15,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{roundDisplayName(r)}</div>
+                    <div style={{fontSize:11,color:'#90ccf0',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{dayRoundSummary(r)||formatRoundStart(r)}</div>
+                  </div>
+                  <div style={{fontSize:18,color:'#60b8f0',fontWeight:950}}>&gt;</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {/* Completed rounds */}
         {completedRounds.length>0&&(
           <div style={{marginTop:20}}>
