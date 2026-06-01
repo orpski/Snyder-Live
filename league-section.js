@@ -68,6 +68,34 @@ async function getReadyServiceWorker(){
   ]);
 }
 
+async function saveLeaguePushSubscription({replace=false}={}){
+  const registration=await getReadyServiceWorker();
+  let subscription=await registration.pushManager.getSubscription();
+  if(subscription&&replace){
+    await subscription.unsubscribe();
+    subscription=null;
+  }
+  if(!subscription){
+    subscription=await registration.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:urlBase64ToUint8Array(LEAGUE_VAPID_PUBLIC_KEY),
+    });
+  }
+  const sub=subscription.toJSON();
+  const{data:saved,error}=await sb.from('push_subscriptions').upsert({
+    endpoint:sub.endpoint,
+    subscription:sub,
+    p256dh:sub.keys?.p256dh||'',
+    auth:sub.keys?.auth||'',
+    user_agent:navigator.userAgent,
+    active:true,
+    updated_at:new Date().toISOString(),
+  },{onConflict:'endpoint'}).select('id').single();
+  if(error||!saved)throw new Error(error?.message||'No saved row returned');
+  try{localStorage.setItem('leagueNotificationsEnabled','true');}catch(e){}
+  return saved;
+}
+
 function getBest8(s){return[...s].sort((a,b)=>b.points-a.points).slice(0,8)}
 function getTotal(s){return getBest8(s).reduce((t,x)=>t+x.points,0)}
 function fmtDate(d){return toLocalDate(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}
@@ -172,17 +200,8 @@ function LeagueView({onExit}){
       if(Notification.permission!=='granted'){setNotifyStatus('idle');return;}
 
       try{
-        const registration=await getReadyServiceWorker();
-        const subscription=await registration.pushManager.getSubscription();
-        if(cancelled)return;
-        if(!subscription){setNotifyStatus('idle');return;}
-
-        const{data,error}=await sb.from('push_subscriptions')
-          .select('id,active')
-          .eq('endpoint',subscription.endpoint)
-          .maybeSingle();
-        if(cancelled)return;
-        setNotifyStatus(!error&&data&&data.active!==false?'enabled':'idle');
+        await saveLeaguePushSubscription();
+        if(!cancelled)setNotifyStatus('enabled');
       }catch(e){
         if(!cancelled)setNotifyStatus('idle');
       }
@@ -206,35 +225,9 @@ function LeagueView({onExit}){
         flash('Notifications were not enabled.','error');
         return;
       }
-      const registration=await getReadyServiceWorker();
-
-      // Important: if the VAPID key has changed, the browser can keep an old subscription
-      // even after rows are deleted from Supabase. Always replace the local subscription
-      // so the saved endpoint is created with the current public VAPID key.
-      const existingSubscription=await registration.pushManager.getSubscription();
-      if(existingSubscription){
-        await existingSubscription.unsubscribe();
-      }
-
-      const subscription=await registration.pushManager.subscribe({
-        userVisibleOnly:true,
-        applicationServerKey:urlBase64ToUint8Array(LEAGUE_VAPID_PUBLIC_KEY),
-      });
-      const sub=subscription.toJSON();
-      const{data:saved,error}=await sb.from('push_subscriptions').upsert({
-        endpoint:sub.endpoint,
-        subscription:sub,
-        p256dh:sub.keys?.p256dh||'',
-        auth:sub.keys?.auth||'',
-        user_agent:navigator.userAgent,
-        active:true,
-        updated_at:new Date().toISOString(),
-      },{onConflict:'endpoint'}).select('id').single();
-      if(error||!saved){
-        setNotifyStatus('error');
-        flash(`Notifications allowed, but subscription was not saved: ${error?.message||'No saved row returned'}`,'error');
-        return;
-      }
+      // Important: explicit retries replace the local subscription so stale VAPID endpoints
+      // are repaired, while normal app entry simply refreshes the saved row.
+      await saveLeaguePushSubscription({replace:true});
       setNotifyStatus('enabled');
       flash('Notifications enabled ✓');
     }catch(err){
