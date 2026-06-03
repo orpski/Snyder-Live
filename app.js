@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.41
+// SNYDER GOLF v3.42
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.41',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.42',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1670,7 +1670,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.41" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.41</span>
+          <span aria-label="App version v3.42" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.42</span>
         </button>
       </div>
 
@@ -1792,7 +1792,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     dayNums.forEach(day=>cupGroupsForDay(cupMatches,day).forEach(group=>{
       const rd=cupRounds.find(r=>cupRoundDayNumber(r)===day&&cupRoundGroupNumber(r)===(parseInt(group.idx)||1));
       if(!rd||!isCompletedRound(rd))return;
-      [group.doubles,...(group.singles||[])].filter(Boolean).forEach(match=>{
+      [group.doubles,...(group.singles||[])].filter(Boolean).filter(isCupTeamScoringMatch).forEach(match=>{
         const goldIds=match.gold_player_ids||[];
         const navyIds=match.navy_player_ids||[];
         const leftKey=sideKey(goldIds);
@@ -1817,17 +1817,6 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
         else totals[winner]=(totals[winner]||0)+1;
       });
     }));
-    dayNums.forEach(day=>{
-      const dayRounds=cupRounds.filter(r=>cupRoundDayNumber(r)===day);
-      if(!dayRounds.length||!dayRounds.every(isCompletedRound))return;
-      const teamScores=CUP_TEAM_KEYS.map(key=>{
-        const rows=(cupPlayers||[]).filter(p=>p.team_key===key).map(p=>dayRounds.reduce((t,rd)=>t+stablefordTotal(rd,p.id),0)).sort((a,b)=>b-a);
-        return{key,total:rows.slice(0,3).reduce((t,v)=>t+(parseInt(v)||0),0)};
-      });
-      const best=Math.max(...teamScores.map(t=>t.total));
-      const winners=teamScores.filter(t=>t.total===best&&best>0);
-      winners.forEach(w=>{totals[w.key]=(totals[w.key]||0)+(1/winners.length);});
-    });
     return CUP_TEAM_KEYS.reduce((acc,k)=>({...acc,[k]:totals[k]||0,[k+'Name']:(teams[k]&&teams[k].name)||CUP_THEME[k].name}),{});
   }
   async function openRound(rd){
@@ -4469,7 +4458,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const projected={gold:0,navy:0,red:0};
     groupsToUse.forEach(g=>{
       const rd=(round&&round._cupDayRounds||[]).find(r=>parseInt(r.day_number||g.day||1)===parseInt(g.day||1)&&String(r.name||'').includes('Group '+(g.idx||1)));
-      [g&&g.doubles,...((g&&g.singles)||[])].filter(Boolean).forEach(m=>{
+      [g&&g.doubles,...((g&&g.singles)||[])].filter(Boolean).filter(isCupTeamScoringMatch).forEach(m=>{
         const isCurrent=groupData&&parseInt(groupData.idx||1)===parseInt(g.idx||1)&&parseInt(groupData.day||1)===parseInt(g.day||1);
         const leader=isCurrent?liveMatchLeader(m):savedMatchLeader(m,rd);
         const leftKey=cupSideTeamKey(m.gold_player_ids||[]);
@@ -6070,8 +6059,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
                 <div style={{fontSize:12,fontWeight:950,letterSpacing:'0.1em',color:'#fff'}}>PROJECTED SCORE</div>
                 <div style={{fontSize:10,color:'rgba(255,255,255,0.78)',marginTop:2}}>Live if current matches finished now</div>
               </div>
-              {(()=>{const s=liveCupProjectedScore()||{gold:0,navy:0,red:0,goldName:'Team A',navyName:'Team B',redName:'Team C'};return (
-                <div style={{minWidth:210,flex:1,display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',alignItems:'stretch',gap:7}}>
+              {(()=>{const s=liveCupProjectedScore()||{gold:0,navy:0,goldName:'Team LIV',navyName:'Team Boring'};return (
+                <div style={{minWidth:210,flex:1,display:'grid',gridTemplateColumns:`repeat(${CUP_TEAM_KEYS.length},minmax(0,1fr))`,alignItems:'stretch',gap:7}}>
                   {CUP_TEAM_KEYS.map(k=><div key={'scorecard-proj-'+k} style={{minWidth:0,textAlign:'center',border:'1px solid rgba(255,255,255,0.18)',borderRadius:10,background:'rgba(0,0,0,0.14)',padding:'6px 5px'}}>
                     <div style={{fontSize:11,fontWeight:950,color:CUP_THEME[k].accent,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textTransform:'uppercase'}}>{s[k+'Name']||CUP_THEME[k].name}</div>
                     <div style={{fontSize:24,fontWeight:950,color:'#fff',lineHeight:1,marginTop:3}}>{fmtCupPoint(s[k]||0)}</div>
@@ -6346,7 +6335,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             {overallMode==='cupOverall'&&(()=>{const s=cupIfItStaysScore();const rows=cupOverallSinglesRows();return <>
               <div style={{border:'1px solid rgba(255,255,255,0.22)',background:cupProjectedBg(),borderRadius:16,padding:'12px 14px',marginBottom:12,boxShadow:'0 10px 24px rgba(0,0,0,0.25)'}}>
                 <div style={{fontSize:11,fontWeight:950,letterSpacing:'0.12em',color:'rgba(255,255,255,0.86)',textTransform:'uppercase',marginBottom:8}}>If it stays like this...</div>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',alignItems:'stretch',gap:8}}>
+                <div style={{display:'grid',gridTemplateColumns:`repeat(${CUP_TEAM_KEYS.length},minmax(0,1fr))`,alignItems:'stretch',gap:8}}>
                   {CUP_TEAM_KEYS.map(k=><div key={'overall-cup-proj-'+k} style={{minWidth:0,textAlign:'center',border:'1px solid rgba(255,255,255,0.18)',borderRadius:12,background:'rgba(0,0,0,0.14)',padding:'8px 6px'}}>
                     <div style={{fontSize:12,fontWeight:950,color:CUP_THEME[k].accent,textTransform:'uppercase',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s[k+'Name']||CUP_THEME[k].name}</div>
                     <div style={{fontSize:30,fontWeight:950,color:'#fff',lineHeight:1,marginTop:4}}>{fmtCupPoint(s[k]||0)}</div>
@@ -6859,20 +6848,26 @@ function OldTournamentsView({competitions,rounds,groups,scores,players,courses,s
 
 
 
-const CUP_TEAM_KEYS=['gold','navy','red'];
-const CUP_THEME={gold:{name:'Team A',primary:'#D4AF37',accent:'#F5E6A3',bg:'rgba(212,175,55,0.11)'},navy:{name:'Team B',primary:'#2563EB',accent:'#93C5FD',bg:'rgba(59,130,246,0.12)'},red:{name:'Team C',primary:'#DC2626',accent:'#FCA5A5',bg:'rgba(220,38,38,0.12)'}};
-const CUP_SLOT_TEAMS=[{key:'gold',code:'A'},{key:'navy',code:'B'},{key:'red',code:'C'}];
+const CUP_TEAM_KEYS=['gold','navy'];
+const CUP_THEME={gold:{name:'Team LIV',primary:'#D4AF37',accent:'#F5E6A3',bg:'rgba(212,175,55,0.11)'},navy:{name:'Team Boring',primary:'#2563EB',accent:'#93C5FD',bg:'rgba(59,130,246,0.12)'},red:{name:'The Stags',primary:'#DC2626',accent:'#FCA5A5',bg:'rgba(220,38,38,0.12)'}};
+const CUP_SLOT_TEAMS=[{key:'gold',code:'A',slots:4,note:'Paolo, Jon, Milner and Novak'},{key:'navy',code:'B',slots:5,note:'Smithy, Ben, Coburn, Stokoe and Hullee'},{key:'red',code:'C',slots:3,note:'Slug, Kev and Leng'}];
 const CUP_FIXED_MATCHUPS=[
-  {day:1,doubles:[['A',1],['A',2],['B',1],['B',2]],singles:[[['A',1],['B',1]],[['A',2],['B',2]]]},
-  {day:1,doubles:[['B',3],['B',4],['C',1],['C',2]],singles:[[['B',3],['C',1]],[['B',4],['C',2]]]},
-  {day:1,doubles:[['C',3],['C',4],['A',3],['A',4]],singles:[[['C',3],['A',3]],[['C',4],['A',4]]]},
-  {day:2,doubles:[['A',1],['A',3],['B',1],['B',3]],singles:[[['A',1],['B',3]],[['A',3],['B',1]]]},
-  {day:2,doubles:[['B',2],['B',4],['C',1],['C',3]],singles:[[['B',2],['C',3]],[['B',4],['C',1]]]},
-  {day:2,doubles:[['C',2],['C',4],['A',2],['A',4]],singles:[[['C',2],['A',4]],[['C',4],['A',2]]]},
-  {day:3,doubles:[['A',2],['A',3],['B',1],['B',4]],singles:[[['A',2],['B',1]],[['A',3],['B',4]]]},
-  {day:3,doubles:[['B',2],['B',3],['C',1],['C',4]],singles:[[['B',2],['C',1]],[['B',3],['C',4]]]},
-  {day:3,doubles:[['C',2],['C',3],['A',1],['A',4]],singles:[[['C',2],['A',1]],[['C',3],['A',4]]]}
+  {day:1,doubles:[['A',1],['A',2],['B',1],['B',3]],singles:[[['A',1],['B',1]],[['A',2],['B',3]]]},
+  {day:1,doubles:[['A',3],['A',4],['B',4],['B',5]],singles:[[['A',3],['B',4]],[['A',4],['B',5]]]},
+  {day:2,doubles:[['A',1],['A',3],['B',1],['B',2]],singles:[[['A',1],['B',1]],[['A',3],['B',2]]]},
+  {day:2,doubles:[['A',2],['A',4],['B',4],['B',5]],singles:[[['A',2],['B',4]],[['A',4],['B',5]]]},
+  {day:3,doubles:[['A',1],['A',4],['B',1],['B',5]],singles:[[['A',1],['B',1]],[['A',4],['B',5]]]},
+  {day:3,doubles:[['A',2],['A',3],['B',2],['B',3]],singles:[[['A',2],['B',2]],[['A',3],['B',3]]]}
 ];
+const CUP_STAGS_ROTATION={1:'Ben joins The Stags group',2:'Coburn joins The Stags group',3:'Stokoe joins The Stags group'};
+const CUP_STAGS_GROUPS=[
+  {day:1,players:[['C',1],['C',2],['C',3],['B',2]]},
+  {day:2,players:[['C',1],['C',2],['C',3],['B',3]]},
+  {day:3,players:[['C',1],['C',2],['C',3],['B',4]]}
+];
+const CUP_SLOT_DEFAULT_NAMES={A:['Paolo','Jon','Milner','Novak'],B:['Smithy','Ben','Coburn','Stokoe','Hullee'],C:['Slug','Kev','Leng']};
+function isCupTeamScoringMatch(match){return String(match&&match.match_type||'').toLowerCase()!=='stags';}
+function cupDefaultSlotName(code,slot){return (CUP_SLOT_DEFAULT_NAMES[code]||[])[(parseInt(slot)||1)-1]||code+slot;}
 function cupSlotTeamKey(code){return code==='A'?'gold':code==='B'?'navy':'red';}
 function cupTeamStyle(teamKey,extra={}){const t=CUP_THEME[teamKey]||CUP_THEME.gold;return {border:'1px solid '+t.primary,background:t.bg,...extra};}
 function CupTeamBadge({teamKey,label}){const t=CUP_THEME[teamKey]||CUP_THEME.gold;return <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:10,fontWeight:800,letterSpacing:'0.08em',color:t.accent,textTransform:'uppercase'}}><span style={{width:8,height:8,borderRadius:999,background:t.primary,boxShadow:'0 0 10px '+t.primary}}/> {label||t.name}</span>;}
@@ -6901,12 +6896,12 @@ function cupForfeitMark(idx,total,overall=false){
   const last=(parseInt(total)||0)-1;
   return last>=0&&(parseInt(idx)||0)===last?(overall?' 🎩👕✈️':' 🎩👕'):'';
 }
-function getCupTeams(cup,cupTeams){const rows=(cupTeams||[]).filter(t=>t.cup_id===cup.id);return {gold:rows.find(t=>t.team_key==='gold')||{name:cup.team_a_name||'Team A',team_key:'gold'},navy:rows.find(t=>t.team_key==='navy')||{name:cup.team_b_name||'Team B',team_key:'navy'},red:rows.find(t=>t.team_key==='red')||{name:cup.team_c_name||'Team C',team_key:'red'}};}
+function getCupTeams(cup,cupTeams){const rows=(cupTeams||[]).filter(t=>t.cup_id===cup.id);return {gold:rows.find(t=>t.team_key==='gold')||{name:cup.team_a_name||'Team LIV',team_key:'gold'},navy:rows.find(t=>t.team_key==='navy')||{name:cup.team_b_name||'Team Boring',team_key:'navy'},red:rows.find(t=>t.team_key==='red')||{name:cup.team_c_name||'The Stags',team_key:'red'}};}
 function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,courses,rounds}){
   const[name,setName]=useState('Snyder Cup 2026');
-  const[goldName,setGoldName]=useState('Team A');
-  const[navyName,setNavyName]=useState('Team B');
-  const[redName,setRedName]=useState('Team C');
+  const[goldName,setGoldName]=useState('Team LIV');
+  const[navyName,setNavyName]=useState('Team Boring');
+  const[redName,setRedName]=useState('The Stags');
   const[selectedCupId,setSelectedCupId]=useState((cupEvents&&cupEvents[0]&&cupEvents[0].id)||'');
   const[matchDay,setMatchDay]=useState('1');
   const[matchType,setMatchType]=useState('doubles');
@@ -6930,7 +6925,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     const ca=Date.parse(a.created_at||'')||0,cb=Date.parse(b.created_at||'')||0;
     return ca-cb||String(a.id||'').localeCompare(String(b.id||''));
   });
-  const cupSlotRows=teamKey=>sortCupSlotPlayers(cupPlayersByTeam[teamKey]||[]).slice(0,4);
+  const cupSlotRows=teamKey=>sortCupSlotPlayers(cupPlayersByTeam[teamKey]||[]).slice(0,parseInt((CUP_SLOT_TEAMS.find(t=>t.key===teamKey)||{}).slots)||4);
   const slotPlayer=(code,num)=>{
     const rows=cupSlotRows(cupSlotTeamKey(code));
     return rows[(parseInt(num)||1)-1]||null;
@@ -6953,9 +6948,9 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   const accountOptionsForPlayer=player=>accountOptions.filter(u=>!(cupPlayers||[]).some(p=>p.id!==(player&&player.id)&&normaliseId(p.user_id)===normaliseId(u.id)));
   async function createCup(){
     try{
-      const{data,error}=await sb.from('snyder_cups').insert({name:name.trim()||'Snyder Cup',team_a_name:goldName.trim()||'Team A',team_b_name:navyName.trim()||'Team B',team_a_colour:'#D4AF37',team_b_colour:'#2563EB',status:'setup'}).select().single();
+      const{data,error}=await sb.from('snyder_cups').insert({name:name.trim()||'Snyder Cup',team_a_name:goldName.trim()||'Team LIV',team_b_name:navyName.trim()||'Team Boring',team_a_colour:'#D4AF37',team_b_colour:'#2563EB',status:'setup'}).select().single();
       if(error)throw error;
-      await sb.from('snyder_cup_teams').insert([{cup_id:data.id,team_key:'gold',name:goldName.trim()||'Team A',colour:'#D4AF37'},{cup_id:data.id,team_key:'navy',name:navyName.trim()||'Team B',colour:'#2563EB'},{cup_id:data.id,team_key:'red',name:redName.trim()||'Team C',colour:'#DC2626'}]);
+      await sb.from('snyder_cup_teams').insert([{cup_id:data.id,team_key:'gold',name:goldName.trim()||'Team LIV',colour:'#D4AF37'},{cup_id:data.id,team_key:'navy',name:navyName.trim()||'Team Boring',colour:'#2563EB'},{cup_id:data.id,team_key:'red',name:redName.trim()||'The Stags',colour:'#DC2626'}]);
       flash('Cup created');await load();setSelectedCupId(data.id);
     }catch(e){flash('Cup tables missing or save failed. Run the v66 SQL first. '+(e.message||''),'error');}
   }
@@ -7074,8 +7069,9 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       const ok=await ensureCupTeamRow(t.key);
       if(!ok)return false;
       const rows=cupSlotRows(t.key);
-      for(let i=rows.length+1;i<=4;i++){
-        const{error}=await insertCupPlayer(t.key,t.code+i,0);
+      const slotCount=parseInt(t.slots)||4;
+      for(let i=rows.length+1;i<=slotCount;i++){
+        const{error}=await insertCupPlayer(t.key,cupDefaultSlotName(t.code,i),0);
         if(error){flash(error.message,'error');return false;}
       }
     }
@@ -7083,7 +7079,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     return true;
   }
   function fixedScheduleRows(sourcePlayers=cupPlayers){
-    const rowsByTeam=CUP_TEAM_KEYS.reduce((acc,k)=>({...acc,[k]:sortCupSlotPlayers((sourcePlayers||[]).filter(p=>p.team_key===k)).slice(0,4)}),{});
+      const rowsByTeam=CUP_SLOT_TEAMS.reduce((acc,t)=>({...acc,[t.key]:sortCupSlotPlayers((sourcePlayers||[]).filter(p=>p.team_key===t.key)).slice(0,parseInt(t.slots)||4)}),{});
     const idFor=slot=>{
       const p=(rowsByTeam[cupSlotTeamKey(slot[0])]||[])[(parseInt(slot[1])||1)-1];
       return p?playerKey(p):null;
@@ -7099,6 +7095,10 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
         const b=idFor(pair[1]);
         rows.push({cup_id:cup.id,day_number:group.day,match_type:'singles',gold_player_ids:a?[a]:[],navy_player_ids:b?[b]:[],status:'locked'});
       });
+    });
+    CUP_STAGS_GROUPS.forEach(group=>{
+      const ids=group.players.map(idFor).filter(Boolean);
+      if(ids.length)rows.push({cup_id:cup.id,day_number:group.day,match_type:'stags',gold_player_ids:ids,navy_player_ids:[],status:'locked'});
     });
     return rows;
   }
@@ -7121,7 +7121,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     await sb.from('snyder_cup_matches').delete().eq('cup_id',cup.id);
     const{error}=await sb.from('snyder_cup_matches').insert(fixedScheduleRows(freshPlayers||cupPlayers));
     if(error){flash(error.message,'error');return;}
-    flash('Fixed A/B/C matchups built');
+    flash('Team LIV v Team Boring matchups built');
     await load();
   }
   async function removeCupPlayer(p){
@@ -7290,12 +7290,13 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     flash('Snyder Cup reset. Teams and squad players kept.');
   }
   function renderTeamAdminCard(teamKey,team,rows){
-    const slotMeta=CUP_SLOT_TEAMS.find(t=>t.key===teamKey)||{code:'?'};
+    const slotMeta=CUP_SLOT_TEAMS.find(t=>t.key===teamKey)||{code:'?',slots:4};
+    const slotCount=parseInt(slotMeta.slots)||4;
     const slotRows=cupSlotRows(teamKey);
     return <div style={{...S.card,...cupTeamStyle(teamKey),padding:12}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><CupTeamBadge teamKey={teamKey} label={team.name}/><div style={{fontSize:20,color:'#fff',fontWeight:900}}>{slotRows.length}/4</div></div>
-      <div style={{fontSize:11,color:'#9fb6c9',marginBottom:8}}>Assign the fixed Cup positions. The matchups use these slots automatically: {slotMeta.code}1, {slotMeta.code}2, {slotMeta.code}3 and {slotMeta.code}4.</div>
-      {Array.from({length:4},(_,i)=>({slot:i+1,player:slotRows[i]})).map(({slot,player})=>(
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><CupTeamBadge teamKey={teamKey} label={team.name}/><div style={{fontSize:20,color:'#fff',fontWeight:900}}>{slotRows.length}/{slotCount}</div></div>
+      <div style={{fontSize:11,color:'#9fb6c9',marginBottom:8}}>Assign the fixed Cup positions. {slotMeta.note||'The matchups use these slots automatically.'}</div>
+      {Array.from({length:slotCount},(_,i)=>({slot:i+1,player:slotRows[i]})).map(({slot,player})=>(
         <div key={teamKey+'-slot-'+slot} style={{borderTop:'1px solid rgba(255,255,255,0.08)',padding:'9px 0'}}>
           <div style={{fontSize:11,color:(CUP_THEME[teamKey]||CUP_THEME.gold).accent,fontWeight:950,letterSpacing:'0.10em',marginBottom:6}}>{(team&&team.name)||CUP_THEME[teamKey].name} - {slot} ({slotMeta.code}{slot})</div>
           {player?renderCupSlotPlayerEditor(player):renderCupEmptySlotEditor(teamKey,slotMeta.code+slot)}
@@ -7312,18 +7313,18 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     {!cup&&<div style={{...S.card,marginBottom:14}}>
       <div style={{fontSize:14,color:'#fff',fontWeight:800,marginBottom:10}}>Create Cup</div>
       <input style={{...S.inp,marginBottom:8}} value={name} onChange={e=>setName(e.target.value)} placeholder="Cup name"/>
-      <input style={{...S.inp,marginBottom:8}} value={goldName} onChange={e=>setGoldName(e.target.value)} placeholder="Team A name"/>
-      <input style={{...S.inp,marginBottom:8}} value={navyName} onChange={e=>setNavyName(e.target.value)} placeholder="Team B name"/>
-      <input style={{...S.inp,marginBottom:12}} value={redName} onChange={e=>setRedName(e.target.value)} placeholder="Team C name"/>
-      <button onClick={createCup} style={{...S.pri,width:'100%',background:'linear-gradient(135deg,#D4AF37,#2563EB,#DC2626)'}}>Create 3 Team Cup</button>
+      <input style={{...S.inp,marginBottom:8}} value={goldName} onChange={e=>setGoldName(e.target.value)} placeholder="Team LIV name"/>
+      <input style={{...S.inp,marginBottom:8}} value={navyName} onChange={e=>setNavyName(e.target.value)} placeholder="Team Boring name"/>
+      <input style={{...S.inp,marginBottom:12}} value={redName} onChange={e=>setRedName(e.target.value)} placeholder="Stags group name"/>
+      <button onClick={createCup} style={{...S.pri,width:'100%',background:'linear-gradient(135deg,#D4AF37,#2563EB)'}}>Create Cup</button>
     </div>}
     {cup&&<div>
       <div style={{...S.card,marginBottom:10,padding:10}}>
         <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>CUP OVERVIEW</div>
         <select style={{...S.inp,marginBottom:8}} value={cup.id} onChange={e=>setSelectedCupId(e.target.value)}>{(cupEvents||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:7,textAlign:'center',marginBottom:10}}><div style={{...S.card,padding:8}}><div style={{fontSize:18,color:'#fff',fontWeight:900}}>{cupPlayers.length}</div><div style={{fontSize:10,color:'#8ea0ad'}}>Players</div></div><div style={{...S.card,padding:8}}><div style={{fontSize:18,color:'#fff',fontWeight:900}}>{days.length}</div><div style={{fontSize:10,color:'#8ea0ad'}}>Days</div></div><div style={{...S.card,padding:8}}><div style={{fontSize:18,color:'#fff',fontWeight:900}}>{matches.length}</div><div style={{fontSize:10,color:'#8ea0ad'}}>Matches</div></div></div>
-        <button onClick={buildFixedCupSchedule} style={{...S.pri,width:'100%',background:'linear-gradient(135deg,#D4AF37,#2563EB,#DC2626)',fontSize:13}}>Build fixed A/B/C matchups</button>
-        <div style={{fontSize:10,color:'#9fb6c9',lineHeight:1.35,marginTop:7}}>Creates A1-A4, B1-B4 and C1-C4 slots if needed, then fills Day 1, Day 2 and Day 3 from the agreed matchup plan.</div>
+        <button onClick={buildFixedCupSchedule} style={{...S.pri,width:'100%',background:'linear-gradient(135deg,#D4AF37,#2563EB)',fontSize:13}}>Build fixed LIV v Boring matchups</button>
+        <div style={{fontSize:10,color:'#9fb6c9',lineHeight:1.35,marginTop:7}}>Creates the LIV, Boring and Stags slots if needed, then fills two scoring groups per day. {CUP_STAGS_ROTATION[1]}, {CUP_STAGS_ROTATION[2]}, {CUP_STAGS_ROTATION[3]}.</div>
       </div>
       <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'0 0 8px'}}>TEAMS & PLAYERS</div>
       <div style={{display:'grid',gridTemplateColumns:'1fr',gap:10,marginBottom:14}}>
@@ -7425,6 +7426,13 @@ function CupDayView({day,course,groups,teams,playersInCup,released,roundForGroup
   const courseLine=course?courseSummaryLine(course,{tee:course.tee},course.holes):'Choose a course in Cup Admin';
   function playerName(id){const p=findPlayer(id);return gameName(p&&p.display_name||'Player');}
   function MatchRow({match,round,label}){
+    if(String(match&&match.match_type||'').toLowerCase()==='stags'){
+      const ids=[...(match.gold_player_ids||[]),...(match.navy_player_ids||[])];
+      return <div style={{border:'1px solid rgba(252,165,165,0.26)',borderRadius:12,background:'linear-gradient(135deg,rgba(220,38,38,0.16),rgba(15,23,42,0.70))',padding:10}}>
+        <div style={{fontSize:10,color:CUP_THEME.red.accent,fontWeight:950,letterSpacing:'0.14em',marginBottom:7}}>THE STAGS - OVERALL SINGLES ONLY</div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:6}}>{ids.map(id=><span key={'stags-'+id} style={{border:'1px solid rgba(255,255,255,0.12)',borderRadius:999,padding:'5px 8px',background:'rgba(0,0,0,0.16)',fontSize:12,color:'#fff',fontWeight:900}}>{playerName(id)}</span>)}</div>
+      </div>;
+    }
     const res=matchResult(match,round);
     const finished=round&&isCompletedRound(round);
     const goldIds=match.gold_player_ids||[];
@@ -7888,39 +7896,27 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   function teamPoints(){
     const totals={gold:0,navy:0,red:0};
     const projected={gold:0,navy:0,red:0};
-    const bonusRows=[];
     matchesByDay.forEach(dayGroup=>cupDayGroups(dayGroup.day).forEach(group=>{
       const rd=roundForGroup(group.day,group.idx);
-      [group.doubles,...group.singles].filter(Boolean).forEach(match=>{
+      [group.doubles,...group.singles].filter(Boolean).filter(isCupTeamScoringMatch).forEach(match=>{
         const res=matchResult(match,rd);
         if(res.complete&&res.pointsByTeam)Object.keys(res.pointsByTeam).forEach(k=>{totals[k]=(totals[k]||0)+(parseFloat(res.pointsByTeam[k])||0);});
         if(res.winner&&res.winner!=='tie')projected[res.winner]=(projected[res.winner]||0)+1;
       });
     }));
-    cupDayNumbers.forEach(day=>{
-      if(!isCupDayComplete(day))return;
-      const teamScores=CUP_TEAM_KEYS.map(key=>{
-        const rows=(playersInCup||[]).filter(p=>p.team_key===key).map(p=>cupDayRounds(day).reduce((t,r)=>t+playerAdjustedSinglesPointsFromRound(r,p,day),0)).sort((a,b)=>b-a);
-        return{key,total:rows.slice(0,3).reduce((t,v)=>t+(parseInt(v)||0),0)};
-      });
-      const best=Math.max(...teamScores.map(t=>t.total));
-      const winners=teamScores.filter(t=>t.total===best&&best>0);
-      winners.forEach(w=>{totals[w.key]=(totals[w.key]||0)+(1/winners.length);});
-      if(winners.length)bonusRows.push({day,winners,teamScores});
-    });
-    return{...totals,projected,bonusRows};
+    return{...totals,projected,bonusRows:[]};
   }
   const teamTotals=teamPoints();
   const goldPts=teamTotals.gold;
   const navyPts=teamTotals.navy;
   const redPts=teamTotals.red;
-  function cupScoreSummary(){return{gold:goldPts,navy:navyPts,red:redPts,goldName:teams&&teams.gold&&teams.gold.name||'Team A',navyName:teams&&teams.navy&&teams.navy.name||'Team B',redName:teams&&teams.red&&teams.red.name||'Team C'};}
+  function cupScoreSummary(){return{gold:goldPts,navy:navyPts,red:redPts,goldName:teams&&teams.gold&&teams.gold.name||'Team LIV',navyName:teams&&teams.navy&&teams.navy.name||'Team Boring',redName:teams&&teams.red&&teams.red.name||'The Stags'};}
   function fmtCupPoint(v){const n=parseFloat(v)||0;return Number.isInteger(n)?String(n):String(n).replace(/\.0$/,'');}
   function cupResultsSummaryRows(){
     const rows=[];
     matchesByDay.forEach(dayGroup=>cupDayGroups(dayGroup.day).forEach(group=>{
       const rd=roundForGroup(group.day,group.idx);
-      [group.doubles,...group.singles].filter(Boolean).forEach(match=>{
+      [group.doubles,...group.singles].filter(Boolean).filter(isCupTeamScoringMatch).forEach(match=>{
         const res=matchResult(match,rd);
         const isDoubles=String(match.match_type||'').toLowerCase()==='doubles';
         const leftTeamKey=res.leftTeamKey||sideTeamKey(match.gold_player_ids||[]);
@@ -8014,7 +8010,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   }
   const leading=CUP_TEAM_KEYS.reduce((best,k)=>parseFloat(teamTotals[k]||0)>parseFloat(teamTotals[best]||0)?k:best,'gold');
   const tiedLead=CUP_TEAM_KEYS.filter(k=>parseFloat(teamTotals[k]||0)===parseFloat(teamTotals[leading]||0));
-  const summaryScoreBg=tiedLead.length>1?'linear-gradient(90deg,rgba(212,175,55,0.72),rgba(37,99,235,0.66),rgba(220,38,38,0.58))':(leading==='gold'?'linear-gradient(90deg,rgba(212,175,55,0.98),rgba(146,96,10,0.92))':leading==='navy'?'linear-gradient(90deg,rgba(37,99,235,0.96),rgba(8,24,61,0.97))':'linear-gradient(90deg,rgba(220,38,38,0.96),rgba(69,10,10,0.94))');
+  const summaryScoreBg=tiedLead.length>1?'linear-gradient(90deg,rgba(212,175,55,0.72),rgba(37,99,235,0.66))':(leading==='gold'?'linear-gradient(90deg,rgba(212,175,55,0.98),rgba(146,96,10,0.92))':'linear-gradient(90deg,rgba(37,99,235,0.96),rgba(8,24,61,0.97))');
   const cupScoreBannerBg=summaryScoreBg;
   const cupFineGrandTotal=(rounds||[]).filter(r=>r&&((String(r.name||'').startsWith(cupTitle+' Day '))||String(r.name||'').startsWith('Synder Cup Day '))).reduce((t,r)=>t+cupFineTotalForRound(r,scores),0);
   function cupFineTotalForRoundAndPlayer(round,p){
@@ -8352,7 +8348,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   return <div style={{minHeight:'100vh',paddingBottom:80}}>
     <div style={{background:'linear-gradient(135deg,#064E3B,#042F2E)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(94,234,212,0.18)'}}><button onClick={goBackOnePage} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button><div style={{display:'flex',alignItems:'center',gap:8,fontSize:16,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}><span style={{color:'#D4AF37'}}>{EMOJI.trophy}</span><span>SNYDER CUP</span></div><div style={{width:60}}/></div>
     <div style={{padding:16}}>
-      {!cup?<div style={{...S.card,textAlign:'center',padding:28}}><div style={{fontSize:18,color:'#fff',fontWeight:800,marginBottom:8}}>No Cup set up yet</div><div style={{fontSize:13,color:'#8ea0ad',marginBottom:14}}>Admin can create the 3 team Cup in the Admin Cup tab.</div>{isAdmin&&<button onClick={()=>setView('admin')} style={S.pri}>Open Admin</button>}</div>:<>
+      {!cup?<div style={{...S.card,textAlign:'center',padding:28}}><div style={{fontSize:18,color:'#fff',fontWeight:800,marginBottom:8}}>No Cup set up yet</div><div style={{fontSize:13,color:'#8ea0ad',marginBottom:14}}>Admin can create the Cup in the Admin Cup tab.</div>{isAdmin&&<button onClick={()=>setView('admin')} style={S.pri}>Open Admin</button>}</div>:<>
         {selectedCupPlayerDetail?(()=>{const p=selectedCupPlayerSummary;const d=selectedCupPlayerDetail;const rows=Array.from({length:18},(_,i)=>i+1).map(h=>{const hd=(d.courseHoles||[]).find(x=>parseInt(x.hole)===h)||{hole:h,par:'-',stroke_index:'-',yards:'-'};return {hole:h,hd,row:d.byHole[h]};});const totalPar=(d.courseHoles||[]).reduce((t,h)=>t+(parseInt(h.par)||0),0);const totalYards=(d.courseHoles||[]).reduce((t,h)=>t+(parseInt(h.yards)||0),0);return <>
           <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',margin:'2px 0 8px'}}>{cupDisplayName(p)} - DAY {d.day}</div>
           <div style={{fontSize:12,color:'#8ea0ad',marginBottom:12}}>{d.courseName}{d.tee?' - '+d.tee+' tee':''}{totalPar?' - Par '+totalPar:''}{totalYards?' - '+totalYards+' yds':''}</div>
@@ -8402,7 +8398,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
           <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',margin:'2px 0 8px'}}>RESULTS SO FAR</div>
           <div style={{fontSize:12,color:'#8ea0ad',marginBottom:12}}>Tap Back to return to the main Snyder Cup page.</div>
           <div style={{borderRadius:20,padding:18,marginBottom:14,border:'1px solid rgba(255,255,255,0.22)',background:summaryScoreBg,boxShadow:'0 18px 42px rgba(0,0,0,0.30)',overflow:'hidden'}}>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,alignItems:'stretch'}}>{CUP_TEAM_KEYS.map(k=><div key={'summary-score-'+k} style={{border:'1px solid rgba(255,255,255,0.20)',borderRadius:14,background:'rgba(0,0,0,0.16)',padding:10,textAlign:'center'}}><CupTeamBadge teamKey={k} label={teams[k].name}/><div style={{fontSize:42,color:'#fff',fontWeight:950,lineHeight:1,marginTop:7,textShadow:'0 2px 14px rgba(0,0,0,0.38)'}}>{fmtCupPoint(teamTotals[k]||0)}</div></div>)}</div>
+            <div style={{display:'grid',gridTemplateColumns:`repeat(${CUP_TEAM_KEYS.length},1fr)`,gap:10,alignItems:'stretch'}}>{CUP_TEAM_KEYS.map(k=><div key={'summary-score-'+k} style={{border:'1px solid rgba(255,255,255,0.20)',borderRadius:14,background:'rgba(0,0,0,0.16)',padding:10,textAlign:'center'}}><CupTeamBadge teamKey={k} label={teams[k].name}/><div style={{fontSize:42,color:'#fff',fontWeight:950,lineHeight:1,marginTop:7,textShadow:'0 2px 14px rgba(0,0,0,0.38)'}}>{fmtCupPoint(teamTotals[k]||0)}</div></div>)}</div>
           </div>
           <div style={{display:'grid',gap:14}}>{cupDayNumbers.map(day=>{
             const dayRows=cupResultsSummaryRows().filter(r=>parseInt(r.day)===parseInt(day));
@@ -8445,7 +8441,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
           </div>
           <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>TEAM SCORE</div>
           <button onClick={openCupSummary} style={{width:'100%',borderRadius:18,padding:'13px 14px',marginBottom:10,border:'1px solid rgba(255,255,255,0.22)',background:cupScoreBannerBg,cursor:'pointer',textAlign:'initial',boxShadow:'0 14px 34px rgba(0,0,0,0.28)',overflow:'hidden'}}>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,alignItems:'stretch'}}>{CUP_TEAM_KEYS.map(k=><div key={'home-score-'+k} style={{border:'1px solid rgba(255,255,255,0.16)',borderRadius:13,background:'rgba(0,0,0,0.16)',padding:'8px 5px',textAlign:'center'}}><CupTeamBadge teamKey={k} label={teams[k].name}/><div style={{fontSize:34,color:'#fff',fontWeight:950,lineHeight:1,marginTop:5,textShadow:'0 2px 14px rgba(0,0,0,0.38)'}}>{fmtCupPoint(teamTotals[k]||0)}</div></div>)}</div>
+            <div style={{display:'grid',gridTemplateColumns:`repeat(${CUP_TEAM_KEYS.length},1fr)`,gap:8,alignItems:'stretch'}}>{CUP_TEAM_KEYS.map(k=><div key={'home-score-'+k} style={{border:'1px solid rgba(255,255,255,0.16)',borderRadius:13,background:'rgba(0,0,0,0.16)',padding:'8px 5px',textAlign:'center'}}><CupTeamBadge teamKey={k} label={teams[k].name}/><div style={{fontSize:34,color:'#fff',fontWeight:950,lineHeight:1,marginTop:5,textShadow:'0 2px 14px rgba(0,0,0,0.38)'}}>{fmtCupPoint(teamTotals[k]||0)}</div></div>)}</div>
             <div style={{fontSize:10,color:'#90ccf0',fontWeight:900,textAlign:'center',letterSpacing:'0.08em',marginTop:5}}>TAP FOR RESULTS SUMMARY</div>
           </button>
           <div style={{fontSize:11,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'12px 0 7px'}}>OVERALL SINGLES</div>
