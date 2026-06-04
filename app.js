@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.48
+// SNYDER GOLF v3.49
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.48',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.49',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -832,6 +832,12 @@ function Avatar({user,size=36}){
   );
 }
 
+function formatHeaderHandicap(value){
+  const n=parseFloat(value);
+  if(!Number.isFinite(n))return '0';
+  return Number.isInteger(n)?String(n):n.toFixed(1);
+}
+
 function HandicapPicker({value,onChange,style={},buttonStyle={},label='Handicap',step=1,min=-6,max=54,defaultValue=8}){
   const[open,setOpen]=useState(false);
   const hasValue=!(value===''||value==null||Number.isNaN(parseFloat(value)));
@@ -1176,6 +1182,23 @@ function App(){
   function canPullRefreshView(v){
     return v==='home'||v==='play'||v==='live'||v==='league';
   }
+  function applyCurrentUserUpdate(user,row){
+    if(!user||!row||normaliseId(user.id)!==normaliseId(row.id))return user||null;
+    const updated={...user,...row};
+    setCurrentUser(updated);
+    try{localStorage.setItem('snyder_user',JSON.stringify(updated));}catch(e){}
+    return updated;
+  }
+  async function refreshCurrentUserFromCloud(user=currentUser){
+    if(!user||!user.id)return user||null;
+    try{
+      const{data,error}=await sb.from('cup_users').select('*').eq('id',user.id).single();
+      if(error||!data)return user;
+      return applyCurrentUserUpdate(user,data);
+    }catch(e){
+      return user;
+    }
+  }
 
   useEffect(()=>{viewRef.current=view;},[view]);
   useEffect(()=>{
@@ -1296,7 +1319,13 @@ function App(){
       setSplash(false);
     }
     const saved=localStorage.getItem('snyder_user');
-    if(saved){try{setCurrentUser(JSON.parse(saved));}catch(e){}}
+    if(saved){
+      try{
+        const savedUser=JSON.parse(saved);
+        setCurrentUser(savedUser);
+        refreshCurrentUserFromCloud(savedUser);
+      }catch(e){}
+    }
     loadAll();
     registerSnyderServiceWorker();
     let lastPopTime=0;
@@ -1392,6 +1421,10 @@ function App(){
       sb.from('snyder_cup_matches').select('*').then(r=>r.data||[]).catch(()=>[]),
     ]);
     setAppData({players,courses:mergePresetCourses(courses),rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches});
+    if(currentUser&&currentUser.id){
+      const freshUser=(cupUsers||[]).find(u=>normaliseId(u.id)===normaliseId(currentUser.id));
+      if(freshUser)applyCurrentUserUpdate(currentUser,freshUser);
+    }
   }
 
   const{players,courses,rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches}=appData;
@@ -1607,8 +1640,12 @@ function App(){
             </button>
           )}
           {currentUser
-            ?<button onClick={()=>setView('profile')} style={{background:'none',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,padding:0}}>
-              <Avatar user={currentUser} size={32}/>
+            ?<button onClick={()=>setView('profile')} style={{...NO_SELECT,border:'1px solid rgba(96,184,240,0.28)',borderRadius:999,background:'rgba(255,255,255,0.06)',cursor:'pointer',display:'flex',alignItems:'center',gap:8,padding:'5px 9px 5px 5px',maxWidth:'46vw',minWidth:0,boxShadow:'0 8px 18px rgba(0,0,0,0.16)'}}>
+              <Avatar user={currentUser} size={28}/>
+              <span style={{display:'flex',flexDirection:'column',alignItems:'flex-start',minWidth:0,lineHeight:1.05}}>
+                <span style={{maxWidth:'30vw',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:12,fontWeight:950,color:'#fff'}}>{currentUser.display_name||currentUser.username||'Player'}</span>
+                <span style={{fontSize:10,fontWeight:900,color:'#90ccf0',letterSpacing:0}}>HCP {formatHeaderHandicap(currentUser.handicap)}</span>
+              </span>
             </button>
             :<button onClick={()=>{setAuthPrompt(null);setShowAuth(true);}} style={{...S.pri,padding:'7px 10px',fontSize:11,lineHeight:1.15,boxShadow:'0 6px 18px rgba(0,112,187,0.28)',whiteSpace:'nowrap'}}>Sign In</button>
           }
@@ -1687,7 +1724,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.48" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.48</span>
+          <span aria-label="App version v3.49" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.49</span>
         </button>
       </div>
 
@@ -1698,7 +1735,7 @@ function App(){
         signupButtonText={authPrompt==='startRound'?'Quick Register':null}
         guests={guests}
         onRefresh={loadAll}
-        onLogin={u=>{setCurrentUser(u);setShowAuth(false);if(authPrompt==='startRound')setView('play');setAuthPrompt(null);flash('Welcome '+u.display_name);}}
+        onLogin={async u=>{setCurrentUser(u);const fresh=await refreshCurrentUserFromCloud(u);setShowAuth(false);if(authPrompt==='startRound')setView('play');setAuthPrompt(null);flash('Welcome '+((fresh&&fresh.display_name)||u.display_name));}}
         onClose={()=>{setShowAuth(false);setAuthPrompt(null);}}
       />}
       <Toast toast={toast}/>
