@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.49
+// SNYDER GOLF v3.50
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.49',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.50',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -838,6 +838,27 @@ function formatHeaderHandicap(value){
   return Number.isInteger(n)?String(n):n.toFixed(1);
 }
 
+function handicapTrendFromHistory(row){
+  if(!row)return null;
+  const oldHandicap=parseFloat(row.old_handicap);
+  const newHandicap=parseFloat(row.new_handicap);
+  if(!Number.isFinite(oldHandicap)||!Number.isFinite(newHandicap))return null;
+  const delta=newHandicap-oldHandicap;
+  if(Math.abs(delta)<0.05)return null;
+  return {direction:delta<0?'down':'up',delta:Math.abs(delta),oldHandicap,newHandicap};
+}
+
+function HandicapTrendBadge({trend}){
+  if(!trend)return null;
+  const improved=trend.direction==='down';
+  return(
+    <span aria-label={improved?'Handicap came down':'Handicap went up'} title={(improved?'Down ':'Up ')+formatHeaderHandicap(trend.delta)} style={{display:'inline-flex',alignItems:'center',gap:3,marginLeft:7,color:improved?'#22c55e':'#ef4444',fontSize:18,fontWeight:950,lineHeight:1,textShadow:'0 2px 8px rgba(0,0,0,0.45)'}}>
+      <span style={{fontSize:17,lineHeight:1}}>{improved?'▼':'▲'}</span>
+      <span style={{fontSize:12,lineHeight:1}}>{formatHeaderHandicap(trend.delta)}</span>
+    </span>
+  );
+}
+
 function HandicapPicker({value,onChange,style={},buttonStyle={},label='Handicap',step=1,min=-6,max=54,defaultValue=8}){
   const[open,setOpen]=useState(false);
   const hasValue=!(value===''||value==null||Number.isNaN(parseFloat(value)));
@@ -1169,6 +1190,7 @@ function App(){
   const[homePull,setHomePull]=useState(0);
   const[homeRefreshing,setHomeRefreshing]=useState(false);
   const viewRef=useRef(view);
+  const currentUserRef=useRef(null);
   const homeRefreshRef=useRef(false);
   const pullRef=useRef({active:false,startX:0,startY:0,dy:0,view:'home'});
   const isAdmin=true; // Admin panel is password protected internally
@@ -1189,18 +1211,24 @@ function App(){
     try{localStorage.setItem('snyder_user',JSON.stringify(updated));}catch(e){}
     return updated;
   }
-  async function refreshCurrentUserFromCloud(user=currentUser){
+  async function refreshCurrentUserFromCloud(user=currentUserRef.current){
     if(!user||!user.id)return user||null;
     try{
-      const{data,error}=await sb.from('cup_users').select('*').eq('id',user.id).single();
+      const[userResult,historyResult]=await Promise.all([
+        sb.from('cup_users').select('*').eq('id',user.id).single(),
+        sb.from('handicap_sync_history').select('old_handicap,new_handicap,synced_at').eq('user_id',user.id).order('synced_at',{ascending:false}).limit(1).maybeSingle()
+      ]);
+      const{data,error}=userResult||{};
+      const history=historyResult&&!historyResult.error?historyResult.data:null;
       if(error||!data)return user;
-      return applyCurrentUserUpdate(user,data);
+      return applyCurrentUserUpdate(user,{...data,_handicapTrend:handicapTrendFromHistory(history)});
     }catch(e){
       return user;
     }
   }
 
   useEffect(()=>{viewRef.current=view;},[view]);
+  useEffect(()=>{currentUserRef.current=currentUser;},[currentUser]);
   useEffect(()=>{
     let alive=true;
     const permission=('Notification' in window)?Notification.permission:'unsupported';
@@ -1359,6 +1387,7 @@ function App(){
       setHomePull(92);
       try{
         await loadAll();
+        await refreshCurrentUserFromCloud(currentUserRef.current);
         try{window.dispatchEvent(new CustomEvent('snyderPullRefresh',{detail:{view:targetView}}));}catch(err){}
         flash(label.charAt(0).toUpperCase()+label.slice(1)+' refreshed');
       }
@@ -1421,9 +1450,10 @@ function App(){
       sb.from('snyder_cup_matches').select('*').then(r=>r.data||[]).catch(()=>[]),
     ]);
     setAppData({players,courses:mergePresetCourses(courses),rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches});
-    if(currentUser&&currentUser.id){
-      const freshUser=(cupUsers||[]).find(u=>normaliseId(u.id)===normaliseId(currentUser.id));
-      if(freshUser)applyCurrentUserUpdate(currentUser,freshUser);
+    const activeUser=currentUserRef.current||currentUser;
+    if(activeUser&&activeUser.id){
+      const freshUser=(cupUsers||[]).find(u=>normaliseId(u.id)===normaliseId(activeUser.id));
+      if(freshUser)applyCurrentUserUpdate(activeUser,freshUser);
     }
   }
 
@@ -1640,12 +1670,8 @@ function App(){
             </button>
           )}
           {currentUser
-            ?<button onClick={()=>setView('profile')} style={{...NO_SELECT,border:'1px solid rgba(96,184,240,0.28)',borderRadius:999,background:'rgba(255,255,255,0.06)',cursor:'pointer',display:'flex',alignItems:'center',gap:8,padding:'5px 9px 5px 5px',maxWidth:'46vw',minWidth:0,boxShadow:'0 8px 18px rgba(0,0,0,0.16)'}}>
-              <Avatar user={currentUser} size={28}/>
-              <span style={{display:'flex',flexDirection:'column',alignItems:'flex-start',minWidth:0,lineHeight:1.05}}>
-                <span style={{maxWidth:'30vw',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:12,fontWeight:950,color:'#fff'}}>{currentUser.display_name||currentUser.username||'Player'}</span>
-                <span style={{fontSize:10,fontWeight:900,color:'#90ccf0',letterSpacing:0}}>HCP {formatHeaderHandicap(currentUser.handicap)}</span>
-              </span>
+            ?<button onClick={()=>setView('profile')} aria-label="Open profile" title="Open profile" style={{background:'none',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,padding:0}}>
+              <Avatar user={currentUser} size={32}/>
             </button>
             :<button onClick={()=>{setAuthPrompt(null);setShowAuth(true);}} style={{...S.pri,padding:'7px 10px',fontSize:11,lineHeight:1.15,boxShadow:'0 6px 18px rgba(0,112,187,0.28)',whiteSpace:'nowrap'}}>Sign In</button>
           }
@@ -1655,7 +1681,14 @@ function App(){
       <div style={{padding:'14px 16px 0',minHeight:'calc(100vh - 132px)',display:'flex',flexDirection:'column'}}>
         <div style={{textAlign:'center',padding:'4px 0 12px'}}>
           <img src={SNYDER_GOLF_LOGO} onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src=LOGO;}} alt="Snyder Golf" style={{width:'min(122px,34vw)',height:'auto',objectFit:'contain',filter:'drop-shadow(0 8px 20px rgba(96,184,240,0.26))'}}/>
-          <div className="sg-pop-title" style={{fontSize:27,lineHeight:1,marginTop:7}}>SNYDER GOLF</div>
+          {currentUser
+            ?<div className="sg-pop-title" style={{fontSize:'clamp(19px,6.2vw,27px)',lineHeight:1.08,marginTop:7,display:'flex',alignItems:'center',justifyContent:'center',gap:4,flexWrap:'wrap',padding:'0 8px'}}>
+              <span style={{maxWidth:'58vw',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{currentUser.display_name||currentUser.username||'Player'}</span>
+              <span style={{whiteSpace:'nowrap'}}>HCP {formatHeaderHandicap(currentUser.handicap)}</span>
+              <HandicapTrendBadge trend={currentUser._handicapTrend}/>
+            </div>
+            :<div className="sg-pop-title" style={{fontSize:27,lineHeight:1,marginTop:7}}>SNYDER GOLF</div>
+          }
         </div>
         <div style={{display:'grid',gap:11,marginBottom:14,flex:1,gridTemplateRows:'1.2fr 1fr 1fr'}}>
           <section style={{border:'1px solid rgba(96,184,240,0.24)',borderRadius:22,background:'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(13,37,72,0.96))',padding:14,boxShadow:'0 16px 34px rgba(0,112,187,0.18)',display:'flex',flexDirection:'column',justifyContent:'space-between',minHeight:142}}>
@@ -1724,7 +1757,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.49" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.49</span>
+          <span aria-label="App version v3.50" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.50</span>
         </button>
       </div>
 
