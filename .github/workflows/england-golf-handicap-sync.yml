@@ -1,0 +1,26 @@
+name: England Golf handicap sync
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 5 * * *"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install sync dependencies
+        run: npm install @supabase/supabase-js playwright
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+      - name: Sync handicaps
+        run: node scripts/sync-england-golf-handicaps.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ENGLAND_GOLF_CREDENTIAL_KEY: ${{ secrets.ENGLAND_GOLF_CREDENTIAL_KEY }}

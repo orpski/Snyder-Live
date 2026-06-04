@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.45
+// SNYDER GOLF v3.46
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.45',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.46',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1687,7 +1687,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.45" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.45</span>
+          <span aria-label="App version v3.46" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.46</span>
         </button>
       </div>
 
@@ -2223,6 +2223,9 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
 function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrentUser}){
   const[editing,setEditing]=useState(false);
   const[hcp,setHcp]=useState(currentUser&&currentUser.handicap||0);
+  const[egUsername,setEgUsername]=useState(currentUser&&currentUser.england_golf_member_no||'');
+  const[egPassword,setEgPassword]=useState('');
+  const[egConnecting,setEgConnecting]=useState(false);
   const myRounds=rounds.filter(r=>groups.some(g=>g.round_id===r.id&&(g.player_ids||[]).includes(currentUser&&currentUser.id)));
 
   async function saveHcp(){
@@ -2231,6 +2234,42 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
     setCurrentUser(updated);
     localStorage.setItem('snyder_user',JSON.stringify(updated));
     flash('Handicap updated');setEditing(false);
+  }
+
+  async function connectEnglandGolf(){
+    if(!currentUser||!currentUser.id)return;
+    if(!egUsername.trim()||!egPassword.trim()){flash('Enter your England Golf login details','error');return;}
+    setEgConnecting(true);
+    try{
+      const {data,error}=await sb.functions.invoke('england-golf-connect',{
+        body:{
+          userId:currentUser.id,
+          playerPin:currentUser.pin,
+          username:egUsername.trim(),
+          password:egPassword
+        }
+      });
+      if(error)throw error;
+      if(data&&data.error)throw new Error(data.error);
+      const nextHandicap=Number.isFinite(parseFloat(data&&data.handicap))?parseFloat(data.handicap):parseFloat(currentUser.handicap)||0;
+      const updated={
+        ...currentUser,
+        handicap:nextHandicap,
+        england_golf_member_no:egUsername.trim(),
+        england_golf_last_sync_at:(data&&data.synced_at)||new Date().toISOString(),
+        england_golf_sync_error:null
+      };
+      setCurrentUser(updated);
+      try{localStorage.setItem('snyder_user',JSON.stringify(updated));}catch(e){}
+      setHcp(nextHandicap);
+      setEgPassword('');
+      flash('England Golf connected');
+      load&&load();
+    }catch(e){
+      flash('England Golf connect failed: '+(e.message||String(e)),'error');
+    }finally{
+      setEgConnecting(false);
+    }
   }
 
   return(
@@ -2253,6 +2292,19 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
             </div>
             :<button onClick={()=>setEditing(true)} style={{...S.gho,marginTop:12,fontSize:13}}>Edit Handicap</button>
           }
+        </div>
+        <div style={{...S.card,marginBottom:16}}>
+          <div style={{fontSize:16,color:'#fff',fontWeight:900,marginBottom:6}}>England Golf</div>
+          <div style={{fontSize:12,color:'#90ccf0',lineHeight:1.45,marginBottom:12}}>Connect once and the server can refresh your handicap index daily. Your password is sent only to the secure backend function and is never saved in this app.</div>
+          <label style={S.lbl}>England Golf username / member number</label>
+          <input value={egUsername} onChange={e=>setEgUsername(e.target.value)} inputMode="numeric" autoComplete="username" style={{...S.inp,marginBottom:10}} placeholder="e.g. 1009120266"/>
+          <label style={S.lbl}>England Golf password</label>
+          <input value={egPassword} onChange={e=>setEgPassword(e.target.value)} type="password" autoComplete="current-password" style={{...S.inp,marginBottom:10}} placeholder={currentUser&&currentUser.england_golf_member_no?'Enter password to reconnect':'Password'}/>
+          <button onClick={connectEnglandGolf} disabled={egConnecting} style={{...S.pri,width:'100%',padding:13,opacity:egConnecting?0.65:1}}>{egConnecting?'Connecting...':(currentUser&&currentUser.england_golf_member_no?'Reconnect England Golf':'Connect England Golf')}</button>
+          <div style={{fontSize:11,color:currentUser&&currentUser.england_golf_sync_error?'#fca5a5':'rgba(255,255,255,0.55)',marginTop:10,lineHeight:1.45}}>
+            {currentUser&&currentUser.england_golf_last_sync_at?'Last sync: '+new Date(currentUser.england_golf_last_sync_at).toLocaleString('en-GB'):'Not connected yet'}
+            {currentUser&&currentUser.england_golf_sync_error?' - '+currentUser.england_golf_sync_error:''}
+          </div>
         </div>
         <div style={{fontSize:12,color:'#60b8f0',marginBottom:8}}>MY ROUNDS ({myRounds.length})</div>
         {myRounds.slice(0,5).map(r=>(
