@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.58
+// SNYDER GOLF v3.59
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.58',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.59',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1860,18 +1860,20 @@ function App(){
         <div style={{textAlign:'center',padding:'4px 0 12px'}}>
           <img src={SNYDER_GOLF_LOGO} onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src=LOGO;}} alt="Snyder Golf" style={{width:'min(122px,34vw)',height:'auto',objectFit:'contain',filter:'drop-shadow(0 8px 20px rgba(96,184,240,0.26))'}}/>
           {currentUser
-            ?<div role="button" tabIndex={0} onClick={openHandicapHistory} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openHandicapHistory();}}} aria-label="Open handicap history graph" title="Open handicap history graph" style={{width:'100%',boxSizing:'border-box',margin:'9px 0 0',position:'relative',borderRadius:12,padding:'10px 13px',border:'1px solid '+homeHandicapTone.border,background:homeHandicapTone.background,boxShadow:homeHandicapTone.glow,overflow:'hidden',cursor:'pointer',display:'grid',gridTemplateColumns:'88px 1fr',gap:13,alignItems:'center',minHeight:112,textAlign:'left'}}>
+            ?<div role="button" tabIndex={0} onClick={openHandicapHistory} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openHandicapHistory();}}} aria-label="Open handicap history graph" title="Open handicap history graph" style={{width:'100%',boxSizing:'border-box',margin:'9px 0 0',position:'relative',borderRadius:12,padding:'10px 13px',border:'1px solid '+homeHandicapTone.border,background:homeHandicapTone.background,boxShadow:homeHandicapTone.glow,overflow:'hidden',cursor:'pointer',minHeight:112,textAlign:'left',display:'flex',alignItems:'center',justifyContent:'center'}}>
               <div aria-hidden="true" style={{position:'absolute',top:0,left:10,right:10,height:2,background:'linear-gradient(90deg,transparent,#F5D76E,transparent)',opacity:0.9}}></div>
               <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} style={{display:'none'}}/>
-              <button type="button" onClick={e=>{e.stopPropagation();if(!avatarUploading&&avatarInputRef.current)avatarInputRef.current.click();}} title={homeAvatarImage?'Change profile photo':'Upload profile photo'} aria-label={homeAvatarImage?'Change profile photo':'Upload profile photo'} style={{position:'relative',width:86,height:86,borderRadius:'50%',border:'2px solid rgba(245,215,110,0.55)',background:'rgba(13,37,72,0.85)',boxShadow:'0 10px 24px rgba(0,0,0,0.34)',padding:0,overflow:'hidden',cursor:avatarUploading?'default':'pointer',color:'#fff',fontSize:28,fontWeight:950,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                {homeAvatarImage?<img src={homeAvatarImage} alt="" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>:<span>{((currentUser.display_name||currentUser.username||'P').trim()[0]||'P').toUpperCase()}</span>}
-                {avatarUploading&&<span style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(2,8,23,0.62)',fontSize:10,fontWeight:950,color:'#fff'}}>Saving</span>}
-              </button>
-              <div style={{position:'relative',minWidth:0}}>
-                <div style={{fontSize:'clamp(25px,7.6vw,34px)',lineHeight:1.02,fontWeight:950,color:'#eaf6ff',fontStyle:'italic',letterSpacing:0,textShadow:'0 2px 0 rgba(3,12,28,0.85),0 0 10px rgba(96,184,240,0.34)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{currentUser.display_name||currentUser.username||'Player'}</div>
-                <div style={{display:'flex',alignItems:'center',gap:10,marginTop:7,flexWrap:'wrap'}}>
-                  <span style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:'clamp(22px,6.4vw,32px)',lineHeight:1,fontWeight:950,color:'#F5D76E',letterSpacing:0,textShadow:'0 2px 0 rgba(3,12,28,0.92),0 0 12px rgba(245,215,110,0.32)'}}><span aria-label="England Golf handicap" title="England Golf handicap" style={{fontSize:'0.62em',lineHeight:1,textShadow:'none'}}>&#x1F3F4;&#xE0067;&#xE0062;&#xE0065;&#xE006E;&#xE0067;&#xE007F;</span>{formatHeaderHandicap(currentUser.handicap)}</span>
-                  <HandicapTrendBadge trend={currentUser._handicapTrend}/>
+              <div style={{position:'relative',display:'grid',gridTemplateColumns:'86px minmax(0,auto)',gap:14,alignItems:'center',justifyContent:'center',width:'100%',maxWidth:340}}>
+                <button type="button" onPointerDown={e=>e.stopPropagation()} onTouchStart={e=>e.stopPropagation()} onClick={e=>{e.preventDefault();e.stopPropagation();if(!avatarUploading&&avatarInputRef.current)avatarInputRef.current.click();}} title={homeAvatarImage?'Change profile photo':'Upload profile photo'} aria-label={homeAvatarImage?'Change profile photo':'Upload profile photo'} style={{position:'relative',width:86,height:86,borderRadius:'50%',border:'2px solid rgba(245,215,110,0.55)',background:'rgba(13,37,72,0.85)',boxShadow:'0 10px 24px rgba(0,0,0,0.34)',padding:0,overflow:'hidden',cursor:avatarUploading?'default':'pointer',color:'#fff',fontSize:28,fontWeight:950,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {homeAvatarImage?<img src={homeAvatarImage} alt="" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>:<span>{((currentUser.display_name||currentUser.username||'P').trim()[0]||'P').toUpperCase()}</span>}
+                  {avatarUploading&&<span style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(2,8,23,0.62)',fontSize:10,fontWeight:950,color:'#fff'}}>Saving</span>}
+                </button>
+                <div style={{minWidth:0,textAlign:'left'}}>
+                  <div style={{fontSize:'clamp(25px,7.6vw,34px)',lineHeight:1.02,fontWeight:950,color:'#eaf6ff',fontStyle:'italic',letterSpacing:0,textShadow:'0 2px 0 rgba(3,12,28,0.85),0 0 10px rgba(96,184,240,0.34)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{currentUser.display_name||currentUser.username||'Player'}</div>
+                  <div style={{display:'flex',alignItems:'center',gap:10,marginTop:7,flexWrap:'wrap'}}>
+                    <span style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:'clamp(22px,6.4vw,32px)',lineHeight:1,fontWeight:950,color:'#F5D76E',letterSpacing:0,textShadow:'0 2px 0 rgba(3,12,28,0.92),0 0 12px rgba(245,215,110,0.32)'}}><span aria-label="England Golf handicap" title="England Golf handicap" style={{fontSize:'0.62em',lineHeight:1,textShadow:'none'}}>&#x1F3F4;&#xE0067;&#xE0062;&#xE0065;&#xE006E;&#xE0067;&#xE007F;</span>{formatHeaderHandicap(currentUser.handicap)}</span>
+                    <HandicapTrendBadge trend={currentUser._handicapTrend}/>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1945,7 +1947,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.58" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.58</span>
+          <span aria-label="App version v3.59" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.59</span>
         </button>
       </div>
 
