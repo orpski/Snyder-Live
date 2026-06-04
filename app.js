@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.50
+// SNYDER GOLF v3.51
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.50',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.51',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -851,10 +851,13 @@ function handicapTrendFromHistory(row){
 function HandicapTrendBadge({trend}){
   if(!trend)return null;
   const improved=trend.direction==='down';
+  const tone=improved
+    ?{fg:'#86efac',bg:'rgba(34,197,94,0.16)',border:'rgba(34,197,94,0.34)',arrow:'↓'}
+    :{fg:'#fca5a5',bg:'rgba(239,68,68,0.16)',border:'rgba(239,68,68,0.36)',arrow:'↑'};
   return(
-    <span aria-label={improved?'Handicap came down':'Handicap went up'} title={(improved?'Down ':'Up ')+formatHeaderHandicap(trend.delta)} style={{display:'inline-flex',alignItems:'center',gap:3,marginLeft:7,color:improved?'#22c55e':'#ef4444',fontSize:18,fontWeight:950,lineHeight:1,textShadow:'0 2px 8px rgba(0,0,0,0.45)'}}>
-      <span style={{fontSize:17,lineHeight:1}}>{improved?'▼':'▲'}</span>
-      <span style={{fontSize:12,lineHeight:1}}>{formatHeaderHandicap(trend.delta)}</span>
+    <span aria-label={improved?'Handicap came down':'Handicap went up'} title={(improved?'Down ':'Up ')+formatHeaderHandicap(trend.delta)} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:4,marginLeft:7,padding:'4px 8px',borderRadius:999,border:'1px solid '+tone.border,background:tone.bg,color:tone.fg,fontSize:12,fontWeight:950,lineHeight:1,verticalAlign:'middle',boxShadow:'0 6px 14px rgba(0,0,0,0.20)',textShadow:'none'}}>
+      <span style={{fontSize:14,lineHeight:'12px',fontWeight:950}}>{tone.arrow}</span>
+      <span style={{fontSize:11,lineHeight:'12px'}}>{formatHeaderHandicap(trend.delta)}</span>
     </span>
   );
 }
@@ -1684,7 +1687,7 @@ function App(){
           {currentUser
             ?<div className="sg-pop-title" style={{fontSize:'clamp(19px,6.2vw,27px)',lineHeight:1.08,marginTop:7,display:'flex',alignItems:'center',justifyContent:'center',gap:4,flexWrap:'wrap',padding:'0 8px'}}>
               <span style={{maxWidth:'58vw',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{currentUser.display_name||currentUser.username||'Player'}</span>
-              <span style={{whiteSpace:'nowrap'}}>HCP {formatHeaderHandicap(currentUser.handicap)}</span>
+              <span style={{whiteSpace:'nowrap',color:'#F5D76E',textShadow:'0 2px 0 rgba(3,12,28,0.92),0 0 14px rgba(245,215,110,0.32)'}}>{formatHeaderHandicap(currentUser.handicap)}</span>
               <HandicapTrendBadge trend={currentUser._handicapTrend}/>
             </div>
             :<div className="sg-pop-title" style={{fontSize:27,lineHeight:1,marginTop:7}}>SNYDER GOLF</div>
@@ -1757,7 +1760,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.50" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.50</span>
+          <span aria-label="App version v3.51" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.51</span>
         </button>
       </div>
 
