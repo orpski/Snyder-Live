@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.56
+// SNYDER GOLF v3.57
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.56',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.57',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -880,6 +880,75 @@ function handicapBannerTone(trend){
   };
 }
 
+function handicapHistoryPoints(rows,currentHandicap){
+  const clean=(rows||[]).slice().sort((a,b)=>new Date(a.synced_at||0)-new Date(b.synced_at||0));
+  const points=[];
+  clean.forEach((row,idx)=>{
+    const oldValue=parseFloat(row.old_handicap);
+    const newValue=parseFloat(row.new_handicap);
+    const when=row.synced_at||null;
+    if(idx===0&&Number.isFinite(oldValue))points.push({value:oldValue,date:when,label:'Before'});
+    if(Number.isFinite(newValue))points.push({value:newValue,date:when,label:when?new Date(when).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}):'Sync'});
+  });
+  if(!points.length&&Number.isFinite(parseFloat(currentHandicap)))points.push({value:parseFloat(currentHandicap),date:null,label:'Now'});
+  return points;
+}
+
+function HandicapHistoryModal({open,onClose,user,rows,loading,error}){
+  if(!open)return null;
+  const points=handicapHistoryPoints(rows,user&&user.handicap);
+  const values=points.map(p=>p.value).filter(Number.isFinite);
+  const minValue=values.length?Math.min(...values):0;
+  const maxValue=values.length?Math.max(...values):0;
+  const pad=Math.max(0.3,(maxValue-minValue)*0.22);
+  const minScale=minValue-pad;
+  const maxScale=maxValue+pad;
+  const range=Math.max(0.1,maxScale-minScale);
+  const w=320,h=170,padX=24,padY=22;
+  const chartPoints=points.map((p,i)=>{
+    const x=points.length===1?w/2:padX+(i*(w-(padX*2))/(points.length-1));
+    const y=padY+((maxScale-p.value)/range)*(h-(padY*2));
+    return {...p,x,y};
+  });
+  const line=chartPoints.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+  const latest=points[points.length-1];
+  const first=points[0];
+  const moved=first&&latest&&Number.isFinite(first.value)&&Number.isFinite(latest.value)?latest.value-first.value:0;
+  const movedDown=moved<0;
+  const movedColor=Math.abs(moved)<0.05?'#9fb6c9':movedDown?'#86efac':'#fca5a5';
+  return(
+    <div style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(2,8,23,0.82)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={e=>{if(e.target===e.currentTarget)onClose&&onClose();}}>
+      <div role="dialog" aria-modal="true" aria-label="Handicap history" style={{width:'100%',maxWidth:420,borderRadius:20,border:'1px solid rgba(96,184,240,0.24)',background:'linear-gradient(180deg,rgba(13,37,72,0.98),rgba(8,24,48,0.98))',boxShadow:'0 24px 70px rgba(0,0,0,0.55)',overflow:'hidden'}}>
+        <div style={{padding:'16px 16px 10px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:18,fontWeight:950,color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{(user&&(user.display_name||user.username))||'Player'}</div>
+            <div style={{fontSize:12,color:'#90ccf0',fontWeight:800,marginTop:2}}>England Golf handicap history</div>
+          </div>
+          <button onClick={onClose} aria-label="Close handicap history" style={{width:34,height:34,borderRadius:999,border:'1px solid rgba(255,255,255,0.18)',background:'rgba(255,255,255,0.07)',color:'#fff',fontSize:18,fontWeight:900,cursor:'pointer'}}>x</button>
+        </div>
+        <div style={{padding:'0 16px 16px'}}>
+          {loading?<div style={{...S.card,textAlign:'center',fontSize:13,color:'#90ccf0'}}>Loading handicap history...</div>:error?<div style={{...S.card,textAlign:'center',fontSize:13,color:'#fca5a5'}}>{error}</div>:points.length<2?<div style={{...S.card,textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.65)'}}>No handicap changes recorded yet. The graph will build as the daily England Golf sync records changes.</div>:(
+            <>
+              <div style={{border:'1px solid rgba(255,255,255,0.12)',borderRadius:16,background:'rgba(255,255,255,0.045)',padding:10,overflow:'hidden'}}>
+                <svg viewBox={`0 0 ${w} ${h}`} style={{display:'block',width:'100%',height:'auto'}}>
+                  {[0,1,2,3].map(i=>{const y=padY+(i*(h-(padY*2))/3);const value=maxScale-(i*range/3);return <g key={'grid-'+i}><line x1={padX} x2={w-padX} y1={y} y2={y} stroke="rgba(255,255,255,0.10)" strokeWidth="1"/><text x={4} y={y+4} fill="rgba(255,255,255,0.50)" fontSize="9" fontWeight="700">{formatHeaderHandicap(value)}</text></g>;})}
+                  <polyline points={line} fill="none" stroke="#F5D76E" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+                  {chartPoints.map((p,i)=><g key={'pt-'+i}><circle cx={p.x} cy={p.y} r="5" fill={i===chartPoints.length-1?'#F5D76E':'#90ccf0'} stroke="#0d2548" strokeWidth="2"/>{(i===0||i===chartPoints.length-1)&&<text x={p.x} y={p.y-11} textAnchor="middle" fill="#fff" fontSize="11" fontWeight="900">{formatHeaderHandicap(p.value)}</text>}</g>)}
+                </svg>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginTop:10}}>
+                <div style={{border:'1px solid rgba(255,255,255,0.10)',borderRadius:12,padding:10,background:'rgba(255,255,255,0.045)'}}><div style={{fontSize:10,color:'#9fb6c9',fontWeight:900}}>START</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{formatHeaderHandicap(first.value)}</div></div>
+                <div style={{border:'1px solid rgba(255,255,255,0.10)',borderRadius:12,padding:10,background:'rgba(255,255,255,0.045)'}}><div style={{fontSize:10,color:'#9fb6c9',fontWeight:900}}>NOW</div><div style={{fontSize:18,color:'#F5D76E',fontWeight:950}}>{formatHeaderHandicap(latest.value)}</div></div>
+                <div style={{border:'1px solid rgba(255,255,255,0.10)',borderRadius:12,padding:10,background:'rgba(255,255,255,0.045)'}}><div style={{fontSize:10,color:'#9fb6c9',fontWeight:900}}>MOVE</div><div style={{fontSize:18,color:movedColor,fontWeight:950}}>{Math.abs(moved)<0.05?'0':(moved>0?'+':'')+formatHeaderHandicap(moved)}</div></div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HandicapPicker({value,onChange,style={},buttonStyle={},label='Handicap',step=1,min=-6,max=54,defaultValue=8}){
   const[open,setOpen]=useState(false);
   const hasValue=!(value===''||value==null||Number.isNaN(parseFloat(value)));
@@ -1210,6 +1279,10 @@ function App(){
   const[holeScores,setHoleScores]=useState({});
   const[homePull,setHomePull]=useState(0);
   const[homeRefreshing,setHomeRefreshing]=useState(false);
+  const[handicapHistoryOpen,setHandicapHistoryOpen]=useState(false);
+  const[handicapHistoryRows,setHandicapHistoryRows]=useState([]);
+  const[handicapHistoryLoading,setHandicapHistoryLoading]=useState(false);
+  const[handicapHistoryError,setHandicapHistoryError]=useState('');
   const viewRef=useRef(view);
   const currentUserRef=useRef(null);
   const homeRefreshRef=useRef(false);
@@ -1245,6 +1318,23 @@ function App(){
       return applyCurrentUserUpdate(user,{...data,_handicapTrend:handicapTrendFromHistory(history)});
     }catch(e){
       return user;
+    }
+  }
+  async function openHandicapHistory(){
+    const user=currentUserRef.current||currentUser;
+    if(!user||!user.id)return;
+    setHandicapHistoryOpen(true);
+    setHandicapHistoryLoading(true);
+    setHandicapHistoryError('');
+    try{
+      const{data,error}=await sb.from('handicap_sync_history').select('old_handicap,new_handicap,synced_at').eq('user_id',user.id).order('synced_at',{ascending:true}).limit(80);
+      if(error)throw error;
+      setHandicapHistoryRows(data||[]);
+    }catch(e){
+      setHandicapHistoryRows([]);
+      setHandicapHistoryError('Could not load handicap history');
+    }finally{
+      setHandicapHistoryLoading(false);
     }
   }
 
@@ -1704,7 +1794,7 @@ function App(){
         <div style={{textAlign:'center',padding:'4px 0 12px'}}>
           <img src={SNYDER_GOLF_LOGO} onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src=LOGO;}} alt="Snyder Golf" style={{width:'min(122px,34vw)',height:'auto',objectFit:'contain',filter:'drop-shadow(0 8px 20px rgba(96,184,240,0.26))'}}/>
           {currentUser
-            ?<div style={{width:'100%',boxSizing:'border-box',margin:'9px 0 0',position:'relative',borderRadius:12,padding:'7px 12px 9px',border:'1px solid '+homeHandicapTone.border,background:homeHandicapTone.background,boxShadow:homeHandicapTone.glow,overflow:'hidden'}}>
+            ?<div role="button" tabIndex={0} onClick={openHandicapHistory} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openHandicapHistory();}}} aria-label="Open handicap history graph" title="Open handicap history graph" style={{width:'100%',boxSizing:'border-box',margin:'9px 0 0',position:'relative',borderRadius:12,padding:'7px 12px 9px',border:'1px solid '+homeHandicapTone.border,background:homeHandicapTone.background,boxShadow:homeHandicapTone.glow,overflow:'hidden',cursor:'pointer'}}>
               <div aria-hidden="true" style={{position:'absolute',top:0,left:10,right:10,height:2,background:'linear-gradient(90deg,transparent,#F5D76E,transparent)',opacity:0.9}}></div>
               <div style={{position:'relative',fontSize:'clamp(23px,7vw,32px)',lineHeight:1.02,fontWeight:950,color:'#eaf6ff',fontStyle:'italic',letterSpacing:0,textShadow:'0 2px 0 rgba(3,12,28,0.85),0 0 10px rgba(96,184,240,0.34)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{currentUser.display_name||currentUser.username||'Player'}</div>
               <div style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'center',gap:10,marginTop:3}}>
@@ -1782,7 +1872,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.56" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.56</span>
+          <span aria-label="App version v3.57" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.57</span>
         </button>
       </div>
 
@@ -1796,6 +1886,7 @@ function App(){
         onLogin={async u=>{setCurrentUser(u);const fresh=await refreshCurrentUserFromCloud(u);setShowAuth(false);if(authPrompt==='startRound')setView('play');setAuthPrompt(null);flash('Welcome '+((fresh&&fresh.display_name)||u.display_name));}}
         onClose={()=>{setShowAuth(false);setAuthPrompt(null);}}
       />}
+      <HandicapHistoryModal open={handicapHistoryOpen} onClose={()=>setHandicapHistoryOpen(false)} user={currentUser} rows={handicapHistoryRows} loading={handicapHistoryLoading} error={handicapHistoryError}/>
       <Toast toast={toast}/>
     </div>
   );
