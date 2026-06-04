@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.54
+// SNYDER GOLF v3.55
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.54',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.55',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -860,6 +860,24 @@ function HandicapTrendBadge({trend}){
       <span style={{fontSize:11,lineHeight:'12px'}}>{formatHeaderHandicap(trend.delta)}</span>
     </span>
   );
+}
+
+function handicapBannerTone(trend){
+  if(!trend)return {
+    border:'rgba(245,215,110,0.34)',
+    background:'linear-gradient(100deg,rgba(0,112,187,0.36) 0%,rgba(16,48,98,0.92) 44%,rgba(152,30,42,0.44) 100%)',
+    glow:'0 10px 26px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.16)'
+  };
+  if(trend.direction==='down')return {
+    border:'rgba(74,222,128,0.38)',
+    background:'linear-gradient(100deg,rgba(0,112,187,0.34) 0%,rgba(16,48,98,0.92) 42%,rgba(22,101,52,0.58) 100%)',
+    glow:'0 10px 26px rgba(0,0,0,0.25),0 0 18px rgba(34,197,94,0.12), inset 0 1px 0 rgba(255,255,255,0.16)'
+  };
+  return {
+    border:'rgba(248,113,113,0.38)',
+    background:'linear-gradient(100deg,rgba(0,112,187,0.34) 0%,rgba(16,48,98,0.92) 42%,rgba(153,27,27,0.62) 100%)',
+    glow:'0 10px 26px rgba(0,0,0,0.25),0 0 18px rgba(239,68,68,0.12), inset 0 1px 0 rgba(255,255,255,0.16)'
+  };
 }
 
 function HandicapPicker({value,onChange,style={},buttonStyle={},label='Handicap',step=1,min=-6,max=54,defaultValue=8}){
@@ -1657,6 +1675,7 @@ function App(){
   const bottomIconStyle={height:24,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,lineHeight:1};
   const bottomLabelStyle={fontSize:10,fontWeight:700,letterSpacing:'0.08em',lineHeight:'12px'};
   const bottomSpacer=<span aria-hidden="true" style={{height:9,lineHeight:'9px',fontSize:8}}></span>;
+  const homeHandicapTone=handicapBannerTone(currentUser&&currentUser._handicapTrend);
 
   return(
     <div style={{minHeight:'100vh',paddingBottom:60,background:'linear-gradient(180deg,#0d2548 0%,#0a1f3d 100%)'}}>
@@ -1685,7 +1704,7 @@ function App(){
         <div style={{textAlign:'center',padding:'4px 0 12px'}}>
           <img src={SNYDER_GOLF_LOGO} onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src=LOGO;}} alt="Snyder Golf" style={{width:'min(122px,34vw)',height:'auto',objectFit:'contain',filter:'drop-shadow(0 8px 20px rgba(96,184,240,0.26))'}}/>
           {currentUser
-            ?<div style={{width:'100%',boxSizing:'border-box',margin:'9px 0 0',position:'relative',borderRadius:12,padding:'7px 12px 9px',border:'1px solid rgba(245,215,110,0.34)',background:'linear-gradient(100deg,rgba(0,112,187,0.36) 0%,rgba(16,48,98,0.92) 44%,rgba(152,30,42,0.44) 100%)',boxShadow:'0 10px 26px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.16)',overflow:'hidden'}}>
+            ?<div style={{width:'100%',boxSizing:'border-box',margin:'9px 0 0',position:'relative',borderRadius:12,padding:'7px 12px 9px',border:'1px solid '+homeHandicapTone.border,background:homeHandicapTone.background,boxShadow:homeHandicapTone.glow,overflow:'hidden'}}>
               <div aria-hidden="true" style={{position:'absolute',top:0,left:10,right:10,height:2,background:'linear-gradient(90deg,transparent,#F5D76E,transparent)',opacity:0.9}}></div>
               <div style={{position:'relative',fontSize:'clamp(23px,7vw,32px)',lineHeight:1.02,fontWeight:950,color:'#eaf6ff',fontStyle:'italic',letterSpacing:0,textShadow:'0 2px 0 rgba(3,12,28,0.85),0 0 10px rgba(96,184,240,0.34)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{currentUser.display_name||currentUser.username||'Player'}</div>
               <div style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'center',gap:10,marginTop:3}}>
@@ -1763,7 +1782,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.54" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.54</span>
+          <span aria-label="App version v3.55" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.55</span>
         </button>
       </div>
 
