@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.46
+// SNYDER GOLF v3.47
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.46',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.47',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1687,7 +1687,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.46" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.46</span>
+          <span aria-label="App version v3.47" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.47</span>
         </button>
       </div>
 
@@ -2226,6 +2226,7 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
   const[egUsername,setEgUsername]=useState(currentUser&&currentUser.england_golf_member_no||'');
   const[egPassword,setEgPassword]=useState('');
   const[egConnecting,setEgConnecting]=useState(false);
+  const[egConnectStatus,setEgConnectStatus]=useState('');
   const myRounds=rounds.filter(r=>groups.some(g=>g.round_id===r.id&&(g.player_ids||[]).includes(currentUser&&currentUser.id)));
 
   async function saveHcp(){
@@ -2240,16 +2241,18 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
     if(!currentUser||!currentUser.id)return;
     if(!egUsername.trim()||!egPassword.trim()){flash('Enter your England Golf login details','error');return;}
     setEgConnecting(true);
+    setEgConnectStatus('Connecting to secure England Golf setup...');
     try{
-      const {data,error}=await sb.functions.invoke('england-golf-connect',{
-        body:{
-          userId:currentUser.id,
-          playerPin:currentUser.pin,
-          username:egUsername.trim(),
-          password:egPassword
-        }
-      });
-      if(error)throw error;
+      const payload={
+        userId:currentUser.id,
+        playerPin:currentUser.pin,
+        username:egUsername.trim(),
+        password:egPassword
+      };
+      const invokePromise=sb.functions.invoke('england-golf-connect',{body:payload});
+      const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('Connection timed out. Check the england-golf-connect Edge Function is deployed.')),20000));
+      const {data,error}=await Promise.race([invokePromise,timeoutPromise]);
+      if(error)throw new Error(error.message||error.name||String(error));
       if(data&&data.error)throw new Error(data.error);
       const nextHandicap=Number.isFinite(parseFloat(data&&data.handicap))?parseFloat(data.handicap):parseFloat(currentUser.handicap)||0;
       const updated={
@@ -2263,10 +2266,13 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
       try{localStorage.setItem('snyder_user',JSON.stringify(updated));}catch(e){}
       setHcp(nextHandicap);
       setEgPassword('');
+      setEgConnectStatus('Connected. Daily sync will update your handicap.');
       flash('England Golf connected');
       load&&load();
     }catch(e){
-      flash('England Golf connect failed: '+(e.message||String(e)),'error');
+      const msg=e.message||String(e);
+      setEgConnectStatus('Connect failed: '+msg);
+      flash('England Golf connect failed: '+msg,'error');
     }finally{
       setEgConnecting(false);
     }
@@ -2301,6 +2307,7 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
           <label style={S.lbl}>England Golf password</label>
           <input value={egPassword} onChange={e=>setEgPassword(e.target.value)} type="password" autoComplete="current-password" style={{...S.inp,marginBottom:10}} placeholder={currentUser&&currentUser.england_golf_member_no?'Enter password to reconnect':'Password'}/>
           <button onClick={connectEnglandGolf} disabled={egConnecting} style={{...S.pri,width:'100%',padding:13,opacity:egConnecting?0.65:1}}>{egConnecting?'Connecting...':(currentUser&&currentUser.england_golf_member_no?'Reconnect England Golf':'Connect England Golf')}</button>
+          {egConnectStatus&&<div style={{fontSize:12,color:egConnectStatus.toLowerCase().includes('failed')?'#fca5a5':'#86efac',marginTop:10,lineHeight:1.45}}>{egConnectStatus}</div>}
           <div style={{fontSize:11,color:currentUser&&currentUser.england_golf_sync_error?'#fca5a5':'rgba(255,255,255,0.55)',marginTop:10,lineHeight:1.45}}>
             {currentUser&&currentUser.england_golf_last_sync_at?'Last sync: '+new Date(currentUser.england_golf_last_sync_at).toLocaleString('en-GB'):'Not connected yet'}
             {currentUser&&currentUser.england_golf_sync_error?' - '+currentUser.england_golf_sync_error:''}
