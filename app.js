@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.60
+// SNYDER GOLF v3.61
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.60',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.61',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1157,7 +1157,7 @@ function UserAuth({onLogin,onClose,initialMode='login',promptTitle,promptText,si
 // Friends, guests and ad-hoc player management
 // =========================================================
 function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAdded}){
-  const[tab,setTab]=useState('search');
+  const[tab,setTab]=useState('friends');
   const[search,setSearch]=useState('');
   const[memberList,setMemberList]=useState(cupUsers||[]);
   const[friends,setFriends]=useState([]);
@@ -1223,17 +1223,17 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
   }
 
   return(
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',display:'flex',alignItems:'flex-start',justifyContent:'center',zIndex:150,padding:'max(24px,8vh) 14px 14px'}}>
-      <div style={{background:'#0d2548',border:'1px solid rgba(255,255,255,0.16)',borderRadius:18,width:'100%',maxWidth:500,maxHeight:'min(78vh,680px)',display:'flex',flexDirection:'column',boxShadow:'0 24px 60px rgba(0,0,0,0.45)',overflow:'hidden'}}>
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',display:'flex',alignItems:'flex-start',justifyContent:'center',zIndex:150,padding:'max(24px,8vh) 14px 14px'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'#0d2548',border:'1px solid rgba(255,255,255,0.16)',borderRadius:18,width:'100%',maxWidth:500,maxHeight:'min(78vh,680px)',display:'flex',flexDirection:'column',boxShadow:'0 24px 60px rgba(0,0,0,0.45)',overflow:'hidden'}}>
         <div style={{padding:'14px 16px 12px',display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
           <div>
             <div style={{fontSize:18,color:'#fff',fontWeight:900}}>Add player</div>
-            <div style={{fontSize:12,color:'#90ccf0',marginTop:3}}>Search members or add a guest</div>
+            <div style={{fontSize:12,color:'#90ccf0',marginTop:3}}>Add friends quickly, search members or add a guest</div>
           </div>
           <button onClick={onClose} style={{...S.gho,padding:'5px 10px',fontSize:16,lineHeight:1}}>x</button>
         </div>
         <div style={{display:'flex',gap:6,padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
-          {[['search','Search'],['friends','Friends'],['guests','Guests']].map(([key,label])=>(
+          {[['friends','Friends'],['search','Search'],['guests','Guests']].map(([key,label])=>(
             <button key={key} onClick={()=>setTab(key)} style={{...(tab===key?S.pri:S.gho),flex:1,padding:'8px 4px',fontSize:12}}>{label}</button>
           ))}
         </div>
@@ -1245,7 +1245,7 @@ function PeoplePicker({currentUser,cupUsers,guests,flash,onAdd,onClose,alreadyAd
                 <button onClick={refreshPlayers} disabled={refreshingMembers} style={{...S.gho,padding:'6px 10px',fontSize:12,opacity:refreshingMembers?0.6:1}}>{refreshingMembers?'Refreshing...':'Refresh'}</button>
               </div>
               {friends.length===0
-                ?<div style={{color:'rgba(255,255,255,0.4)',fontSize:13,textAlign:'center',padding:20}}>No friends yet - use Search tab</div>
+                ?<div style={{color:'rgba(255,255,255,0.4)',fontSize:13,textAlign:'center',padding:20}}>No friends yet - use Search tab to add some</div>
                 :friends.map(u=>(
                 <div key={u.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8,padding:'10px 12px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
                   <div>
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.60" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.60</span>
+          <span aria-label="App version v3.61" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.61</span>
         </button>
       </div>
 
@@ -3543,17 +3543,17 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
     }
   },[selectedRound]);
 
-  function addPersonToGroup(person,groupIdx){
+  function addPersonToGroup(person,groupIdx,options={}){
     const flat=groupSetup.flat();
     if(flat.find(p=>normaliseId(p.id)===normaliseId(person.id))){flash('Already added');return;}
     const idx=Math.max(0,Math.min(groupIdx,groupSetup.length-1));
     const next=groupSetup.map(g=>[...g]);
     next[idx].push(withPlayingHandicap(person));
     syncGroups(next);
-    setShowPicker(false);
+    if(options.closePicker!==false)setShowPicker(false);
   }
   function addP(person){
-    addPersonToGroup(person,pickerGroup);
+    addPersonToGroup(person,pickerGroup,{closePicker:false});
   }
   function removeFromGroup(groupIdx,playerId){
     const next=groupSetup.map((g,i)=>i===groupIdx?g.filter(p=>normaliseId(p.id)!==normaliseId(playerId)):[...g]);
