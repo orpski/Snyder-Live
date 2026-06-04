@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.62
+// SNYDER GOLF v3.63
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.62',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.63',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.62" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.62</span>
+          <span aria-label="App version v3.63" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.63</span>
         </button>
       </div>
 
@@ -2294,8 +2294,8 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
           if(!aRow||!bRow||!hasEnteredGross(aRow.gross_score)||!hasEnteredGross(bRow.gross_score))return;
           const markedAWon=isFoursomesWonMarker(aRow.gross_score)||isFoursomesConcededMarker(bRow.gross_score);
           const markedBWon=isFoursomesWonMarker(bRow.gross_score)||isFoursomesConcededMarker(aRow.gross_score);
-          const aShot=(parseInt(cfg.teamAShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
-          const bShot=(parseInt(cfg.teamBShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
+          const aShot=shotsOnHole(cfg.teamAShots||0,hd.stroke_index);
+          const bShot=shotsOnHole(cfg.teamBShots||0,hd.stroke_index);
           const aNet=isFoursomesOutcomeMarker(aRow.gross_score)?null:(parseInt(aRow.gross_score)||0)-aShot;
           const bNet=isFoursomesOutcomeMarker(bRow.gross_score)?null:(parseInt(bRow.gross_score)||0)-bShot;
           let winner='halve';
@@ -3268,8 +3268,8 @@ function buildFoursomesMatchplaySummary(rd,rdGroups,rowSources,courseList){
       const markedAWon=isFoursomesWonMarker(aGross)||isFoursomesConcededMarker(bGross);
       const markedBWon=isFoursomesWonMarker(bGross)||isFoursomesConcededMarker(aGross);
       const si=parseInt(hd.stroke_index)||h;
-      const aShot=(parseInt(cfg.teamAShots)||0)>=si?1:0;
-      const bShot=(parseInt(cfg.teamBShots)||0)>=si?1:0;
+      const aShot=shotsOnHole(cfg.teamAShots||0,si);
+      const bShot=shotsOnHole(cfg.teamBShots||0,si);
       const aNet=isFoursomesOutcomeMarker(aGross)?null:(parseInt(aGross)||0)-aShot;
       const bNet=isFoursomesOutcomeMarker(bGross)?null:(parseInt(bGross)||0)-bShot;
       if(markedAWon&&!markedBWon)lead+=1;
@@ -5819,8 +5819,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         if(!hasEnteredGross(aGross)||!hasEnteredGross(bGross))return;
         const markedAWon=isFoursomesWonMarker(aGross)||isFoursomesConcededMarker(bGross);
         const markedBWon=isFoursomesWonMarker(bGross)||isFoursomesConcededMarker(aGross);
-        const aShot=(parseInt(cfg.teamAShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
-        const bShot=(parseInt(cfg.teamBShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
+        const aShot=shotsOnHole(cfg.teamAShots||0,hd.stroke_index);
+        const bShot=shotsOnHole(cfg.teamBShots||0,hd.stroke_index);
         const aNet=isFoursomesOutcomeMarker(aGross)?null:(parseInt(aGross)||0)-aShot;
         const bNet=isFoursomesOutcomeMarker(bGross)?null:(parseInt(bGross)||0)-bShot;
         let winner='halve';
@@ -5840,8 +5840,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         if(!hasEnteredGross(aGross)||!hasEnteredGross(bGross))return;
         const markedAWon=isFoursomesWonMarker(aGross)||isFoursomesConcededMarker(bGross);
         const markedBWon=isFoursomesWonMarker(bGross)||isFoursomesConcededMarker(aGross);
-        const aShot=(parseInt(cfg.teamAShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
-        const bShot=(parseInt(cfg.teamBShots)||0)>=parseInt(hd.stroke_index||99)?1:0;
+        const aShot=shotsOnHole(cfg.teamAShots||0,hd.stroke_index);
+        const bShot=shotsOnHole(cfg.teamBShots||0,hd.stroke_index);
         const aNet=isFoursomesOutcomeMarker(aGross)?null:(parseInt(aGross)||0)-aShot;
         const bNet=isFoursomesOutcomeMarker(bGross)?null:(parseInt(bGross)||0)-bShot;
         let winner='halve';
