@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.55
+// SNYDER GOLF v3.56
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.55',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.56',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1708,7 +1708,7 @@ function App(){
               <div aria-hidden="true" style={{position:'absolute',top:0,left:10,right:10,height:2,background:'linear-gradient(90deg,transparent,#F5D76E,transparent)',opacity:0.9}}></div>
               <div style={{position:'relative',fontSize:'clamp(23px,7vw,32px)',lineHeight:1.02,fontWeight:950,color:'#eaf6ff',fontStyle:'italic',letterSpacing:0,textShadow:'0 2px 0 rgba(3,12,28,0.85),0 0 10px rgba(96,184,240,0.34)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{currentUser.display_name||currentUser.username||'Player'}</div>
               <div style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'center',gap:10,marginTop:3}}>
-                <span style={{fontSize:'clamp(22px,6.4vw,32px)',lineHeight:1,fontWeight:950,color:'#F5D76E',letterSpacing:0,textShadow:'0 2px 0 rgba(3,12,28,0.92),0 0 12px rgba(245,215,110,0.32)'}}>{formatHeaderHandicap(currentUser.handicap)}</span>
+                <span style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:'clamp(22px,6.4vw,32px)',lineHeight:1,fontWeight:950,color:'#F5D76E',letterSpacing:0,textShadow:'0 2px 0 rgba(3,12,28,0.92),0 0 12px rgba(245,215,110,0.32)'}}><span aria-label="England Golf handicap" title="England Golf handicap" style={{fontSize:'0.62em',lineHeight:1,textShadow:'none'}}>&#x1F3F4;&#xE0067;&#xE0062;&#xE0065;&#xE006E;&#xE0067;&#xE007F;</span>{formatHeaderHandicap(currentUser.handicap)}</span>
                 <HandicapTrendBadge trend={currentUser._handicapTrend}/>
               </div>
             </div>
@@ -1782,7 +1782,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.55" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.55</span>
+          <span aria-label="App version v3.56" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.56</span>
         </button>
       </div>
 
