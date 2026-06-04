@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.42
+// SNYDER GOLF v3.43
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.42',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.43',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1670,7 +1670,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.42" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.42</span>
+          <span aria-label="App version v3.43" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.43</span>
         </button>
       </div>
 
@@ -3712,6 +3712,11 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const[showSweepstake,setShowSweepstake]=useState(false);
   const[scorecardNotificationsOff,setScorecardNotificationsOff]=useState(()=>scorecardNotificationsMuted(round&&round.id));
   const[foursomesAutoFinished,setFoursomesAutoFinished]=useState(false);
+  const[leagueSubmitData,setLeagueSubmitData]=useState(null);
+  const[leagueSubmitLoading,setLeagueSubmitLoading]=useState(false);
+  const[leagueSubmitSubmitting,setLeagueSubmitSubmitting]=useState(false);
+  const[leagueSubmitSelected,setLeagueSubmitSelected]=useState({});
+  const[leagueSubmitNote,setLeagueSubmitNote]=useState('');
   const foursomesNotifyStateRef=useRef(null);
   const suppressFoursomesNotifyRef=useRef(false);
   const foursomesAutoFinishRef=useRef('');
@@ -5537,6 +5542,207 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     }} style={{width:38,height:38,borderRadius:10,border:'1px solid '+(muted?'rgba(148,163,184,0.34)':enabledGlobally?'rgba(34,197,94,0.42)':'rgba(245,158,11,0.38)'),background:muted?'rgba(148,163,184,0.12)':enabledGlobally?'rgba(34,197,94,0.15)':'rgba(245,158,11,0.12)',color:muted?'#94a3b8':enabledGlobally?'#86efac':'#fbbf24',fontSize:18,fontWeight:950,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,lineHeight:1}}>{muted?'🔕':'🔔'}</button>;
   }
 
+  function leagueSubmitToLocalDate(value){
+    if(value instanceof Date)return new Date(value.getFullYear(),value.getMonth(),value.getDate());
+    if(typeof value==='string'){
+      const m=value.slice(0,10).split('-').map(Number);
+      if(m[0]&&m[1]&&m[2])return new Date(m[0],m[1]-1,m[2]);
+    }
+    const d=value?new Date(value):new Date();
+    return new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  }
+  function leagueSubmitDateKey(value){
+    const d=leagueSubmitToLocalDate(value);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function leagueSubmitIsScoreDay(value){
+    const day=leagueSubmitToLocalDate(value).getDay();
+    return day===3||day===6||day===0;
+  }
+  function leagueSubmitRoundDateKey(){
+    const d=leagueSubmitToLocalDate(roundStartDate(round));
+    for(let i=0;i<7;i++){
+      const candidate=new Date(d);
+      candidate.setDate(d.getDate()-i);
+      if(leagueSubmitIsScoreDay(candidate))return leagueSubmitDateKey(candidate);
+    }
+    return leagueSubmitDateKey(d);
+  }
+  function leagueSubmitWeekKey(value){
+    const d=leagueSubmitToLocalDate(value),t=new Date(d);
+    t.setDate(d.getDate()-((d.getDay()+6)%7)+3);
+    const j=new Date(t.getFullYear(),0,4);
+    const w=1+Math.round((t-j)/604800000);
+    return `${t.getFullYear()}-W${String(w).padStart(2,'0')}`;
+  }
+  function leagueSubmitNameKey(value){
+    return String(value||'').trim().toLowerCase().replace(/\s+/g,' ');
+  }
+  function leagueSubmitFirstName(value){
+    return leagueSubmitNameKey(value).split(' ')[0]||'';
+  }
+  function leagueSubmitPlayerName(player){
+    return String((player&&(player.name||player.display_name||player.username))||'Player').trim();
+  }
+  function findLeagueSubmitPlayer(scorecardPlayer,leaguePlayers){
+    const name=leagueSubmitPlayerName(scorecardPlayer);
+    const key=leagueSubmitNameKey(name);
+    const exact=(leaguePlayers||[]).find(p=>leagueSubmitNameKey(p&&p.name)===key);
+    if(exact)return exact;
+    const first=leagueSubmitFirstName(name);
+    if(!first)return null;
+    const matches=(leaguePlayers||[]).filter(p=>leagueSubmitFirstName(p&&p.name)===first);
+    return matches.length===1?matches[0]:null;
+  }
+  function leagueSubmitScoresInWeek(playerId,approved,pending,dateKey){
+    const w=leagueSubmitWeekKey(dateKey);
+    const id=normaliseId(playerId);
+    return [...(approved||[]),...(pending||[])].filter(s=>normaliseId(s&&s.player_id)===id&&leagueSubmitWeekKey(s&&s.date)===w).length;
+  }
+  function leagueSubmitCompletedHoles(pid){
+    return holes.filter(h=>hasEnteredGross((holeScores[h.hole]||{})[pid])).length;
+  }
+  function buildLeagueSubmitData(leaguePlayers,approved,pending,snakeLog){
+    const dateKey=leagueSubmitRoundDateKey();
+    const rows=(grpPlayers||[]).map(p=>{
+      const leaguePlayer=findLeagueSubmitPlayer(p,leaguePlayers);
+      const holesPlayed=leagueSubmitCompletedHoles(p.id);
+      const points=getRunning(p.id,holes.length);
+      const already=leaguePlayer?[...(approved||[]),...(pending||[])].some(s=>normaliseId(s&&s.player_id)===normaliseId(leaguePlayer.id)&&leagueSubmitDateKey(s&&s.date)===dateKey):false;
+      const weekCount=leaguePlayer?leagueSubmitScoresInWeek(leaguePlayer.id,approved,pending,dateKey):0;
+      let status='Ready';
+      let ready=true;
+      if(!leaguePlayer){status='Not in League';ready=false;}
+      else if(holesPlayed<18){status=`${holesPlayed}/18 holes`;ready=false;}
+      else if(already){status='Already submitted';ready=false;}
+      else if(weekCount>=2){status='2 this week';ready=false;}
+      return {key:normaliseId(p.id),scorecardPlayer:p,leaguePlayer,points,holesPlayed,ready,status};
+    });
+    const snakeScorecardId=snakeHolderForHole(18);
+    const snakeScorecardPlayer=snakeScorecardId?(grpPlayers||[]).find(p=>normaliseId(p.id)===normaliseId(snakeScorecardId)):null;
+    const snakeLeaguePlayer=snakeScorecardPlayer?findLeagueSubmitPlayer(snakeScorecardPlayer,leaguePlayers):null;
+    const snakeAlready=snakeLeaguePlayer?(snakeLog||[]).some(s=>normaliseId(s&&s.player_id)===normaliseId(snakeLeaguePlayer.id)&&leagueSubmitDateKey(s&&s.date)===dateKey):false;
+    return {
+      dateKey,
+      rows,
+      snake:{scorecardPlayer:snakeScorecardPlayer,leaguePlayer:snakeLeaguePlayer,already:snakeAlready},
+    };
+  }
+  async function loadLeagueSubmitData(){
+    if(!sb||!round||round._cupScoring||isFoursomesScorecard)return;
+    setLeagueSubmitLoading(true);
+    setLeagueSubmitNote('');
+    try{
+      const [{data:leaguePlayers,error:playersError},{data:approved,error:approvedError},{data:pending,error:pendingError},{data:snakeLog,error:snakeError}]=await Promise.all([
+        sb.from('players').select('*').order('name',{ascending:true}),
+        sb.from('scores').select('*').order('date',{ascending:false}),
+        sb.from('pending_scores').select('*').order('submitted_at',{ascending:false}),
+        sb.from('snake_log').select('*').order('created_at',{ascending:false})
+      ]);
+      const err=playersError||approvedError||pendingError||snakeError;
+      if(err)throw err;
+      const data=buildLeagueSubmitData(leaguePlayers||[],approved||[],pending||[],snakeLog||[]);
+      setLeagueSubmitData(data);
+      setLeagueSubmitSelected(Object.fromEntries((data.rows||[]).filter(r=>r.ready).map(r=>[r.key,true])));
+    }catch(e){
+      setLeagueSubmitData(null);
+      setLeagueSubmitNote('League check failed: '+(e.message||String(e)));
+    }finally{
+      setLeagueSubmitLoading(false);
+    }
+  }
+  useEffect(()=>{
+    if(isCompletedRound(round)&&!round._cupScoring&&!isFoursomesScorecard)loadLeagueSubmitData();
+  },[round&&round.id,round&&round.status,activeGroupId]);
+
+  async function submitCompletedRoundToLeague(){
+    if(!leagueSubmitData)return;
+    const selected=(leagueSubmitData.rows||[]).filter(r=>r.ready&&leagueSubmitSelected[r.key]);
+    if(!selected.length){flash('Choose at least one League score','error');return;}
+    setLeagueSubmitSubmitting(true);
+    setLeagueSubmitNote('');
+    try{
+      const rows=selected.map(r=>({
+        player_id:r.leaguePlayer.id,
+        player_name:r.leaguePlayer.name,
+        points:r.points,
+        date:leagueSubmitData.dateKey,
+        is_double_chip:false,
+        snake_player_id:null,
+        snake_player_name:null
+      }));
+      const {error}=await sb.from('pending_scores').insert(rows);
+      if(error)throw error;
+      let snakeText='';
+      const snake=leagueSubmitData.snake;
+      if(snake&&snake.leaguePlayer&&!snake.already){
+        const {data:existing,error:existingError}=await sb.from('snake_log')
+          .select('id')
+          .eq('player_id',snake.leaguePlayer.id)
+          .eq('date',leagueSubmitData.dateKey)
+          .limit(1);
+        if(existingError)throw existingError;
+        if(!existing||!existing.length){
+          const {error:snakeError}=await sb.from('snake_log').insert({
+            player_id:snake.leaguePlayer.id,
+            player_name:snake.leaguePlayer.name,
+            date:leagueSubmitData.dateKey,
+            confirmed:false
+          });
+          if(snakeError)throw snakeError;
+          snakeText=' + snake claim';
+        }
+      }
+      const msg=`Submitted ${selected.length} League score${selected.length===1?'':'s'}${snakeText}`;
+      setLeagueSubmitNote(msg);
+      flash(msg);
+      await loadLeagueSubmitData();
+    }catch(e){
+      const msg=e.message||String(e);
+      setLeagueSubmitNote('Submit failed: '+msg);
+      flash('League submit failed: '+msg,'error');
+    }finally{
+      setLeagueSubmitSubmitting(false);
+    }
+  }
+
+  function LeagueSubmitCard(){
+    if(!isCompletedRound(round)||round._cupScoring||isFoursomesScorecard)return null;
+    const data=leagueSubmitData;
+    const selectedCount=(data&&data.rows||[]).filter(r=>r.ready&&leagueSubmitSelected[r.key]).length;
+    const snake=data&&data.snake;
+    const snakeLabel=snake&&snake.scorecardPlayer?(leagueSubmitPlayerName(snake.scorecardPlayer)+(snake.leaguePlayer?(snake.already?' - already logged':' - ready'):' - not matched to League')):'No snake marked';
+    return <div style={{margin:'0 16px 12px'}}>
+      <div style={{...S.card,margin:0,background:'linear-gradient(135deg,rgba(34,197,94,0.14),rgba(0,112,187,0.12))',borderColor:'rgba(34,197,94,0.32)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:10}}>
+          <div>
+            <div style={{fontSize:18,color:'#fff',fontWeight:950}}>Submit to League</div>
+            <div style={{fontSize:11,color:'#90ccf0',marginTop:3}}>League date: {data?data.dateKey:'checking...'}</div>
+          </div>
+          <button onClick={loadLeagueSubmitData} disabled={leagueSubmitLoading||leagueSubmitSubmitting} style={{...S.gho,padding:'7px 10px',fontSize:12,opacity:leagueSubmitLoading?0.6:1}}>Refresh</button>
+        </div>
+        {leagueSubmitLoading&&!data&&<div style={{fontSize:13,color:'#90ccf0',padding:'10px 0'}}>Checking League players...</div>}
+        {data&&<div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {data.rows.map(r=><label key={r.key} style={{display:'grid',gridTemplateColumns:'28px 1fr auto',gap:8,alignItems:'center',padding:'9px 10px',borderRadius:10,background:r.ready?'rgba(255,255,255,0.06)':'rgba(255,255,255,0.035)',border:'1px solid '+(r.ready?'rgba(134,239,172,0.16)':'rgba(255,255,255,0.08)')}}>
+            <input type="checkbox" disabled={!r.ready||leagueSubmitSubmitting} checked={!!leagueSubmitSelected[r.key]&&r.ready} onChange={e=>setLeagueSubmitSelected(prev=>({...prev,[r.key]:e.target.checked}))} />
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:14,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{leagueSubmitPlayerName(r.scorecardPlayer)}</div>
+              <div style={{fontSize:11,color:r.ready?'#86efac':'#fca5a5',marginTop:2}}>{r.status}</div>
+            </div>
+            <div style={{fontSize:20,color:r.ready?'#60b8f0':'rgba(255,255,255,0.45)',fontWeight:950}}>{r.points}<span style={{fontSize:10,marginLeft:3}}>pts</span></div>
+          </label>)}
+        </div>}
+        {data&&<div style={{marginTop:10,padding:'9px 10px',borderRadius:10,background:'rgba(0,0,0,0.20)',border:'1px solid rgba(255,255,255,0.08)',fontSize:12,color:'#dbeafe'}}>
+          Snake: <span style={{fontWeight:900,color:snake&&snake.leaguePlayer&&!snake.already?'#86efac':'#90ccf0'}}>{snakeLabel}</span>
+        </div>}
+        {leagueSubmitNote&&<div style={{marginTop:10,fontSize:12,color:leagueSubmitNote.toLowerCase().includes('failed')?'#fca5a5':'#86efac'}}>{leagueSubmitNote}</div>}
+        <button onClick={submitCompletedRoundToLeague} disabled={!data||selectedCount===0||leagueSubmitSubmitting||leagueSubmitLoading} style={{...S.pri,width:'100%',padding:14,fontSize:15,marginTop:12,background:selectedCount?'#0a8a4a':'rgba(255,255,255,0.10)',opacity:(!data||selectedCount===0||leagueSubmitSubmitting||leagueSubmitLoading)?0.65:1}}>
+          {leagueSubmitSubmitting?'Submitting...':`Submit ${selectedCount||0} score${selectedCount===1?'':'s'} to League`}
+        </button>
+      </div>
+    </div>;
+  }
+
   function FinalStablefordSweepstakeBlock({topMargin=12}){
     if(!isCompletedRound(round)||round._cupScoring)return null;
     const finalRows=[...grpPlayers].map(p=>({id:p.id,name:gameFirstName((p.name||p.display_name)||'?'),total:getRunning(p.id,holes.length)})).sort((a,b)=>b.total-a.total);
@@ -5621,8 +5827,14 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     notifyFinishedScores().catch(e=>console.warn('Snyder Live finished-round notification error',e));
     round.status='complete';
     await load();
-    setShowEnd(false);
-    setView('home');
+    if(round._cupScoring){
+      setShowEnd(false);
+      setView('home');
+    }else{
+      setEndStep(1);
+      setShowEnd(true);
+      loadLeagueSubmitData();
+    }
   }
 
   const canDeleteRound=currentUser&&!round._spectator&&(
@@ -5914,6 +6126,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           </div>
           <div style={{padding:'10px 12px',background:'rgba(0,0,0,0.3)',marginBottom:12,borderRadius:8}}><div style={{fontSize:15,color:'#fff',fontWeight:700}}>{getCourseDisplayName(course,round)}</div><div style={{fontSize:11,color:'#60b8f0',marginTop:3}}>Round start: {roundStartText}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.55)',marginTop:2}}>{courseSummaryLine(course,round,holes)}</div></div>
           <FinalStablefordSweepstakeBlock topMargin={0}/>
+          <LeagueSubmitCard/>
           <div id="f9-card"><MiniCard holeList={front9} label="FRONT 9"/></div>
           <MiniCard holeList={back9} label="BACK 9"/>
           <div style={{...S.card}}>
@@ -5942,6 +6155,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           <button onClick={()=>{setShowEnd(false);setView('home');}} style={{...S.pri,padding:'8px 14px',fontSize:13}}>Done</button>
         </div>
         <div id="stats-card" style={{padding:16,background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)'}}>
+          <LeagueSubmitCard/>
           <SweepstakePanel throughHole={18} reviewTitle="💰 SWEEPSTAKE - PAY UP" payUp={true}/>
           {grpPlayers.map(p=>{
             const st=getStats(p.id);
