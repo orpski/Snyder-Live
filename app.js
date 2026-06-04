@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.43
+// SNYDER GOLF v3.44
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -120,7 +120,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.43',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.44',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1670,7 +1670,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.43" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.43</span>
+          <span aria-label="App version v3.44" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.44</span>
         </button>
       </div>
 
@@ -2262,6 +2262,69 @@ function groupCountForRange(range){
   return 1;
 }
 function normaliseId(v){return v==null?'':String(v);}
+
+const LEAGUE_PLAYER_LINKS_STORAGE_KEY='snyder_league_player_links_v1';
+function leagueLinkLiveId(person){
+  return normaliseId(person&&(person.user_id||person.guest_id||person.id||person.round_player_id));
+}
+function leagueLinkLiveName(person){
+  return String((person&&(person.display_name||person.name||person.username))||'Player').trim();
+}
+function readLocalLeaguePlayerLinks(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(LEAGUE_PLAYER_LINKS_STORAGE_KEY)||'{}');
+    return raw&&typeof raw==='object'?raw:{};
+  }catch(e){return {};}
+}
+function writeLocalLeaguePlayerLink(link){
+  const liveId=normaliseId(link&&link.live_user_id);
+  if(!liveId)return;
+  const all=readLocalLeaguePlayerLinks();
+  all[liveId]={...link,live_user_id:liveId,updated_at:new Date().toISOString()};
+  try{localStorage.setItem(LEAGUE_PLAYER_LINKS_STORAGE_KEY,JSON.stringify(all));}catch(e){}
+}
+function normaliseLeaguePlayerLinks(rows){
+  const out={...readLocalLeaguePlayerLinks()};
+  (rows||[]).forEach(r=>{
+    const liveId=normaliseId(r&&r.live_user_id);
+    if(liveId)out[liveId]={
+      live_user_id:liveId,
+      live_name:r.live_name||'',
+      league_player_id:r.league_player_id,
+      league_player_name:r.league_player_name||'',
+      updated_at:r.updated_at||''
+    };
+  });
+  return out;
+}
+async function fetchLeaguePlayerLinks(sb){
+  try{
+    const {data,error}=await sb.from('league_player_links').select('*').order('live_name',{ascending:true});
+    if(error)throw error;
+    return {links:normaliseLeaguePlayerLinks(data||[]),cloudAvailable:true,error:null};
+  }catch(e){
+    return {links:readLocalLeaguePlayerLinks(),cloudAvailable:false,error:e};
+  }
+}
+async function saveLeaguePlayerLink(sb,link){
+  const clean={
+    live_user_id:normaliseId(link&&link.live_user_id),
+    live_name:String(link&&link.live_name||'').trim(),
+    league_player_id:link&&link.league_player_id,
+    league_player_name:String(link&&link.league_player_name||'').trim(),
+    updated_at:new Date().toISOString()
+  };
+  if(!clean.live_user_id||!clean.league_player_id)throw new Error('Missing live player or League player');
+  try{
+    const {error}=await sb.from('league_player_links').upsert(clean,{onConflict:'live_user_id'});
+    if(error)throw error;
+    writeLocalLeaguePlayerLink(clean);
+    return {cloudAvailable:true};
+  }catch(e){
+    writeLocalLeaguePlayerLink(clean);
+    return {cloudAvailable:false,error:e};
+  }
+}
 
 const SNAKE_SCORE_PREFIX='__snake__|';
 const SNAKE_STABLEFORD_OFFSET=1000;
@@ -3717,6 +3780,9 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const[leagueSubmitSubmitting,setLeagueSubmitSubmitting]=useState(false);
   const[leagueSubmitSelected,setLeagueSubmitSelected]=useState({});
   const[leagueSubmitNote,setLeagueSubmitNote]=useState('');
+  const[leagueSubmitLinks,setLeagueSubmitLinks]=useState({});
+  const[leagueSubmitLinkCloud,setLeagueSubmitLinkCloud]=useState(true);
+  const[leagueSubmitLinking,setLeagueSubmitLinking]=useState('');
   const foursomesNotifyStateRef=useRef(null);
   const suppressFoursomesNotifyRef=useRef(false);
   const foursomesAutoFinishRef=useRef('');
@@ -5584,7 +5650,12 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   function leagueSubmitPlayerName(player){
     return String((player&&(player.name||player.display_name||player.username))||'Player').trim();
   }
-  function findLeagueSubmitPlayer(scorecardPlayer,leaguePlayers){
+  function findLeagueSubmitPlayer(scorecardPlayer,leaguePlayers,links=leagueSubmitLinks){
+    const linked=links&&links[leagueLinkLiveId(scorecardPlayer)];
+    if(linked&&linked.league_player_id){
+      const byId=(leaguePlayers||[]).find(p=>normaliseId(p&&p.id)===normaliseId(linked.league_player_id));
+      if(byId)return byId;
+    }
     const name=leagueSubmitPlayerName(scorecardPlayer);
     const key=leagueSubmitNameKey(name);
     const exact=(leaguePlayers||[]).find(p=>leagueSubmitNameKey(p&&p.name)===key);
@@ -5602,10 +5673,10 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   function leagueSubmitCompletedHoles(pid){
     return holes.filter(h=>hasEnteredGross((holeScores[h.hole]||{})[pid])).length;
   }
-  function buildLeagueSubmitData(leaguePlayers,approved,pending,snakeLog){
+  function buildLeagueSubmitData(leaguePlayers,approved,pending,snakeLog,links=leagueSubmitLinks){
     const dateKey=leagueSubmitRoundDateKey();
     const rows=(grpPlayers||[]).map(p=>{
-      const leaguePlayer=findLeagueSubmitPlayer(p,leaguePlayers);
+      const leaguePlayer=findLeagueSubmitPlayer(p,leaguePlayers,links);
       const holesPlayed=leagueSubmitCompletedHoles(p.id);
       const points=getRunning(p.id,holes.length);
       const already=leaguePlayer?[...(approved||[]),...(pending||[])].some(s=>normaliseId(s&&s.player_id)===normaliseId(leaguePlayer.id)&&leagueSubmitDateKey(s&&s.date)===dateKey):false;
@@ -5620,11 +5691,12 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     });
     const snakeScorecardId=snakeHolderForHole(18);
     const snakeScorecardPlayer=snakeScorecardId?(grpPlayers||[]).find(p=>normaliseId(p.id)===normaliseId(snakeScorecardId)):null;
-    const snakeLeaguePlayer=snakeScorecardPlayer?findLeagueSubmitPlayer(snakeScorecardPlayer,leaguePlayers):null;
+    const snakeLeaguePlayer=snakeScorecardPlayer?findLeagueSubmitPlayer(snakeScorecardPlayer,leaguePlayers,links):null;
     const snakeAlready=snakeLeaguePlayer?(snakeLog||[]).some(s=>normaliseId(s&&s.player_id)===normaliseId(snakeLeaguePlayer.id)&&leagueSubmitDateKey(s&&s.date)===dateKey):false;
     return {
       dateKey,
       rows,
+      leaguePlayers:leaguePlayers||[],
       snake:{scorecardPlayer:snakeScorecardPlayer,leaguePlayer:snakeLeaguePlayer,already:snakeAlready},
     };
   }
@@ -5633,15 +5705,19 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     setLeagueSubmitLoading(true);
     setLeagueSubmitNote('');
     try{
-      const [{data:leaguePlayers,error:playersError},{data:approved,error:approvedError},{data:pending,error:pendingError},{data:snakeLog,error:snakeError}]=await Promise.all([
+      const [{data:leaguePlayers,error:playersError},{data:approved,error:approvedError},{data:pending,error:pendingError},{data:snakeLog,error:snakeError},linkResult]=await Promise.all([
         sb.from('players').select('*').order('name',{ascending:true}),
         sb.from('scores').select('*').order('date',{ascending:false}),
         sb.from('pending_scores').select('*').order('submitted_at',{ascending:false}),
-        sb.from('snake_log').select('*').order('created_at',{ascending:false})
+        sb.from('snake_log').select('*').order('created_at',{ascending:false}),
+        fetchLeaguePlayerLinks(sb)
       ]);
       const err=playersError||approvedError||pendingError||snakeError;
       if(err)throw err;
-      const data=buildLeagueSubmitData(leaguePlayers||[],approved||[],pending||[],snakeLog||[]);
+      const links=(linkResult&&linkResult.links)||{};
+      setLeagueSubmitLinks(links);
+      setLeagueSubmitLinkCloud(!(linkResult&&linkResult.cloudAvailable===false));
+      const data=buildLeagueSubmitData(leaguePlayers||[],approved||[],pending||[],snakeLog||[],links);
       setLeagueSubmitData(data);
       setLeagueSubmitSelected(Object.fromEntries((data.rows||[]).filter(r=>r.ready).map(r=>[r.key,true])));
     }catch(e){
@@ -5706,6 +5782,40 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     }
   }
 
+  async function linkScorecardPlayerToLeague(row,leaguePlayerId){
+    if(!row||!leaguePlayerId||!leagueSubmitData)return;
+    const leaguePlayer=(leagueSubmitData.rows||[]).map(r=>r.leaguePlayer).filter(Boolean).find(p=>normaliseId(p.id)===normaliseId(leaguePlayerId))
+      ||((leagueSubmitData&&leagueSubmitData.leaguePlayers)||[]).find(p=>normaliseId(p.id)===normaliseId(leaguePlayerId));
+    const allLeaguePlayers=((leagueSubmitData&&leagueSubmitData.leaguePlayers)||[]);
+    const chosen=leaguePlayer||allLeaguePlayers.find(p=>normaliseId(p.id)===normaliseId(leaguePlayerId));
+    if(!chosen){flash('Choose a League player','error');return;}
+    const liveId=leagueLinkLiveId(row.scorecardPlayer);
+    if(!liveId){flash('This player cannot be linked','error');return;}
+    setLeagueSubmitLinking(row.key);
+    try{
+      const result=await saveLeaguePlayerLink(sb,{
+        live_user_id:liveId,
+        live_name:leagueLinkLiveName(row.scorecardPlayer),
+        league_player_id:chosen.id,
+        league_player_name:chosen.name
+      });
+      setLeagueSubmitLinks(prev=>({...prev,[liveId]:{
+        live_user_id:liveId,
+        live_name:leagueLinkLiveName(row.scorecardPlayer),
+        league_player_id:chosen.id,
+        league_player_name:chosen.name,
+        updated_at:new Date().toISOString()
+      }}));
+      if(result.cloudAvailable===false)setLeagueSubmitLinkCloud(false);
+      flash((leagueLinkLiveName(row.scorecardPlayer)||'Player')+' linked to '+chosen.name);
+      await loadLeagueSubmitData();
+    }catch(e){
+      flash('Link failed: '+(e.message||String(e)),'error');
+    }finally{
+      setLeagueSubmitLinking('');
+    }
+  }
+
   function LeagueSubmitCard(){
     if(!isCompletedRound(round)||round._cupScoring||isFoursomesScorecard)return null;
     const data=leagueSubmitData;
@@ -5722,15 +5832,22 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           <button onClick={loadLeagueSubmitData} disabled={leagueSubmitLoading||leagueSubmitSubmitting} style={{...S.gho,padding:'7px 10px',fontSize:12,opacity:leagueSubmitLoading?0.6:1}}>Refresh</button>
         </div>
         {leagueSubmitLoading&&!data&&<div style={{fontSize:13,color:'#90ccf0',padding:'10px 0'}}>Checking League players...</div>}
+        {data&&!leagueSubmitLinkCloud&&<div style={{marginBottom:9,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.12)',border:'1px solid rgba(245,158,11,0.24)',fontSize:11,color:'#fbbf24'}}>League links are saved on this device until the cloud link table is added.</div>}
         {data&&<div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {data.rows.map(r=><label key={r.key} style={{display:'grid',gridTemplateColumns:'28px 1fr auto',gap:8,alignItems:'center',padding:'9px 10px',borderRadius:10,background:r.ready?'rgba(255,255,255,0.06)':'rgba(255,255,255,0.035)',border:'1px solid '+(r.ready?'rgba(134,239,172,0.16)':'rgba(255,255,255,0.08)')}}>
+          {data.rows.map(r=><div key={r.key} style={{display:'grid',gridTemplateColumns:'28px 1fr auto',gap:8,alignItems:'center',padding:'9px 10px',borderRadius:10,background:r.ready?'rgba(255,255,255,0.06)':'rgba(255,255,255,0.035)',border:'1px solid '+(r.ready?'rgba(134,239,172,0.16)':'rgba(255,255,255,0.08)')}}>
             <input type="checkbox" disabled={!r.ready||leagueSubmitSubmitting} checked={!!leagueSubmitSelected[r.key]&&r.ready} onChange={e=>setLeagueSubmitSelected(prev=>({...prev,[r.key]:e.target.checked}))} />
             <div style={{minWidth:0}}>
               <div style={{fontSize:14,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{leagueSubmitPlayerName(r.scorecardPlayer)}</div>
               <div style={{fontSize:11,color:r.ready?'#86efac':'#fca5a5',marginTop:2}}>{r.status}</div>
+              {!r.leaguePlayer&&<div style={{marginTop:7}}>
+                <select disabled={leagueSubmitLinking===r.key} value="" onChange={e=>linkScorecardPlayerToLeague(r,e.target.value)} style={{...S.inp,padding:'7px 9px',fontSize:12}}>
+                  <option value="">Is this player in League?</option>
+                  {((data&&data.leaguePlayers)||[]).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>}
             </div>
             <div style={{fontSize:20,color:r.ready?'#60b8f0':'rgba(255,255,255,0.45)',fontWeight:950}}>{r.points}<span style={{fontSize:10,marginLeft:3}}>pts</span></div>
-          </label>)}
+          </div>)}
         </div>}
         {data&&<div style={{marginTop:10,padding:'9px 10px',borderRadius:10,background:'rgba(0,0,0,0.20)',border:'1px solid rgba(255,255,255,0.08)',fontSize:12,color:'#dbeafe'}}>
           Snake: <span style={{fontWeight:900,color:snake&&snake.leaguePlayer&&!snake.already?'#86efac':'#90ccf0'}}>{snakeLabel}</span>
@@ -6601,6 +6718,7 @@ function AdminPanel({courses,rounds,groups,sb,flash,setView,load,cupUsers,guests
   const[tab,setTab]=useState('courses');
   const[pw,setPw]=useState('');
   const[auth,setAuth]=useState(false);
+  const adminTabs=[['courses','Courses'],['days','Days'],['rounds','Rounds'],['users','Users'],['leagueLinks','League Links'],['cup','Cup']];
 
   if(!auth)return(
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
@@ -6620,14 +6738,15 @@ function AdminPanel({courses,rounds,groups,sb,flash,setView,load,cupUsers,guests
         <div style={{fontSize:16,color:'#fff'}}>Admin</div>
       </div>
       <div style={{display:'flex',gap:4,padding:'10px 12px',overflowX:'auto',borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
-        {['courses','days','rounds','users','cup'].map(t=>(
-          <button key={t} onClick={()=>setTab(t)} style={{...tab===t?S.pri:S.gho,padding:'7px 14px',fontSize:12,textTransform:'capitalize',flexShrink:0}}>{t}</button>
+        {adminTabs.map(([t,label])=>(
+          <button key={t} onClick={()=>setTab(t)} style={{...tab===t?S.pri:S.gho,padding:'7px 14px',fontSize:12,textTransform:'capitalize',flexShrink:0}}>{label}</button>
         ))}
       </div>
       <div style={{padding:16}}>
         {tab==='courses'&&<CoursesTab courses={courses} sb={sb} flash={flash} load={load}/>}
         {tab==='days'&&<DayBoardsTab rounds={rounds} sb={sb} flash={flash} load={load}/>}
         {tab==='rounds'&&<RoundsTab rounds={rounds} groups={groups} sb={sb} flash={flash} load={load}/>}
+        {tab==='leagueLinks'&&<LeagueLinksAdminTab sb={sb} flash={flash} cupUsers={cupUsers} guests={guests}/>}
         {tab==='cup'&&<CupAdminTab sb={sb} flash={flash} load={load} cupUsers={cupUsers} cupEvents={cupEvents} cupTeams={cupTeams} cupEventPlayers={cupEventPlayers} cupDays={cupDays} cupMatches={cupMatches} courses={courses} rounds={rounds}/>}
         {tab==='users'&&(
           <div>
@@ -6672,6 +6791,91 @@ function AdminPanel({courses,rounds,groups,sb,flash,setView,load,cupUsers,guests
       </div>
     </div>
   );
+}
+
+function LeagueLinksAdminTab({sb,flash,cupUsers,guests}){
+  const[leaguePlayers,setLeaguePlayers]=useState([]);
+  const[links,setLinks]=useState({});
+  const[loading,setLoading]=useState(true);
+  const[saving,setSaving]=useState('');
+  const[cloudAvailable,setCloudAvailable]=useState(true);
+
+  async function loadLinks(){
+    setLoading(true);
+    try{
+      const [{data:players,error:playersError},linkResult]=await Promise.all([
+        sb.from('players').select('*').order('name',{ascending:true}),
+        fetchLeaguePlayerLinks(sb)
+      ]);
+      if(playersError)throw playersError;
+      setLeaguePlayers(players||[]);
+      setLinks((linkResult&&linkResult.links)||{});
+      setCloudAvailable(!(linkResult&&linkResult.cloudAvailable===false));
+    }catch(e){
+      flash('League links failed: '+(e.message||String(e)),'error');
+    }finally{
+      setLoading(false);
+    }
+  }
+  useEffect(()=>{loadLinks();},[]);
+
+  const livePeople=[
+    ...(cupUsers||[]).map(u=>({...u,_type:'Live account',_sort:leagueLinkLiveName(u)})),
+    ...(guests||[]).map(g=>({...g,display_name:g.name,_type:'Guest',_sort:leagueLinkLiveName(g)}))
+  ].filter(p=>leagueLinkLiveId(p)).sort((a,b)=>String(a._sort||'').localeCompare(String(b._sort||'')));
+
+  async function setLink(person,leaguePlayerId){
+    const liveId=leagueLinkLiveId(person);
+    if(!leaguePlayerId){
+      flash('Choose a Summer League player','error');
+      return;
+    }
+    const leaguePlayer=leaguePlayers.find(p=>normaliseId(p.id)===normaliseId(leaguePlayerId));
+    if(!leaguePlayer)return;
+    setSaving(liveId);
+    try{
+      const result=await saveLeaguePlayerLink(sb,{
+        live_user_id:liveId,
+        live_name:leagueLinkLiveName(person),
+        league_player_id:leaguePlayer.id,
+        league_player_name:leaguePlayer.name
+      });
+      setLinks(prev=>({...prev,[liveId]:{
+        live_user_id:liveId,
+        live_name:leagueLinkLiveName(person),
+        league_player_id:leaguePlayer.id,
+        league_player_name:leaguePlayer.name,
+        updated_at:new Date().toISOString()
+      }}));
+      if(result.cloudAvailable===false)setCloudAvailable(false);
+      flash('Linked '+leagueLinkLiveName(person)+' to '+leaguePlayer.name);
+    }catch(e){
+      flash('Could not save link: '+(e.message||String(e)),'error');
+    }finally{
+      setSaving('');
+    }
+  }
+
+  return <div>
+    <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.12em',margin:'0 0 8px'}}>LIVE TO LEAGUE LINKS</div>
+    {!cloudAvailable&&<div style={{...S.card,marginBottom:10,borderColor:'rgba(245,158,11,0.28)',background:'rgba(245,158,11,0.10)',fontSize:12,color:'#fbbf24'}}>Cloud link table not available yet, so links are saved on this device for now.</div>}
+    {loading&&<div style={{...S.card,fontSize:13,color:'#90ccf0'}}>Loading League players...</div>}
+    {!loading&&livePeople.map(person=>{
+      const liveId=leagueLinkLiveId(person);
+      const linked=links[liveId]||{};
+      return <div key={person._type+'-'+liveId} style={{...S.card,marginBottom:8,display:'grid',gridTemplateColumns:'1fr minmax(140px,220px)',gap:10,alignItems:'center'}}>
+        <div style={{minWidth:0}}>
+          <div style={{fontSize:14,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{leagueLinkLiveName(person)}</div>
+          <div style={{fontSize:11,color:'#60b8f0',marginTop:2}}>{person._type}{linked.league_player_name?' - linked to '+linked.league_player_name:''}</div>
+        </div>
+        <select value={linked.league_player_id||''} disabled={saving===liveId} onChange={e=>setLink(person,e.target.value)} style={{...S.inp,padding:'9px 10px',fontSize:13}}>
+          <option value="">Choose League player</option>
+          {leaguePlayers.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      </div>;
+    })}
+    {!loading&&!livePeople.length&&<div style={{...S.card,fontSize:13,color:'rgba(255,255,255,0.55)',textAlign:'center'}}>No live users or guests found.</div>}
+  </div>;
 }
 
 // =========================================================
