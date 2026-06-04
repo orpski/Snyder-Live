@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.59
+// SNYDER GOLF v3.60
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -26,6 +26,7 @@ const EMOJI={
   scores:'\uD83D\uDCCA',
   trophy:'\uD83C\uDFC6',
   profile:'\uD83D\uDC64',
+  friends:'\uD83D\uDC65',
   admin:'\u2699\uFE0F',
   plus:'\u2795',
   live:'\uD83D\uDD34',
@@ -120,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.59',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.60',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -899,6 +900,11 @@ function HandicapTrendBadge({trend}){
       <span style={{fontSize:11,lineHeight:'12px'}}>{formatHeaderHandicap(trend.delta)}</span>
     </span>
   );
+}
+
+function EnglandGolfMarker({user,size='1em',style={}}){
+  if(!user||!user.england_golf_member_no)return null;
+  return <span aria-label="England Golf linked" title="England Golf linked" style={{fontSize:size,lineHeight:1,textShadow:'none',display:'inline-flex',alignItems:'center',...style}}>&#x1F3F4;&#xE0067;&#xE0062;&#xE0065;&#xE006E;&#xE0067;&#xE007F;</span>;
 }
 
 function handicapBannerTone(trend){
@@ -1820,6 +1826,7 @@ function App(){
   }
   if(view==='admin')return <AdminPanel {...props}/>;
   if(view==='profile')return <ProfileView {...props} setCurrentUser={setCurrentUser}/>;
+  if(view==='friends')return <FriendsView {...props}/>;
   if(view==='live')return <>{pullIndicator}<LiveScoringView {...props} selectedComp={selectedComp} activeComp={activeComp}/></>;
   if(view==='tournaments')return <TournamentsView {...props} activeComp={activeComp} selectedComp={selectedComp} setSelectedComp={setSelectedComp}/>;
 
@@ -1871,7 +1878,7 @@ function App(){
                 <div style={{minWidth:0,textAlign:'left'}}>
                   <div style={{fontSize:'clamp(25px,7.6vw,34px)',lineHeight:1.02,fontWeight:950,color:'#eaf6ff',fontStyle:'italic',letterSpacing:0,textShadow:'0 2px 0 rgba(3,12,28,0.85),0 0 10px rgba(96,184,240,0.34)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{currentUser.display_name||currentUser.username||'Player'}</div>
                   <div style={{display:'flex',alignItems:'center',gap:10,marginTop:7,flexWrap:'wrap'}}>
-                    <span style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:'clamp(22px,6.4vw,32px)',lineHeight:1,fontWeight:950,color:'#F5D76E',letterSpacing:0,textShadow:'0 2px 0 rgba(3,12,28,0.92),0 0 12px rgba(245,215,110,0.32)'}}><span aria-label="England Golf handicap" title="England Golf handicap" style={{fontSize:'0.62em',lineHeight:1,textShadow:'none'}}>&#x1F3F4;&#xE0067;&#xE0062;&#xE0065;&#xE006E;&#xE0067;&#xE007F;</span>{formatHeaderHandicap(currentUser.handicap)}</span>
+                    <span style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:'clamp(22px,6.4vw,32px)',lineHeight:1,fontWeight:950,color:'#F5D76E',letterSpacing:0,textShadow:'0 2px 0 rgba(3,12,28,0.92),0 0 12px rgba(245,215,110,0.32)'}}><EnglandGolfMarker user={currentUser} size="0.62em"/>{formatHeaderHandicap(currentUser.handicap)}</span>
                     <HandicapTrendBadge trend={currentUser._handicapTrend}/>
                   </div>
                 </div>
@@ -1939,6 +1946,11 @@ function App(){
           <div style={{...bottomLabelStyle,fontWeight:800}}>LEAGUE</div>
           {bottomSpacer}
         </button>
+        <button onClick={()=>currentUser?setView('friends'):(setAuthPrompt(null),setShowAuth(true))} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
+          <div style={bottomIconStyle}>{EMOJI.friends}</div>
+          <div style={bottomLabelStyle}>FRIENDS</div>
+          {bottomSpacer}
+        </button>
         <button onClick={()=>currentUser?setView('profile'):(setAuthPrompt(null),setShowAuth(true))} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.profile}</div>
           <div style={bottomLabelStyle}>PROFILE</div>
@@ -1947,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.59" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.59</span>
+          <span aria-label="App version v3.60" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.60</span>
         </button>
       </div>
 
@@ -2610,6 +2622,132 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
           </div>
         ))}
         <button onClick={()=>{localStorage.removeItem('snyder_user');setCurrentUser(null);setView('home');}} style={{...S.dan,width:'100%',marginTop:16,fontSize:13}}>Sign Out</button>
+      </div>
+    </div>
+  );
+}
+
+function FriendsView({currentUser,cupUsers,sb,flash,setView,load}){
+  const[friends,setFriends]=useState([]);
+  const[loading,setLoading]=useState(false);
+  const[searchOpen,setSearchOpen]=useState(false);
+  const[search,setSearch]=useState('');
+  const[adding,setAdding]=useState('');
+
+  async function loadFriends(){
+    if(!currentUser||!currentUser.id){setFriends([]);return;}
+    setLoading(true);
+    try{
+      const [{data:links,error},{data:users}]=await Promise.all([
+        sb.from('cup_friendships').select('friend_id').eq('user_id',currentUser.id),
+        sb.from('cup_users').select('*').order('display_name',{ascending:true})
+      ]);
+      if(error)throw error;
+      const ids=(links||[]).map(x=>normaliseId(x.friend_id));
+      const allUsers=users||cupUsers||[];
+      setFriends(allUsers
+        .filter(u=>ids.includes(normaliseId(u.id)))
+        .sort((a,b)=>String(a.display_name||a.username||'').localeCompare(String(b.display_name||b.username||'')))
+      );
+    }catch(e){
+      setFriends([]);
+      flash&&flash('Could not load friends','error');
+    }finally{
+      setLoading(false);
+    }
+  }
+
+  useEffect(()=>{loadFriends();},[currentUser&&currentUser.id]);
+
+  const friendIds=new Set((friends||[]).map(f=>normaliseId(f.id)));
+  const q=search.trim().toLowerCase();
+  const results=q.length>1?(cupUsers||[]).filter(u=>{
+    if(!u)return false;
+    if(normaliseId(u.id)===normaliseId(currentUser&&currentUser.id))return false;
+    if(friendIds.has(normaliseId(u.id)))return false;
+    return String(u.display_name||'').toLowerCase().includes(q)||String(u.username||'').toLowerCase().includes(q);
+  }).slice(0,8):[];
+
+  async function addFriend(user){
+    if(!currentUser||!currentUser.id||!user||!user.id)return;
+    setAdding(user.id);
+    try{
+      const pairs=[
+        {user_id:currentUser.id,friend_id:user.id},
+        {user_id:user.id,friend_id:currentUser.id}
+      ];
+      for(const pair of pairs){
+        const {data:existing}=await sb.from('cup_friendships').select('id').eq('user_id',pair.user_id).eq('friend_id',pair.friend_id).limit(1);
+        if(!existing||existing.length===0)await sb.from('cup_friendships').insert(pair);
+      }
+      setSearch('');
+      await loadFriends();
+      load&&load();
+      flash&&flash((user.display_name||user.username||'Player')+' added');
+    }catch(e){
+      flash&&flash('Could not add friend','error');
+    }finally{
+      setAdding('');
+    }
+  }
+
+  const rowStyle={display:'grid',gridTemplateColumns:'1fr auto',alignItems:'center',gap:10,padding:'12px 13px',borderTop:'1px solid rgba(255,255,255,0.08)'};
+
+  return(
+    <div style={{minHeight:'100vh',paddingBottom:76,background:'linear-gradient(180deg,#0d2548 0%,#0a1f3d 100%)'}}>
+      <div style={{background:'#0d2548',padding:'13px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
+        <button onClick={()=>setView('home')} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:18,color:'#fff',fontWeight:950}}>Friends</div>
+          <div style={{fontSize:11,color:'#90ccf0',fontWeight:800}}>Names, handicaps and England Golf links</div>
+        </div>
+        <button onClick={()=>setSearchOpen(v=>!v)} aria-label="Search friends" title="Search friends" style={{width:36,height:36,borderRadius:999,border:'1px solid rgba(96,184,240,0.30)',background:searchOpen?'rgba(0,112,187,0.30)':'rgba(255,255,255,0.06)',color:'#90ccf0',fontSize:17,fontWeight:950,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>&#x1F50D;</button>
+      </div>
+      <div style={{padding:16}}>
+        {searchOpen&&(
+          <div style={{...S.card,marginBottom:12,padding:12}}>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or username..." autoCapitalize="none" autoFocus style={{...S.inp,fontSize:16,marginBottom:10}}/>
+            {q.length<=1&&<div style={{fontSize:12,color:'rgba(255,255,255,0.55)',textAlign:'center',padding:8}}>Type at least 2 letters</div>}
+            {results.map(u=>(
+              <div key={u.id} style={{display:'grid',gridTemplateColumns:'1fr auto',gap:10,alignItems:'center',padding:'9px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
+                <div style={{minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,fontSize:14,color:'#fff',fontWeight:900,overflow:'hidden'}}>
+                    <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.display_name||u.username||'Player'}</span>
+                    <EnglandGolfMarker user={u} size="14px"/>
+                  </div>
+                  <div style={{fontSize:11,color:'#90ccf0'}}>@{u.username||'user'} - {formatHeaderHandicap(u.handicap)}</div>
+                </div>
+                <button onClick={()=>addFriend(u)} disabled={adding===u.id} style={{...S.pri,padding:'7px 11px',fontSize:12,opacity:adding===u.id?0.6:1}}>{adding===u.id?'Adding':'Add'}</button>
+              </div>
+            ))}
+            {q.length>1&&!results.length&&<div style={{fontSize:12,color:'rgba(255,255,255,0.55)',textAlign:'center',padding:10}}>No matching players found</div>}
+          </div>
+        )}
+        <div style={{border:'1px solid rgba(96,184,240,0.22)',borderRadius:16,background:'rgba(255,255,255,0.055)',overflow:'hidden'}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:10,padding:'10px 13px',background:'rgba(0,112,187,0.14)',fontSize:11,color:'#90ccf0',fontWeight:950,letterSpacing:'0.08em',textTransform:'uppercase'}}>
+            <div>Friend</div>
+            <div>Handicap</div>
+          </div>
+          {loading
+            ?<div style={{padding:18,textAlign:'center',fontSize:13,color:'#90ccf0'}}>Loading friends...</div>
+            :friends.length?friends.map(f=>(
+              <div key={f.id} style={rowStyle}>
+                <div style={{minWidth:0,display:'flex',alignItems:'center',gap:9}}>
+                  <Avatar user={f} size={34}/>
+                  <div style={{minWidth:0}}>
+                    <div style={{display:'flex',alignItems:'center',gap:6,fontSize:14,color:'#fff',fontWeight:950,minWidth:0}}>
+                      <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.display_name||f.username||'Player'}</span>
+                      <EnglandGolfMarker user={f} size="14px"/>
+                    </div>
+                    <div style={{fontSize:11,color:'rgba(255,255,255,0.48)'}}>@{f.username||'user'}</div>
+                  </div>
+                </div>
+                <div style={{fontSize:18,color:'#F5D76E',fontWeight:950,textAlign:'right'}}>{formatHeaderHandicap(f.handicap)}</div>
+              </div>
+            ))
+            :<div style={{padding:18,textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.62)'}}>No friends yet. Tap the search icon to add someone.</div>
+          }
+        </div>
       </div>
     </div>
   );
