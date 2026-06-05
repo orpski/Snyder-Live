@@ -99,9 +99,9 @@ function loginFailureMessage(text: string) {
     return "England Golf says that username/member number or password is incorrect. Please re-enter them.";
   }
   if (/membership number/i.test(cleanText) && /password/i.test(cleanText) && /login|log in/i.test(cleanText)) {
-    return "England Golf did not accept those login details. Please check the member number and password.";
+    return "Could not verify those England Golf details with the quick check. Your existing saved login has not been changed.";
   }
-  return "Could not verify those England Golf details. Please try again.";
+  return "Could not verify those England Golf details with the quick check. Your existing saved login has not been changed.";
 }
 
 async function verifyEnglandGolfLogin(username: string, password: string) {
@@ -202,7 +202,7 @@ Deno.serve(async (req) => {
       needs_sync_confirmation: !!saveWithoutVerification,
       message: saveWithoutVerification
         ? "England Golf credentials saved. Run the handicap sync to confirm them."
-        : "England Golf credentials saved. Daily sync will update the handicap.",
+        : "England Golf username and password verified. Daily sync will update the handicap.",
     });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : String(error) }, 500);
