@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.73
+// SNYDER GOLF v3.74
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.73',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.74',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -472,7 +472,7 @@ function roundPlayerPrimaryId(rp,isCup){
 }
 function mapRoundPlayerForScorecard(rp,isCup){
   const id=roundPlayerPrimaryId(rp,isCup);
-  return {id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0,user_id:rp.user_id,guest_id:rp.guest_id,cup_player_id:rp.cup_player_id,round_player_id:rp.id};
+  return {id,name:rp.display_name,display_name:rp.display_name,current_handicap:rp.playing_handicap||0,handicap:rp.playing_handicap||0,user_id:rp.user_id,guest_id:rp.guest_id,cup_player_id:rp.cup_player_id,round_player_id:rp.id,avatar_image:rp.avatar_image,avatar_url:rp.avatar_url};
 }
 function scoreAliasesForPerson(person){
   return [person&&person.id,person&&person.user_id,person&&person.guest_id,person&&person.cup_player_id,person&&person.round_player_id].filter(Boolean).map(String);
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.73" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.73</span>
+          <span aria-label="App version v3.74" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.74</span>
         </button>
       </div>
 
@@ -4251,15 +4251,25 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   });
   function scorecardPlayerProfile(player){
     if(!player)return {display_name:'Player'};
-    const ids=[player.id,player.user_id,player.guest_id,player.cup_player_id,player.round_player_id].filter(Boolean).map(normaliseId);
+    const seedIds=[player.id,player.user_id,player.guest_id,player.cup_player_id,player.round_player_id].filter(Boolean).map(normaliseId);
+    const expandedIds=new Set(seedIds);
     const playerName=String(player.display_name||player.name||'').trim().toLowerCase();
-    const source=[player,...(allRoundPlayers||[]),...(players||[])].find(candidate=>{
-      if(!candidate)return false;
-      const candidateIds=[candidate.id,candidate.user_id,candidate.guest_id,candidate.cup_player_id,candidate.round_player_id].filter(Boolean).map(normaliseId);
-      if(ids.length&&candidateIds.some(id=>ids.includes(id)))return true;
+    const pool=[player,...(allRoundPlayers||[]),...(players||[])].filter(Boolean);
+    const isNameMatch=candidate=>{
       const candidateName=String(candidate.display_name||candidate.name||'').trim().toLowerCase();
       return !!playerName&&!!candidateName&&candidateName===playerName;
-    })||{};
+    };
+    const firstMatches=pool.filter(candidate=>{
+      if(!candidate)return false;
+      const candidateIds=[candidate.id,candidate.user_id,candidate.guest_id,candidate.cup_player_id,candidate.round_player_id].filter(Boolean).map(normaliseId);
+      return (seedIds.length&&candidateIds.some(id=>expandedIds.has(id)))||isNameMatch(candidate);
+    });
+    firstMatches.forEach(candidate=>[candidate.id,candidate.user_id,candidate.guest_id,candidate.cup_player_id,candidate.round_player_id].filter(Boolean).forEach(id=>expandedIds.add(normaliseId(id))));
+    const matches=pool.filter(candidate=>{
+      const candidateIds=[candidate.id,candidate.user_id,candidate.guest_id,candidate.cup_player_id,candidate.round_player_id].filter(Boolean).map(normaliseId);
+      return candidateIds.some(id=>expandedIds.has(id))||isNameMatch(candidate);
+    });
+    const source=matches.find(candidate=>userAvatarImage(candidate))||matches[0]||{};
     return {
       ...source,
       ...player,
