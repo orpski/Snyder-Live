@@ -93,15 +93,12 @@ function hiddenFields(html: string) {
   return fields;
 }
 
-function loginFailureMessage(text: string) {
+function loginFailure(text: string) {
   const cleanText = String(text || "").replace(/\s+/g, " ").trim();
   if (/invalid|incorrect|not recognised|not recognized|unable to log|try again|failed/i.test(cleanText)) {
-    return "England Golf says that username/member number or password is incorrect. Please re-enter them.";
+    return { definite: true, message: "England Golf says that username/member number or password is incorrect. Please re-enter them." };
   }
-  if (/membership number/i.test(cleanText) && /password/i.test(cleanText) && /login|log in/i.test(cleanText)) {
-    return "Could not verify those England Golf details with the quick check. Your existing saved login has not been changed.";
-  }
-  return "Could not verify those England Golf details with the quick check. Your existing saved login has not been changed.";
+  return { definite: false, message: "England Golf login saved. It will be confirmed on the next handicap sync." };
 }
 
 async function verifyEnglandGolfLogin(username: string, password: string) {
@@ -128,8 +125,10 @@ async function verifyEnglandGolfLogin(username: string, password: string) {
   const text = posted.text;
   const stillLogin = /ctl74_tbMembershipNumber|ctl74_tbPassword|Membership Number/i.test(text) && /Forgot Password|Login/i.test(text);
   const accepted = /Log out|My Overview|My Scores|My Handicap|Handicap Index/i.test(text) && !stillLogin;
-  if (!accepted) return { ok: false, error: loginFailureMessage(text) };
-  return { ok: true };
+  if (accepted) return { ok: true, needsSyncConfirmation: false };
+  const failure = loginFailure(text);
+  if (failure.definite) return { ok: false, error: failure.message };
+  return { ok: true, needsSyncConfirmation: true };
 }
 
 Deno.serve(async (req) => {
@@ -137,7 +136,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
-    const { userId, playerPin, username, password, saveWithoutVerification } = await req.json();
+    const { userId, playerPin, username, password } = await req.json();
     if (!userId || !playerPin || !username || !password) {
       return json({ error: "Missing user, PIN, username or password" }, 400);
     }
@@ -158,15 +157,12 @@ Deno.serve(async (req) => {
       return json({ error: "Could not verify player account" }, 403);
     }
 
-    if (!saveWithoutVerification) {
-      const loginCheck = await verifyEnglandGolfLogin(String(username), String(password));
-      if (!loginCheck.ok) {
-        return json({
-          error: loginCheck.error,
-          canSaveAnyway: true,
-          message: "Your existing saved England Golf login has not been changed.",
-        }, 400);
-      }
+    const loginCheck = await verifyEnglandGolfLogin(String(username), String(password));
+    if (!loginCheck.ok) {
+      return json({
+        error: loginCheck.error,
+        message: "Your existing saved England Golf login has not been changed.",
+      }, 400);
     }
 
     const encrypted = await encryptPassword(String(password));
@@ -188,7 +184,7 @@ Deno.serve(async (req) => {
       .from("cup_users")
       .update({
         england_golf_member_no: String(username).trim(),
-        england_golf_sync_error: saveWithoutVerification ? "Saved new login details. Waiting for next sync to confirm." : null,
+        england_golf_sync_error: loginCheck.needsSyncConfirmation ? "Saved new login details. Waiting for next sync to confirm." : null,
       })
       .eq("id", userId);
 
@@ -199,9 +195,9 @@ Deno.serve(async (req) => {
       connected: true,
       handicap: user.handicap,
       synced_at: null,
-      needs_sync_confirmation: !!saveWithoutVerification,
-      message: saveWithoutVerification
-        ? "England Golf credentials saved. Run the handicap sync to confirm them."
+      needs_sync_confirmation: !!loginCheck.needsSyncConfirmation,
+      message: loginCheck.needsSyncConfirmation
+        ? "England Golf login saved. It will be confirmed on the next handicap sync."
         : "England Golf username and password verified. Daily sync will update the handicap.",
     });
   } catch (error) {

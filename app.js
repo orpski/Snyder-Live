@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.68
+// SNYDER GOLF v3.69
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.68',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.69',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.68" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.68</span>
+          <span aria-label="App version v3.69" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.69</span>
         </button>
       </div>
 
@@ -2500,7 +2500,6 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
   const[egPassword,setEgPassword]=useState('');
   const[egConnecting,setEgConnecting]=useState(false);
   const[egConnectStatus,setEgConnectStatus]=useState('');
-  const[egCanSaveAnyway,setEgCanSaveAnyway]=useState(false);
   const[egEditingLogin,setEgEditingLogin]=useState(!(currentUser&&currentUser.england_golf_member_no));
   const myRounds=rounds.filter(r=>groups.some(g=>g.round_id===r.id&&(g.player_ids||[]).includes(currentUser&&currentUser.id)));
 
@@ -2531,34 +2530,29 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
     flash('Handicap updated');setEditing(false);
   }
 
-  async function connectEnglandGolf(saveWithoutVerification=false){
+  async function connectEnglandGolf(){
     if(!currentUser||!currentUser.id)return;
     if(!egUsername.trim()||!egPassword.trim()){flash('Enter your England Golf login details','error');return;}
     setEgConnecting(true);
-    setEgCanSaveAnyway(false);
-    setEgConnectStatus(saveWithoutVerification?'Saving login for next sync confirmation...':'Checking your England Golf login...');
+    setEgConnectStatus('Checking your England Golf login...');
     try{
       const payload={
         userId:currentUser.id,
         playerPin:currentUser.pin,
         username:egUsername.trim(),
-        password:egPassword,
-        saveWithoutVerification
+        password:egPassword
       };
       const invokePromise=sb.functions.invoke('england-golf-connect',{body:payload});
       const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('Connection timed out while checking England Golf. Please try again.')),45000));
       const {data,error}=await Promise.race([invokePromise,timeoutPromise]);
       if(error){
         let functionMessage='';
-        let canSaveAnyway=false;
         try{
           if(error.context&&typeof error.context.json==='function'){
             const body=await error.context.json();
             functionMessage=body&&body.error||'';
-            canSaveAnyway=!!(body&&body.canSaveAnyway);
           }
         }catch(_e){}
-        if(canSaveAnyway)setEgCanSaveAnyway(true);
         throw new Error(functionMessage||error.message||error.name||String(error));
       }
       if(data&&data.error)throw new Error(data.error);
@@ -2574,10 +2568,9 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
       try{localStorage.setItem('snyder_user',JSON.stringify(updated));}catch(e){}
       setHcp(nextHandicap);
       setEgPassword('');
-      setEgCanSaveAnyway(false);
-      setEgConnectStatus(data&&data.needs_sync_confirmation?'Saved. Run the handicap sync to confirm this login.':'Username and password verified. Daily sync will update your handicap.');
+      setEgConnectStatus(data&&data.needs_sync_confirmation?'Login saved. It will be confirmed on the next handicap sync.':'Username and password verified. Daily sync will update your handicap.');
       setEgEditingLogin(false);
-      flash(data&&data.needs_sync_confirmation?'England Golf login saved for sync confirmation':'England Golf connected');
+      flash(data&&data.needs_sync_confirmation?'England Golf login saved':'England Golf connected');
       load&&load();
     }catch(e){
       const msg=e.message||String(e);
@@ -2621,8 +2614,7 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
             <input value={egUsername} onChange={e=>setEgUsername(e.target.value)} inputMode="numeric" autoComplete="username" style={{...S.inp,marginBottom:10}} placeholder="e.g. 1009120266"/>
             <label style={S.lbl}>England Golf password</label>
             <input value={egPassword} onChange={e=>setEgPassword(e.target.value)} type="password" autoComplete="current-password" style={{...S.inp,marginBottom:10}} placeholder={currentUser&&currentUser.england_golf_member_no?'Enter password to update saved login':'Password'}/>
-            <button onClick={()=>connectEnglandGolf(false)} disabled={egConnecting} style={{...S.pri,width:'100%',padding:13,opacity:egConnecting?0.65:1}}>{egConnecting?'Connecting...':(currentUser&&currentUser.england_golf_member_no?'Update England Golf Login':'Connect England Golf')}</button>
-            {egCanSaveAnyway&&<button onClick={()=>connectEnglandGolf(true)} disabled={egConnecting} style={{...S.gho,width:'100%',padding:11,fontSize:12,marginTop:8,borderColor:'rgba(245,215,110,0.42)',color:'#F5D76E'}}>Save Anyway - Confirm On Next Sync</button>}
+            <button onClick={connectEnglandGolf} disabled={egConnecting} style={{...S.pri,width:'100%',padding:13,opacity:egConnecting?0.65:1}}>{egConnecting?'Connecting...':(currentUser&&currentUser.england_golf_member_no?'Update England Golf Login':'Connect England Golf')}</button>
           </>}
           {currentUser&&currentUser.england_golf_member_no&&!egEditingLogin&&<button onClick={()=>setEgEditingLogin(true)} style={{...S.gho,width:'100%',padding:11,fontSize:13}}>Update England Golf Login</button>}
           {egConnectStatus&&<div style={{fontSize:12,color:egConnectStatus.toLowerCase().includes('failed')?'#fca5a5':'#86efac',marginTop:10,lineHeight:1.45}}>{egConnectStatus}</div>}
