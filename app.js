@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.71
+// SNYDER GOLF v3.72
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.71',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.72',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.71" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.71</span>
+          <span aria-label="App version v3.72" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.72</span>
         </button>
       </div>
 
@@ -2498,6 +2498,7 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
   const[hcp,setHcp]=useState(currentUser&&currentUser.handicap||0);
   const[egUsername,setEgUsername]=useState(currentUser&&currentUser.england_golf_member_no||'');
   const[egPassword,setEgPassword]=useState('');
+  const[egShowPassword,setEgShowPassword]=useState(false);
   const[egConnecting,setEgConnecting]=useState(false);
   const[egConnectStatus,setEgConnectStatus]=useState('');
   const[egEditingLogin,setEgEditingLogin]=useState(!(currentUser&&currentUser.england_golf_member_no));
@@ -2571,6 +2572,7 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
       try{localStorage.setItem('snyder_user',JSON.stringify(updated));}catch(e){}
       setHcp(nextHandicap);
       setEgPassword('');
+      setEgShowPassword(false);
       setEgConnectStatus(data&&data.needs_sync_confirmation?'':'Username and password verified. Daily sync will update your handicap.');
       setEgEditingLogin(false);
       flash(data&&data.needs_sync_confirmation?'England Golf login saved':'England Golf connected');
@@ -2616,7 +2618,12 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
             <label style={S.lbl}>England Golf username / member number</label>
             <input value={egUsername} onChange={e=>setEgUsername(e.target.value)} inputMode="numeric" autoComplete="username" style={{...S.inp,marginBottom:10}} placeholder="e.g. 1009120266"/>
             <label style={S.lbl}>England Golf password</label>
-            <input value={egPassword} onChange={e=>setEgPassword(e.target.value)} type="password" autoComplete="current-password" style={{...S.inp,marginBottom:10}} placeholder={currentUser&&currentUser.england_golf_member_no?'Enter password to update saved login':'Password'}/>
+            <div style={{position:'relative',marginBottom:10}}>
+              <input value={egPassword} onChange={e=>setEgPassword(e.target.value)} type={egShowPassword?'text':'password'} autoComplete="current-password" style={{...S.inp,paddingRight:78}} placeholder={currentUser&&currentUser.england_golf_member_no?'Enter password to update saved login':'Password'}/>
+              <button type="button" onClick={()=>setEgShowPassword(v=>!v)} aria-label={egShowPassword?'Hide England Golf password':'Show England Golf password'} style={{position:'absolute',right:6,top:6,bottom:6,minWidth:58,border:'1px solid rgba(255,255,255,0.14)',borderRadius:8,background:'rgba(255,255,255,0.08)',color:'#90ccf0',fontSize:11,fontWeight:900}}>
+                {egShowPassword?'Hide':'Show'}
+              </button>
+            </div>
             <button onClick={connectEnglandGolf} disabled={egConnecting} style={{...S.pri,width:'100%',padding:13,opacity:egConnecting?0.65:1}}>{egConnecting?'Connecting...':(currentUser&&currentUser.england_golf_member_no?'Update England Golf Login':'Connect England Golf')}</button>
           </>}
           {currentUser&&currentUser.england_golf_member_no&&!egEditingLogin&&<button onClick={()=>setEgEditingLogin(true)} style={{...S.gho,width:'100%',padding:11,fontSize:13}}>Update England Golf Login</button>}
