@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.74
+// SNYDER GOLF v3.75
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.74',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.75',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.74" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.74</span>
+          <span aria-label="App version v3.75" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.75</span>
         </button>
       </div>
 
@@ -3901,7 +3901,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   // Scorecard handoff
   // ---------------------------------------------------------
   if(step==='scorecard'&&activeRound&&activeGroup){
-    return <LiveScorecard round={activeRound} group={activeGroup} players={players} courses={courses} rounds={rounds} scores={scores} sb={sb} flash={flash} load={load} setView={setView} holeScores={holeScores} setHoleScores={setHoleScores} currentUser={currentUser}/>;
+    return <LiveScorecard round={activeRound} group={activeGroup} players={[...(players||[]),...(cupUsers||[])]} courses={courses} rounds={rounds} scores={scores} sb={sb} flash={flash} load={load} setView={setView} holeScores={holeScores} setHoleScores={setHoleScores} currentUser={currentUser}/>;
   }
 
     // ---------------------------------------------------------
@@ -4254,7 +4254,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const seedIds=[player.id,player.user_id,player.guest_id,player.cup_player_id,player.round_player_id].filter(Boolean).map(normaliseId);
     const expandedIds=new Set(seedIds);
     const playerName=String(player.display_name||player.name||'').trim().toLowerCase();
-    const pool=[player,...(allRoundPlayers||[]),...(players||[])].filter(Boolean);
+    const pool=[player,...(allRoundPlayers||[]),...((round&&round._cupDayAllPlayers)||[]),...(players||[])].filter(Boolean);
     const isNameMatch=candidate=>{
       const candidateName=String(candidate.display_name||candidate.name||'').trim().toLowerCase();
       return !!playerName&&!!candidateName&&candidateName===playerName;
