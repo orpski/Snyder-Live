@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.65
+// SNYDER GOLF v3.66
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.65',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.66',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.65" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.65</span>
+          <span aria-label="App version v3.66" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.66</span>
         </button>
       </div>
 
@@ -2534,7 +2534,7 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
     if(!currentUser||!currentUser.id)return;
     if(!egUsername.trim()||!egPassword.trim()){flash('Enter your England Golf login details','error');return;}
     setEgConnecting(true);
-    setEgConnectStatus('Connecting to secure England Golf setup...');
+    setEgConnectStatus('Checking your England Golf login...');
     try{
       const payload={
         userId:currentUser.id,
@@ -2543,9 +2543,18 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
         password:egPassword
       };
       const invokePromise=sb.functions.invoke('england-golf-connect',{body:payload});
-      const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('Connection timed out. Check the england-golf-connect Edge Function is deployed.')),20000));
+      const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('Connection timed out while checking England Golf. Please try again.')),45000));
       const {data,error}=await Promise.race([invokePromise,timeoutPromise]);
-      if(error)throw new Error(error.message||error.name||String(error));
+      if(error){
+        let functionMessage='';
+        try{
+          if(error.context&&typeof error.context.json==='function'){
+            const body=await error.context.json();
+            functionMessage=body&&body.error||'';
+          }
+        }catch(_e){}
+        throw new Error(functionMessage||error.message||error.name||String(error));
+      }
       if(data&&data.error)throw new Error(data.error);
       const nextHandicap=Number.isFinite(parseFloat(data&&data.handicap))?parseFloat(data.handicap):parseFloat(currentUser.handicap)||0;
       const updated={
@@ -2595,7 +2604,7 @@ function ProfileView({currentUser,rounds,groups,sb,flash,setView,load,setCurrent
         </div>
         <div style={{...S.card,marginBottom:16}}>
           <div style={{fontSize:16,color:'#fff',fontWeight:900,marginBottom:6}}>England Golf</div>
-          <div style={{fontSize:12,color:'#90ccf0',lineHeight:1.45,marginBottom:12}}>Connect once and the server can refresh your handicap index daily. Your password is sent only to the secure backend function and is never saved in this app.</div>
+          <div style={{fontSize:12,color:'#90ccf0',lineHeight:1.45,marginBottom:12}}>Connect once and the server can refresh your handicap index daily. Your password is checked with England Golf, encrypted on the secure backend, and never saved in this app.</div>
           {currentUser&&currentUser.england_golf_member_no&&!egEditingLogin&&<div style={{padding:'10px 12px',borderRadius:10,background:'rgba(34,197,94,0.12)',border:'1px solid rgba(34,197,94,0.28)',marginBottom:10}}>
             <div style={{fontSize:13,color:'#86efac',fontWeight:900}}>Connected</div>
             <div style={{fontSize:11,color:'#bbf7d0',marginTop:3}}>Member no: {currentUser.england_golf_member_no} - daily sync runs automatically.</div>

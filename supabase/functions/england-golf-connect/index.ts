@@ -1,5 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const LOGIN_URL = "https://www.englandgolf.org/my-golf-login";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -47,6 +49,89 @@ async function encryptPassword(password: string) {
   };
 }
 
+function collectSetCookies(headers: Headers) {
+  const getSetCookie = (headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
+  const values = typeof getSetCookie === "function" ? getSetCookie.call(headers) : [headers.get("set-cookie") || ""];
+  return values
+    .filter(Boolean)
+    .map((value) => value.split(";")[0])
+    .filter(Boolean);
+}
+
+function mergeCookies(existing: string[], headers: Headers) {
+  const byName = new Map(existing.map((cookie) => [cookie.split("=")[0], cookie]));
+  collectSetCookies(headers).forEach((cookie) => byName.set(cookie.split("=")[0], cookie));
+  return Array.from(byName.values());
+}
+
+function absoluteUrl(value: string) {
+  return new URL(value, LOGIN_URL).toString();
+}
+
+async function fetchWithCookies(url: string, init: RequestInit = {}, cookies: string[] = [], redirects = 0): Promise<{ response: Response; text: string; cookies: string[]; url: string }> {
+  const headers = new Headers(init.headers || {});
+  if (cookies.length) headers.set("cookie", cookies.join("; "));
+  const response = await fetch(url, { ...init, headers, redirect: "manual" });
+  const nextCookies = mergeCookies(cookies, response.headers);
+  const location = response.headers.get("location");
+  if (location && response.status >= 300 && response.status < 400 && redirects < 5) {
+    return fetchWithCookies(absoluteUrl(location), { method: "GET" }, nextCookies, redirects + 1);
+  }
+  return { response, text: await response.text(), cookies: nextCookies, url };
+}
+
+function hiddenFields(html: string) {
+  const fields = new URLSearchParams();
+  const inputPattern = /<input\b[^>]*>/gi;
+  const attrPattern = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*["']([^"']*)["']/g;
+  for (const input of html.match(inputPattern) || []) {
+    const attrs: Record<string, string> = {};
+    for (const match of input.matchAll(attrPattern)) attrs[match[1].toLowerCase()] = match[2];
+    if ((attrs.type || "").toLowerCase() !== "hidden" || !attrs.name) continue;
+    fields.set(attrs.name, attrs.value || "");
+  }
+  return fields;
+}
+
+function loginFailureMessage(text: string) {
+  const cleanText = String(text || "").replace(/\s+/g, " ").trim();
+  if (/invalid|incorrect|not recognised|not recognized|unable to log|try again|failed/i.test(cleanText)) {
+    return "England Golf says that username/member number or password is incorrect. Please re-enter them.";
+  }
+  if (/membership number/i.test(cleanText) && /password/i.test(cleanText) && /login|log in/i.test(cleanText)) {
+    return "England Golf did not accept those login details. Please check the member number and password.";
+  }
+  return "Could not verify those England Golf details. Please try again.";
+}
+
+async function verifyEnglandGolfLogin(username: string, password: string) {
+  const first = await fetchWithCookies(LOGIN_URL, { method: "GET" });
+  const form = hiddenFields(first.text);
+  form.set("ctl74$tbMembershipNumber", username.trim());
+  form.set("ctl74$tbPassword", password);
+  form.set("ctl74$btnLogin", "Login");
+
+  const posted = await fetchWithCookies(
+    "https://www.englandgolf.org/layouts/terraces_eg/Template.aspx?page=My+Golf+Login",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "referer": LOGIN_URL,
+        "user-agent": "SnyderGolf/1.0",
+      },
+      body: form.toString(),
+    },
+    first.cookies,
+  );
+
+  const text = posted.text;
+  const stillLogin = /ctl74_tbMembershipNumber|ctl74_tbPassword|Membership Number/i.test(text) && /Forgot Password|Login/i.test(text);
+  const accepted = /Log out|My Overview|My Scores|My Handicap|Handicap Index/i.test(text) && !stillLogin;
+  if (!accepted) return { ok: false, error: loginFailureMessage(text) };
+  return { ok: true };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -71,6 +156,11 @@ Deno.serve(async (req) => {
 
     if (userError || !user || String(user.pin) !== String(playerPin)) {
       return json({ error: "Could not verify player account" }, 403);
+    }
+
+    const loginCheck = await verifyEnglandGolfLogin(String(username), String(password));
+    if (!loginCheck.ok) {
+      return json({ error: loginCheck.error }, 400);
     }
 
     const encrypted = await encryptPassword(String(password));
