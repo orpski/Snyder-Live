@@ -95,7 +95,7 @@ function hiddenFields(html: string) {
 
 function loginFailure(text: string) {
   const cleanText = String(text || "").replace(/\s+/g, " ").trim();
-  if (/invalid|incorrect|not recognised|not recognized|unable to log|try again|failed/i.test(cleanText)) {
+  if (/invalid\s+(membership|member|username|password|login)|incorrect\s+(membership|member|username|password|login)|not\s+recognised|not\s+recognized|unable\s+to\s+log\s+in/i.test(cleanText)) {
     return { definite: true, message: "England Golf says that username/member number or password is incorrect. Please re-enter them." };
   }
   return { definite: false, message: "England Golf login saved. It will be confirmed on the next handicap sync." };
@@ -157,7 +157,10 @@ Deno.serve(async (req) => {
       return json({ error: "Could not verify player account" }, 403);
     }
 
-    const loginCheck = await verifyEnglandGolfLogin(String(username), String(password));
+    const loginCheck = await verifyEnglandGolfLogin(String(username), String(password)).catch(() => ({
+      ok: true,
+      needsSyncConfirmation: true,
+    }));
     if (!loginCheck.ok) {
       return json({
         error: loginCheck.error,
