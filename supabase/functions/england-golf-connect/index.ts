@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
-    const { userId, playerPin, username, password } = await req.json();
+    const { userId, playerPin, username, password, saveWithoutVerification } = await req.json();
     if (!userId || !playerPin || !username || !password) {
       return json({ error: "Missing user, PIN, username or password" }, 400);
     }
@@ -158,9 +158,15 @@ Deno.serve(async (req) => {
       return json({ error: "Could not verify player account" }, 403);
     }
 
-    const loginCheck = await verifyEnglandGolfLogin(String(username), String(password));
-    if (!loginCheck.ok) {
-      return json({ error: loginCheck.error }, 400);
+    if (!saveWithoutVerification) {
+      const loginCheck = await verifyEnglandGolfLogin(String(username), String(password));
+      if (!loginCheck.ok) {
+        return json({
+          error: loginCheck.error,
+          canSaveAnyway: true,
+          message: "Your existing saved England Golf login has not been changed.",
+        }, 400);
+      }
     }
 
     const encrypted = await encryptPassword(String(password));
@@ -182,7 +188,7 @@ Deno.serve(async (req) => {
       .from("cup_users")
       .update({
         england_golf_member_no: String(username).trim(),
-        england_golf_sync_error: null,
+        england_golf_sync_error: saveWithoutVerification ? "Saved new login details. Waiting for next sync to confirm." : null,
       })
       .eq("id", userId);
 
@@ -193,7 +199,10 @@ Deno.serve(async (req) => {
       connected: true,
       handicap: user.handicap,
       synced_at: null,
-      message: "England Golf credentials saved. Daily sync will update the handicap.",
+      needs_sync_confirmation: !!saveWithoutVerification,
+      message: saveWithoutVerification
+        ? "England Golf credentials saved. Run the handicap sync to confirm them."
+        : "England Golf credentials saved. Daily sync will update the handicap.",
     });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : String(error) }, 500);

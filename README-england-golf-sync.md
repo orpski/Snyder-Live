@@ -38,7 +38,7 @@ supabase secrets set ENGLAND_GOLF_CREDENTIAL_KEY=...
 supabase secrets set SERVICE_ROLE_KEY=...
 ```
 
-The frontend never stores England Golf passwords. It sends them to `england-golf-connect`, which checks the login with England Golf, then encrypts the password before writing it to Supabase. If England Golf rejects the details, the player is asked to re-enter their username/member number and password.
+The frontend never stores England Golf passwords. It sends them to `england-golf-connect`, which tries a quick login check with England Golf, then encrypts the password before writing it to Supabase. If the quick check rejects the details, the existing saved login is left unchanged and the player can re-enter them. If the quick check is falsely rejected, the player can save anyway and confirm on the next GitHub handicap sync.
 
 ## Daily Sync
 
