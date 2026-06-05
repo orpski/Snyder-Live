@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.72
+// SNYDER GOLF v3.73
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.72',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.73',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.72" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.72</span>
+          <span aria-label="App version v3.73" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.73</span>
         </button>
       </div>
 
@@ -4249,6 +4249,39 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const p=allRoundPlayers.find(pl=>normaliseId(pl.id)===normaliseId(id))||players.find(pl=>normaliseId(pl.id)===normaliseId(id));
     return p||{id,name:'Player',display_name:'Player',current_handicap:playingHcps[id]||0};
   });
+  function scorecardPlayerProfile(player){
+    if(!player)return {display_name:'Player'};
+    const ids=[player.id,player.user_id,player.guest_id,player.cup_player_id,player.round_player_id].filter(Boolean).map(normaliseId);
+    const playerName=String(player.display_name||player.name||'').trim().toLowerCase();
+    const source=[player,...(allRoundPlayers||[]),...(players||[])].find(candidate=>{
+      if(!candidate)return false;
+      const candidateIds=[candidate.id,candidate.user_id,candidate.guest_id,candidate.cup_player_id,candidate.round_player_id].filter(Boolean).map(normaliseId);
+      if(ids.length&&candidateIds.some(id=>ids.includes(id)))return true;
+      const candidateName=String(candidate.display_name||candidate.name||'').trim().toLowerCase();
+      return !!playerName&&!!candidateName&&candidateName===playerName;
+    })||{};
+    return {
+      ...source,
+      ...player,
+      display_name:player.display_name||player.name||source.display_name||source.name||'Player',
+      name:player.name||player.display_name||source.name||source.display_name||'Player',
+      avatar_image:player.avatar_image||source.avatar_image,
+      avatar_url:player.avatar_url||source.avatar_url
+    };
+  }
+  function ScorecardPlayerBadge({player,size=30,compact=false,align='center',showHcp=false}){
+    const profile=scorecardPlayerProfile(player);
+    const name=gameFirstName(profile.display_name||profile.name||'?');
+    return (
+      <div style={{display:'flex',alignItems:'center',justifyContent:align==='left'?'flex-start':'center',gap:compact?5:7,minWidth:0}}>
+        <Avatar user={profile} size={size}/>
+        <div style={{minWidth:0,textAlign:align==='left'?'left':'center'}}>
+          <div style={{fontSize:compact?11:13,color:'#fff',fontWeight:900,lineHeight:1.05,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{name}</div>
+          {showHcp&&<div style={{fontSize:9,color:'#90ccf0',fontWeight:800,lineHeight:1.1,marginTop:2}}>HCP {playingHcps[player.id]||0}</div>}
+        </div>
+      </div>
+    );
+  }
 
   // Determine if current user can edit.
   // Cup scorecards are locked to the signed-in player actually assigned to this scorecard.
@@ -6065,7 +6098,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         <div style={{padding:'6px 12px',fontSize:11,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(0,0,0,0.3)'}}>{label}</div>
         <div style={{display:'grid',gridTemplateColumns:'80px 1fr 1fr',padding:'8px 12px',borderBottom:'1px solid rgba(255,255,255,0.1)',background:'linear-gradient(135deg,rgba(0,50,120,0.72),rgba(0,112,187,0.32))',gap:6,alignItems:'center'}}>
           <div style={{fontSize:9,color:'#60b8f0',textTransform:'uppercase',letterSpacing:'0.08em'}}>Hole</div>
-          {names.map((n,i)=><div key={i} style={{textAlign:'center',minWidth:0}}><div style={{fontSize:16,color:'#fff',fontWeight:950,lineHeight:1.08,whiteSpace:'normal',overflowWrap:'anywhere'}}>{n}</div><div style={{fontSize:10,color:'#90ccf0',fontWeight:800}}>{shots[i]?shots[i]+' shots':'No shots'}</div></div>)}
+          {names.map((n,i)=><div key={i} style={{textAlign:'center',minWidth:0}}><ScorecardPlayerBadge player={{id:teamIds[i],display_name:n,name:n}} size={28} compact/><div style={{fontSize:10,color:'#90ccf0',fontWeight:800,marginTop:2}}>{shots[i]?shots[i]+' shots':'No shots'}</div></div>)}
         </div>
         {list.map((hd,i)=>{const vals=teamIds.map(id=>(holeScores[hd.hole]||{})[id]);return <div key={hd.hole} style={{display:'grid',gridTemplateColumns:'80px 1fr 1fr',minHeight:74,borderBottom:'1px solid rgba(255,255,255,0.06)',background:i%2===0?'rgba(255,255,255,0.03)':'rgba(255,255,255,0.06)'}}>
           <div style={{padding:'8px 12px',background:'rgba(0,0,0,0.18)'}}><div style={{fontSize:26,color:'#fff',fontWeight:300}}>{hd.hole}</div><div style={{fontSize:12,color:'#60b8f0'}}>Par {hd.par}</div><div style={{fontSize:11,color:'#d4af37',fontWeight:800}}>SI {hd.stroke_index}</div></div>
@@ -6098,7 +6131,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         <div style={{padding:'6px 12px',fontSize:11,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(0,0,0,0.3)'}}>{label}</div>
         <div style={{display:'grid',gridTemplateColumns:'80px 1fr 1fr',padding:'8px 12px',borderBottom:'1px solid rgba(255,255,255,0.1)',background:'linear-gradient(135deg,rgba(0,50,120,0.72),rgba(0,112,187,0.32))',gap:6,alignItems:'center'}}>
           <div style={{fontSize:9,color:'#60b8f0',textTransform:'uppercase',letterSpacing:'0.08em'}}>Hole</div>
-          {names.map((n,i)=><div key={i} style={{textAlign:'center',minWidth:0}}><div style={{fontSize:16,color:'#fff',fontWeight:950,lineHeight:1.08,whiteSpace:'normal',overflowWrap:'anywhere'}}>{n}</div><div style={{fontSize:10,color:'#90ccf0',fontWeight:800}}>{shots[i]?shots[i]+' shots':'No shots'}</div></div>)}
+          {names.map((n,i)=><div key={i} style={{textAlign:'center',minWidth:0}}><ScorecardPlayerBadge player={{id:ids[i],display_name:n,name:n}} size={28} compact/><div style={{fontSize:10,color:'#90ccf0',fontWeight:800,marginTop:2}}>{shots[i]?shots[i]+' shots':'No shots'}</div></div>)}
         </div>
         {list.map((hd,i)=>{const vals=ids.map(id=>(holeScores[hd.hole]||{})[id]);return <div key={hd.hole} style={{display:'grid',gridTemplateColumns:'80px 1fr 1fr',minHeight:74,borderBottom:'1px solid rgba(255,255,255,0.06)',background:i%2===0?'rgba(255,255,255,0.03)':'rgba(255,255,255,0.06)'}}>
           <div style={{padding:'8px 12px',background:'rgba(0,0,0,0.18)'}}><div style={{fontSize:26,color:'#fff',fontWeight:300}}>{hd.hole}</div><div style={{fontSize:12,color:'#60b8f0'}}>Par {hd.par}</div><div style={{fontSize:11,color:'#d4af37',fontWeight:800}}>SI {hd.stroke_index}</div></div>
@@ -6358,8 +6391,9 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         {leagueSubmitLoading&&!data&&<div style={{fontSize:13,color:'#90ccf0',padding:'10px 0'}}>Checking League players...</div>}
         {data&&!leagueSubmitLinkCloud&&<div style={{marginBottom:9,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.12)',border:'1px solid rgba(245,158,11,0.24)',fontSize:11,color:'#fbbf24'}}>League links are saved on this device until the cloud link table is added.</div>}
         {data&&<div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {data.rows.map(r=><div key={r.key} style={{display:'grid',gridTemplateColumns:'28px 1fr auto',gap:8,alignItems:'center',padding:'9px 10px',borderRadius:10,background:r.ready?'rgba(255,255,255,0.06)':'rgba(255,255,255,0.035)',border:'1px solid '+(r.ready?'rgba(134,239,172,0.16)':'rgba(255,255,255,0.08)')}}>
+          {data.rows.map(r=><div key={r.key} style={{display:'grid',gridTemplateColumns:'28px 34px 1fr auto',gap:8,alignItems:'center',padding:'9px 10px',borderRadius:10,background:r.ready?'rgba(255,255,255,0.06)':'rgba(255,255,255,0.035)',border:'1px solid '+(r.ready?'rgba(134,239,172,0.16)':'rgba(255,255,255,0.08)')}}>
             <input type="checkbox" disabled={!r.ready||leagueSubmitSubmitting} checked={!!leagueSubmitSelected[r.key]&&r.ready} onChange={e=>setLeagueSubmitSelected(prev=>({...prev,[r.key]:e.target.checked}))} />
+            <Avatar user={scorecardPlayerProfile(r.scorecardPlayer)} size={32}/>
             <div style={{minWidth:0}}>
               <div style={{fontSize:14,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{leagueSubmitPlayerName(r.scorecardPlayer)}</div>
               <div style={{fontSize:11,color:r.ready?'#86efac':'#fca5a5',marginTop:2}}>{r.status}</div>
@@ -6386,7 +6420,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
 
   function FinalStablefordSweepstakeBlock({topMargin=12}){
     if(!isCompletedRound(round)||round._cupScoring)return null;
-    const finalRows=[...grpPlayers].map(p=>({id:p.id,name:gameFirstName((p.name||p.display_name)||'?'),total:getRunning(p.id,holes.length)})).sort((a,b)=>b.total-a.total);
+    const finalRows=[...grpPlayers].map(p=>({id:p.id,name:gameFirstName((p.name||p.display_name)||'?'),player:p,total:getRunning(p.id,holes.length)})).sort((a,b)=>b.total-a.total);
     return <div style={{margin:topMargin+'px 16px 12px'}}>
       <div style={{...S.card,margin:0,background:'linear-gradient(135deg,rgba(0,112,187,0.22),rgba(255,255,255,0.05))',borderColor:'rgba(96,184,240,0.42)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
@@ -6398,6 +6432,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         </div>
         {finalRows.map((r,idx)=><div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:idx?'1px solid rgba(255,255,255,0.08)':'none'}}>
           <div style={{width:26,height:26,borderRadius:9,background:idx===0?'rgba(251,191,36,0.22)':'rgba(255,255,255,0.08)',border:'1px solid '+(idx===0?'rgba(251,191,36,0.38)':'rgba(255,255,255,0.10)'),display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:idx===0?'#fbbf24':'rgba(255,255,255,0.78)',fontWeight:950}}>{idx+1}</div>
+          <Avatar user={scorecardPlayerProfile(r.player)} size={30}/>
           <div style={{flex:1,fontSize:14,color:'#fff',fontWeight:850}}>{r.name}</div>
           <div style={{fontSize:24,color:'#60b8f0',fontWeight:950,lineHeight:1}}>{r.total} <span style={{fontSize:10,color:'#90ccf0',fontWeight:900}}>pts</span></div>
         </div>)}
@@ -6659,13 +6694,14 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   function MiniCard({holeList,label}){
     // Compact full-card layout: one column per player so all 4 player totals fit on mobile.
     const cols='42px 30px '+grpPlayers.map(()=>'minmax(54px,1fr)').join(' ');
-    const hdrs=['H','Par',...grpPlayers.map(p=>(((p.name||p.display_name)||'?').split(' ')[0]).slice(0,6))];
     return(
       <div style={{marginBottom:20}}>
         <div style={{fontSize:11,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:8,padding:'4px 12px',background:'rgba(0,0,0,0.3)'}}>{label}</div>
         <div style={{border:'1px solid rgba(255,255,255,0.1)',borderRadius:10,overflow:'hidden'}}>
           <div style={{display:'grid',gridTemplateColumns:cols,background:'rgba(59,111,212,0.15)',padding:'6px 6px',gap:4}}>
-            {hdrs.map((h,i)=><div key={i} style={{fontSize:9,color:'#60b8f0',textAlign:'center',textTransform:'uppercase',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{h}</div>)}
+            <div style={{fontSize:9,color:'#60b8f0',textAlign:'center',textTransform:'uppercase'}}>H</div>
+            <div style={{fontSize:9,color:'#60b8f0',textAlign:'center',textTransform:'uppercase'}}>Par</div>
+            {grpPlayers.map(p=><div key={'mini-head-'+p.id} style={{minWidth:0}}><ScorecardPlayerBadge player={p} size={22} compact/></div>)}
           </div>
           {holeList.map((hd,i)=>(
             <div key={hd.hole} style={{display:'grid',gridTemplateColumns:cols,padding:'6px 6px',gap:4,borderBottom:i<holeList.length-1?'1px solid rgba(255,255,255,0.06)':'none',background:i%2===0?'rgba(255,255,255,0.03)':'transparent',alignItems:'center'}}>
@@ -6725,7 +6761,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           <div style={{display:'flex',gap:10,marginBottom:16}}>
             {grpPlayers.map(p=>(
               <div key={p.id} style={{flex:1,...S.card,textAlign:'center'}}>
-                <div style={{fontSize:12,color:'#60b8f0',marginBottom:4}}>{gameFirstName((p.name||p.display_name)||'?')}</div>
+                <div style={{marginBottom:7}}><ScorecardPlayerBadge player={p} size={32} compact/></div>
                 <div style={{fontSize:32,color:'#fff',lineHeight:1}}>{back9.reduce((t,h)=>{const g=(holeScores[h.hole]||{})[p.id];return t+(g===-1?0:(getPts(g,h.hole,p.id)||0));},0)}</div>
                 <div style={{fontSize:10,color:'#60b8f0',marginTop:2}}>back 9</div>
                 <div style={{fontSize:13,color:'rgba(255,255,255,0.5)',marginTop:4}}>{getRunning(p.id,holes.length)} total</div>
@@ -6773,7 +6809,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           <div style={{...S.card}}>
             <div style={{display:'grid',gridTemplateColumns:'64px '+grpPlayers.map(()=>'minmax(54px,1fr)').join(' '),gap:6,alignItems:'center'}}>
               <div style={{fontSize:11,color:'#60b8f0'}}>Total</div>
-              {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',fontSize:11,color:'#60b8f0'}}>{gameFirstName((p.name||p.display_name)||'?')}</div>)}
+              {grpPlayers.map(p=><div key={p.id} style={{minWidth:0}}><ScorecardPlayerBadge player={p} size={24} compact/></div>)}
               <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:6}}>Gross</div>
               {grpPlayers.map(p=><div key={p.id} style={{textAlign:'center',borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:4,minHeight:54,display:'flex',alignItems:'center',justifyContent:'center'}}><GrossScoreStack text={grossOverParSummaryDisplay(p.id,holes)} size={20} overSize={15}/></div>)}
               <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',paddingTop:2}}>Points</div>
@@ -6803,7 +6839,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             return(
               <div key={p.id} style={{...S.card,marginBottom:16}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-                  <div style={{fontSize:18,color:'#fff'}}>{gameFirstName((p.name||p.display_name)||'?')}</div>
+                  <ScorecardPlayerBadge player={p} size={38} align="left"/>
                   <div style={{textAlign:'right'}}>
                     <div style={{fontSize:28,color:'#60b8f0',lineHeight:1}}>{getRunning(p.id,holes.length)}</div>
                     <div style={{fontSize:10,color:'rgba(255,255,255,0.4)'}}>pts</div>
@@ -6836,7 +6872,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           <div style={{display:'flex',gap:10,marginBottom:16}}>
             {grpPlayers.map(p=>(
               <div key={p.id} style={{flex:1,...S.card,textAlign:'center'}}>
-                <div style={{fontSize:12,color:'#60b8f0',marginBottom:4}}>{gameFirstName((p.name||p.display_name)||'?')}</div>
+                <div style={{marginBottom:7}}><ScorecardPlayerBadge player={p} size={32} compact/></div>
                 <div style={{fontSize:32,color:'#fff',lineHeight:1}}>{front9.reduce((t,h)=>{const g=(holeScores[h.hole]||{})[p.id];return t+(g===-1?0:(getPts(g,h.hole,p.id)||0));},0)}</div>
                 <div style={{fontSize:10,color:'#60b8f0',marginTop:2}}>front 9</div>
               </div>
@@ -6905,6 +6941,15 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             <span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap',textTransform:'capitalize'}}>{round.tee||'White'} tee</span>
             {course.slope_rating&&<span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap'}}>Slope {course.slope_rating}</span>}
             {course.course_rating&&<span style={{fontSize:12,color:'#90ccf0',whiteSpace:'nowrap'}}>Rating {course.course_rating}</span>}
+          </div>
+        )}
+        {activeGroupId!=='leaderboard'&&grpPlayers.length>0&&(
+          <div style={{padding:'7px 12px',display:'flex',gap:8,overflowX:'auto',borderTop:'1px solid rgba(255,255,255,0.08)',background:'rgba(0,0,0,0.12)'}}>
+            {grpPlayers.map(p=>(
+              <div key={'scorecard-top-'+p.id} style={{flex:'0 0 auto',minWidth:92,maxWidth:138,border:'1px solid rgba(96,184,240,0.18)',borderRadius:999,background:'rgba(255,255,255,0.055)',padding:'5px 9px'}}>
+                <ScorecardPlayerBadge player={p} size={26} compact align="left"/>
+              </div>
+            ))}
           </div>
         )}
         {round._cupScoring&&activeGroupId!=='leaderboard'&&(
@@ -6982,6 +7027,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'12px',background:idx===0?'rgba(184,134,11,0.15)':'rgba(255,255,255,0.06)',border:'1px solid '+(idx===0?'rgba(184,134,11,0.3)':'rgba(255,255,255,0.08)'),borderRadius:14,marginBottom:8}}>
             <div style={{width:30,textAlign:'center',fontSize:19,color:idx===0?'#fbbf24':'rgba(255,255,255,0.55)',fontWeight:900}}>{idx+1}</div>
             <div style={{width:10,height:10,borderRadius:'50%',background:groupColour(r.groupNumber||1),flexShrink:0}}></div>
+            <Avatar user={scorecardPlayerProfile({id:r.id,display_name:r.name,name:r.name})} size={34}/>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:16,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{gameName(r.name)}</div>
               <div style={{fontSize:11,color:'#90ccf0'}}>Group {groupLetter(r.groupNumber||1)} - thru {r.holes}</div>
@@ -7001,6 +7047,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
               </div>
               {overallLeaderboardRows().map((r,idx)=><div key={'final-'+r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:idx?'1px solid rgba(255,255,255,0.08)':'none'}}>
                 <div style={{width:26,height:26,borderRadius:9,background:idx===0?'rgba(251,191,36,0.22)':'rgba(255,255,255,0.08)',border:'1px solid '+(idx===0?'rgba(251,191,36,0.38)':'rgba(255,255,255,0.10)'),display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:idx===0?'#fbbf24':'rgba(255,255,255,0.78)',fontWeight:950}}>{idx+1}</div>
+                <Avatar user={scorecardPlayerProfile({id:r.id,display_name:r.name,name:r.name})} size={30}/>
                 <div style={{flex:1,fontSize:14,color:'#fff',fontWeight:850}}>{gameFirstName(r.name||'?')}</div>
                 <div style={{fontSize:24,color:'#60b8f0',fontWeight:950,lineHeight:1}}>{r.total} <span style={{fontSize:10,color:'#90ccf0',fontWeight:900}}>pts</span></div>
               </div>)}
@@ -7033,6 +7080,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
               return(
                 <div key={p.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',background:rank===0?'rgba(184,134,11,0.15)':'rgba(255,255,255,0.05)',borderRadius:10,border:rank===0?'1px solid rgba(184,134,11,0.3)':'1px solid rgba(255,255,255,0.08)'}}>
                   <div style={{fontSize:18,fontWeight:700,color:rank===0?'#fbbf24':'rgba(255,255,255,0.4)',width:24,textAlign:'center'}}>{rank+1}</div>
+                  <Avatar user={scorecardPlayerProfile(p)} size={34}/>
                   <div style={{flex:1}}>
                     <div style={{fontSize:14,color:'#fff',fontWeight:600}}>{gameFirstName(p.name||p.display_name||'?')}</div>
                     <div style={{fontSize:11,color:'#60b8f0'}}>{holesPlayed} holes played{lastHole>0?' - Hole '+lastHole:''}</div>
@@ -7063,9 +7111,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           <div style={{display:'grid',gridTemplateColumns:'80px '+grpPlayers.map(()=>'1fr').join(' '),padding:'4px 12px',borderBottom:'1px solid rgba(255,255,255,0.1)',background:'rgba(0,50,120,0.4)',gap:6,alignItems:'center'}}>
             <div style={{fontSize:9,color:'#60b8f0',textTransform:'uppercase',letterSpacing:'0.08em'}}>Hole</div>
             {grpPlayers.map(p=>(
-              <div key={p.id} style={{textAlign:'center',padding:'3px 0'}}>
-                <div style={{fontSize:16,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',letterSpacing:'0.01em'}}>{gameFirstName((p.name||p.display_name)||'?')}</div>
-                <div style={{fontSize:10,color:'#90ccf0',fontWeight:700}}>HCP {playingHcps[p.id]||0}</div>
+              <div key={p.id} style={{textAlign:'center',padding:'3px 0',minWidth:0}}>
+                <ScorecardPlayerBadge player={p} size={28} compact showHcp/>
               </div>
             ))}
           </div>
@@ -7202,6 +7249,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
               {rows.map((r,idx)=>{const tone=cupRankTone(idx,rows.length);return (
                 <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:tone.bg,border:'1px solid '+tone.border,borderRadius:12,marginBottom:8,boxShadow:idx<3?'0 10px 22px rgba(0,0,0,0.20)':'0 6px 14px rgba(0,0,0,0.12)'}}>
                   <div style={{width:48,textAlign:'center',fontSize:idx<3?21:18,color:tone.color,fontWeight:950,lineHeight:1.05}}>{cupRankLabel(idx,rows.length)}{cupForfeitMark(idx,rows.length,true)}</div>
+                  <Avatar user={scorecardPlayerProfile({id:r.id,display_name:r.name,name:r.name})} size={34}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:15,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{gameName(r.name)}</div>
                     <div style={{fontSize:11,color:'#90ccf0'}}>Thru {r.holes}</div>
@@ -7216,6 +7264,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             {overallMode!=='cupOverall'&&(()=>{const lbRows=overallLeaderboardRows();return lbRows.map((r,idx)=>{const tone=overallMode==='cupDay'?cupRankTone(idx,lbRows.length):null;return (
               <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:tone?tone.bg:(idx===0?'rgba(184,134,11,0.15)':'rgba(255,255,255,0.06)'),border:'1px solid '+(tone?tone.border:(idx===0?'rgba(184,134,11,0.3)':'rgba(255,255,255,0.08)')),borderRadius:12,marginBottom:8,boxShadow:tone?'0 6px 14px rgba(0,0,0,0.12)':'none'}}>
                 <div style={{width:tone?48:28,textAlign:'center',fontSize:tone&&idx<3?21:18,color:tone?tone.color:(idx===0?'#fbbf24':'rgba(255,255,255,0.48)'),fontWeight:900}}>{tone?cupRankLabel(idx,lbRows.length)+cupForfeitMark(idx,lbRows.length,false):idx+1}</div>
+                <Avatar user={scorecardPlayerProfile({id:r.id,display_name:r.name,name:r.name})} size={34}/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:15,color:'#fff',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{gameName(r.name)}</div>
                   <div style={{fontSize:11,color:'#60b8f0'}}>Thru {r.holes}</div>
