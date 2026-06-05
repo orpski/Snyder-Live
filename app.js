@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.63
+// SNYDER GOLF v3.64
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.63',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.64',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.63" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.63</span>
+          <span aria-label="App version v3.64" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.64</span>
         </button>
       </div>
 
@@ -7223,7 +7223,7 @@ function AdminPanel({courses,rounds,groups,sb,flash,setView,load,cupUsers,guests
   const[tab,setTab]=useState('courses');
   const[pw,setPw]=useState('');
   const[auth,setAuth]=useState(false);
-  const adminTabs=[['courses','Courses'],['days','Days'],['rounds','Rounds'],['users','Users'],['leagueLinks','League Links'],['cup','Cup']];
+  const adminTabs=[['courses','Courses'],['days','Days'],['rounds','Rounds'],['users','Users'],['englandGolf','England Golf'],['leagueLinks','League Links'],['cup','Cup']];
 
   if(!auth)return(
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
@@ -7251,6 +7251,7 @@ function AdminPanel({courses,rounds,groups,sb,flash,setView,load,cupUsers,guests
         {tab==='courses'&&<CoursesTab courses={courses} sb={sb} flash={flash} load={load}/>}
         {tab==='days'&&<DayBoardsTab rounds={rounds} sb={sb} flash={flash} load={load}/>}
         {tab==='rounds'&&<RoundsTab rounds={rounds} groups={groups} sb={sb} flash={flash} load={load}/>}
+        {tab==='englandGolf'&&<EnglandGolfAdminTab cupUsers={cupUsers}/>}
         {tab==='leagueLinks'&&<LeagueLinksAdminTab sb={sb} flash={flash} cupUsers={cupUsers} guests={guests}/>}
         {tab==='cup'&&<CupAdminTab sb={sb} flash={flash} load={load} cupUsers={cupUsers} cupEvents={cupEvents} cupTeams={cupTeams} cupEventPlayers={cupEventPlayers} cupDays={cupDays} cupMatches={cupMatches} courses={courses} rounds={rounds}/>}
         {tab==='users'&&(
@@ -7294,6 +7295,44 @@ function AdminPanel({courses,rounds,groups,sb,flash,setView,load,cupUsers,guests
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function EnglandGolfAdminTab({cupUsers}){
+  const linked=(cupUsers||[])
+    .filter(u=>u&&u.england_golf_member_no)
+    .sort((a,b)=>String(a.display_name||a.username||'').localeCompare(String(b.display_name||b.username||'')));
+  const formatSyncDate=value=>{
+    if(!value)return 'Never';
+    const date=new Date(value);
+    if(Number.isNaN(date.getTime()))return 'Unknown';
+    return date.toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'});
+  };
+  return(
+    <div>
+      <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.12em',margin:'0 0 8px'}}>ENGLAND GOLF LINKS</div>
+      <div style={{...S.card,marginBottom:10,borderColor:'rgba(96,184,240,0.22)',background:'rgba(0,112,187,0.10)',fontSize:12,color:'#90ccf0',lineHeight:1.45}}>
+        Shows who has connected England Golf and whether the last daily sync succeeded. Passwords are encrypted and never shown here.
+      </div>
+      {!linked.length&&<div style={{...S.card,fontSize:13,color:'rgba(255,255,255,0.55)',textAlign:'center'}}>No England Golf accounts linked yet.</div>}
+      {linked.map(u=>{
+        const failed=!!u.england_golf_sync_error;
+        return(
+          <div key={u.id} style={{...S.card,marginBottom:8,borderColor:failed?'rgba(248,113,113,0.32)':'rgba(34,197,94,0.24)',background:failed?'rgba(239,68,68,0.10)':'rgba(34,197,94,0.08)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'flex-start'}}>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:15,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.display_name||u.username||'Player'}</div>
+                <div style={{fontSize:11,color:'#90ccf0',marginTop:2}}>@{u.username||'user'} - Member {u.england_golf_member_no}</div>
+              </div>
+              <div style={{fontSize:18,color:'#F5D76E',fontWeight:950,whiteSpace:'nowrap'}}>{formatHeaderHandicap(u.handicap)}</div>
+            </div>
+            <div style={{fontSize:11,color:failed?'#fca5a5':'#bbf7d0',marginTop:8,lineHeight:1.4}}>
+              Last sync: {formatSyncDate(u.england_golf_last_sync_at)} - {failed?'Error: '+u.england_golf_sync_error:'OK'}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

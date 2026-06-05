@@ -113,7 +113,7 @@ async function main() {
   });
   const { data: rows, error } = await supabase
     .from('england_golf_credentials')
-    .select('user_id,username,password_ciphertext,password_iv,cup_users(handicap)');
+    .select('user_id,username,password_ciphertext,password_iv,cup_users(display_name,username,handicap)');
   if (error) throw error;
   if (!rows || !rows.length) {
     console.log('No England Golf credentials connected.');
@@ -123,6 +123,8 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   try {
     for (const row of rows) {
+      const playerName = (row.cup_users && (row.cup_users.display_name || row.cup_users.username)) || row.username;
+      const playerLabel = `${playerName} (${row.username})`;
       try {
         const oldHandicap = parseFloat(row.cup_users && row.cup_users.handicap);
         const password = decryptPassword(row);
@@ -148,10 +150,10 @@ async function main() {
             new_handicap: newHandicap,
           });
         }
-        console.log(`Updated ${row.username}: ${Number.isFinite(oldHandicap) ? oldHandicap : 'n/a'} -> ${newHandicap}`);
+        console.log(`Updated ${playerLabel}: ${Number.isFinite(oldHandicap) ? oldHandicap : 'n/a'} -> ${newHandicap}`);
       } catch (entryError) {
         await updateSyncError(supabase, row.user_id, entryError);
-        console.error(`Failed ${row.username}: ${entryError.message || entryError}`);
+        console.error(`Failed ${playerLabel}: ${entryError.message || entryError}`);
       }
     }
   } finally {
