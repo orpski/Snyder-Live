@@ -60,10 +60,56 @@ function handicapFromText(text) {
   return null;
 }
 
+function handicapFromPageText(text) {
+  const cleanText = String(text || '').replace(/\u00a0/g, ' ').replace(/\r/g, '\n');
+  const patterns = [
+    /My\s+Handicap\s+Index(?:®|Â®|\(R\))?[\s:\n]*([+-]?[0-9]{1,2}(?:\.[0-9])?)/i,
+    /Handicap\s+Index(?:®|Â®|\(R\))?[^0-9+-]{0,80}([+-]?[0-9]{1,2}(?:\.[0-9])?)/i,
+    /\bHI\b[^0-9+-]{0,40}([+-]?[0-9]{1,2}(?:\.[0-9])?)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = cleanText.match(pattern);
+    if (match) {
+      const value = parseFloat(match[1]);
+      if (Number.isFinite(value) && value >= -10 && value <= 54) return value;
+    }
+  }
+
+  const lines = cleanText.split('\n').map(line => line.trim()).filter(Boolean);
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (!/handicap\s+index/i.test(line) || /low\s+index/i.test(line)) continue;
+    const nearby = lines.slice(i, i + 6).join(' ');
+    const match = nearby.match(/([+-]?[0-9]{1,2}(?:\.[0-9])?)/);
+    if (match) {
+      const value = parseFloat(match[1]);
+      if (Number.isFinite(value) && value >= -10 && value <= 54) return value;
+    }
+  }
+
+  return handicapFromText(cleanText);
+}
+
+function pageHint(text, url) {
+  const cleanText = String(text || '').replace(/\s+/g, ' ').trim();
+  const hints = [];
+  if (/invalid|incorrect|failed|unable to log|try again/i.test(cleanText)) hints.push('login message found');
+  if (/password|username|log in|login/i.test(cleanText)) hints.push('still looks like login page');
+  if (/cookie|consent/i.test(cleanText)) hints.push('cookie/consent text found');
+  if (/handicap/i.test(cleanText)) hints.push('handicap text found');
+  return `Could not find Handicap Index after login. URL: ${url || 'unknown'}. ${hints.length ? 'Hints: ' + hints.join(', ') + '.' : 'No useful page hints found.'}`;
+}
+
 async function fetchHandicap(browser, username, password) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
   try {
     await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await clickFirst(page, [
+      'button:has-text("Accept")',
+      'button:has-text("Accept all")',
+      'button:has-text("I agree")',
+      'button:has-text("Allow all")',
+    ]).catch(() => {});
     await fillFirst(page, [
       'input[name="username"]',
       'input[name="email"]',
@@ -87,8 +133,8 @@ async function fetchHandicap(browser, username, password) {
     await page.waitForLoadState('networkidle', { timeout: 45000 }).catch(() => {});
     await page.waitForTimeout(3000);
     const text = await page.locator('body').innerText({ timeout: 15000 });
-    const handicap = handicapFromText(text);
-    if (handicap === null) throw new Error('Could not find Handicap Index after login');
+    const handicap = handicapFromPageText(text);
+    if (handicap === null) throw new Error(pageHint(text, page.url()));
     return handicap;
   } finally {
     await page.close().catch(() => {});
