@@ -343,6 +343,19 @@ function LeagueView({onExit}){
 
   async function approve(e){
     const playedDate=leagueScoreDateKey(e.date);
+    const{data:existingScore,error:existingScoreError}=await sb.from('scores')
+      .select('id')
+      .eq('player_id',e.player_id)
+      .eq('date',playedDate)
+      .limit(1);
+    if(existingScoreError){flash(`Approval failed: ${existingScoreError.message}`,'error');return;}
+    if(existingScore&&existingScore.length){
+      const{error:deleteDuplicatePendingError}=await sb.from('pending_scores').delete().eq('id',e.id);
+      if(deleteDuplicatePendingError){flash(`Duplicate score already approved, but pending row was not removed: ${deleteDuplicatePendingError.message}`,'error');return;}
+      flash(`Skipped duplicate ${e.player_name} score for ${fmtDate(playedDate)}.`);
+      load();
+      return;
+    }
     const{error:scoreError}=await sb.from('scores').insert({player_id:e.player_id,points:e.points,date:playedDate,is_double_chip:e.is_double_chip||false});
     if(scoreError){flash(`Approval failed: ${scoreError.message}`,'error');return;}
     if(e.is_double_chip){

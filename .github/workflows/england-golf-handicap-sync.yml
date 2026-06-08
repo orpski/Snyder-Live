@@ -3,7 +3,8 @@ name: England Golf handicap sync
 on:
   workflow_dispatch:
   schedule:
-    - cron: "7 1 * * *"
+    # 02:00 BST is 01:00 UTC.
+    - cron: "0 1 * * *"
 
 jobs:
   sync:

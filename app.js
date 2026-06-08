@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.75
+// SNYDER GOLF v3.76
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.75',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.76',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.75" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.75</span>
+          <span aria-label="App version v3.76" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.76</span>
         </button>
       </div>
 
@@ -4348,6 +4348,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const[leagueSubmitLinks,setLeagueSubmitLinks]=useState({});
   const[leagueSubmitLinkCloud,setLeagueSubmitLinkCloud]=useState(true);
   const[leagueSubmitLinking,setLeagueSubmitLinking]=useState('');
+  const leagueSubmitSubmittingRef=useRef(false);
   const foursomesNotifyStateRef=useRef(null);
   const suppressFoursomesNotifyRef=useRef(false);
   const foursomesAutoFinishRef=useRef('');
@@ -6297,12 +6298,33 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   },[round&&round.id,round&&round.status,activeGroupId]);
 
   async function submitCompletedRoundToLeague(){
+    if(leagueSubmitSubmittingRef.current)return;
     if(!leagueSubmitData)return;
-    const selected=(leagueSubmitData.rows||[]).filter(r=>r.ready&&leagueSubmitSelected[r.key]);
+    let selected=(leagueSubmitData.rows||[]).filter(r=>r.ready&&leagueSubmitSelected[r.key]);
+    const selectedByPlayer={};
+    selected.forEach(r=>{if(r&&r.leaguePlayer&&!selectedByPlayer[normaliseId(r.leaguePlayer.id)])selectedByPlayer[normaliseId(r.leaguePlayer.id)]=r;});
+    selected=Object.values(selectedByPlayer);
     if(!selected.length){flash('Choose at least one League score','error');return;}
+    leagueSubmitSubmittingRef.current=true;
     setLeagueSubmitSubmitting(true);
     setLeagueSubmitNote('');
     try{
+      const [{data:freshApproved,error:freshApprovedError},{data:freshPending,error:freshPendingError}]=await Promise.all([
+        sb.from('scores').select('id,player_id,date').eq('date',leagueSubmitData.dateKey),
+        sb.from('pending_scores').select('id,player_id,date').eq('date',leagueSubmitData.dateKey)
+      ]);
+      const freshErr=freshApprovedError||freshPendingError;
+      if(freshErr)throw freshErr;
+      const existingKeys=new Set([...(freshApproved||[]),...(freshPending||[])].map(s=>normaliseId(s&&s.player_id)+'|'+leagueSubmitDateKey(s&&s.date)));
+      const skipped=selected.filter(r=>existingKeys.has(normaliseId(r.leaguePlayer.id)+'|'+leagueSubmitData.dateKey));
+      selected=selected.filter(r=>!existingKeys.has(normaliseId(r.leaguePlayer.id)+'|'+leagueSubmitData.dateKey));
+      if(!selected.length){
+        const msg='Those League scores have already been submitted';
+        setLeagueSubmitNote(msg);
+        flash(msg,'error');
+        await loadLeagueSubmitData();
+        return;
+      }
       const rows=selected.map(r=>({
         player_id:r.leaguePlayer.id,
         player_name:r.leaguePlayer.name,
@@ -6336,7 +6358,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           sendSnyderLeagueNotification({title:'Snake submitted',body:`🐍 ${snake.leaguePlayer.name} got the snake. That's another £10 in the curry pot.`});
         }
       }
-      const msg=`Submitted ${selected.length} League score${selected.length===1?'':'s'}${snakeText}`;
+      const msg=`Submitted ${selected.length} League score${selected.length===1?'':'s'}${snakeText}${skipped.length?` · skipped ${skipped.length} duplicate${skipped.length===1?'':'s'}`:''}`;
       setLeagueSubmitNote(msg);
       flash(msg);
       await loadLeagueSubmitData();
@@ -6346,6 +6368,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       flash('League submit failed: '+msg,'error');
     }finally{
       setLeagueSubmitSubmitting(false);
+      leagueSubmitSubmittingRef.current=false;
     }
   }
 
