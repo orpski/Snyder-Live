@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.76
+// SNYDER GOLF v3.77
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.76',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.77',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1822,7 +1822,7 @@ function App(){
   if(view==='play')return <>{pullIndicator}<PlayGolf {...props}/></>;
   if(view==='league'){
     const LeagueSection=window.LeagueView;
-    return <>{pullIndicator}{LeagueSection?<LeagueSection onExit={()=>setView('home')}/>:<div style={{minHeight:'100vh',background:'#0a1528',color:'#fff',padding:18}}><button onClick={()=>setView('home')} style={{...S.gho,padding:'7px 12px'}}>Back</button><div style={{marginTop:18,fontWeight:900}}>League is still loading. Try again in a moment.</div></div>}</>;
+    return <>{pullIndicator}{LeagueSection?<LeagueSection onExit={()=>setView('home')} cupUsers={cupUsers}/>:<div style={{minHeight:'100vh',background:'#0a1528',color:'#fff',padding:18}}><button onClick={()=>setView('home')} style={{...S.gho,padding:'7px 12px'}}>Back</button><div style={{marginTop:18,fontWeight:900}}>League is still loading. Try again in a moment.</div></div>}</>;
   }
   if(view==='admin')return <AdminPanel {...props}/>;
   if(view==='profile')return <ProfileView {...props} setCurrentUser={setCurrentUser}/>;
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.76" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.76</span>
+          <span aria-label="App version v3.77" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.77</span>
         </button>
       </div>
 
@@ -3945,6 +3945,17 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       });
       setStep('setup');
     }
+    function roundPresetTitle(o){
+      if(o.key==='normal')return 'Scorecard Round';
+      if(o.key==='singles')return 'Head-to-Head Matchplay';
+      if(o.key==='foursomes')return 'Foursomes Matchplay';
+      return o.title;
+    }
+    function roundPresetSub(o){
+      if(o.key==='normal')return 'Normal golf scoring for 1-4 players';
+      if(o.key==='singles')return '2-player matchplay only';
+      return o.sub;
+    }
     return(
       <div style={{minHeight:'100vh',paddingBottom:40}}>
         <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
@@ -3956,8 +3967,8 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
           {options.map(o=>(
             <div key={o.key} onClick={()=>choosePreset(o)} style={{...S.card,marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,border:'1px solid '+(o.mode==='foursomes'?'rgba(251,191,36,0.25)':o.mode==='singles'?'rgba(96,184,240,0.32)':'rgba(255,255,255,0.10)'),background:o.mode==='foursomes'?'rgba(251,191,36,0.10)':o.mode==='singles'?'rgba(96,184,240,0.10)':'rgba(255,255,255,0.05)',minHeight:78}}>
               <div>
-                <div style={{fontSize:20,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em'}}>{o.title}</div>
-                <div style={{fontSize:12,color:'#60b8f0',marginTop:3}}>{o.sub}</div>
+                <div style={{fontSize:20,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em'}}>{roundPresetTitle(o)}</div>
+                <div style={{fontSize:12,color:'#60b8f0',marginTop:3}}>{roundPresetSub(o)}</div>
               </div>
               <div style={{fontSize:22,color:o.mode==='foursomes'?'#D4AF37':'#60b8f0',fontWeight:950}}>&gt;</div>
             </div>
@@ -3981,9 +3992,9 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
           <div style={{...S.card,marginBottom:12,background:isFoursomesSetup()?'rgba(251,191,36,0.12)':isSinglesMatchplaySetup()?'rgba(96,184,240,0.13)':'rgba(0,112,187,0.10)',borderColor:isFoursomesSetup()?'rgba(251,191,36,0.35)':isSinglesMatchplaySetup()?'rgba(96,184,240,0.38)':'rgba(96,184,240,0.22)'}}>
             <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,letterSpacing:'0.12em',marginBottom:8}}>HOW ARE YOU PLAYING?</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr',gap:8}}>
-              <button onClick={()=>setRoundMode('normal')} style={{border:'1px solid '+(!isFoursomesSetup()&&!isSinglesMatchplaySetup()?'rgba(96,184,240,0.55)':'rgba(255,255,255,0.12)'),background:!isFoursomesSetup()&&!isSinglesMatchplaySetup()?'rgba(96,184,240,0.18)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'12px 11px',fontSize:14,fontWeight:950,textAlign:'left'}}>Normal golf <span style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.62)',fontWeight:700,marginTop:2}}>Stableford points and gross scores</span></button>
-              <button onClick={()=>setRoundMode('singles')} style={{border:'1px solid '+(isSinglesMatchplaySetup()?'rgba(96,184,240,0.6)':'rgba(255,255,255,0.12)'),background:isSinglesMatchplaySetup()?'rgba(96,184,240,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'12px 11px',fontSize:14,fontWeight:950,textAlign:'left'}}>Singles matchplay <span style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.62)',fontWeight:700,marginTop:2}}>Head-to-head for 2 players</span></button>
-              <button onClick={()=>setRoundMode('foursomes')} style={{border:'1px solid '+(isFoursomesSetup()?'rgba(251,191,36,0.58)':'rgba(255,255,255,0.12)'),background:isFoursomesSetup()?'rgba(251,191,36,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'12px 11px',fontSize:14,fontWeight:950,textAlign:'left'}}>Foursomes <span style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.62)',fontWeight:700,marginTop:2}}>Two teams, one ball each</span></button>
+              <button onClick={()=>setRoundMode('normal')} style={{border:'1px solid '+(!isFoursomesSetup()&&!isSinglesMatchplaySetup()?'rgba(96,184,240,0.55)':'rgba(255,255,255,0.12)'),background:!isFoursomesSetup()&&!isSinglesMatchplaySetup()?'rgba(96,184,240,0.18)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'12px 11px',fontSize:14,fontWeight:950,textAlign:'left'}}>Scorecard round <span style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.62)',fontWeight:700,marginTop:2}}>Normal golf scoring and Stableford points</span></button>
+              <button onClick={()=>setRoundMode('singles')} style={{border:'1px solid '+(isSinglesMatchplaySetup()?'rgba(96,184,240,0.6)':'rgba(255,255,255,0.12)'),background:isSinglesMatchplaySetup()?'rgba(96,184,240,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'12px 11px',fontSize:14,fontWeight:950,textAlign:'left'}}>Head-to-head matchplay <span style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.62)',fontWeight:700,marginTop:2}}>Only choose this for a 2-player match</span></button>
+              <button onClick={()=>setRoundMode('foursomes')} style={{border:'1px solid '+(isFoursomesSetup()?'rgba(251,191,36,0.58)':'rgba(255,255,255,0.12)'),background:isFoursomesSetup()?'rgba(251,191,36,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'12px 11px',fontSize:14,fontWeight:950,textAlign:'left'}}>Foursomes matchplay <span style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.62)',fontWeight:700,marginTop:2}}>Two teams, one ball each</span></button>
             </div>
             <div style={{fontSize:11,color:isFoursomesSetup()?'#fbbf24':isSinglesMatchplaySetup()?'#90ccf0':'rgba(255,255,255,0.62)',marginTop:8,lineHeight:1.35}}>{isFoursomesSetup()?'Team scorecard only.':isSinglesMatchplaySetup()?'Choose points as well, or matchplay only.':'Classic live scoring.'}</div>
             {isSinglesMatchplaySetup()&&<div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
@@ -4345,6 +4356,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const[leagueSubmitSubmitting,setLeagueSubmitSubmitting]=useState(false);
   const[leagueSubmitSelected,setLeagueSubmitSelected]=useState({});
   const[leagueSubmitNote,setLeagueSubmitNote]=useState('');
+  const[leagueSubmitChoice,setLeagueSubmitChoice]=useState('');
+  const[showLeagueSubmitPrompt,setShowLeagueSubmitPrompt]=useState(false);
   const[leagueSubmitLinks,setLeagueSubmitLinks]=useState({});
   const[leagueSubmitLinkCloud,setLeagueSubmitLinkCloud]=useState(true);
   const[leagueSubmitLinking,setLeagueSubmitLinking]=useState('');
@@ -6298,13 +6311,17 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   },[round&&round.id,round&&round.status,activeGroupId]);
 
   async function submitCompletedRoundToLeague(){
-    if(leagueSubmitSubmittingRef.current)return;
-    if(!leagueSubmitData)return;
+    if(leagueSubmitSubmittingRef.current)return {ok:false,msg:'League submit is already running'};
+    if(!leagueSubmitData)return {ok:false,msg:'League scores are still being checked'};
     let selected=(leagueSubmitData.rows||[]).filter(r=>r.ready&&leagueSubmitSelected[r.key]);
     const selectedByPlayer={};
     selected.forEach(r=>{if(r&&r.leaguePlayer&&!selectedByPlayer[normaliseId(r.leaguePlayer.id)])selectedByPlayer[normaliseId(r.leaguePlayer.id)]=r;});
     selected=Object.values(selectedByPlayer);
-    if(!selected.length){flash('Choose at least one League score','error');return;}
+    if(!selected.length){
+      const msg='Choose at least one League score';
+      flash(msg,'error');
+      return {ok:false,msg};
+    }
     leagueSubmitSubmittingRef.current=true;
     setLeagueSubmitSubmitting(true);
     setLeagueSubmitNote('');
@@ -6321,9 +6338,10 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       if(!selected.length){
         const msg='Those League scores have already been submitted';
         setLeagueSubmitNote(msg);
-        flash(msg,'error');
+        setLeagueSubmitChoice(msg);
+        flash(msg);
         await loadLeagueSubmitData();
-        return;
+        return {ok:true,msg};
       }
       const rows=selected.map(r=>({
         player_id:r.leaguePlayer.id,
@@ -6360,12 +6378,15 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       }
       const msg=`Submitted ${selected.length} League score${selected.length===1?'':'s'}${snakeText}${skipped.length?` · skipped ${skipped.length} duplicate${skipped.length===1?'':'s'}`:''}`;
       setLeagueSubmitNote(msg);
+      setLeagueSubmitChoice(msg);
       flash(msg);
       await loadLeagueSubmitData();
+      return {ok:true,msg};
     }catch(e){
       const msg=e.message||String(e);
       setLeagueSubmitNote('Submit failed: '+msg);
       flash('League submit failed: '+msg,'error');
+      return {ok:false,msg:'Submit failed: '+msg};
     }finally{
       setLeagueSubmitSubmitting(false);
       leagueSubmitSubmittingRef.current=false;
@@ -6408,6 +6429,14 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
 
   function LeagueSubmitCard(){
     if(!isCompletedRound(round)||round._cupScoring||isFoursomesScorecard)return null;
+    if(leagueSubmitChoice){
+      return <div style={{margin:'0 16px 12px'}}>
+        <div style={{...S.card,margin:0,background:'rgba(34,197,94,0.10)',borderColor:'rgba(34,197,94,0.28)'}}>
+          <div style={{fontSize:12,color:'#86efac',fontWeight:950,letterSpacing:'0.10em',textTransform:'uppercase',marginBottom:5}}>League</div>
+          <div style={{fontSize:15,color:'#fff',fontWeight:850,lineHeight:1.35}}>{leagueSubmitChoice}</div>
+        </div>
+      </div>;
+    }
     const data=leagueSubmitData;
     const selectedCount=(data&&data.rows||[]).filter(r=>r.ready&&leagueSubmitSelected[r.key]).length;
     const snake=data&&data.snake;
@@ -6445,6 +6474,54 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         </div>}
         {leagueSubmitNote&&<div style={{marginTop:10,fontSize:12,color:leagueSubmitNote.toLowerCase().includes('failed')?'#fca5a5':'#86efac'}}>{leagueSubmitNote}</div>}
         <button onClick={submitCompletedRoundToLeague} disabled={!data||selectedCount===0||leagueSubmitSubmitting||leagueSubmitLoading} style={{...S.pri,width:'100%',padding:14,fontSize:15,marginTop:12,background:selectedCount?'#0a8a4a':'rgba(255,255,255,0.10)',opacity:(!data||selectedCount===0||leagueSubmitSubmitting||leagueSubmitLoading)?0.65:1}}>
+          {leagueSubmitSubmitting?'Submitting...':`Submit ${selectedCount||0} score${selectedCount===1?'':'s'} to League`}
+        </button>
+      </div>
+    </div>;
+  }
+
+  function LeagueSubmitPrompt(){
+    if(!showLeagueSubmitPrompt||!isCompletedRound(round)||round._cupScoring||isFoursomesScorecard)return null;
+    const data=leagueSubmitData;
+    const selectedCount=(data&&data.rows||[]).filter(r=>r.ready&&leagueSubmitSelected[r.key]).length;
+    const snake=data&&data.snake;
+    const snakeReady=snake&&snake.leaguePlayer&&!snake.already;
+    async function submitNow(){
+      const result=await submitCompletedRoundToLeague();
+      if(result&&result.ok)setShowLeagueSubmitPrompt(false);
+    }
+    function skipLeague(){
+      const msg='League submit skipped';
+      setLeagueSubmitChoice(msg);
+      setLeagueSubmitNote(msg);
+      setShowLeagueSubmitPrompt(false);
+    }
+    return <div style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(2,8,23,0.74)',backdropFilter:'blur(6px)',display:'flex',alignItems:'flex-end',justifyContent:'center',padding:16}}>
+      <div style={{width:'100%',maxWidth:520,borderRadius:18,background:'linear-gradient(180deg,rgba(15,32,58,0.98),rgba(8,18,34,0.98))',border:'1px solid rgba(96,184,240,0.28)',boxShadow:'0 24px 70px rgba(0,0,0,0.42)',padding:16}}>
+        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12,marginBottom:10}}>
+          <div>
+            <div style={{fontSize:20,color:'#fff',fontWeight:950}}>Submit this round to League?</div>
+            <div style={{fontSize:12,color:'#90ccf0',marginTop:4}}>Send the finished scores straight into League approval.</div>
+          </div>
+          <button onClick={skipLeague} disabled={leagueSubmitSubmitting} style={{...S.gho,padding:'7px 10px',fontSize:12}}>Not now</button>
+        </div>
+        {leagueSubmitLoading&&!data&&<div style={{fontSize:13,color:'#90ccf0',padding:'14px 0'}}>Checking League players...</div>}
+        {data&&<div style={{display:'flex',flexDirection:'column',gap:8,maxHeight:'48vh',overflowY:'auto',paddingRight:2}}>
+          {data.rows.map(r=><div key={r.key} style={{display:'grid',gridTemplateColumns:'28px 34px 1fr auto',gap:8,alignItems:'center',padding:'9px 10px',borderRadius:12,background:r.ready?'rgba(255,255,255,0.07)':'rgba(255,255,255,0.035)',border:'1px solid '+(r.ready?'rgba(134,239,172,0.18)':'rgba(255,255,255,0.08)')}}>
+            <input type="checkbox" disabled={!r.ready||leagueSubmitSubmitting} checked={!!leagueSubmitSelected[r.key]&&r.ready} onChange={e=>setLeagueSubmitSelected(prev=>({...prev,[r.key]:e.target.checked}))} />
+            <Avatar user={scorecardPlayerProfile(r.scorecardPlayer)} size={32}/>
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:14,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{leagueSubmitPlayerName(r.scorecardPlayer)}</div>
+              <div style={{fontSize:11,color:r.ready?'#86efac':'#fca5a5',marginTop:2}}>{r.status}</div>
+            </div>
+            <div style={{fontSize:18,color:r.ready?'#60b8f0':'rgba(255,255,255,0.45)',fontWeight:950}}>{r.points}<span style={{fontSize:10,marginLeft:3}}>pts</span></div>
+          </div>)}
+        </div>}
+        {data&&<div style={{marginTop:10,padding:'9px 10px',borderRadius:10,background:'rgba(0,0,0,0.20)',border:'1px solid rgba(255,255,255,0.08)',fontSize:12,color:'#dbeafe'}}>
+          Snake: <span style={{fontWeight:900,color:snakeReady?'#86efac':'#90ccf0'}}>{snake&&snake.scorecardPlayer?(leagueSubmitPlayerName(snake.scorecardPlayer)+(snakeReady?' - ready':snake.already?' - already logged':' - not matched to League')):'No snake marked'}</span>
+        </div>}
+        {leagueSubmitNote&&<div style={{marginTop:10,fontSize:12,color:leagueSubmitNote.toLowerCase().includes('failed')?'#fca5a5':'#86efac'}}>{leagueSubmitNote}</div>}
+        <button onClick={submitNow} disabled={!data||selectedCount===0||leagueSubmitSubmitting||leagueSubmitLoading} style={{...S.pri,width:'100%',padding:14,fontSize:15,marginTop:12,background:selectedCount?'#0a8a4a':'rgba(255,255,255,0.10)',opacity:(!data||selectedCount===0||leagueSubmitSubmitting||leagueSubmitLoading)?0.65:1}}>
           {leagueSubmitSubmitting?'Submitting...':`Submit ${selectedCount||0} score${selectedCount===1?'':'s'} to League`}
         </button>
       </div>
@@ -6542,6 +6619,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     }else{
       setEndStep(1);
       setShowEnd(true);
+      setLeagueSubmitChoice('');
+      setShowLeagueSubmitPrompt(true);
       loadLeagueSubmitData();
     }
   }
@@ -6781,6 +6860,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   if(showEnd){
     if(endStep===0)return(
       <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)',paddingBottom:40}}>
+        <LeagueSubmitPrompt/>
         <div style={{position:'sticky',top:0,background:'#0a1f3d',borderBottom:'1px solid rgba(255,255,255,0.1)',padding:'12px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div style={{fontSize:16,color:'#fff'}}>Back 9 Review</div>
           <button onClick={()=>setEndStep(1)} style={{...S.pri,padding:'8px 16px',fontSize:14}}>Full Card</button>
@@ -6808,6 +6888,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     );
     if(endStep===1)return(
       <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)',paddingBottom:40}}>
+        <LeagueSubmitPrompt/>
         <div style={{position:'sticky',top:0,background:'#0a1f3d',borderBottom:'1px solid rgba(255,255,255,0.1)',padding:'12px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <button onClick={()=>setEndStep(0)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back 9</button>
           <div style={{fontSize:16,color:'#fff'}}>Full Scorecard</div>
@@ -6859,6 +6940,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     );
     if(endStep===2)return(
       <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)',paddingBottom:40}}>
+        <LeagueSubmitPrompt/>
         <div style={{position:'sticky',top:0,background:'#0a1f3d',borderBottom:'1px solid rgba(255,255,255,0.1)',padding:'12px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <button onClick={()=>setEndStep(1)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Full Card</button>
           <div style={{fontSize:16,color:'#fff'}}>Stats</div>

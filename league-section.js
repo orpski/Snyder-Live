@@ -151,7 +151,7 @@ const LeagueS={
   dan:{fontFamily:'Inter,sans-serif',cursor:'pointer',borderRadius:10,fontSize:13,padding:'10px 18px',border:'1px solid #f87171',background:'rgba(127,29,29,0.35)',color:'#fca5a5'},
 };
 
-function LeagueView({onExit}){
+function LeagueView({onExit,cupUsers=[]}){
   const[players,setPlayers]=useState([]);
   const[scores,setScores]=useState([]);
   const[pending,setPending]=useState([]);
@@ -189,6 +189,49 @@ function LeagueView({onExit}){
   const[notifyStatus,setNotifyStatus]=useState('idle');
   const[notifySupported,setNotifySupported]=useState(false);
   const[tickerText,setTickerText]=useState('League news loading...');
+
+  const leagueTabs=[
+    ['standings','🏆','Table'],
+    ['scores','📊','Scores'],
+    ['potm','🏅','Month'],
+    ['highscore','⭐','Highs'],
+    ['playoffs','🎯','Playoffs'],
+    ['money','💰','Money'],
+    ['rules','📖','Rules'],
+    ['submit','✏️','Submit']
+  ];
+  function leagueNameKey(value){
+    return String(value||'').trim().toLowerCase().replace(/\s+/g,' ');
+  }
+  function leagueFirstName(value){
+    return leagueNameKey(value).split(' ')[0]||'';
+  }
+  function leagueUserAvatar(user){
+    if(!user)return '';
+    return user.avatar_image||user.avatar_url||localStorage.getItem('snyder_avatar_'+user.id)||'';
+  }
+  function leagueUserInitials(player){
+    const name=String(player&&player.name||'?').trim();
+    const parts=name.split(/\s+/).filter(Boolean);
+    return ((parts[0]||'?')[0]+(parts.length>1?parts[parts.length-1][0]:'')).toUpperCase();
+  }
+  function leagueUserForPlayer(player){
+    if(!player||!Array.isArray(cupUsers)||!cupUsers.length)return null;
+    const target=leagueNameKey(player.name);
+    const exact=cupUsers.find(u=>[u.display_name,u.name,u.username].some(v=>leagueNameKey(v)===target));
+    if(exact)return exact;
+    const first=leagueFirstName(player.name);
+    if(!first)return null;
+    const matches=cupUsers.filter(u=>[u.display_name,u.name,u.username].some(v=>leagueFirstName(v)===first));
+    return matches.length===1?matches[0]:null;
+  }
+  function LeaguePlayerAvatar({player,size=34}){
+    const user=leagueUserForPlayer(player);
+    const avatar=leagueUserAvatar(user);
+    return <div style={{width:size,height:size,borderRadius:'50%',overflow:'hidden',flex:'0 0 auto',display:'flex',alignItems:'center',justifyContent:'center',background:'linear-gradient(135deg,#0070BB,#0f2a48)',border:'1px solid rgba(96,184,240,0.42)',boxShadow:'0 6px 16px rgba(0,0,0,0.22)',color:'#fff',fontWeight:950,fontSize:Math.max(11,Math.round(size*0.34))}}>
+      {avatar?<img src={avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>:leagueUserInitials(player)}
+    </div>;
+  }
 
   useEffect(()=>{
     let cancelled=false;
@@ -750,10 +793,16 @@ function LeagueView({onExit}){
           </div>
         </div>
 
-        <div style={{display:'flex',gap:8,marginBottom:24,justifyContent:'center',flexWrap:'wrap'}}>
-          {[['standings','🏆 League Table'],['scores','📊 Scores'],['potm','🏅 Player of the Month'],['highscore','⭐ High Scores'],['playoffs','🎯 Playoffs'],['money','💰 Money'],['rules','📖 Rules'],['submit','✏️ Submit Score']].map(([k,label])=>(
-            <button key={k} onClick={()=>{setView(k);if(k!=='potm')setPotmSelId(null);}} style={{...LeagueS.gho,background:view===k?'#0070BB':'rgba(255,255,255,0.05)',borderColor:view===k?'#60b8f0':'rgba(96,184,240,0.22)',color:view===k?'#fff':'#60b8f0',fontSize:13}}>{label}</button>
-          ))}
+        <div style={{position:'sticky',top:0,zIndex:8;margin:'0 -4px 22px',padding:'7px 4px 8px',background:'linear-gradient(180deg,rgba(10,21,40,0.96),rgba(10,21,40,0.76))',backdropFilter:'blur(10px)'}}>
+          <div style={{display:'flex',gap:6,overflowX:'auto',WebkitOverflowScrolling:'touch',padding:6,borderRadius:16,border:'1px solid rgba(96,184,240,0.18)',background:'rgba(255,255,255,0.045)',boxShadow:'0 12px 28px rgba(0,0,0,0.18)'}}>
+            {leagueTabs.map(([k,icon,label])=>{
+              const active=view===k;
+              return <button key={k} onClick={()=>{setView(k);if(k!=='potm')setPotmSelId(null);}} style={{fontFamily:'Inter,sans-serif',cursor:'pointer',border:'1px solid '+(active?'rgba(96,184,240,0.62)':'rgba(255,255,255,0.07)'),background:active?'linear-gradient(180deg,rgba(0,112,187,0.92),rgba(0,83,145,0.92))':'rgba(255,255,255,0.035)',color:active?'#fff':'rgba(219,234,254,0.78)',borderRadius:12,minWidth:70,padding:'8px 9px 7px',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,boxShadow:active?'0 8px 18px rgba(0,112,187,0.28)':'none'}}>
+                <span style={{fontSize:16,lineHeight:1}}>{icon}</span>
+                <span style={{fontSize:10,fontWeight:900,letterSpacing:'0.04em',whiteSpace:'nowrap'}}>{label}</span>
+              </button>;
+            })}
+          </div>
         </div>
 
         {loading&&<div style={{textAlign:'center',color:'#8ea0ad',padding:60,fontSize:15}}>Loading…</div>}
@@ -1338,10 +1387,12 @@ function LeagueView({onExit}){
                         onMouseLeave={e=>e.currentTarget.style.background=rowBg}
                       >
                         <RankMovementCell player={player} delta={rankMovement[player.id]} isTop4={isTop4} isBottom2={isBottom2}/>
-                        <div style={{minWidth:0}}>
-                          <div style={{fontSize:15,color:'#ffffff',marginBottom:4,display:'flex',alignItems:'center',gap:5}}>
-                            {player.name}
-                            {!player.double_chip_used&&<span title="Double chip available" style={{fontSize:11}}>🍟🍟</span>}
+                        <div style={{minWidth:0,display:'flex',alignItems:'center',gap:9}}>
+                          <LeaguePlayerAvatar player={player} size={36}/>
+                          <div style={{minWidth:0,flex:1}}>
+                          <div style={{fontSize:15,color:'#ffffff',marginBottom:4,display:'flex',alignItems:'center',gap:5,minWidth:0}}>
+                            <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{player.name}</span>
+                            {!player.double_chip_used&&<span title="Double chip available" style={{fontSize:11,flex:'0 0 auto'}}>🍟🍟</span>}
                           </div>
                           <div style={{display:'flex',gap:2,flexWrap:'wrap'}}>
                             {(()=>{
@@ -1363,6 +1414,7 @@ function LeagueView({onExit}){
                               });
                             })()}
                             {Array.from({length:Math.max(0,8-getBest8(player.scores).length)}).map((_,j)=><span key={j} style={{background:'rgba(255,255,255,0.02)',border:'1px dashed rgba(255,255,255,0.10)',borderRadius:3,padding:'1px 5px',fontSize:10,color:'rgba(255,255,255,0.10)'}}>—</span>)}
+                          </div>
                           </div>
                         </div>
                         <div style={{textAlign:'center'}}><div style={{fontSize:14,color:'#d4af37'}}>{player.scores.length}</div></div>
