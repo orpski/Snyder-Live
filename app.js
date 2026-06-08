@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.84
+// SNYDER GOLF v3.85
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.84',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.85',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.84" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.84</span>
+          <span aria-label="App version v3.85" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.85</span>
         </button>
       </div>
 
@@ -3487,8 +3487,9 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   const selectedDayBoardSweepstake=dayBoardSweepstakeConfig(selectedDayBoard);
   const daySweepstakeLocked=setup.dayCompMode==='create'||(setup.dayCompMode==='join'&&selectedDayBoardSweepstake.enabled);
   function updateSetupSweepstakeAmount(value){
-    const pounds=Math.max(0,parseFloat(value)||0);
-    setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),enabled:daySweepstakeLocked?true:!!(q.sweepstake&&q.sweepstake.enabled),amountPence:Math.round(pounds*100),scope:daySweepstakeLocked?'round':((q.sweepstake&&q.sweepstake.scope)==='group'?'group':'round')}}));
+    const raw=String(value||'').trim();
+    const amountPence=raw===''?'':Math.round(Math.max(0,parseFloat(raw)||0)*100);
+    setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),enabled:daySweepstakeLocked?true:!!(q.sweepstake&&q.sweepstake.enabled),amountPence,scope:daySweepstakeLocked?'round':((q.sweepstake&&q.sweepstake.scope)==='group'?'group':'round')}}));
   }
   function withPlayingHandicap(person,course=selectedCourse,allowance=setup.allowance){
     const handicapIndex=parseFloat(person.handicap_index!=null?person.handicap_index:person.current_handicap!=null?person.current_handicap:person.handicap)||0;
@@ -4117,13 +4118,13 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
               </div>
             </div>
             {((setup.sweepstake&&setup.sweepstake.enabled)||daySweepstakeLocked)&&<div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,alignItems:'center'}}>
-              <input type="number" min="0" step="0.5" value={((parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||200)/100)} onChange={e=>updateSetupSweepstakeAmount(e.target.value)} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}} placeholder="£ per pot"/>
+              <input type="number" min="0" step="0.5" value={(setup.sweepstake&&setup.sweepstake.amountPence)===''?'':((parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||0)/100)} onChange={e=>updateSetupSweepstakeAmount(e.target.value)} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}} placeholder="£ per pot"/>
               <select disabled={daySweepstakeLocked} value={daySweepstakeLocked?'round':((setup.sweepstake&&setup.sweepstake.scope)||'round')} onChange={e=>setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),scope:e.target.value==='group'?'group':'round'}}))} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13,opacity:daySweepstakeLocked?0.75:1}}>
                 <option value="round">Whole round / all groups</option>
                 <option value="group">My group only</option>
               </select>
               {daySweepstakeLocked&&<div style={{gridColumn:'1 / -1',fontSize:11,color:'#fbbf24',fontWeight:900,lineHeight:1.35}}>Day sweepstakes are always across the whole board.</div>}
-              <div style={{gridColumn:'1 / -1',fontSize:11,color:'rgba(255,255,255,0.72)',lineHeight:1.35}}>Amount is per front, back and overall pot. Max loss per player: <b>{moneyFromPence((setup.sweepstake.amountPence||200)*3)}</b>.</div>
+              <div style={{gridColumn:'1 / -1',fontSize:11,color:'rgba(255,255,255,0.72)',lineHeight:1.35}}>Amount is per front, back and overall pot. Max loss per player: <b>{moneyFromPence((parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||0)*3)}</b>.</div>
             </div>}
           </div>}
 
@@ -8072,8 +8073,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
             <div style={{fontSize:11,color:'#fbbf24',fontWeight:950}}>ON</div>
           </div>
           <label style={{...S.lbl,marginTop:10}}>Amount per pot</label>
-          <input type="number" min="0" step="0.5" value={(parseInt(sweepstake.amountPence)||200)/100} onChange={e=>setSweepstake(q=>({...q,enabled:true,amountPence:Math.round((Math.max(0,parseFloat(e.target.value)||0))*100),scope:'round'}))} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}} placeholder="2"/>
-          <div style={{fontSize:11,color:'rgba(255,255,255,0.72)',marginTop:7}}>Players can win this amount for front 9, back 9 and overall. Max loss: {moneyFromPence((parseInt(sweepstake.amountPence)||200)*3)}.</div>
+          <input type="number" min="0" step="0.5" value={sweepstake.amountPence===''?'':((parseInt(sweepstake.amountPence)||0)/100)} onChange={e=>{const raw=String(e.target.value||'').trim();setSweepstake(q=>({...q,enabled:true,amountPence:raw===''?'':Math.round((Math.max(0,parseFloat(raw)||0))*100),scope:'round'}));}} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}} placeholder="2"/>
+          <div style={{fontSize:11,color:'rgba(255,255,255,0.72)',marginTop:7}}>Players can win this amount for front 9, back 9 and overall. Max loss: {moneyFromPence((parseInt(sweepstake.amountPence)||0)*3)}.</div>
           {false&&sweepstake.enabled&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:10}}>
             <select value={sweepstake.amountPence} onChange={e=>setSweepstake(q=>({...q,amountPence:parseInt(e.target.value)||200}))} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}>
               <option value={100}>£1 each pot</option>
