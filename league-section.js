@@ -189,6 +189,7 @@ function LeagueView({onExit,cupUsers=[]}){
   const[notifyStatus,setNotifyStatus]=useState('idle');
   const[notifySupported,setNotifySupported]=useState(false);
   const[tickerText,setTickerText]=useState('League news loading...');
+  const[leagueLinks,setLeagueLinks]=useState({});
 
   const leagueTabs=[
     ['standings','🏆','Table'],
@@ -202,6 +203,9 @@ function LeagueView({onExit,cupUsers=[]}){
   ];
   function leagueNameKey(value){
     return String(value||'').trim().toLowerCase().replace(/\s+/g,' ');
+  }
+  function leagueId(value){
+    return value==null?'':String(value);
   }
   function leagueFirstName(value){
     return leagueNameKey(value).split(' ')[0]||'';
@@ -217,6 +221,14 @@ function LeagueView({onExit,cupUsers=[]}){
   }
   function leagueUserForPlayer(player){
     if(!player||!Array.isArray(cupUsers)||!cupUsers.length)return null;
+    const linked=Object.values(leagueLinks||{}).find(link=>{
+      if(!link)return false;
+      return leagueId(link.league_player_id)===leagueId(player.id)||leagueNameKey(link.league_player_name)===leagueNameKey(player.name);
+    });
+    if(linked){
+      const linkedUser=cupUsers.find(u=>leagueId(u.id)===leagueId(linked.live_user_id));
+      if(linkedUser)return linkedUser;
+    }
     const target=leagueNameKey(player.name);
     const exact=cupUsers.find(u=>[u.display_name,u.name,u.username].some(v=>leagueNameKey(v)===target));
     if(exact)return exact;
@@ -306,6 +318,14 @@ function LeagueView({onExit,cupUsers=[]}){
     if(slog)setSnakeLog(slog);
     const{data:cpot}=await sb.from('curry_pot').select('*').limit(1);
     if(cpot&&cpot[0])setCurryPot(cpot[0].amount||0);
+    try{
+      const{data:links}=await sb.from('league_player_links').select('*');
+      const map={};
+      (links||[]).forEach(l=>{
+        if(l&&l.live_user_id)map[leagueId(l.live_user_id)]=l;
+      });
+      setLeagueLinks(map);
+    }catch(e){}
     setLoading(false);
   }
   useEffect(()=>{load();},[]);
@@ -1346,14 +1366,10 @@ function LeagueView({onExit,cupUsers=[]}){
           <div>
             {rankings.length===0&&<div style={{textAlign:'center',color:'#5b7088',padding:40,fontSize:14}}>No players yet — admin needs to add players first.</div>}
             {rankings.length>0&&(
-              <div style={{border:'1px solid rgba(96,184,240,0.22)',borderRadius:14,overflow:'hidden'}}>
-                {/* Table header */}
-                <div style={{display:'grid',gridTemplateColumns:'72px 1fr 52px 52px 64px',background:'rgba(74,180,90,0.1)',borderBottom:'2px solid rgba(96,184,240,0.22)',padding:'10px 16px',gap:6,alignItems:'center'}}>
-                  <div style={{fontSize:10,letterSpacing:'0.15em',color:'#4a8a5a',textTransform:'uppercase',textAlign:'center'}}>Pos</div>
-                  <div style={{fontSize:10,letterSpacing:'0.15em',color:'#4a8a5a',textTransform:'uppercase'}}>Player</div>
-                  <div style={{fontSize:10,letterSpacing:'0.15em',color:'#4a8a5a',textTransform:'uppercase',textAlign:'center'}}>Rnds</div>
-                  <div style={{fontSize:10,letterSpacing:'0.15em',color:'#4a8a5a',textTransform:'uppercase',textAlign:'center'}}>Avg</div>
-                  <div style={{fontSize:10,letterSpacing:'0.15em',color:'#4a8a5a',textTransform:'uppercase',textAlign:'right'}}>Total</div>
+              <div style={{border:'1px solid rgba(96,184,240,0.22)',borderRadius:16,overflow:'hidden',background:'rgba(5,16,31,0.32)'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,background:'rgba(74,180,90,0.08)',borderBottom:'1px solid rgba(96,184,240,0.18)',padding:'10px 14px'}}>
+                  <div style={{fontSize:11,letterSpacing:'0.14em',color:'#9dc9a8',textTransform:'uppercase',fontWeight:900}}>League Table</div>
+                  <div style={{fontSize:10,color:'#60b8f0',fontWeight:800}}>Best 8 shown</div>
                 </div>
                 {/* Finals banner */}
                 {rankings.length>=4&&<div style={{background:'linear-gradient(90deg,rgba(74,180,90,0.25),rgba(74,180,90,0.08))',borderBottom:'2px solid rgba(74,180,90,0.5)',padding:'8px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -1382,19 +1398,31 @@ function LeagueView({onExit,cupUsers=[]}){
                         <div style={{fontSize:10,color:'#ef4444'}}>Bottom 2</div>
                       </div>}
                       <div onClick={()=>{setSelId(player.id);setView('player');}}
-                        style={{display:'grid',gridTemplateColumns:'72px 1fr 52px 52px 64px',padding:'12px 16px',gap:6,alignItems:'center',cursor:'pointer',background:rowBg,borderBottom:i<n-1&&!isBottom2First?'1px solid rgba(255,255,255,0.08)':'none',borderLeft:leftBorder,transition:'background 0.15s'}}
+                        style={{padding:'13px 13px 12px',cursor:'pointer',background:rowBg,borderBottom:i<n-1&&!isBottom2First?'1px solid rgba(255,255,255,0.08)':'none',borderLeft:leftBorder,transition:'background 0.15s'}}
                         onMouseEnter={e=>e.currentTarget.style.background=isTop4?'rgba(74,180,90,0.15)':isBottom2?'rgba(239,68,68,0.12)':'rgba(74,180,90,0.08)'}
                         onMouseLeave={e=>e.currentTarget.style.background=rowBg}
                       >
-                        <RankMovementCell player={player} delta={rankMovement[player.id]} isTop4={isTop4} isBottom2={isBottom2}/>
-                        <div style={{minWidth:0,display:'flex',alignItems:'center',gap:9}}>
-                          <LeaguePlayerAvatar player={player} size={36}/>
-                          <div style={{minWidth:0,flex:1}}>
-                          <div style={{fontSize:15,color:'#ffffff',marginBottom:4,display:'flex',alignItems:'center',gap:5,minWidth:0}}>
-                            <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{player.name}</span>
-                            {!player.double_chip_used&&<span title="Double chip available" style={{fontSize:11,flex:'0 0 auto'}}>🍟🍟</span>}
+                        <div style={{display:'grid',gridTemplateColumns:'44px minmax(0,1fr) auto',gap:10,alignItems:'center'}}>
+                          <RankMovementCell player={player} delta={rankMovement[player.id]} isTop4={isTop4} isBottom2={isBottom2}/>
+                          <div style={{minWidth:0,display:'flex',alignItems:'center',gap:10}}>
+                            <LeaguePlayerAvatar player={player} size={42}/>
+                            <div style={{minWidth:0,flex:1}}>
+                              <div style={{fontSize:21,color:'#ffffff',fontWeight:950,lineHeight:1.05,display:'flex',alignItems:'center',gap:6,minWidth:0}}>
+                                <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{player.name}</span>
+                                {!player.double_chip_used&&<span title="Double chip available" style={{fontSize:12,flex:'0 0 auto'}}>🍟🍟</span>}
+                              </div>
+                              <div style={{display:'flex',alignItems:'center',gap:10,marginTop:5,flexWrap:'wrap'}}>
+                                <span style={{fontSize:11,color:'#d4af37',fontWeight:900}}>{player.scores.length} rounds</span>
+                                <span style={{fontSize:11,color:'#9dc9a8',fontWeight:900}}>Avg {getBest8(player.scores).length>0?(getBest8(player.scores).reduce((s,x)=>s+x.points,0)/getBest8(player.scores).length).toFixed(1):'-'}</span>
+                              </div>
+                            </div>
                           </div>
-                          <div style={{display:'flex',gap:2,flexWrap:'wrap'}}>
+                          <div style={{textAlign:'right',minWidth:58}}>
+                            <div style={{fontSize:26,color:i===0?'#60b8f0':'#dbeafe',lineHeight:1,fontWeight:950}}>{player.total}</div>
+                            <div style={{fontSize:9,color:'#5b7088',fontWeight:900}}>pts</div>
+                          </div>
+                        </div>
+                        <div style={{display:'flex',gap:5,flexWrap:'wrap',marginTop:10,paddingLeft:54}}>
                             {(()=>{
                               const best8=getBest8(player.scores);
                               const lowestCountingScore=best8.length>0?best8.reduce((a,b)=>a.points<=b.points?a:b):null;
@@ -1404,22 +1432,20 @@ function LeagueView({onExit,cupUsers=[]}){
                                 return <span key={s.id} title={isLowestCounting?'Lowest counting score — next to fall off':isDoubleChipScore?'Double chip score':undefined} style={{
                                   background:isLowestCounting?'rgba(251,146,60,0.15)':isDoubleChipScore?'rgba(251,191,36,0.16)':'rgba(74,180,90,0.15)',
                                   border:`1px solid ${isLowestCounting?'rgba(251,146,60,0.45)':isDoubleChipScore?'rgba(251,191,36,0.65)':'rgba(74,180,90,0.35)'}`,
-                                  borderRadius:3,
-                                  padding:'1px 5px',
-                                  fontSize:10,
+                                  borderRadius:6,
+                                  padding:'3px 7px',
+                                  fontSize:11,
                                   color:isLowestCounting?'#fb923c':isDoubleChipScore?'#fbbf24':'#60b8f0',
-                                  fontWeight:isDoubleChipScore||isLowestCounting?700:'normal',
+                                  fontWeight:900,
+                                  lineHeight:1,
+                                  minWidth:21,
+                                  textAlign:'center',
                                   boxShadow:isDoubleChipScore&&!isLowestCounting?'0 0 8px rgba(251,191,36,0.18)':'none'
                                 }}>{s.points}</span>;
                               });
                             })()}
-                            {Array.from({length:Math.max(0,8-getBest8(player.scores).length)}).map((_,j)=><span key={j} style={{background:'rgba(255,255,255,0.02)',border:'1px dashed rgba(255,255,255,0.10)',borderRadius:3,padding:'1px 5px',fontSize:10,color:'rgba(255,255,255,0.10)'}}>—</span>)}
-                          </div>
-                          </div>
+                            {Array.from({length:Math.max(0,8-getBest8(player.scores).length)}).map((_,j)=><span key={j} style={{background:'rgba(255,255,255,0.02)',border:'1px dashed rgba(255,255,255,0.10)',borderRadius:6,padding:'3px 7px',fontSize:11,lineHeight:1,minWidth:21,textAlign:'center',color:'rgba(255,255,255,0.10)',fontWeight:900}}>—</span>)}
                         </div>
-                        <div style={{textAlign:'center'}}><div style={{fontSize:14,color:'#d4af37'}}>{player.scores.length}</div></div>
-                        <div style={{textAlign:'center'}}><div style={{fontSize:14,color:'#9dc9a8'}}>{ getBest8(player.scores).length>0?(getBest8(player.scores).reduce((s,x)=>s+x.points,0)/getBest8(player.scores).length).toFixed(1):'-'}</div></div>
-                        <div style={{textAlign:'right'}}><div style={{fontSize:20,color:i===0?'#60b8f0':'#dbeafe',lineHeight:1,fontWeight:'normal'}}>{player.total}</div><div style={{fontSize:9,color:'#5b7088'}}>pts</div></div>
                       </div>
                     </React.Fragment>
                   );
