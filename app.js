@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.80
+// SNYDER GOLF v3.81
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.80',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.81',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.80" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.80</span>
+          <span aria-label="App version v3.81" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.81</span>
         </button>
       </div>
 
@@ -3441,7 +3441,7 @@ function playerRangeLabel(range){
   if(range==='5-8')return '5-8 players';
   if(range==='9-12')return '9-12 players';
   if(range==='more')return 'Groups';
-  if(range==='13-16'||range==='more')return '13-16 players';
+  if(range==='13-16')return '13-16 players';
   return 'Choose players';
 }
 
@@ -3453,7 +3453,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   const[step,setStep]=useState('playerCount');
   const[activeRound,setActiveRound]=useState(null);
   const[activeGroup,setActiveGroup]=useState(null);
-  const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:1,dayCompMode:'none',dayCompKey:'',sweepstake:{enabled:false,amountPence:200,scope:'round'},matchplay:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,keepStableford:true}});
+  const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:0.95,dayCompMode:'none',dayCompKey:'',sweepstake:{enabled:false,amountPence:200,scope:'round'},matchplay:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,keepStableford:true}});
   const[dayJoinPromptDone,setDayJoinPromptDone]=useState(false);
   const[participants,setParticipants]=useState([]);
   const[groupSetup,setGroupSetup]=useState([[]]);
@@ -4057,8 +4057,8 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
                   <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>Enter EG handicap. Tick Casual golfer for fixed playing shots.</div>
                 </div>
                 <select value={setup.allowance} onChange={e=>setSetup(q=>({...q,allowance:parseFloat(e.target.value)||1}))} style={{...S.inp,width:118,padding:'8px 10px',fontSize:12}}>
-                  <option value={1}>Full shots</option>
                   <option value={0.95}>95% comp</option>
+                  <option value={1}>Full shots</option>
                 </select>
               </div>
               <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>Course rating {selectedCourse.course_rating||'-'} - Par {(selectedCourse.holes||[]).reduce((t,h)=>t+(parseInt(h.par)||0),0)||'-'}</div>
