@@ -814,10 +814,10 @@ function LeagueView({onExit,cupUsers=[]}){
         </div>
 
         <div style={{position:'sticky',top:0,zIndex:8,margin:'0 -4px 22px',padding:'7px 4px 8px',background:'linear-gradient(180deg,rgba(10,21,40,0.96),rgba(10,21,40,0.76))',backdropFilter:'blur(10px)'}}>
-          <div style={{display:'flex',gap:6,overflowX:'auto',WebkitOverflowScrolling:'touch',padding:6,borderRadius:16,border:'1px solid rgba(96,184,240,0.18)',background:'rgba(255,255,255,0.045)',boxShadow:'0 12px 28px rgba(0,0,0,0.18)'}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:6,padding:6,borderRadius:16,border:'1px solid rgba(96,184,240,0.18)',background:'rgba(255,255,255,0.045)',boxShadow:'0 12px 28px rgba(0,0,0,0.18)'}}>
             {leagueTabs.map(([k,icon,label])=>{
               const active=view===k;
-              return <button key={k} onClick={()=>{setView(k);if(k!=='potm')setPotmSelId(null);}} style={{fontFamily:'Inter,sans-serif',cursor:'pointer',border:'1px solid '+(active?'rgba(96,184,240,0.62)':'rgba(255,255,255,0.07)'),background:active?'linear-gradient(180deg,rgba(0,112,187,0.92),rgba(0,83,145,0.92))':'rgba(255,255,255,0.035)',color:active?'#fff':'rgba(219,234,254,0.78)',borderRadius:12,minWidth:70,padding:'8px 9px 7px',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,boxShadow:active?'0 8px 18px rgba(0,112,187,0.28)':'none'}}>
+              return <button key={k} onClick={()=>{setView(k);if(k!=='potm')setPotmSelId(null);}} style={{fontFamily:'Inter,sans-serif',cursor:'pointer',border:'1px solid '+(active?'rgba(96,184,240,0.62)':'rgba(255,255,255,0.07)'),background:active?'linear-gradient(180deg,rgba(0,112,187,0.92),rgba(0,83,145,0.92))':'rgba(255,255,255,0.035)',color:active?'#fff':'rgba(219,234,254,0.78)',borderRadius:12,minWidth:0,padding:'8px 4px 7px',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,boxShadow:active?'0 8px 18px rgba(0,112,187,0.28)':'none'}}>
                 <span style={{fontSize:16,lineHeight:1}}>{icon}</span>
                 <span style={{fontSize:10,fontWeight:900,letterSpacing:'0.04em',whiteSpace:'nowrap'}}>{label}</span>
               </button>;

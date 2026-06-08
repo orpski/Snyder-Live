@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.79
+// SNYDER GOLF v3.80
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.79',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.80',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.79" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.79</span>
+          <span aria-label="App version v3.80" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.80</span>
         </button>
       </div>
 
@@ -3440,6 +3440,7 @@ function playerRangeLabel(range){
   if(range==='1-4')return '1-4 players';
   if(range==='5-8')return '5-8 players';
   if(range==='9-12')return '9-12 players';
+  if(range==='more')return 'Groups';
   if(range==='13-16'||range==='more')return '13-16 players';
   return 'Choose players';
 }
@@ -3934,6 +3935,12 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       {key:'9-12',range:'9-12',title:'🏟️ 9-12 players',sub:'3 groups, one leaderboard',mode:'normal'},
       {key:'13-16',range:'13-16',title:'🎪 13-16 players',sub:'4 groups, one leaderboard',mode:'normal'},
     ];
+    const displayOptions=[
+      options.find(o=>o.key==='normal'),
+      options.find(o=>o.key==='singles'),
+      options.find(o=>o.key==='foursomes'),
+      {key:'groups',range:'more',title:'Groups',sub:'Multiple groups, one leaderboard',mode:'normal'}
+    ].filter(Boolean);
     function choosePreset(o){
       setPlayerRange(o.range);
       resetGroupsForRange(o.range);
@@ -3946,7 +3953,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       setStep('setup');
     }
     function roundPresetTitle(o){
-      if(o.key==='normal')return 'Scorecard Round';
+      if(o.key==='normal')return 'Standard Round';
       if(o.key==='singles')return 'Head-to-Head Matchplay';
       if(o.key==='foursomes')return 'Foursomes Matchplay';
       return o.title;
@@ -3956,6 +3963,16 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       if(o.key==='singles')return '2-player matchplay only';
       return o.sub;
     }
+    function roundPresetStyle(o){
+      const isStandard=o.key==='normal';
+      const isMatchplay=o.key==='singles'||o.key==='foursomes';
+      return {
+        border:'1px solid '+(isStandard?'rgba(34,197,94,0.66)':isMatchplay?'rgba(96,184,240,0.32)':'rgba(255,255,255,0.12)'),
+        background:isStandard?'linear-gradient(135deg,rgba(22,163,74,0.92),rgba(12,88,50,0.82))':isMatchplay?'rgba(96,184,240,0.10)':'rgba(255,255,255,0.055)',
+        minHeight:isStandard?94:78,
+        boxShadow:isStandard?'0 12px 30px rgba(22,163,74,0.22)':'none'
+      };
+    }
     return(
       <div style={{minHeight:'100vh',paddingBottom:40}}>
         <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
@@ -3964,13 +3981,13 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
         </div>
         <div style={{padding:16}}>
           <div style={{fontSize:13,color:'#90ccf0',marginBottom:12}}>Tap the game you want. You can still tweak players, course and shots after this.</div>
-          {options.map(o=>(
-            <div key={o.key} onClick={()=>choosePreset(o)} style={{...S.card,marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,border:'1px solid '+(o.mode==='foursomes'?'rgba(251,191,36,0.25)':o.mode==='singles'?'rgba(96,184,240,0.32)':'rgba(255,255,255,0.10)'),background:o.mode==='foursomes'?'rgba(251,191,36,0.10)':o.mode==='singles'?'rgba(96,184,240,0.10)':'rgba(255,255,255,0.05)',minHeight:78}}>
+          {displayOptions.map(o=>(
+            <div key={o.key} onClick={()=>choosePreset(o)} style={{...S.card,marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,...roundPresetStyle(o)}}>
               <div>
-                <div style={{fontSize:20,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em'}}>{roundPresetTitle(o)}</div>
-                <div style={{fontSize:12,color:'#60b8f0',marginTop:3}}>{roundPresetSub(o)}</div>
+                <div style={{fontSize:o.key==='normal'?28:20,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em'}}>{roundPresetTitle(o)}</div>
+                <div style={{fontSize:o.key==='normal'?13:12,color:o.key==='normal'?'#d9f99d':'#60b8f0',marginTop:3,fontWeight:o.key==='normal'?850:700}}>{roundPresetSub(o)}</div>
               </div>
-              <div style={{fontSize:22,color:o.mode==='foursomes'?'#D4AF37':'#60b8f0',fontWeight:950}}>&gt;</div>
+              <div style={{fontSize:22,color:o.key==='normal'?'#d9f99d':'#60b8f0',fontWeight:950}}>&gt;</div>
             </div>
           ))}
         </div>
@@ -3989,14 +4006,14 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
           <div style={{fontSize:16,color:'#fff'}}>Start a Round</div>
         </div>
         <div style={{padding:16}}>
-          <div style={{...S.card,marginBottom:12,background:isFoursomesSetup()?'rgba(251,191,36,0.12)':isSinglesMatchplaySetup()?'rgba(96,184,240,0.13)':'rgba(0,112,187,0.10)',borderColor:isFoursomesSetup()?'rgba(251,191,36,0.35)':isSinglesMatchplaySetup()?'rgba(96,184,240,0.38)':'rgba(96,184,240,0.22)'}}>
+          <div style={{...S.card,marginBottom:12,background:!isFoursomesSetup()&&!isSinglesMatchplaySetup()?'rgba(34,197,94,0.10)':'rgba(96,184,240,0.10)',borderColor:!isFoursomesSetup()&&!isSinglesMatchplaySetup()?'rgba(34,197,94,0.35)':'rgba(96,184,240,0.28)'}}>
             <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,letterSpacing:'0.12em',marginBottom:8}}>HOW ARE YOU PLAYING?</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr',gap:8}}>
-              <button onClick={()=>setRoundMode('normal')} style={{border:'1px solid '+(!isFoursomesSetup()&&!isSinglesMatchplaySetup()?'rgba(96,184,240,0.55)':'rgba(255,255,255,0.12)'),background:!isFoursomesSetup()&&!isSinglesMatchplaySetup()?'rgba(96,184,240,0.18)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'12px 11px',fontSize:14,fontWeight:950,textAlign:'left'}}>Scorecard round <span style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.62)',fontWeight:700,marginTop:2}}>Normal golf scoring and Stableford points</span></button>
+              <button onClick={()=>setRoundMode('normal')} style={{border:'1px solid '+(!isFoursomesSetup()&&!isSinglesMatchplaySetup()?'rgba(34,197,94,0.66)':'rgba(255,255,255,0.12)'),background:!isFoursomesSetup()&&!isSinglesMatchplaySetup()?'linear-gradient(135deg,rgba(22,163,74,0.92),rgba(12,88,50,0.82))':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'14px 12px',fontSize:18,fontWeight:950,textAlign:'left',boxShadow:!isFoursomesSetup()&&!isSinglesMatchplaySetup()?'0 10px 24px rgba(22,163,74,0.20)':'none'}}>Standard Round <span style={{display:'block',fontSize:12,color:!isFoursomesSetup()&&!isSinglesMatchplaySetup()?'#d9f99d':'rgba(255,255,255,0.62)',fontWeight:800,marginTop:2}}>Normal golf scoring and Stableford points</span></button>
               <button onClick={()=>setRoundMode('singles')} style={{border:'1px solid '+(isSinglesMatchplaySetup()?'rgba(96,184,240,0.6)':'rgba(255,255,255,0.12)'),background:isSinglesMatchplaySetup()?'rgba(96,184,240,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'12px 11px',fontSize:14,fontWeight:950,textAlign:'left'}}>Head-to-head matchplay <span style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.62)',fontWeight:700,marginTop:2}}>Only choose this for a 2-player match</span></button>
-              <button onClick={()=>setRoundMode('foursomes')} style={{border:'1px solid '+(isFoursomesSetup()?'rgba(251,191,36,0.58)':'rgba(255,255,255,0.12)'),background:isFoursomesSetup()?'rgba(251,191,36,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'12px 11px',fontSize:14,fontWeight:950,textAlign:'left'}}>Foursomes matchplay <span style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.62)',fontWeight:700,marginTop:2}}>Two teams, one ball each</span></button>
+              <button onClick={()=>setRoundMode('foursomes')} style={{border:'1px solid '+(isFoursomesSetup()?'rgba(96,184,240,0.6)':'rgba(255,255,255,0.12)'),background:isFoursomesSetup()?'rgba(96,184,240,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:12,padding:'12px 11px',fontSize:14,fontWeight:950,textAlign:'left'}}>Foursomes matchplay <span style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.62)',fontWeight:700,marginTop:2}}>Two teams, one ball each</span></button>
             </div>
-            <div style={{fontSize:11,color:isFoursomesSetup()?'#fbbf24':isSinglesMatchplaySetup()?'#90ccf0':'rgba(255,255,255,0.62)',marginTop:8,lineHeight:1.35}}>{isFoursomesSetup()?'Team scorecard only.':isSinglesMatchplaySetup()?'Choose points as well, or matchplay only.':'Classic live scoring.'}</div>
+            <div style={{fontSize:11,color:isFoursomesSetup()||isSinglesMatchplaySetup()?'#90ccf0':'#d9f99d',marginTop:8,lineHeight:1.35}}>{isFoursomesSetup()?'Team scorecard only.':isSinglesMatchplaySetup()?'Choose points as well, or matchplay only.':'Classic live scoring.'}</div>
             {isSinglesMatchplaySetup()&&<div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
               <button onClick={()=>setSetup(q=>({...q,matchplay:{...cleanMatchplaySetup(q.matchplay||{},participants),enabled:true,mode:'singles',keepStableford:true}}))} style={{border:'1px solid '+(setup.matchplay&&setup.matchplay.keepStableford!==false?'rgba(96,184,240,0.6)':'rgba(255,255,255,0.12)'),background:setup.matchplay&&setup.matchplay.keepStableford!==false?'rgba(96,184,240,0.20)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:10,padding:'10px 8px',fontSize:12,fontWeight:900}}>Matchplay + points</button>
               <button onClick={()=>setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),enabled:false},matchplay:{...cleanMatchplaySetup(q.matchplay||{},participants),enabled:true,mode:'singles',keepStableford:false}}))} style={{border:'1px solid '+(setup.matchplay&&setup.matchplay.keepStableford===false?'rgba(251,191,36,0.55)':'rgba(255,255,255,0.12)'),background:setup.matchplay&&setup.matchplay.keepStableford===false?'rgba(251,191,36,0.16)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:10,padding:'10px 8px',fontSize:12,fontWeight:900}}>Matchplay only</button>
