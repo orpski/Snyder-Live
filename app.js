@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.89
+// SNYDER GOLF v3.90
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.89',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.90',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1960,7 +1960,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.87" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.87</span>
+          <span aria-label="App version v3.90" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.90</span>
         </button>
       </div>
 
@@ -6093,14 +6093,9 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     setSweepstakeLeagueSettlement({status:'checking',changes:[],skipped:[]});
     const markerNote=`Sweepstake League balance settlement ${key}`;
     try{
-      const markerPlayerId=makeSweepstakeScorePlayerId(key);
-      const [{data:scoreMarkers,error:scoreMarkerError},{data:logMarkers,error:logMarkerError}]=await Promise.all([
-        sb.from('cup_scores').select('round_id').eq('round_id',round.id).eq('player_id',markerPlayerId).limit(1),
-        sb.from('payment_log').select('id').eq('note',markerNote).limit(1)
-      ]);
-      if(scoreMarkerError)throw scoreMarkerError;
+      const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').eq('note',markerNote).limit(1);
       if(logMarkerError)throw logMarkerError;
-      if((scoreMarkers&&scoreMarkers.length)||(logMarkers&&logMarkers.length)){
+      if(logMarkers&&logMarkers.length){
         setSweepstakeLeagueSettlement({status:'done',already:true,changes:[],skipped:[]});
         return;
       }
@@ -6144,15 +6139,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       });
       const ids=Object.keys(deltas).filter(id=>Math.abs(deltas[id])>0.0001);
       if(!ids.length){
-        await saveScoreRowsToCloud(sb,[{
-          round_id:round.id,
-          player_id:markerPlayerId,
-          hole_number:SWEEPSTAKE_CONFIG_HOLE+1,
-          gross_score:0,
-          stableford_points:1,
-          par:4,
-          stroke_index:1
-        }]);
         setSweepstakeLeagueSettlement({status:'skipped',changes:[],skipped});
         return;
       }
@@ -6172,16 +6158,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       }));
       const {error:logError}=await sb.from('payment_log').insert(logRows);
       if(logError)throw logError;
-      const marker=await saveScoreRowsToCloud(sb,[{
-        round_id:round.id,
-        player_id:markerPlayerId,
-        hole_number:SWEEPSTAKE_CONFIG_HOLE+1,
-        gross_score:ids.length,
-        stableford_points:1,
-        par:4,
-        stroke_index:1
-      }]);
-      if(marker&&!marker.ok)throw new Error(marker.error||'Could not save sweepstake settlement marker');
       const changes=ids.map(id=>({
         player:(details[id]&&details[id].player&&details[id].player.name)||'Player',
         delta:Math.round(deltas[id]*100)/100,
@@ -8326,18 +8302,13 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerPlayerId=makeSweepstakeScorePlayerId(markerKey);
     const markerNote=`Day sweepstake League balance settlement ${markerKey}`;
     const playable=(linked||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
     if(!playable.length)return {already:false,changes:[],skipped:[]};
     const roundIds=playable.map(r=>r.id);
-    const [{data:scoreMarkers,error:scoreMarkerError},{data:logMarkers,error:logMarkerError}]=await Promise.all([
-      sb.from('cup_scores').select('round_id').eq('round_id',board.id).eq('player_id',markerPlayerId).limit(1),
-      sb.from('payment_log').select('id').eq('note',markerNote).limit(1)
-    ]);
-    if(scoreMarkerError)throw scoreMarkerError;
+    const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').eq('note',markerNote).limit(1);
     if(logMarkerError)throw logMarkerError;
-    if((scoreMarkers&&scoreMarkers.length)||(logMarkers&&logMarkers.length))return {already:true,changes:[],skipped:[]};
+    if(logMarkers&&logMarkers.length)return {already:true,changes:[],skipped:[]};
     const [{data:roundPlayers,error:roundPlayersError},{data:scoreRows,error:scoreRowsError},{data:leaguePlayers,error:leaguePlayersError},linkResult]=await Promise.all([
       sb.from('cup_round_players').select('*').in('round_id',roundIds),
       sb.from('cup_scores').select('*').in('round_id',[board.id,...roundIds]),
@@ -8388,16 +8359,6 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
       const {error:logError}=await sb.from('payment_log').insert(logRows);
       if(logError)throw logError;
     }
-    const marker=await saveScoreRowsToCloud(sb,[{
-      round_id:board.id,
-      player_id:markerPlayerId,
-      hole_number:SWEEPSTAKE_CONFIG_HOLE+1,
-      gross_score:ids.length,
-      stableford_points:1,
-      par:4,
-      stroke_index:1
-    }]);
-    if(marker&&!marker.ok)throw new Error(marker.error||'Could not save day sweepstake settlement marker');
     const changes=ids.map(id=>({
       player:(details[id]&&details[id].player&&details[id].player.name)||'Player',
       delta:Math.round(deltas[id]*100)/100,
@@ -8447,6 +8408,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
       else if((settlement.skipped||[]).length)flash('Day sweepstake finished - guests/unlinked/manual payments shown');
       else flash('Day sweepstake finished');
     }catch(e){
+      console.error('Day sweepstake finish failed',e);
       flash('Could not finish day sweepstake: '+(e.message||String(e)),'error');
     }
   }
