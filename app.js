@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.91
+// SNYDER GOLF v3.92
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.91',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.92',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1961,7 +1961,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.91" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.91</span>
+          <span aria-label="App version v3.92" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.92</span>
         </button>
       </div>
 
@@ -2515,17 +2515,20 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     return rd&&rd.course_name||'Scorecard';
   }
   function CompletedCard({rd}){
+    const isSweepstakeBoard=isDayCompBoardRound(rd);
+    const title=isSweepstakeBoard?dayCompDisplayName(rounds,rd):roundDisplayName(rd);
+    const open=()=>isSweepstakeBoard?setDayScorecardRound(rd):openRound(rd);
     return(
-      <div style={{...S.card,...NO_SELECT,marginBottom:8,cursor:'pointer',opacity:0.9}} onClick={()=>openRound(rd)}>
+      <div style={{...S.card,...NO_SELECT,marginBottom:8,cursor:'pointer',opacity:0.9,borderColor:isSweepstakeBoard?'rgba(251,191,36,0.28)':undefined}} onClick={open}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
           <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
             <CourseBadge course={courses.find(co=>co.id===rd.course_id)} round={rd} size={34}/>
             <div style={{minWidth:0}}>
-              <div style={{fontSize:14,color:'#fff',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{roundDisplayName(rd)}</div>
-              <div style={{fontSize:11,color:'#60b8f0'}}>Round started: {formatRoundStart(rd)}</div>
+              <div style={{fontSize:14,color:'#fff',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{title}</div>
+              <div style={{fontSize:11,color:isSweepstakeBoard?'#fbbf24':'#60b8f0'}}>{isSweepstakeBoard?'Final sweepstake results':'Round started: '+formatRoundStart(rd)}</div>
             </div>
           </div>
-          <div style={{fontSize:11,color:'#1b5e20',background:'rgba(27,94,32,0.15)',borderRadius:6,padding:'3px 8px',fontWeight:600,flexShrink:0}}>Completed</div>
+          <div style={{fontSize:11,color:isSweepstakeBoard?'#7c2d12':'#1b5e20',background:isSweepstakeBoard?'rgba(251,191,36,0.20)':'rgba(27,94,32,0.15)',borderRadius:6,padding:'3px 8px',fontWeight:600,flexShrink:0}}>{isSweepstakeBoard?'Results':'Completed'}</div>
         </div>
       </div>
     );
