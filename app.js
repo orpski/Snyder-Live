@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.88
+// SNYDER GOLF v3.89
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.88',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.89',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1609,7 +1609,8 @@ function App(){
 
   function flash(msg,type){
     setToast({msg,type});
-    setTimeout(()=>setToast(null),3000);
+    const delay=type==='error'?11000:3600;
+    setTimeout(()=>setToast(current=>current&&current.msg===msg?null:current),delay);
   }
 
     // ---------------------------------------------------------
@@ -8380,7 +8381,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
       const logRows=ids.map(id=>({
         player_id:id,
         player_name:(details[id]&&details[id].player&&details[id].player.name)||'Player',
-        action:'Day sweepstake balance',
+        action:'Sweepstake balance',
         amount:Math.round(deltas[id]*100)/100,
         note:markerNote
       }));
@@ -8402,7 +8403,30 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
       delta:Math.round(deltas[id]*100)/100,
       lines:(details[id]&&details[id].lines)||[]
     })).sort((a,b)=>a.player.localeCompare(b.player));
-    return {already:false,changes,skipped};
+    return {already:false,changes,skipped,rows:settlement.rows,payments:settlement.payments};
+  }
+  function daySweepstakeWinnerMessage(board,settlement){
+    const name=dayCompDisplayName(rounds,board)||'Day Sweepstake';
+    const rows=(settlement&&settlement.rows||[]).slice().filter(r=>r&&r.net>0).sort((a,b)=>b.net-a.net||String(a.name).localeCompare(String(b.name)));
+    if(!rows.length)return `${name} finished. No sweepstake winner to pay out.`;
+    const top=rows[0];
+    const tied=rows.filter(r=>r.net===top.net);
+    if(tied.length===1)return `${name}: ${gameFirstName(top.name)} wins ${moneyFromPence(top.net)}.`;
+    const names=tied.slice(0,3).map(r=>gameFirstName(r.name)).join(', ')+(tied.length>3?` +${tied.length-3}`:'');
+    return `${name}: ${names} win ${moneyFromPence(top.net)} each.`;
+  }
+  async function notifyDaySweepstakeFinished(board,settlement){
+    try{
+      if(!board||!board.id)return;
+      const body=daySweepstakeWinnerMessage(board,settlement);
+      await sendSnyderLiveNotification('day_sweepstake_finished',{
+        roundId:board.id,
+        status:'day-sweepstake-finished',
+        title:'🏆 '+(dayCompDisplayName(rounds,board)||'Day Sweepstake')+' finished!',
+        body,
+        roundName:dayCompDisplayName(rounds,board)||'Day Sweepstake'
+      });
+    }catch(e){}
   }
   async function closeBoard(board){
     if(!window.confirm('Mark this day sweepstake as finished? Do this only once the last scorecard is in. This will also add the final sweepstake to League balances.'))return;
@@ -8411,12 +8435,16 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     try{
       const settlement=await settleDaySweepstakeLeagueBalances(board,linked);
       for(const r of linked){
-        if(isLiveRound(r))await sb.from('cup_rounds').update({status:'complete'}).eq('id',r.id);
+        if(isLiveRound(r)){
+          const {error:updateError}=await sb.from('cup_rounds').update({status:'complete'}).eq('id',r.id);
+          if(updateError)throw updateError;
+        }
       }
+      await notifyDaySweepstakeFinished(board,settlement);
       await load();
       if(settlement.already)flash('Day sweepstake finished - League balances already updated');
       else if((settlement.changes||[]).length)flash('Day sweepstake finished - League balances updated');
-      else if((settlement.skipped||[]).length)flash('Day sweepstake finished - guests/unlinked players skipped');
+      else if((settlement.skipped||[]).length)flash('Day sweepstake finished - guests/unlinked/manual payments shown');
       else flash('Day sweepstake finished');
     }catch(e){
       flash('Could not finish day sweepstake: '+(e.message||String(e)),'error');
