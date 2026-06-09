@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.92
+// SNYDER GOLF v3.94
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.92',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.94',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -597,6 +597,57 @@ function compareStablefordLeaderboardRows(a,b){
     if(diff)return diff;
   }
   return String(a.name||'').localeCompare(String(b.name||''));
+}
+
+function sweepstakeCountbackStages(key){
+  const k=String(key||'overall').toLowerCase();
+  if(k==='front'||k==='frontlive')return [
+    {label:'last 6 of front 9',start:4,end:9},
+    {label:'last 3 of front 9',start:7,end:9},
+    {label:'last hole of front 9',start:9,end:9}
+  ];
+  if(k==='back'||k==='backlive')return [
+    {label:'last 6 of back 9',start:13,end:18},
+    {label:'last 3 of back 9',start:16,end:18},
+    {label:'last hole of back 9',start:18,end:18}
+  ];
+  return [
+    {label:'last 6 holes',start:13,end:18},
+    {label:'last 3 holes',start:16,end:18},
+    {label:'last hole',start:18,end:18},
+    {label:'best front 9',start:1,end:9},
+    {label:'last 6 of front 9',start:4,end:9},
+    {label:'last 3 of front 9',start:7,end:9},
+    {label:'last hole of front 9',start:9,end:9}
+  ];
+}
+function resolveSweepstakeCountback(candidates,key,rangeScore){
+  const tied=(candidates||[]).filter(Boolean);
+  if(tied.length<=1)return {winner:tied[0]||null,winners:tied,reason:'',unresolved:false};
+  let active=tied.slice();
+  for(const stage of sweepstakeCountbackStages(key)){
+    const scores=active.map(row=>({row,score:parseInt(rangeScore(row,stage.start,stage.end))||0}));
+    const best=scores.length?Math.max(...scores.map(x=>x.score)):0;
+    const next=scores.filter(x=>x.score===best).map(x=>x.row);
+    if(next.length===1){
+      return {winner:next[0],winners:[next[0]],reason:'Won on countback, '+stage.label,reasonShort:stage.label,unresolved:false};
+    }
+    active=next;
+  }
+  return {winner:null,winners:active,reason:'Still tied after countback',reasonShort:'countback tied',unresolved:true};
+}
+function sweepstakeWinnerText(pot){
+  if(!pot)return 'Waiting for scores';
+  if(pot.rollover)return 'Rolled over to overall';
+  if(pot.manualDecision)return 'Manual decision needed';
+  const winner=pot.winner||((pot.winners||[])[0]);
+  return winner?gameFirstName(winner.name||'Player'):'Waiting for scores';
+}
+function sweepstakeReasonText(pot){
+  if(!pot)return '';
+  if(pot.rollover)return 'Still tied after countback — pot rolls over to overall winner';
+  if(pot.manualDecision)return 'Still tied after all countback checks';
+  return pot.reason||'';
 }
 function rawCourseHandicap(handicapIndex,course){
   const hi=parseFloat(handicapIndex)||0;
@@ -1961,7 +2012,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.92" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.92</span>
+          <span aria-label="App version v3.94" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.94</span>
         </button>
       </div>
 
@@ -2285,40 +2336,63 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     for(let h=start;h<=end;h++)total+=stablefordPointsValue(hp[h]||0);
     return total;
   }
+  function daySweepstakeEntrantIdSet(rd){
+    const key=dayCompKeyFromRound(rd);
+    if(!key)return null;
+    const boardRounds=dayCompRoundsFor(rounds,rd).filter(r=>!isDayCompBoardRound(r));
+    const allRows=normaliseFoursomesScoreRows([...(scores||[]),...(publicScores||[])]);
+    const ids=new Set();
+    let hasExplicit=false;
+    boardRounds.forEach(r=>{
+      const explicit=sweepstakeEntryIdsFromRows(allRows,r);
+      if(explicit){hasExplicit=true;explicit.forEach(id=>ids.add(normaliseId(id)));}
+      else{
+        const rp=(publicRoundPlayers[r.id]||[]).map(x=>mapRoundPlayerForScorecard(x,isSnyderCupRound(r)));
+        rp.forEach(p=>{if(p&&p.id)ids.add(normaliseId(p.id));});
+      }
+    });
+    return ids.size?ids:null;
+  }
   function daySweepstakePotRows(rd,boardRows){
     const cfg=daySweepstakeConfigForLive(rd);
     const amountPence=parseInt(cfg&&cfg.amountPence)||200;
-    const potDefs=[
-      {key:'front',label:'Front 9',start:1,end:9},
-      {key:'back',label:'Back 9',start:10,end:18},
-      {key:'overall',label:'Overall',start:1,end:18}
-    ];
-    return potDefs.map(pot=>{
-      const rows=(boardRows||[]).map(r=>({...r,potTotal:sumRowHoles(r,pot.start,pot.end)})).filter(r=>r.holes>0);
+    const entrantIds=daySweepstakeEntrantIdSet(rd);
+    const sweepRows=(boardRows||[]).filter(r=>!entrantIds||entrantIds.has(normaliseId(r&&r.id)));
+    const rowsForRange=(start,end)=>sweepRows.map(r=>({...r,potTotal:sumRowHoles(r,start,end)})).filter(r=>r.holes>0);
+    const makePot=(def,rolloverIn=0)=>{
+      const rows=rowsForRange(def.start,def.end);
       const best=rows.length?Math.max(...rows.map(r=>r.potTotal)):0;
-      const winners=best>0?rows.filter(r=>r.potTotal===best):[];
-      return {...pot,amountPence,best,winners};
-    });
+      const tied=best>0?rows.filter(r=>r.potTotal===best):[];
+      const resolved=resolveSweepstakeCountback(tied,def.key,(row,start,end)=>sumRowHoles(row,start,end));
+      const unresolved=!!(best>0&&resolved.unresolved);
+      const rollover=unresolved&&(def.key==='front'||def.key==='back');
+      const manualDecision=unresolved&&def.key==='overall';
+      const basePotTotal=amountPence*((sweepRows||[]).filter(r=>r&&r.id).length||0);
+      const payoutAmountPence=rollover?0:(manualDecision?0:(basePotTotal+(parseInt(rolloverIn)||0)));
+      return {...def,amountPence,best,winners:resolved.winners||[],winner:resolved.winner,reason:resolved.reason||'',reasonShort:resolved.reasonShort||'',rollover,manualDecision,basePotTotal,payoutAmountPence,rolloverIn:parseInt(rolloverIn)||0};
+    };
+    const front=makePot({key:'front',label:'Front 9',start:1,end:9});
+    const back=makePot({key:'back',label:'Back 9',start:10,end:18});
+    const rolloverIn=(front.rollover?front.basePotTotal:0)+(back.rollover?back.basePotTotal:0);
+    const overall=makePot({key:'overall',label:'Overall',start:1,end:18},rolloverIn);
+    return [front,back,overall];
   }
   function compactDaySweepstakeSettlement(rd,boardRows,potRows){
     const cfg=daySweepstakeConfigForLive(rd);
     const amountPence=parseInt(cfg&&cfg.amountPence)||200;
-    const rows=(boardRows||[]).filter(r=>r&&r.id).map(r=>({id:r.id,name:gameFirstName(r.name||'Player'),paid:amountPence*3,winnings:0,net:-(amountPence*3),wins:[]}));
+    const entrantIds=daySweepstakeEntrantIdSet(rd);
+    const rows=(boardRows||[]).filter(r=>r&&r.id&&(!entrantIds||entrantIds.has(normaliseId(r.id)))).map(r=>({id:r.id,name:gameFirstName(r.name||'Player'),paid:amountPence*3,winnings:0,net:-(amountPence*3),wins:[]}));
     const byId={};
     rows.forEach(r=>{byId[normaliseId(r.id)]=r;});
     (potRows||[]).forEach(pot=>{
-      const winners=(pot.winners||[]).filter(w=>byId[normaliseId(w.id)]);
-      if(!winners.length)return;
-      const potTotal=amountPence*rows.length;
-      const share=Math.floor(potTotal/winners.length);
-      const remainder=potTotal-(share*winners.length);
-      winners.forEach((w,idx)=>{
-        const row=byId[normaliseId(w.id)];
-        if(!row)return;
-        const win=share+(idx<remainder?1:0);
-        row.winnings+=win;
-        row.wins.push({label:pot.label,amount:win,points:w.potTotal});
-      });
+      if(pot&&pot.rollover)return;
+      const winner=(pot&&pot.winner)?pot.winner:((pot&&pot.winners||[])[0]);
+      const row=winner&&byId[normaliseId(winner.id)];
+      if(!row)return;
+      const win=parseInt(pot&&pot.payoutAmountPence)||0;
+      if(win<=0)return;
+      row.winnings+=win;
+      row.wins.push({label:pot.label,amount:win,points:winner.potTotal,reason:pot.reason||''});
     });
     rows.forEach(r=>{r.net=r.winnings-r.paid;});
     const creditors=rows.filter(r=>r.net>0).map(r=>({...r,remaining:r.net}));
@@ -2404,7 +2478,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                   <div style={{fontSize:13,color:'#fff',fontWeight:900}}>{pot.label}</div>
                   <div style={{fontSize:10,color:'rgba(255,255,255,0.55)'}}>Pot total {moneyFromPence((parseInt(cfg&&cfg.amountPence)||200)*(boardRows.length||0))}</div>
                 </div>
-                <div style={{fontSize:13,color:'#fbbf24',fontWeight:950,textAlign:'right'}}>{pot.winners.length?pot.winners.map(w=>gameFirstName(w.name)).join(' / '):'Waiting for scores'} <span style={{color:'rgba(255,255,255,0.62)'}}>{pot.best?`(${pot.best} pts)`:''}</span></div>
+                <div style={{fontSize:13,color:'#fbbf24',fontWeight:950,textAlign:'right'}}>{sweepstakeWinnerText(pot)} <span style={{color:'rgba(255,255,255,0.62)'}}>{pot.best?`(${pot.best} pts)`:''}</span>{sweepstakeReasonText(pot)&&<div style={{fontSize:10,color:'rgba(255,255,255,0.70)',fontWeight:800,marginTop:2}}>{sweepstakeReasonText(pot)}</div>}{pot.rolloverIn>0&&pot.key==='overall'&&<div style={{fontSize:10,color:'#86efac',fontWeight:900,marginTop:2}}>Includes rollover {moneyFromPence(pot.rolloverIn)}</div>}</div>
               </div>
             ))}
             <div style={{marginTop:12,padding:'10px 10px',borderRadius:12,background:'rgba(2,8,23,0.30)',border:'1px solid rgba(255,255,255,0.10)'}}>
@@ -2528,7 +2602,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
               <div style={{fontSize:11,color:isSweepstakeBoard?'#fbbf24':'#60b8f0'}}>{isSweepstakeBoard?'Final sweepstake results':'Round started: '+formatRoundStart(rd)}</div>
             </div>
           </div>
-          <div style={{fontSize:11,color:isSweepstakeBoard?'#7c2d12':'#1b5e20',background:isSweepstakeBoard?'rgba(251,191,36,0.20)':'rgba(27,94,32,0.15)',borderRadius:6,padding:'3px 8px',fontWeight:600,flexShrink:0}}>{isSweepstakeBoard?'Results':'Completed'}</div>
+          <div style={{fontSize:11,color:isSweepstakeBoard?'#fff':'#1b5e20',background:isSweepstakeBoard?'rgba(251,191,36,0.36)':'rgba(27,94,32,0.15)',border:isSweepstakeBoard?'1px solid rgba(251,191,36,0.55)':'none',borderRadius:6,padding:'3px 8px',fontWeight:800,flexShrink:0,textShadow:isSweepstakeBoard?'0 1px 2px rgba(0,0,0,0.45)':'none'}}>{isSweepstakeBoard?'Results':'Completed'}</div>
         </div>
       </div>
     );
@@ -3080,7 +3154,36 @@ function parseFineScoreRow(row){
 function isFineScoreRow(row){return !!parseFineScoreRow(row);}
 const SWEEPSTAKE_SCORE_PREFIX='__sweepstake__|';
 const SWEEPSTAKE_CONFIG_HOLE=950001;
+const SWEEPSTAKE_ENTRY_HOLE=950002;
 function makeSweepstakeScorePlayerId(key){return SWEEPSTAKE_SCORE_PREFIX+encodeURIComponent(key||'config');}
+function sweepstakeEntryKeyForPlayer(playerId){return 'entry_'+encodeURIComponent(normaliseId(playerId));}
+function parseSweepstakeEntryRow(row){
+  const parsed=parseSweepstakeScoreRow(row);
+  if(!parsed||!String(parsed.key||'').startsWith('entry_'))return null;
+  try{return {playerId:normaliseId(decodeURIComponent(String(parsed.key).slice(6))),included:(parseInt(row&&row.gross_score)||0)>0};}
+  catch(e){return null;}
+}
+function sweepstakeEntryIdsFromRows(rows,round){
+  const entries=(rows||[]).filter(r=>r&&(!round||r.round_id===round.id)&&parseInt(r.hole_number)===SWEEPSTAKE_ENTRY_HOLE).map(parseSweepstakeEntryRow).filter(Boolean);
+  if(!entries.length)return null;
+  const ids=new Set();
+  entries.forEach(e=>{if(e.included&&e.playerId)ids.add(normaliseId(e.playerId));});
+  return ids;
+}
+async function saveSweepstakeEntryIdsToCloud(roundId,playerIds){
+  if(!roundId||!Array.isArray(playerIds))return {ok:true,count:0};
+  const ids=Array.from(new Set(playerIds.map(normaliseId).filter(Boolean)));
+  if(!ids.length)return {ok:true,count:0};
+  return saveScoreRowsToCloud(sb,ids.map(id=>({
+    round_id:roundId,
+    player_id:makeSweepstakeScorePlayerId(sweepstakeEntryKeyForPlayer(id)),
+    hole_number:SWEEPSTAKE_ENTRY_HOLE,
+    gross_score:1,
+    stableford_points:1,
+    par:4,
+    stroke_index:1
+  })));
+}
 function parseSweepstakeScoreRow(row){
   const txt=String(row&&row.player_id||'');
   if(!txt.startsWith(SWEEPSTAKE_SCORE_PREFIX))return null;
@@ -3625,6 +3728,8 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   const[activeGroup,setActiveGroup]=useState(null);
   const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:0.95,dayCompMode:'none',dayCompKey:'',sweepstake:{enabled:false,amountPence:200,scope:'round'},matchplay:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,keepStableford:true}});
   const[dayJoinPromptDone,setDayJoinPromptDone]=useState(false);
+  const[daySweepstakeEntryMode,setDaySweepstakeEntryMode]=useState('all');
+  const[daySweepstakeEntryIds,setDaySweepstakeEntryIds]=useState([]);
   const[participants,setParticipants]=useState([]);
   const[groupSetup,setGroupSetup]=useState([[]]);
   const[pickerGroup,setPickerGroup]=useState(0);
@@ -3653,6 +3758,21 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   const selectedDayBoard=setup.dayCompMode==='join'?dayBoardByKey(setup.dayCompKey):null;
   const selectedDayBoardSweepstake=dayBoardSweepstakeConfig(selectedDayBoard);
   const daySweepstakeLocked=setup.dayCompMode==='create'||setup.dayCompMode==='join';
+  const daySweepstakePlayerIds=participants.map(p=>normaliseId(p.id)).filter(Boolean);
+  const daySweepstakeSelectedIds=daySweepstakeEntryMode==='all'?daySweepstakePlayerIds:daySweepstakeEntryIds.map(normaliseId).filter(id=>daySweepstakePlayerIds.includes(id));
+  function toggleDaySweepstakeEntry(playerId){
+    const id=normaliseId(playerId);
+    setDaySweepstakeEntryMode('custom');
+    setDaySweepstakeEntryIds(ids=>{
+      const set=new Set((ids||[]).map(normaliseId));
+      if(set.has(id))set.delete(id); else set.add(id);
+      return Array.from(set);
+    });
+  }
+  useEffect(()=>{
+    if(setup.dayCompMode!=='join'){setDaySweepstakeEntryMode('all');setDaySweepstakeEntryIds([]);return;}
+    setDaySweepstakeEntryIds(ids=>(ids||[]).map(normaliseId).filter(id=>daySweepstakePlayerIds.includes(id)));
+  },[setup.dayCompMode,daySweepstakePlayerIds.join('|')]);
   useEffect(()=>{
     if(setup.dayCompMode!=='join'||!selectedDayBoard)return;
     const cfg=selectedDayBoardSweepstake&&selectedDayBoardSweepstake.enabled?selectedDayBoardSweepstake:{enabled:true,amountPence:200,scope:'round'};
@@ -3938,6 +4058,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
     if(allParticipants.length===0){flash('Add players','error');return;}
     if(!foursomesMode&&!allParticipants.some(p=>normaliseId(p.id)===normaliseId(currentUser.id))){flash('Add yourself first so at least one signed-in player is in the round','error');return;}
     if(setup.dayCompMode==='create'&&(parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||0)<=0){flash('Enter a sweepstake amount','error');return;}
+    if(setup.dayCompMode==='join'&&allParticipants.length>0&&!daySweepstakeSelectedIds.length){flash('Choose at least one player for the day sweepstake, or choose All','error');return;}
     if(singlesMode&&allParticipants.length!==2){flash('Singles matchplay needs exactly 2 players','error');return;}
     if(foursomesMode&&(!(setup.matchplay.teamAName||'').trim()||!(setup.matchplay.teamBName||'').trim())){flash('Add both foursomes team names','error');return;}
     if(singlesMode){setup.matchplay.teamA=[String(allParticipants[0].id)];setup.matchplay.teamB=[String(allParticipants[1].id)];setup.matchplay.teamAName=gameFirstName(allParticipants[0].display_name||allParticipants[0].name||'Player 1');setup.matchplay.teamBName=gameFirstName(allParticipants[1].display_name||allParticipants[1].name||'Player 2');}
@@ -4033,6 +4154,11 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       if(roundSweepstake&&roundSweepstake.enabled){
         const swSave=await saveSweepstakeConfigToCloud(rd.id,roundSweepstake);
         if(!swSave.ok)flash('Sweepstake setting did not sync yet. Tap refresh/retry if it is missing on another device.','error');
+        if(joinedDayBoard){
+          const entryIds=daySweepstakeSelectedIds.length?daySweepstakeSelectedIds:allParticipants.map(p=>normaliseId(p.id)).filter(Boolean);
+          const entrySave=await saveSweepstakeEntryIdsToCloud(rd.id,entryIds);
+          if(!entrySave.ok)flash('Sweepstake player choices did not sync yet. Tap refresh if the sweepstake list is wrong.','error');
+        }
       }
 
       if(setup.matchplay&&setup.matchplay.enabled){
@@ -4412,6 +4538,22 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
             ))}
           </div>}
           </>}
+          {setup.dayCompMode==='join'&&participants.length>0&&!isMatchplayOnlySetup()&&<div style={{...S.card,marginTop:12,borderColor:'rgba(245,158,11,0.38)',background:'rgba(245,158,11,0.10)'}}>
+            <div style={{fontSize:15,color:'#fff',fontWeight:950,marginBottom:4}}>Who is joining the sweepstake?</div>
+            <div style={{fontSize:11,color:'#fbbf24',lineHeight:1.35,marginBottom:10}}>Anyone left out still appears on the scorecard and day leaderboard, but they are not included in the sweepstake pots or payments.</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+              <button onClick={()=>{setDaySweepstakeEntryMode('all');setDaySweepstakeEntryIds([]);}} style={{border:'1px solid '+(daySweepstakeEntryMode==='all'?'rgba(245,158,11,0.65)':'rgba(255,255,255,0.12)'),background:daySweepstakeEntryMode==='all'?'rgba(245,158,11,0.22)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:10,padding:'9px 8px',fontSize:12,fontWeight:950}}>All players</button>
+              <button onClick={()=>{setDaySweepstakeEntryMode('custom');setDaySweepstakeEntryIds(ids=>ids&&ids.length?ids:daySweepstakePlayerIds);}} style={{border:'1px solid '+(daySweepstakeEntryMode==='custom'?'rgba(96,184,240,0.65)':'rgba(255,255,255,0.12)'),background:daySweepstakeEntryMode==='custom'?'rgba(96,184,240,0.22)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:10,padding:'9px 8px',fontSize:12,fontWeight:950}}>Choose individually</button>
+            </div>
+            {daySweepstakeEntryMode==='custom'&&<div style={{display:'flex',flexDirection:'column',gap:7}}>
+              {participants.map(p=>{const id=normaliseId(p.id);const checked=daySweepstakeSelectedIds.includes(id);return <label key={id} style={{display:'flex',alignItems:'center',gap:9,padding:'9px 10px',borderRadius:10,background:checked?'rgba(245,158,11,0.15)':'rgba(255,255,255,0.05)',border:'1px solid '+(checked?'rgba(245,158,11,0.32)':'rgba(255,255,255,0.08)'),fontSize:13,color:'#fff',fontWeight:850}}>
+                <input type="checkbox" checked={checked} onChange={()=>toggleDaySweepstakeEntry(p.id)}/>
+                <span style={{flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||p.name||'Player'}</span>
+                <span style={{fontSize:10,color:checked?'#fbbf24':'rgba(255,255,255,0.45)',fontWeight:950}}>{checked?'IN':'OUT'}</span>
+              </label>;})}
+            </div>}
+            <div style={{fontSize:11,color:'#dbeafe',marginTop:9,fontWeight:800}}>{daySweepstakeSelectedIds.length} of {participants.length} player{participants.length===1?'':'s'} in sweepstake</div>
+          </div>}
           {openRoundBlock&&(
             <div style={{...S.card,marginTop:12,borderColor:isSameLocalDay(roundStartValue(openRoundBlock),Date.now())?'rgba(239,68,68,0.45)':'rgba(245,158,11,0.45)',background:isSameLocalDay(roundStartValue(openRoundBlock),Date.now())?'rgba(239,68,68,0.12)':'rgba(245,158,11,0.12)'}}>
               <div style={{fontSize:15,color:'#fff',fontWeight:900,marginBottom:5}}>{isSameLocalDay(roundStartValue(openRoundBlock),Date.now())?'You already have a live round open today':'You have an unfinished round from a previous day'}</div>
@@ -6044,7 +6186,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     }
     const fallbackGroupPlayers=(grpPlayers&&grpPlayers.length)?grpPlayers:(((allGroups&&allGroups[0]&&allGroups[0].participants)||[]).length?(allGroups[0].participants):((group&&group.participants)||[]));
     const playerSource=scope==='round'?(allRoundPlayers&&allRoundPlayers.length?allRoundPlayers:(fallbackGroupPlayers&&fallbackGroupPlayers.length?fallbackGroupPlayers:grpPlayers)):(grpPlayers&&grpPlayers.length?grpPlayers:fallbackGroupPlayers);
-    const sweepPlayers=(playerSource||[]).filter((p,idx,arr)=>p&&p.id&&arr.findIndex(x=>normaliseId(x&&x.id)===normaliseId(p.id))===idx);
+    const entryIds=sweepstakeEntryIdsFromRows(overallScores||[],round);
+    const sweepPlayers=(playerSource||[]).filter((p,idx,arr)=>p&&p.id&&(!entryIds||entryIds.has(normaliseId(p.id)))&&arr.findIndex(x=>normaliseId(x&&x.id)===normaliseId(p.id))===idx);
     const pointByPlayerHole={};
     (overallScores||[]).filter(r=>r&&!isMetaScoreRow(r)).forEach(r=>{
       const pid=normaliseId(r.player_id); const hn=parseInt(r.hole_number);
@@ -6063,17 +6206,24 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     }
     const rows=sweepPlayers.map(p=>({id:p.id,player:p,name:gameFirstName((p.name||p.display_name)||'?'),paid:amountPence*3,winnings:0,net:-(amountPence*3),potWins:[]}));
     const byId={};rows.forEach(r=>{byId[normaliseId(r.id)]=r;});
-    const potRows=pots.map(pot=>{
-      const scores=sweepPlayers.map(p=>({id:p.id,name:gameFirstName((p.name||p.display_name)||'?'),points:sweepPts(p.id,pot.holes)}));
+    let rolloverPence=0;
+    const potRows=[];
+    pots.forEach(pot=>{
+      const scores=sweepPlayers.map(p=>({id:p.id,name:gameFirstName((p.name||p.display_name)||'?'),points:sweepPts(p.id,pot.holes),player:p}));
       const best=scores.length?Math.max(...scores.map(x=>x.points)):0;
-      const winners=scores.filter(x=>x.points===best);
+      const tied=scores.filter(x=>x.points===best);
       const potTotal=amountPence*sweepPlayers.length;
-      const share=winners.length?Math.floor(potTotal/winners.length):0;
-      const remainder=winners.length?potTotal-(share*winners.length):0;
+      let winner=null,winners=tied,reason='',rollover=false,manualDecision=false,payoutAmountPence=potTotal;
       if(pot.settles){
-        winners.forEach((w,idx)=>{const row=byId[normaliseId(w.id)];if(row){const win=share+(idx<remainder?1:0);row.winnings+=win;row.potWins.push({label:pot.label,amount:win,points:w.points});}});
+        const resolved=resolveSweepstakeCountback(tied,pot.key,(row,start,end)=>sweepPts(row.id,Array.from({length:(end-start)+1},(_,i)=>({hole:start+i}))));
+        winner=resolved.winner;winners=resolved.winners||[];reason=resolved.reason||'';
+        if(resolved.unresolved&&(pot.key==='front'||pot.key==='back')){rollover=true;rolloverPence+=potTotal;payoutAmountPence=0;}
+        else if(resolved.unresolved&&pot.key==='overall'){manualDecision=true;payoutAmountPence=0;}
+        else if(winner){payoutAmountPence=potTotal+(pot.key==='overall'?rolloverPence:0);const row=byId[normaliseId(winner.id)];if(row){row.winnings+=payoutAmountPence;row.potWins.push({label:pot.label,amount:payoutAmountPence,points:winner.points,reason});}}
+      }else{
+        winner=tied[0]||null;
       }
-      return {...pot,best,winners,potTotal,share};
+      potRows.push({...pot,best,winners,winner,reason,rollover,manualDecision,potTotal,payoutAmountPence,rolloverIn:pot.key==='overall'?rolloverPence:0,share:payoutAmountPence});
     });
     rows.forEach(r=>{r.net=r.winnings-r.paid;});
     const creditors=final?rows.filter(r=>r.net>0).map(r=>({...r,remaining:r.net})):[];
@@ -6198,7 +6348,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       {!sw.final&&<div style={{padding:'8px 10px',borderRadius:10,background:'rgba(96,184,240,0.12)',border:'1px solid rgba(96,184,240,0.22)',fontSize:12,color:'#dbeafe',fontWeight:800,marginBottom:8}}>Live standings only — final net settlement appears after 18 holes.</div>}
       {sw.pots.map(pot=><div key={pot.key} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'7px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
         <div style={{fontSize:12,color:'#fff',fontWeight:800}}>{pot.label}</div>
-        <div style={{fontSize:12,color:'#fbbf24',fontWeight:900,textAlign:'right'}}>{pot.winners.map(w=>w.name).join(' / ')||'-'} <span style={{color:'rgba(255,255,255,0.65)'}}>({pot.best||0} pts)</span></div>
+        <div style={{fontSize:12,color:'#fbbf24',fontWeight:900,textAlign:'right'}}>{sweepstakeWinnerText(pot)||'-'} <span style={{color:'rgba(255,255,255,0.65)'}}>({pot.best||0} pts)</span>{sweepstakeReasonText(pot)&&<div style={{fontSize:10,color:'rgba(255,255,255,0.70)',fontWeight:800,marginTop:2}}>{sweepstakeReasonText(pot)}</div>}{pot.rolloverIn>0&&pot.key==='overall'&&<div style={{fontSize:10,color:'#86efac',fontWeight:900,marginTop:2}}>Includes rollover {moneyFromPence(pot.rolloverIn)}</div>}</div>
       </div>)}
       {sw.final&&<>
         <div style={{marginTop:12,fontSize:payUp?14:12,color:'#90ccf0',fontWeight:950,letterSpacing:'0.08em'}}>FINAL BALANCES</div>
