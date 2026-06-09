@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.94
+// SNYDER GOLF v3.95
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.94',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.95',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -641,7 +641,7 @@ function sweepstakeWinnerText(pot){
   if(pot.rollover)return 'Rolled over to overall';
   if(pot.manualDecision)return 'Manual decision needed';
   const winner=pot.winner||((pot.winners||[])[0]);
-  return winner?gameFirstName(winner.name||'Player'):'Waiting for scores';
+  return winner?(winner.displayName||gameFirstName(winner.name||'Player')):'Waiting for scores';
 }
 function sweepstakeReasonText(pot){
   if(!pot)return '';
@@ -687,6 +687,33 @@ function gameName(name){
 }
 function gameFirstName(name){
   return gameName(String(name||'Player').split(' ')[0]);
+}
+function splitPlayerNameParts(name){
+  const parts=String(name||'Player').trim().split(/\s+/).filter(Boolean);
+  return {first:gameName(parts[0]||'Player'),second:gameName(parts.slice(1).join(' ')||parts[0]||'Player'),full:gameName(parts.join(' ')||'Player')};
+}
+function contextualPlayerName(name,allNames){
+  const parts=splitPlayerNameParts(name);
+  const firstCounts={};
+  (allNames||[]).forEach(n=>{const f=splitPlayerNameParts(n).first;firstCounts[f]=(firstCounts[f]||0)+1;});
+  return (firstCounts[parts.first]||0)>1?parts.full:parts.first;
+}
+function contextualNameMapFromRows(rows){
+  const list=(rows||[]).filter(Boolean);
+  const names=list.map(r=>r.display_name||r.name||'Player');
+  const map={};
+  list.forEach(r=>{if(r&&r.id)map[normaliseId(r.id)]=contextualPlayerName(r.display_name||r.name||'Player',names);});
+  return map;
+}
+function contextualNameMapFromPlayers(players){
+  const list=(players||[]).filter(Boolean);
+  const names=list.map(p=>p.display_name||p.name||'Player');
+  const map={};
+  list.forEach(p=>{if(p&&p.id)map[normaliseId(p.id)]=contextualPlayerName(p.display_name||p.name||'Player',names);});
+  return map;
+}
+function nameFromContextMap(map,id,fallback){
+  return (map&&map[normaliseId(id)])||gameFirstName(fallback||'Player');
 }
 
 
@@ -2344,21 +2371,23 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     const ids=new Set();
     let hasExplicit=false;
     boardRounds.forEach(r=>{
-      const explicit=sweepstakeEntryIdsFromRows(allRows,r);
+      const explicit=sweepstakeEntryIdsFromRows(allRows,r)||loadLocalSweepstakeEntryIds(r&&r.id);
       if(explicit){hasExplicit=true;explicit.forEach(id=>ids.add(normaliseId(id)));}
       else{
         const rp=(publicRoundPlayers[r.id]||[]).map(x=>mapRoundPlayerForScorecard(x,isSnyderCupRound(r)));
         rp.forEach(p=>{if(p&&p.id)ids.add(normaliseId(p.id));});
       }
     });
-    return ids.size?ids:null;
+    return hasExplicit?ids:(ids.size?ids:null);
   }
   function daySweepstakePotRows(rd,boardRows){
     const cfg=daySweepstakeConfigForLive(rd);
     const amountPence=parseInt(cfg&&cfg.amountPence)||200;
     const entrantIds=daySweepstakeEntrantIdSet(rd);
-    const sweepRows=(boardRows||[]).filter(r=>!entrantIds||entrantIds.has(normaliseId(r&&r.id)));
-    const rowsForRange=(start,end)=>sweepRows.map(r=>({...r,potTotal:sumRowHoles(r,start,end)})).filter(r=>r.holes>0);
+    const sweepRows=(boardRows||[]).filter(r=>r&&r.id&&(!entrantIds||entrantIds.has(normaliseId(r.id))));
+    const dayNameMap=contextualNameMapFromRows(boardRows||[]);
+    const sweepNameMap=contextualNameMapFromRows(sweepRows||[]);
+    const rowsForRange=(start,end)=>sweepRows.map(r=>({...r,displayName:nameFromContextMap(sweepNameMap,r.id,r.name),potTotal:sumRowHoles(r,start,end)})).filter(r=>r.holes>0);
     const makePot=(def,rolloverIn=0)=>{
       const rows=rowsForRange(def.start,def.end);
       const best=rows.length?Math.max(...rows.map(r=>r.potTotal)):0;
@@ -2367,9 +2396,12 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
       const unresolved=!!(best>0&&resolved.unresolved);
       const rollover=unresolved&&(def.key==='front'||def.key==='back');
       const manualDecision=unresolved&&def.key==='overall';
-      const basePotTotal=amountPence*((sweepRows||[]).filter(r=>r&&r.id).length||0);
+      const entrantCount=(sweepRows||[]).filter(r=>r&&r.id).length||0;
+      const basePotTotal=amountPence*entrantCount;
       const payoutAmountPence=rollover?0:(manualDecision?0:(basePotTotal+(parseInt(rolloverIn)||0)));
-      return {...def,amountPence,best,winners:resolved.winners||[],winner:resolved.winner,reason:resolved.reason||'',reasonShort:resolved.reasonShort||'',rollover,manualDecision,basePotTotal,payoutAmountPence,rolloverIn:parseInt(rolloverIn)||0};
+      const winner=resolved.winner?{...resolved.winner,displayName:nameFromContextMap(sweepNameMap,resolved.winner.id,resolved.winner.name)}:null;
+      const winners=(resolved.winners||[]).map(w=>({...w,displayName:nameFromContextMap(sweepNameMap,w.id,w.name)}));
+      return {...def,amountPence,best,winners,winner,reason:resolved.reason||'',reasonShort:resolved.reasonShort||'',rollover,manualDecision,basePotTotal,payoutAmountPence,rolloverIn:parseInt(rolloverIn)||0,entrantCount,winnerUpPence:winner?Math.max(0,payoutAmountPence-amountPence):0};
     };
     const front=makePot({key:'front',label:'Front 9',start:1,end:9});
     const back=makePot({key:'back',label:'Back 9',start:10,end:18});
@@ -2381,7 +2413,8 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     const cfg=daySweepstakeConfigForLive(rd);
     const amountPence=parseInt(cfg&&cfg.amountPence)||200;
     const entrantIds=daySweepstakeEntrantIdSet(rd);
-    const rows=(boardRows||[]).filter(r=>r&&r.id&&(!entrantIds||entrantIds.has(normaliseId(r.id)))).map(r=>({id:r.id,name:gameFirstName(r.name||'Player'),paid:amountPence*3,winnings:0,net:-(amountPence*3),wins:[]}));
+    const nameMap=contextualNameMapFromRows(boardRows||[]);
+    const rows=(boardRows||[]).filter(r=>r&&r.id&&(!entrantIds||entrantIds.has(normaliseId(r.id)))).map(r=>({id:r.id,name:nameFromContextMap(nameMap,r.id,r.name||'Player'),paid:amountPence*3,winnings:0,net:-(amountPence*3),wins:[]}));
     const byId={};
     rows.forEach(r=>{byId[normaliseId(r.id)]=r;});
     (potRows||[]).forEach(pot=>{
@@ -2430,6 +2463,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
   function DayLeaderboardModal({rd}){
     if(!rd)return null;
     const boardRows=leaderboardForRound(rd);
+    const dayNameMap=contextualNameMapFromRows(boardRows||[]);
     const potRows=daySweepstakePotRows(rd,boardRows);
     const compactSettlement=compactDaySweepstakeSettlement(rd,boardRows,potRows);
     const cfg=daySweepstakeConfigForLive(rd);
@@ -2461,7 +2495,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
             {boardRows.length?boardRows.map((r,idx)=>(
               <div key={r.id} style={{display:'grid',gridTemplateColumns:'30px minmax(0,1fr) 42px 42px 46px 42px',gap:6,alignItems:'center',padding:'8px 0',borderBottom:idx===boardRows.length-1?'none':'1px solid rgba(255,255,255,0.07)'}}>
                 <div style={{fontSize:13,color:idx===0?'#fbbf24':'rgba(255,255,255,0.58)',fontWeight:950}}>{idx+1}</div>
-                <div style={{fontSize:13,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{gameFirstName(r.name||'Player')}</div>
+                <div style={{fontSize:13,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nameFromContextMap(dayNameMap,r.id,r.name||'Player')}</div>
                 <div style={{fontSize:13,color:'#dbeafe',textAlign:'right',fontWeight:900}}>{sumRowHoles(r,1,9)}</div>
                 <div style={{fontSize:13,color:'#dbeafe',textAlign:'right',fontWeight:900}}>{sumRowHoles(r,10,18)}</div>
                 <div style={{fontSize:17,color:'#60b8f0',textAlign:'right',fontWeight:950}}>{r.total}</div>
@@ -2476,9 +2510,9 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
               <div key={pot.key} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'9px 0',borderTop:'1px solid rgba(255,255,255,0.08)',marginTop:8}}>
                 <div>
                   <div style={{fontSize:13,color:'#fff',fontWeight:900}}>{pot.label}</div>
-                  <div style={{fontSize:10,color:'rgba(255,255,255,0.55)'}}>Pot total {moneyFromPence((parseInt(cfg&&cfg.amountPence)||200)*(boardRows.length||0))}</div>
+                  <div style={{fontSize:10,color:'rgba(255,255,255,0.55)'}}>Pot {moneyFromPence(pot.basePotTotal||0)} · {pot.entrantCount||0} entered{pot.payoutAmountPence>0&&pot.winner?<span> · winner up {moneyFromPence(pot.winnerUpPence||0)}</span>:null}</div>
                 </div>
-                <div style={{fontSize:13,color:'#fbbf24',fontWeight:950,textAlign:'right'}}>{sweepstakeWinnerText(pot)} <span style={{color:'rgba(255,255,255,0.62)'}}>{pot.best?`(${pot.best} pts)`:''}</span>{sweepstakeReasonText(pot)&&<div style={{fontSize:10,color:'rgba(255,255,255,0.70)',fontWeight:800,marginTop:2}}>{sweepstakeReasonText(pot)}</div>}{pot.rolloverIn>0&&pot.key==='overall'&&<div style={{fontSize:10,color:'#86efac',fontWeight:900,marginTop:2}}>Includes rollover {moneyFromPence(pot.rolloverIn)}</div>}</div>
+                <div style={{fontSize:13,color:'#fbbf24',fontWeight:950,textAlign:'right'}}>{sweepstakeWinnerText(pot)} <span style={{color:'rgba(255,255,255,0.62)'}}>{pot.best?`(${pot.best} pts)`:''}</span>{pot.payoutAmountPence>0&&pot.winner&&<div style={{fontSize:10,color:'#86efac',fontWeight:900,marginTop:2}}>Up {moneyFromPence(pot.winnerUpPence||0)} · pot {moneyFromPence(pot.payoutAmountPence||0)}</div>}{sweepstakeReasonText(pot)&&<div style={{fontSize:10,color:'rgba(255,255,255,0.70)',fontWeight:800,marginTop:2}}>{sweepstakeReasonText(pot)}</div>}{pot.rolloverIn>0&&pot.key==='overall'&&<div style={{fontSize:10,color:'#86efac',fontWeight:900,marginTop:2}}>Includes rollover {moneyFromPence(pot.rolloverIn)}</div>}</div>
               </div>
             ))}
             <div style={{marginTop:12,padding:'10px 10px',borderRadius:12,background:'rgba(2,8,23,0.30)',border:'1px solid rgba(255,255,255,0.10)'}}>
@@ -3170,19 +3204,40 @@ function sweepstakeEntryIdsFromRows(rows,round){
   entries.forEach(e=>{if(e.included&&e.playerId)ids.add(normaliseId(e.playerId));});
   return ids;
 }
-async function saveSweepstakeEntryIdsToCloud(roundId,playerIds){
+function sweepstakeEntryStorageKey(roundId){return 'sweepstake_entries_'+roundId;}
+function loadLocalSweepstakeEntryIds(roundId){
+  try{
+    const raw=roundId?localStorage.getItem(sweepstakeEntryStorageKey(roundId)):null;
+    if(!raw)return null;
+    const data=JSON.parse(raw);
+    if(!data||!Array.isArray(data.included))return null;
+    return new Set(data.included.map(normaliseId).filter(Boolean));
+  }catch(e){return null;}
+}
+function saveLocalSweepstakeEntryIds(roundId,includedIds,allIds){
+  try{
+    if(!roundId)return;
+    localStorage.setItem(sweepstakeEntryStorageKey(roundId),JSON.stringify({included:(includedIds||[]).map(normaliseId).filter(Boolean),all:(allIds||[]).map(normaliseId).filter(Boolean),savedAt:new Date().toISOString()}));
+  }catch(e){}
+}
+async function saveSweepstakeEntryIdsToCloud(roundId,playerIds,allPlayerIds){
   if(!roundId||!Array.isArray(playerIds))return {ok:true,count:0};
-  const ids=Array.from(new Set(playerIds.map(normaliseId).filter(Boolean)));
-  if(!ids.length)return {ok:true,count:0};
-  return saveScoreRowsToCloud(sb,ids.map(id=>({
-    round_id:roundId,
-    player_id:makeSweepstakeScorePlayerId(sweepstakeEntryKeyForPlayer(id)),
-    hole_number:SWEEPSTAKE_ENTRY_HOLE,
-    gross_score:1,
-    stableford_points:1,
-    par:4,
-    stroke_index:1
-  })));
+  const included=new Set(playerIds.map(normaliseId).filter(Boolean));
+  const all=Array.from(new Set(((Array.isArray(allPlayerIds)&&allPlayerIds.length)?allPlayerIds:playerIds).map(normaliseId).filter(Boolean)));
+  saveLocalSweepstakeEntryIds(roundId,Array.from(included),all);
+  if(!all.length)return {ok:true,count:0};
+  return saveScoreRowsToCloud(sb,all.map(id=>{
+    const isIn=included.has(id);
+    return {
+      round_id:roundId,
+      player_id:makeSweepstakeScorePlayerId(sweepstakeEntryKeyForPlayer(id)),
+      hole_number:SWEEPSTAKE_ENTRY_HOLE,
+      gross_score:isIn?1:0,
+      stableford_points:isIn?1:0,
+      par:4,
+      stroke_index:1
+    };
+  }));
 }
 function parseSweepstakeScoreRow(row){
   const txt=String(row&&row.player_id||'');
@@ -4155,8 +4210,9 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
         const swSave=await saveSweepstakeConfigToCloud(rd.id,roundSweepstake);
         if(!swSave.ok)flash('Sweepstake setting did not sync yet. Tap refresh/retry if it is missing on another device.','error');
         if(joinedDayBoard){
-          const entryIds=daySweepstakeSelectedIds.length?daySweepstakeSelectedIds:allParticipants.map(p=>normaliseId(p.id)).filter(Boolean);
-          const entrySave=await saveSweepstakeEntryIdsToCloud(rd.id,entryIds);
+          const allEntryIds=allParticipants.map(p=>normaliseId(p.id)).filter(Boolean);
+          const entryIds=daySweepstakeEntryMode==='custom'?daySweepstakeSelectedIds:allEntryIds;
+          const entrySave=await saveSweepstakeEntryIdsToCloud(rd.id,entryIds,allEntryIds);
           if(!entrySave.ok)flash('Sweepstake player choices did not sync yet. Tap refresh if the sweepstake list is wrong.','error');
         }
       }
@@ -6186,8 +6242,9 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     }
     const fallbackGroupPlayers=(grpPlayers&&grpPlayers.length)?grpPlayers:(((allGroups&&allGroups[0]&&allGroups[0].participants)||[]).length?(allGroups[0].participants):((group&&group.participants)||[]));
     const playerSource=scope==='round'?(allRoundPlayers&&allRoundPlayers.length?allRoundPlayers:(fallbackGroupPlayers&&fallbackGroupPlayers.length?fallbackGroupPlayers:grpPlayers)):(grpPlayers&&grpPlayers.length?grpPlayers:fallbackGroupPlayers);
-    const entryIds=sweepstakeEntryIdsFromRows(overallScores||[],round);
+    const entryIds=sweepstakeEntryIdsFromRows(overallScores||[],round)||loadLocalSweepstakeEntryIds(round&&round.id);
     const sweepPlayers=(playerSource||[]).filter((p,idx,arr)=>p&&p.id&&(!entryIds||entryIds.has(normaliseId(p.id)))&&arr.findIndex(x=>normaliseId(x&&x.id)===normaliseId(p.id))===idx);
+    const sweepNameMap=contextualNameMapFromPlayers(sweepPlayers);
     const pointByPlayerHole={};
     (overallScores||[]).filter(r=>r&&!isMetaScoreRow(r)).forEach(r=>{
       const pid=normaliseId(r.player_id); const hn=parseInt(r.hole_number);
@@ -6204,12 +6261,12 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         return t+((g===-1||isGivenGross(g))?0:(getPts(g,hn,pid)||0));
       },0);
     }
-    const rows=sweepPlayers.map(p=>({id:p.id,player:p,name:gameFirstName((p.name||p.display_name)||'?'),paid:amountPence*3,winnings:0,net:-(amountPence*3),potWins:[]}));
+    const rows=sweepPlayers.map(p=>({id:p.id,player:p,name:nameFromContextMap(sweepNameMap,p.id,(p.name||p.display_name)||'?'),paid:amountPence*3,winnings:0,net:-(amountPence*3),potWins:[]}));
     const byId={};rows.forEach(r=>{byId[normaliseId(r.id)]=r;});
     let rolloverPence=0;
     const potRows=[];
     pots.forEach(pot=>{
-      const scores=sweepPlayers.map(p=>({id:p.id,name:gameFirstName((p.name||p.display_name)||'?'),points:sweepPts(p.id,pot.holes),player:p}));
+      const scores=sweepPlayers.map(p=>({id:p.id,name:nameFromContextMap(sweepNameMap,p.id,(p.name||p.display_name)||'?'),displayName:nameFromContextMap(sweepNameMap,p.id,(p.name||p.display_name)||'?'),points:sweepPts(p.id,pot.holes),player:p}));
       const best=scores.length?Math.max(...scores.map(x=>x.points)):0;
       const tied=scores.filter(x=>x.points===best);
       const potTotal=amountPence*sweepPlayers.length;
