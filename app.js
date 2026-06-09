@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.90
+// SNYDER GOLF v3.91
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.90',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.91',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1793,17 +1793,18 @@ function App(){
   }
 
   function CompletedCard({rd}){
+    const isDay=isDayCompBoardRound(rd);
     return(
-      <div style={{...S.card,...NO_SELECT,marginBottom:8,cursor:'pointer',opacity:0.9}} onClick={()=>openRound(rd)}>
+      <div style={{...S.card,...NO_SELECT,marginBottom:8,cursor:'pointer',opacity:0.9}} onClick={()=>isDay?setDayScorecardRound(rd):openRound(rd)}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
           <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
             <CourseBadge course={courses.find(co=>co.id===rd.course_id)} round={rd} size={34}/>
             <div style={{minWidth:0}}>
-              <div style={{fontSize:14,color:'#fff',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{roundDisplayName(rd)}</div>
-              <div style={{fontSize:11,color:'#60b8f0'}}>Round started: {formatRoundStart(rd)}</div>
+              <div style={{fontSize:14,color:'#fff',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{isDay?dayCompDisplayName(rounds,rd):roundDisplayName(rd)}</div>
+              <div style={{fontSize:11,color:'#60b8f0'}}>{isDay?'Final sweepstake results':'Round started: '+formatRoundStart(rd)}</div>
             </div>
           </div>
-          <div style={{fontSize:11,color:'#1b5e20',background:'rgba(27,94,32,0.15)',borderRadius:6,padding:'3px 8px',fontWeight:600,flexShrink:0}}>Completed</div>
+          <div style={{fontSize:11,color:isDay?'#92400e':'#1b5e20',background:isDay?'rgba(245,158,11,0.16)':'rgba(27,94,32,0.15)',borderRadius:6,padding:'3px 8px',fontWeight:600,flexShrink:0}}>{isDay?'Sweepstake':'Completed'}</div>
         </div>
       </div>
     );
@@ -1960,7 +1961,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.90" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.90</span>
+          <span aria-label="App version v3.91" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.91</span>
         </button>
       </div>
 
@@ -1998,14 +1999,16 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     merged.forEach(g=>{byId[g.id||('g'+g.group_number)]=g;});
     return Object.values(byId).sort((a,b)=>(parseInt(a.group_number)||0)-(parseInt(b.group_number)||0));
   };
+  const modalRoundIds=dayScorecardRound?liveDataRoundIds(rounds,[dayScorecardRound]):[];
+  const dataRoundIds=Array.from(new Set([...(liveRoundIds||[]),...(modalRoundIds||[])].filter(Boolean)));
   useEffect(()=>{
     let alive=true;
     async function refreshLiveRoundData(){
-      if(!liveRoundIds.length){setPublicScores([]);setPublicRoundPlayers({});setPublicGroups([]);return;}
+      if(!dataRoundIds.length){setPublicScores([]);setPublicRoundPlayers({});setPublicGroups([]);return;}
       const[{data:scoreRows},{data:roundPlayers},{data:groupRows}]=await Promise.all([
-        sb.from('cup_scores').select('*').in('round_id',liveRoundIds),
-        sb.from('cup_round_players').select('*').in('round_id',liveRoundIds),
-        sb.from('cup_groups').select('*').in('round_id',liveRoundIds)
+        sb.from('cup_scores').select('*').in('round_id',dataRoundIds),
+        sb.from('cup_round_players').select('*').in('round_id',dataRoundIds),
+        sb.from('cup_groups').select('*').in('round_id',dataRoundIds)
       ]);
       if(!alive)return;
       setPublicScores(scoreRows||[]);
@@ -2022,11 +2025,13 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     function onPullRefresh(e){if(e&&e.detail&&e.detail.view==='live')refreshLiveRoundData();}
     window.addEventListener('snyderPullRefresh',onPullRefresh);
     return()=>{alive=false;clearInterval(timer);window.removeEventListener('snyderPullRefresh',onPullRefresh);};
-  },[liveRoundIds.join('|')]);
+  },[dataRoundIds.join('|')]);
   const completedRounds=sortRoundsNewestFirst(rounds.filter(isCompletedRound));
+  const completedDayBoards=completedRounds.filter(isDayCompBoardRound);
+  const completedScorecards=completedRounds.filter(r=>!isDayCompBoardRound(r));
   const thisWeekStart=startOfThisWeek();
-  const thisWeeksCards=completedRounds.filter(r=>roundStartDate(r)>=thisWeekStart);
-  const olderCards=completedRounds.filter(r=>roundStartDate(r)<thisWeekStart);
+  const thisWeeksCards=completedScorecards.filter(r=>roundStartDate(r)>=thisWeekStart);
+  const olderCards=completedScorecards.filter(r=>roundStartDate(r)<thisWeekStart);
   const olderCardsByMonth=groupRoundsByMonth(olderCards);
   async function buildCupSummaryForLiveOpen(cup,teams,currentRound){
     const cupRounds=(rounds||[]).filter(isSnyderCupRound);
@@ -2618,6 +2623,12 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
         {completedRounds.length>0&&(
           <div style={{marginTop:20}}>
             <div style={{fontSize:18,color:'#fff',fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.03em',marginBottom:10}}>Completed Scores</div>
+            {completedDayBoards.length>0&&(
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:11,color:'#fbbf24',letterSpacing:'0.15em',fontWeight:700,marginBottom:10}}>SWEEPSTAKES</div>
+                {completedDayBoards.map(rd=><CompletedCard key={rd.id} rd={rd}/>)}
+              </div>
+            )}
             {thisWeeksCards.length>0&&(
               <div style={{marginBottom:16}}>
                 <div style={{fontSize:11,color:'#60b8f0',letterSpacing:'0.15em',fontWeight:600,marginBottom:10}}>THIS WEEK'S CARDS</div>
