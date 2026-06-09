@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.86
+// SNYDER GOLF v3.88
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.86',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.88',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.86" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.86</span>
+          <span aria-label="App version v3.87" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.87</span>
         </button>
       </div>
 
@@ -2294,14 +2294,69 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
       return {...pot,amountPence,best,winners};
     });
   }
+  function compactDaySweepstakeSettlement(rd,boardRows,potRows){
+    const cfg=daySweepstakeConfigForLive(rd);
+    const amountPence=parseInt(cfg&&cfg.amountPence)||200;
+    const rows=(boardRows||[]).filter(r=>r&&r.id).map(r=>({id:r.id,name:gameFirstName(r.name||'Player'),paid:amountPence*3,winnings:0,net:-(amountPence*3),wins:[]}));
+    const byId={};
+    rows.forEach(r=>{byId[normaliseId(r.id)]=r;});
+    (potRows||[]).forEach(pot=>{
+      const winners=(pot.winners||[]).filter(w=>byId[normaliseId(w.id)]);
+      if(!winners.length)return;
+      const potTotal=amountPence*rows.length;
+      const share=Math.floor(potTotal/winners.length);
+      const remainder=potTotal-(share*winners.length);
+      winners.forEach((w,idx)=>{
+        const row=byId[normaliseId(w.id)];
+        if(!row)return;
+        const win=share+(idx<remainder?1:0);
+        row.winnings+=win;
+        row.wins.push({label:pot.label,amount:win,points:w.potTotal});
+      });
+    });
+    rows.forEach(r=>{r.net=r.winnings-r.paid;});
+    const creditors=rows.filter(r=>r.net>0).map(r=>({...r,remaining:r.net}));
+    const debtors=rows.filter(r=>r.net<0).map(r=>({...r,remaining:-r.net}));
+    const payments=[];
+    let i=0,j=0;
+    while(i<debtors.length&&j<creditors.length){
+      const amount=Math.min(debtors[i].remaining,creditors[j].remaining);
+      if(amount>0)payments.push({from:debtors[i].name,to:creditors[j].name,fromId:debtors[i].id,toId:creditors[j].id,amount});
+      debtors[i].remaining-=amount;
+      creditors[j].remaining-=amount;
+      if(debtors[i].remaining<=0)i++;
+      if(creditors[j].remaining<=0)j++;
+    }
+    const grouped=[];
+    payments.forEach(pay=>{
+      let group=grouped.find(g=>normaliseId(g.toId)===normaliseId(pay.toId));
+      if(!group){group={to:pay.to,toId:pay.toId,total:0,from:[]};grouped.push(group);}
+      group.total+=pay.amount;
+      group.from.push({name:pay.from,id:pay.fromId,amount:pay.amount});
+    });
+    grouped.forEach(g=>g.from.sort((a,b)=>b.amount-a.amount||String(a.name).localeCompare(String(b.name))));
+    return {rows,payments,grouped,totalEntry:amountPence*3,playerCount:rows.length,amountPence};
+  }
+  function compactPayersText(group){
+    const from=group&&group.from||[];
+    if(!from.length)return '';
+    const same=from.every(x=>x.amount===from[0].amount);
+    if(same){
+      const names=from.map(x=>x.name).join(', ');
+      return `${from.length} payer${from.length===1?'':'s'} · ${moneyFromPence(from[0].amount)} each · ${names}`;
+    }
+    return from.map(x=>`${x.name} ${moneyFromPence(x.amount)}`).join(' · ');
+  }
   function DayLeaderboardModal({rd}){
     if(!rd)return null;
     const boardRows=leaderboardForRound(rd);
     const potRows=daySweepstakePotRows(rd,boardRows);
+    const compactSettlement=compactDaySweepstakeSettlement(rd,boardRows,potRows);
     const cfg=daySweepstakeConfigForLive(rd);
     const board=dayCompBoardFor(rounds,rd);
     const playable=playableDayCompRounds(rounds,rd).sort((a,b)=>roundStartDate(a)-roundStartDate(b));
     const allDone=playable.length>0&&playable.every(isCompletedRound);
+    const dayClosed=board&&!isLiveRound(board);
     return(
       <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.84)',zIndex:1200,padding:'max(24px,8vh) 14px 14px',overflowY:'auto'}}>
         <div style={{maxWidth:560,margin:'0 auto'}}>
@@ -2341,11 +2396,29 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
               <div key={pot.key} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'9px 0',borderTop:'1px solid rgba(255,255,255,0.08)',marginTop:8}}>
                 <div>
                   <div style={{fontSize:13,color:'#fff',fontWeight:900}}>{pot.label}</div>
-                  <div style={{fontSize:10,color:'rgba(255,255,255,0.55)'}}>Winner gets {moneyFromPence(pot.amountPence)}</div>
+                  <div style={{fontSize:10,color:'rgba(255,255,255,0.55)'}}>Pot total {moneyFromPence((parseInt(cfg&&cfg.amountPence)||200)*(boardRows.length||0))}</div>
                 </div>
                 <div style={{fontSize:13,color:'#fbbf24',fontWeight:950,textAlign:'right'}}>{pot.winners.length?pot.winners.map(w=>gameFirstName(w.name)).join(' / '):'Waiting for scores'} <span style={{color:'rgba(255,255,255,0.62)'}}>{pot.best?`(${pot.best} pts)`:''}</span></div>
               </div>
             ))}
+            <div style={{marginTop:12,padding:'10px 10px',borderRadius:12,background:'rgba(2,8,23,0.30)',border:'1px solid rgba(255,255,255,0.10)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:8}}>
+                <div>
+                  <div style={{fontSize:13,color:'#fff',fontWeight:950}}>Who pays who</div>
+                  <div style={{fontSize:10,color:'rgba(255,255,255,0.58)'}}>{dayClosed?'Final net settlement':'Projected net settlement until admin presses Day Finished'}</div>
+                </div>
+                <div style={{fontSize:11,color:'#fbbf24',fontWeight:950,textAlign:'right'}}>{compactSettlement.playerCount} player{compactSettlement.playerCount===1?'':'s'} · {moneyFromPence(compactSettlement.totalEntry)} in</div>
+              </div>
+              {compactSettlement.grouped.length?compactSettlement.grouped.map(group=>(
+                <div key={group.toId} style={{padding:'8px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'baseline'}}>
+                    <div style={{fontSize:13,color:'#fff',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{group.to} receives</div>
+                    <div style={{fontSize:15,color:'#86efac',fontWeight:950}}>{moneyFromPence(group.total)}</div>
+                  </div>
+                  <div style={{fontSize:10,color:'rgba(255,255,255,0.62)',lineHeight:1.35,marginTop:3}}>{compactPayersText(group)}</div>
+                </div>
+              )):<div style={{padding:'8px 0',borderTop:'1px solid rgba(255,255,255,0.08)',fontSize:12,color:'rgba(255,255,255,0.62)'}}>No payments yet.</div>}
+            </div>
           </div>
           <div style={{fontSize:12,color:'#90ccf0',fontWeight:900,letterSpacing:'0.10em',margin:'12px 0 8px'}}>SCORECARDS</div>
           {playable.map(r=>(
@@ -6121,7 +6194,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     }
   }
   useEffect(()=>{
-    if(isCompletedRound(round)&&!round._cupScoring&&!isFoursomesScorecard)settleSweepstakeLeagueBalances();
+    if(isCompletedRound(round)&&!round._cupScoring&&!isFoursomesScorecard&&!dayCompKeyFromRound(round))settleSweepstakeLeagueBalances();
   },[round&&round.id,round&&round.status,canSettleSweepstakeLeagueBalance,activeGroupId,sweepstakeConfig&&sweepstakeConfig.enabled,sweepstakeConfig&&sweepstakeConfig.amountPence,sweepstakeConfig&&sweepstakeConfig.scope]);
   function SweepstakePanel({compact=false,throughHole=null,reviewTitle='',payUp=false,forceEnabled=false}){
     const sw=sweepstakePlayerRows({throughHole,forceEnabled});
@@ -8151,14 +8224,203 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     }catch(e){flash('Error: '+(e.message||String(e)),'error');}
     setSaving(false);
   }
+  function dayLeaguePlayerName(player){
+    return String((player&&(player.name||player.display_name||player.username))||'Player').trim();
+  }
+  function dayLeagueNameKey(value){
+    return String(value||'').trim().toLowerCase().replace(/\s+/g,' ');
+  }
+  function dayLeagueFirstName(value){
+    return dayLeagueNameKey(value).split(' ')[0]||'';
+  }
+  function daySweepstakeIsGuest(player){
+    const id=normaliseId(player&&player.id).toLowerCase();
+    return !!(player&&(player.is_guest||player.guest_id||player.is_casual||id.startsWith('guest')||id.startsWith('casual')));
+  }
+  function findDayLeaguePlayer(scorecardPlayer,leaguePlayers,links){
+    const linked=links&&links[leagueLinkLiveId(scorecardPlayer)];
+    if(linked&&linked.league_player_id){
+      const byId=(leaguePlayers||[]).find(p=>normaliseId(p&&p.id)===normaliseId(linked.league_player_id));
+      if(byId)return byId;
+    }
+    const name=dayLeaguePlayerName(scorecardPlayer);
+    const key=dayLeagueNameKey(name);
+    const exact=(leaguePlayers||[]).find(p=>dayLeagueNameKey(p&&p.name)===key);
+    if(exact)return exact;
+    const first=dayLeagueFirstName(name);
+    if(!first)return null;
+    const matches=(leaguePlayers||[]).filter(p=>dayLeagueFirstName(p&&p.name)===first);
+    return matches.length===1?matches[0]:null;
+  }
+  function buildDaySweepstakeSettlement(board,linked,roundPlayers,scoreRows){
+    const cfg=sweepstakeConfigFromRows(scoreRows||[],board);
+    const amountPence=parseInt(cfg&&cfg.amountPence)||200;
+    const playable=(linked||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
+    const playableIds=new Set(playable.map(r=>normaliseId(r.id)));
+    const personMap={};
+    const aliasMap={};
+    (roundPlayers||[]).filter(rp=>playableIds.has(normaliseId(rp.round_id))).forEach(rp=>{
+      const person=mapRoundPlayerForScorecard(rp,false);
+      const key=normaliseId(person.id||person.user_id||person.guest_id||person.round_player_id);
+      if(!key)return;
+      personMap[key]=person;
+      scoreAliasesForPerson(person).forEach(alias=>{aliasMap[normaliseId(alias)]=key;});
+    });
+    const holePoints={};
+    const holes={};
+    const cleanScores=(scoreRows||[]).filter(row=>row&&playableIds.has(normaliseId(row.round_id))&&!isMetaScoreRow(row));
+    cleanScores.forEach(row=>{
+      const pidKey=aliasMap[normaliseId(row.player_id)]||normaliseId(row.player_id);
+      if(!pidKey)return;
+      if(!personMap[pidKey])personMap[pidKey]={id:pidKey,name:String(row.player_id||'Player')};
+      if(!holePoints[pidKey])holePoints[pidKey]={};
+      if(!holes[pidKey])holes[pidKey]=new Set();
+      const h=parseInt(row.hole_number);
+      if(h>=1&&h<=18){
+        holePoints[pidKey][h]=stablefordPointsValue(row.stableford_points);
+        holes[pidKey].add(h);
+      }
+    });
+    function sum(pid,start,end){
+      let total=0;
+      for(let h=start;h<=end;h++)total+=stablefordPointsValue((holePoints[pid]||{})[h]||0);
+      return total;
+    }
+    const rows=Object.keys(holePoints).map(pid=>{
+      const p=personMap[pid]||{id:pid,name:String(pid||'Player')};
+      return {id:pid,player:p,name:dayLeaguePlayerName(p),paid:amountPence*3,winnings:0,net:-(amountPence*3),front:sum(pid,1,9),back:sum(pid,10,18),overall:sum(pid,1,18),holes:holes[pid]?holes[pid].size:0};
+    }).filter(r=>r.holes>0);
+    const byId={};
+    rows.forEach(r=>{byId[normaliseId(r.id)]=r;});
+    const potDefs=[{key:'front',label:'Front 9',prop:'front'},{key:'back',label:'Back 9',prop:'back'},{key:'overall',label:'Overall',prop:'overall'}];
+    potDefs.forEach(pot=>{
+      const active=rows.filter(r=>r.holes>0);
+      const best=active.length?Math.max(...active.map(r=>parseInt(r[pot.prop])||0)):0;
+      const winners=best>0?active.filter(r=>(parseInt(r[pot.prop])||0)===best):[];
+      if(!winners.length)return;
+      const potTotal=amountPence*rows.length;
+      const share=Math.floor(potTotal/winners.length);
+      const remainder=potTotal-(share*winners.length);
+      winners.forEach((winner,idx)=>{
+        const row=byId[normaliseId(winner.id)];
+        if(row)row.winnings+=share+(idx<remainder?1:0);
+      });
+    });
+    rows.forEach(r=>{r.net=r.winnings-r.paid;});
+    const creditors=rows.filter(r=>r.net>0).map(r=>({...r,remaining:r.net}));
+    const debtors=rows.filter(r=>r.net<0).map(r=>({...r,remaining:-r.net}));
+    const payments=[];
+    let i=0,j=0;
+    while(i<debtors.length&&j<creditors.length){
+      const amount=Math.min(debtors[i].remaining,creditors[j].remaining);
+      if(amount>0)payments.push({from:debtors[i].name,to:creditors[j].name,fromId:debtors[i].id,toId:creditors[j].id,fromPlayer:debtors[i].player,toPlayer:creditors[j].player,amount});
+      debtors[i].remaining-=amount;
+      creditors[j].remaining-=amount;
+      if(debtors[i].remaining<=0)i++;
+      if(creditors[j].remaining<=0)j++;
+    }
+    return {rows,payments,amountPence};
+  }
+  async function settleDaySweepstakeLeagueBalances(board,linked){
+    if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
+    const key=dayCompKeyFromRound(board);
+    const markerKey=`league-day-balance-${key||board.id}`;
+    const markerPlayerId=makeSweepstakeScorePlayerId(markerKey);
+    const markerNote=`Day sweepstake League balance settlement ${markerKey}`;
+    const playable=(linked||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
+    if(!playable.length)return {already:false,changes:[],skipped:[]};
+    const roundIds=playable.map(r=>r.id);
+    const [{data:scoreMarkers,error:scoreMarkerError},{data:logMarkers,error:logMarkerError}]=await Promise.all([
+      sb.from('cup_scores').select('round_id').eq('round_id',board.id).eq('player_id',markerPlayerId).limit(1),
+      sb.from('payment_log').select('id').eq('note',markerNote).limit(1)
+    ]);
+    if(scoreMarkerError)throw scoreMarkerError;
+    if(logMarkerError)throw logMarkerError;
+    if((scoreMarkers&&scoreMarkers.length)||(logMarkers&&logMarkers.length))return {already:true,changes:[],skipped:[]};
+    const [{data:roundPlayers,error:roundPlayersError},{data:scoreRows,error:scoreRowsError},{data:leaguePlayers,error:leaguePlayersError},linkResult]=await Promise.all([
+      sb.from('cup_round_players').select('*').in('round_id',roundIds),
+      sb.from('cup_scores').select('*').in('round_id',[board.id,...roundIds]),
+      sb.from('players').select('*').order('name',{ascending:true}),
+      fetchLeaguePlayerLinks(sb)
+    ]);
+    if(roundPlayersError)throw roundPlayersError;
+    if(scoreRowsError)throw scoreRowsError;
+    if(leaguePlayersError)throw leaguePlayersError;
+    const settlement=buildDaySweepstakeSettlement(board,linked,roundPlayers||[],scoreRows||[]);
+    const links=(linkResult&&linkResult.links)||{};
+    const skipped=[];
+    const deltas={};
+    const details={};
+    settlement.payments.forEach(pay=>{
+      const fromLeague=daySweepstakeIsGuest(pay.fromPlayer)?null:findDayLeaguePlayer(pay.fromPlayer,leaguePlayers||[],links);
+      const toLeague=daySweepstakeIsGuest(pay.toPlayer)?null:findDayLeaguePlayer(pay.toPlayer,leaguePlayers||[],links);
+      if(!fromLeague||!toLeague){
+        skipped.push(`${pay.from} -> ${pay.to} ${moneyFromPence(pay.amount)}`);
+        return;
+      }
+      const pounds=(Math.round(pay.amount)||0)/100;
+      const fromId=normaliseId(fromLeague.id);
+      const toId=normaliseId(toLeague.id);
+      deltas[fromId]=(deltas[fromId]||0)-pounds;
+      deltas[toId]=(deltas[toId]||0)+pounds;
+      if(!details[fromId])details[fromId]={player:fromLeague,lines:[]};
+      if(!details[toId])details[toId]={player:toLeague,lines:[]};
+      details[fromId].lines.push(`paid ${toLeague.name} £${pounds.toFixed(2)}`);
+      details[toId].lines.push(`received from ${fromLeague.name} £${pounds.toFixed(2)}`);
+    });
+    const ids=Object.keys(deltas).filter(id=>Math.abs(deltas[id])>0.0001);
+    if(ids.length){
+      const {data:existing,error:paymentError}=await sb.from('payments').select('player_id,paid').in('player_id',ids);
+      if(paymentError)throw paymentError;
+      const existingPaid={};
+      (existing||[]).forEach(p=>{existingPaid[normaliseId(p.player_id)]=parseFloat(p.paid)||0;});
+      const upserts=ids.map(id=>({player_id:id,paid:Math.round(((existingPaid[id]||0)+deltas[id])*100)/100}));
+      const {error:upsertError}=await sb.from('payments').upsert(upserts,{onConflict:'player_id'});
+      if(upsertError)throw upsertError;
+      const logRows=ids.map(id=>({
+        player_id:id,
+        player_name:(details[id]&&details[id].player&&details[id].player.name)||'Player',
+        action:'Day sweepstake balance',
+        amount:Math.round(deltas[id]*100)/100,
+        note:markerNote
+      }));
+      const {error:logError}=await sb.from('payment_log').insert(logRows);
+      if(logError)throw logError;
+    }
+    const marker=await saveScoreRowsToCloud(sb,[{
+      round_id:board.id,
+      player_id:markerPlayerId,
+      hole_number:SWEEPSTAKE_CONFIG_HOLE+1,
+      gross_score:ids.length,
+      stableford_points:1,
+      par:4,
+      stroke_index:1
+    }]);
+    if(marker&&!marker.ok)throw new Error(marker.error||'Could not save day sweepstake settlement marker');
+    const changes=ids.map(id=>({
+      player:(details[id]&&details[id].player&&details[id].player.name)||'Player',
+      delta:Math.round(deltas[id]*100)/100,
+      lines:(details[id]&&details[id].lines)||[]
+    })).sort((a,b)=>a.player.localeCompare(b.player));
+    return {already:false,changes,skipped};
+  }
   async function closeBoard(board){
-    if(!window.confirm('Mark this day sweepstake as finished? Do this only once the last scorecard is in.'))return;
+    if(!window.confirm('Mark this day sweepstake as finished? Do this only once the last scorecard is in. This will also add the final sweepstake to League balances.'))return;
     const key=dayCompKeyFromRound(board);
     const linked=(rounds||[]).filter(r=>dayCompKeyFromRound(r)===key);
-    for(const r of linked){
-      if(isLiveRound(r))await sb.from('cup_rounds').update({status:'complete'}).eq('id',r.id);
+    try{
+      const settlement=await settleDaySweepstakeLeagueBalances(board,linked);
+      for(const r of linked){
+        if(isLiveRound(r))await sb.from('cup_rounds').update({status:'complete'}).eq('id',r.id);
+      }
+      await load();
+      if(settlement.already)flash('Day sweepstake finished - League balances already updated');
+      else if((settlement.changes||[]).length)flash('Day sweepstake finished - League balances updated');
+      else if((settlement.skipped||[]).length)flash('Day sweepstake finished - guests/unlinked players skipped');
+      else flash('Day sweepstake finished');
+    }catch(e){
+      flash('Could not finish day sweepstake: '+(e.message||String(e)),'error');
     }
-    await load();flash('Day sweepstake finished');
   }
   async function deleteBoard(board){
     if(!window.confirm('Delete this empty day sweepstake? Scorecards already joined to it will stay as normal rounds.'))return;
