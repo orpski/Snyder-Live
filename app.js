@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.85
+// SNYDER GOLF v3.86
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.85',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.86',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -1959,7 +1959,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.85" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.85</span>
+          <span aria-label="App version v3.86" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.86</span>
         </button>
       </div>
 
@@ -2261,6 +2261,107 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     }catch(e){}
     return Object.keys(totals).map(pid=>({id:pid,name:nameMap[pid]||getDisplayName(pid),total:totals[pid]||0,holes:holes[pid]?holes[pid].size:0,_holePoints:holePoints[pid]||{}})).sort(compareStablefordLeaderboardRows);
   }
+  function daySweepstakeConfigForLive(rd){
+    const board=dayCompBoardFor(rounds,rd);
+    const boardRounds=dayCompKeyFromRound(rd)?dayCompRoundsFor(rounds,rd):[rd];
+    const allRows=normaliseFoursomesScoreRows([...(scores||[]),...(publicScores||[])]);
+    const boardCfg=board?sweepstakeConfigFromRows(allRows,board):null;
+    if(boardCfg&&boardCfg.enabled)return boardCfg;
+    for(const r of boardRounds){
+      const cfg=sweepstakeConfigFromRows(allRows,r);
+      if(cfg&&cfg.enabled)return cfg;
+    }
+    return {enabled:!!dayCompKeyFromRound(rd),amountPence:200,scope:'round'};
+  }
+  function sumRowHoles(row,start,end){
+    const hp=row&&row._holePoints||{};
+    let total=0;
+    for(let h=start;h<=end;h++)total+=stablefordPointsValue(hp[h]||0);
+    return total;
+  }
+  function daySweepstakePotRows(rd,boardRows){
+    const cfg=daySweepstakeConfigForLive(rd);
+    const amountPence=parseInt(cfg&&cfg.amountPence)||200;
+    const potDefs=[
+      {key:'front',label:'Front 9',start:1,end:9},
+      {key:'back',label:'Back 9',start:10,end:18},
+      {key:'overall',label:'Overall',start:1,end:18}
+    ];
+    return potDefs.map(pot=>{
+      const rows=(boardRows||[]).map(r=>({...r,potTotal:sumRowHoles(r,pot.start,pot.end)})).filter(r=>r.holes>0);
+      const best=rows.length?Math.max(...rows.map(r=>r.potTotal)):0;
+      const winners=best>0?rows.filter(r=>r.potTotal===best):[];
+      return {...pot,amountPence,best,winners};
+    });
+  }
+  function DayLeaderboardModal({rd}){
+    if(!rd)return null;
+    const boardRows=leaderboardForRound(rd);
+    const potRows=daySweepstakePotRows(rd,boardRows);
+    const cfg=daySweepstakeConfigForLive(rd);
+    const board=dayCompBoardFor(rounds,rd);
+    const playable=playableDayCompRounds(rounds,rd).sort((a,b)=>roundStartDate(a)-roundStartDate(b));
+    const allDone=playable.length>0&&playable.every(isCompletedRound);
+    return(
+      <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.84)',zIndex:1200,padding:'max(24px,8vh) 14px 14px',overflowY:'auto'}}>
+        <div style={{maxWidth:560,margin:'0 auto'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,marginBottom:12}}>
+            <div>
+              <div style={{fontSize:20,color:'#fff',fontWeight:950}}>{dayCompDisplayName(rounds,rd)}</div>
+              <div style={{fontSize:12,color:'#90ccf0'}}>Day leaderboard · {playable.length} scorecard{playable.length===1?'':'s'} joined</div>
+            </div>
+            <button onClick={()=>setDayScorecardRound(null)} style={{...S.gho,padding:'7px 12px',fontSize:12}}>Close</button>
+          </div>
+          <div style={{...S.card,marginBottom:10,borderColor:'rgba(96,184,240,0.34)',background:'rgba(96,184,240,0.08)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:8}}>
+              <div>
+                <div style={{fontSize:16,color:'#fff',fontWeight:950}}>Full day table</div>
+                <div style={{fontSize:11,color:'#90ccf0'}}>{allDone?'All linked scorecards are in. Admin can press Day Finished.':'Live until admin presses Day Finished.'}</div>
+              </div>
+              <div style={{fontSize:11,color:isLiveRound(board)?'#86efac':'#8ea0ad',fontWeight:950,letterSpacing:'0.08em'}}>{isLiveRound(board)?'OPEN':'FINISHED'}</div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'30px minmax(0,1fr) 42px 42px 46px 42px',gap:6,padding:'7px 0',borderBottom:'1px solid rgba(255,255,255,0.12)',fontSize:10,color:'#90ccf0',fontWeight:950,letterSpacing:'0.05em'}}>
+              <div>#</div><div>Player</div><div style={{textAlign:'right'}}>F9</div><div style={{textAlign:'right'}}>B9</div><div style={{textAlign:'right'}}>Total</div><div style={{textAlign:'right'}}>Holes</div>
+            </div>
+            {boardRows.length?boardRows.map((r,idx)=>(
+              <div key={r.id} style={{display:'grid',gridTemplateColumns:'30px minmax(0,1fr) 42px 42px 46px 42px',gap:6,alignItems:'center',padding:'8px 0',borderBottom:idx===boardRows.length-1?'none':'1px solid rgba(255,255,255,0.07)'}}>
+                <div style={{fontSize:13,color:idx===0?'#fbbf24':'rgba(255,255,255,0.58)',fontWeight:950}}>{idx+1}</div>
+                <div style={{fontSize:13,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{gameFirstName(r.name||'Player')}</div>
+                <div style={{fontSize:13,color:'#dbeafe',textAlign:'right',fontWeight:900}}>{sumRowHoles(r,1,9)}</div>
+                <div style={{fontSize:13,color:'#dbeafe',textAlign:'right',fontWeight:900}}>{sumRowHoles(r,10,18)}</div>
+                <div style={{fontSize:17,color:'#60b8f0',textAlign:'right',fontWeight:950}}>{r.total}</div>
+                <div style={{fontSize:12,color:'rgba(255,255,255,0.62)',textAlign:'right',fontWeight:800}}>{r.holes}</div>
+              </div>
+            )):<div style={{padding:18,textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.58)'}}>No scores entered yet.</div>}
+          </div>
+          <div style={{...S.card,marginBottom:10,borderColor:'rgba(245,158,11,0.46)',background:'linear-gradient(135deg,rgba(245,158,11,0.18),rgba(255,255,255,0.05))'}}>
+            <div style={{fontSize:16,color:'#fff',fontWeight:950}}>Sweepstake</div>
+            <div style={{fontSize:11,color:'#fbbf24',fontWeight:900,marginTop:3}}>{moneyFromPence(parseInt(cfg&&cfg.amountPence)||200)} front / back / overall · Admin locked</div>
+            {potRows.map(pot=>(
+              <div key={pot.key} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'9px 0',borderTop:'1px solid rgba(255,255,255,0.08)',marginTop:8}}>
+                <div>
+                  <div style={{fontSize:13,color:'#fff',fontWeight:900}}>{pot.label}</div>
+                  <div style={{fontSize:10,color:'rgba(255,255,255,0.55)'}}>Winner gets {moneyFromPence(pot.amountPence)}</div>
+                </div>
+                <div style={{fontSize:13,color:'#fbbf24',fontWeight:950,textAlign:'right'}}>{pot.winners.length?pot.winners.map(w=>gameFirstName(w.name)).join(' / '):'Waiting for scores'} <span style={{color:'rgba(255,255,255,0.62)'}}>{pot.best?`(${pot.best} pts)`:''}</span></div>
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:12,color:'#90ccf0',fontWeight:900,letterSpacing:'0.10em',margin:'12px 0 8px'}}>SCORECARDS</div>
+          {playable.map(r=>(
+            <button key={r.id} onClick={()=>openRound(r)} style={{...S.card,width:'100%',textAlign:'left',marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:15,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{roundDisplayName(r)}</div>
+                <div style={{fontSize:11,color:'#90ccf0',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{dayRoundSummary(r)||formatRoundStart(r)}</div>
+              </div>
+              <div style={{fontSize:18,color:'#60b8f0',fontWeight:950}}>&gt;</div>
+            </button>
+          ))}
+          {!playable.length&&<div style={{...S.card,fontSize:13,color:'#8ea0ad',textAlign:'center'}}>No scorecards have joined this board yet.</div>}
+        </div>
+      </div>
+    );
+  }
   function foursomesMatchplaySummaryForLiveRound(rd){
     const rdGroups=groupsForRound(rd);
     const allRows=[...(scores||[]),...(publicScores||[]),...localScoreRowsForRound(rd.id)];
@@ -2432,35 +2533,13 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                 </>}
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',borderTop:'1px solid rgba(255,255,255,0.08)',paddingTop:10}}>
                   <div style={{fontSize:11,color:'rgba(255,255,255,0.5)'}}>{mp?((mp.mode==='foursomes'?'Foursomes matchplay':mp.mode==='singles'?'Singles matchplay':'Matchplay')+' - Tap to view'):(dayCompKeyFromRound(rd)?(playableDayCompRounds(rounds,rd).length+' scorecards on sweepstake board - Tap to view'):(rdGroups.length+' group'+(rdGroups.length!==1?'s':'')+' live - Tap to view'))}</div>
-                  <button onClick={e=>{e.stopPropagation();dayCompKeyFromRound(rd)?setDayScorecardRound(rd):openRound(rd);}} style={{...S.pri,padding:'7px 10px',fontSize:11}}>{dayCompKeyFromRound(rd)?'Scorecards':'Check Scorecard'}</button>
+                  <button onClick={e=>{e.stopPropagation();dayCompKeyFromRound(rd)?setDayScorecardRound(rd):openRound(rd);}} style={{...S.pri,padding:'7px 10px',fontSize:11}}>{dayCompKeyFromRound(rd)?'Day Table':'Check Scorecard'}</button>
                 </div>
               </div>
             );
           })
         }
-        {dayScorecardRound&&(
-          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',zIndex:1200,padding:'max(24px,8vh) 14px 14px',overflowY:'auto'}}>
-            <div style={{maxWidth:520,margin:'0 auto'}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,marginBottom:12}}>
-                <div>
-                  <div style={{fontSize:20,color:'#fff',fontWeight:950}}>Day Scorecards</div>
-                  <div style={{fontSize:12,color:'#90ccf0'}}>{dayCompDisplayName(rounds,dayScorecardRound)}</div>
-                </div>
-                <button onClick={()=>setDayScorecardRound(null)} style={{...S.gho,padding:'7px 12px',fontSize:12}}>Close</button>
-              </div>
-              {playableDayCompRounds(rounds,dayScorecardRound).sort((a,b)=>roundStartDate(a)-roundStartDate(b)).map(r=>(
-                <button key={r.id} onClick={()=>openRound(r)} style={{...S.card,width:'100%',textAlign:'left',marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
-                  <div style={{minWidth:0}}>
-                    <div style={{fontSize:15,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{roundDisplayName(r)}</div>
-                    <div style={{fontSize:11,color:'#90ccf0',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{dayRoundSummary(r)||formatRoundStart(r)}</div>
-                  </div>
-                  <div style={{fontSize:18,color:'#60b8f0',fontWeight:950}}>&gt;</div>
-                </button>
-              ))}
-              {!playableDayCompRounds(rounds,dayScorecardRound).length&&<div style={{...S.card,fontSize:13,color:'#8ea0ad',textAlign:'center'}}>No scorecards have joined this board yet.</div>}
-            </div>
-          </div>
-        )}
+{dayScorecardRound&&<DayLeaderboardModal rd={dayScorecardRound}/>}
         {/* Completed rounds */}
         {completedRounds.length>0&&(
           <div style={{marginTop:20}}>
@@ -3485,7 +3564,17 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   }
   const selectedDayBoard=setup.dayCompMode==='join'?dayBoardByKey(setup.dayCompKey):null;
   const selectedDayBoardSweepstake=dayBoardSweepstakeConfig(selectedDayBoard);
-  const daySweepstakeLocked=setup.dayCompMode==='create'||(setup.dayCompMode==='join'&&selectedDayBoardSweepstake.enabled);
+  const daySweepstakeLocked=setup.dayCompMode==='create'||setup.dayCompMode==='join';
+  useEffect(()=>{
+    if(setup.dayCompMode!=='join'||!selectedDayBoard)return;
+    const cfg=selectedDayBoardSweepstake&&selectedDayBoardSweepstake.enabled?selectedDayBoardSweepstake:{enabled:true,amountPence:200,scope:'round'};
+    setSetup(q=>{
+      const current=q.sweepstake||{};
+      const nextAmount=parseInt(cfg.amountPence)||200;
+      if(current.enabled===true&&parseInt(current.amountPence)===nextAmount&&current.scope==='round')return q;
+      return {...q,sweepstake:{...current,enabled:true,amountPence:nextAmount,scope:'round'}};
+    });
+  },[setup.dayCompMode,setup.dayCompKey,selectedDayBoard&&selectedDayBoard.id,selectedDayBoardSweepstake&&selectedDayBoardSweepstake.enabled,selectedDayBoardSweepstake&&selectedDayBoardSweepstake.amountPence]);
   function updateSetupSweepstakeAmount(value){
     const raw=String(value||'').trim();
     const amountPence=raw===''?'':Math.round(Math.max(0,parseFloat(raw)||0)*100);
@@ -3789,9 +3878,17 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       const dayCompKey=setup.dayCompMode==='create'?makeDayCompKey():(setup.dayCompMode==='join'?setup.dayCompKey:'');
       let roundName=setup.dayCompMode==='create'?(setup.name||defaultDaySweepstakeName()):(setup.name||creatorName||(courseBaseName+' - '+today)||'Round');
       const joinedDayBoard=setup.dayCompMode==='join'?dayBoardByKey(dayCompKey):null;
-      const inheritedSweepstake=joinedDayBoard?dayBoardSweepstakeConfig(joinedDayBoard):null;
+      let inheritedSweepstake=joinedDayBoard?dayBoardSweepstakeConfig(joinedDayBoard):null;
+      if(joinedDayBoard&&(!inheritedSweepstake||!inheritedSweepstake.enabled)){
+        try{
+          const{data:boardSweepRows}=await sb.from('cup_scores').select('*').eq('round_id',joinedDayBoard.id);
+          const cloudCfg=sweepstakeConfigFromRows(boardSweepRows||[],joinedDayBoard);
+          if(cloudCfg&&cloudCfg.enabled)inheritedSweepstake=cloudCfg;
+        }catch(e){}
+      }
+      if(joinedDayBoard&&(!inheritedSweepstake||!inheritedSweepstake.enabled))inheritedSweepstake={enabled:true,amountPence:parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||200,scope:'round'};
       const roundSweepstake=inheritedSweepstake&&inheritedSweepstake.enabled
-        ?{enabled:true,amountPence:parseInt(inheritedSweepstake.amountPence)||200,scope:inheritedSweepstake.scope==='group'?'group':'round'}
+        ?{enabled:true,amountPence:parseInt(inheritedSweepstake.amountPence)||200,scope:'round'}
         :{enabled:!!(setup.sweepstake&&setup.sweepstake.enabled),amountPence:parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||200,scope:(setup.sweepstake&&setup.sweepstake.scope)==='group'?'group':'round'};
       if(dayCompKey)roundName=appendDayCompMarker(roundName,dayCompKey);
       const joinCode=Math.random().toString(36).substring(2,6).toUpperCase();
@@ -4070,17 +4167,16 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
               <div>
                 <div style={{fontSize:14,color:'#fff',fontWeight:800}}>Day sweepstake</div>
-                <div style={{fontSize:11,color:'#90ccf0',marginTop:2}}>For separate tee times in the same front, back and overall sweepstake.</div>
+                <div style={{fontSize:11,color:'#90ccf0',marginTop:2}}>Join the admin-created day sweepstake for separate tee times.</div>
               </div>
               <select value={setup.dayCompMode==='join'?setup.dayCompKey:setup.dayCompMode||'none'} onChange={e=>{const v=e.target.value;setSetup(q=>v==='create'?{...q,dayCompMode:'create',dayCompKey:''}:v==='none'?{...q,dayCompMode:'none',dayCompKey:''}:{...q,dayCompMode:'join',dayCompKey:v});}} style={{...S.inp,width:150,marginBottom:0,padding:'8px 9px',fontSize:12}}>
                 <option value="none">No sweepstake</option>
-                <option value="create">Create today</option>
                 {activeDayBoards.map(r=><option key={dayCompKeyFromRound(r)} value={dayCompKeyFromRound(r)}>{dayCompDisplayName(rounds,r)}</option>)}
               </select>
             </div>
             {setup.dayCompMode&&setup.dayCompMode!=='none'&&<div style={{fontSize:11,color:'rgba(255,255,255,0.70)',marginTop:9,lineHeight:1.35}}>
-              {setup.dayCompMode==='create'?'This starts a Saturday Sweepstake-style board. Later players can choose it when they start.':'This round will appear on the selected sweepstake board.'}
-              {setup.dayCompMode==='join'&&selectedDayBoardSweepstake.enabled&&<div style={{marginTop:7,color:'#fbbf24',fontWeight:900}}>Joining this board enters you into its sweepstake.</div>}
+              {setup.dayCompMode==='create'?'This starts a Saturday Sweepstake-style board. Later players can choose it when they start.':'This round will appear on the selected sweepstake board and use the admin-set sweepstake.'}
+              {setup.dayCompMode==='join'&&<div style={{marginTop:7,color:'#fbbf24',fontWeight:900}}>Joining this board enters you into its sweepstake. The amount is locked by admin.</div>}
             </div>}
           </div>}
           <label style={S.lbl}>Course</label>
@@ -4118,7 +4214,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
               </div>
             </div>
             {((setup.sweepstake&&setup.sweepstake.enabled)||daySweepstakeLocked)&&<div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,alignItems:'center'}}>
-              <input type="number" min="0" step="0.5" value={(setup.sweepstake&&setup.sweepstake.amountPence)===''?'':((parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||0)/100)} onChange={e=>updateSetupSweepstakeAmount(e.target.value)} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}} placeholder="£ per pot"/>
+              <input type="number" min="0" step="0.5" disabled={setup.dayCompMode==='join'} value={(setup.sweepstake&&setup.sweepstake.amountPence)===''?'':((parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||0)/100)} onChange={e=>updateSetupSweepstakeAmount(e.target.value)} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13,opacity:setup.dayCompMode==='join'?0.72:1}} placeholder="£ per pot"/>
               <select disabled={daySweepstakeLocked} value={daySweepstakeLocked?'round':((setup.sweepstake&&setup.sweepstake.scope)||'round')} onChange={e=>setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),scope:e.target.value==='group'?'group':'round'}}))} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13,opacity:daySweepstakeLocked?0.75:1}}>
                 <option value="round">Whole round / all groups</option>
                 <option value="group">My group only</option>
@@ -4618,6 +4714,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             boardScores=normaliseFoursomesScoreRows(boardScs||[]);
           }
         }
+        setSweepstakeConfig(sweepstakeConfigFromRows(boardScores,round));
         setAllRoundPlayers(boardPeople);
         setAllGroups(normalised);
         setOverallPlayers(boardPeople.map(p=>({id:p.id,name:p.display_name||p.name,playing_handicap:p.playing_handicap||0})));
@@ -4687,7 +4784,18 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         aliasesForSavedScoreId(canonicalFoursomesPlayerId(s.player_id),scorePeople).forEach(pid=>{m[s.hole_number][pid]=s.gross_score;});
       });
       const cloudSnakes=rowsToSnakeMarks(rows);
-      setSweepstakeConfig(sweepstakeConfigFromRows(rows,round));
+      let nextSweepstakeConfig=sweepstakeConfigFromRows(rows,round);
+      if(dayCompKeyFromRound(round)&&(!nextSweepstakeConfig||!nextSweepstakeConfig.enabled)){
+        try{
+          const board=dayCompBoardFor(rounds,round);
+          if(board&&board.id&&board.id!==round.id){
+            const{data:boardRows}=await sb.from('cup_scores').select('*').eq('round_id',board.id);
+            const boardCfg=sweepstakeConfigFromRows(boardRows||[],board);
+            if(boardCfg&&boardCfg.enabled)nextSweepstakeConfig=boardCfg;
+          }
+        }catch(e){}
+      }
+      setSweepstakeConfig(nextSweepstakeConfig);
       const refreshedMatchplayConfig=matchplayConfigFromRows(allScoreRows,round,(groupRows&&groupRows[0])||activeScoreGroup||group);
       setMatchplayConfig(prev=>preserveFoursomesTeamNames(refreshedMatchplayConfig,prev));
       if(groupRows&&groupRows.length){
@@ -8044,12 +8152,13 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     setSaving(false);
   }
   async function closeBoard(board){
+    if(!window.confirm('Mark this day sweepstake as finished? Do this only once the last scorecard is in.'))return;
     const key=dayCompKeyFromRound(board);
     const linked=(rounds||[]).filter(r=>dayCompKeyFromRound(r)===key);
     for(const r of linked){
       if(isLiveRound(r))await sb.from('cup_rounds').update({status:'complete'}).eq('id',r.id);
     }
-    await load();flash('Day sweepstake closed');
+    await load();flash('Day sweepstake finished');
   }
   async function deleteBoard(board){
     if(!window.confirm('Delete this empty day sweepstake? Scorecards already joined to it will stay as normal rounds.'))return;
@@ -8061,7 +8170,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     <div>
       <div style={{...S.card,marginBottom:16,borderColor:'rgba(96,184,240,0.25)',background:'rgba(96,184,240,0.08)'}}>
         <div style={{fontSize:17,color:'#fff',fontWeight:900,marginBottom:6}}>Create Day Sweepstake</div>
-        <div style={{fontSize:12,color:'#90ccf0',lineHeight:1.4,marginBottom:12}}>Set this up before the first tee time. Players can then join it from Start Round.</div>
+        <div style={{fontSize:12,color:'#90ccf0',lineHeight:1.4,marginBottom:12}}>Set this up before the first tee time. Players then join this fixed sweepstake from Start Round.</div>
         <label style={S.lbl}>Sweepstake Name</label>
         <input style={{...S.inp,marginBottom:10}} value={name} onChange={e=>setName(e.target.value)} placeholder="Saturday Sweepstake"/>
         <div style={{padding:'11px 12px',borderRadius:12,background:'rgba(245,158,11,0.12)',border:'1px solid rgba(245,158,11,0.32)',marginBottom:12}}>
@@ -8106,7 +8215,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
             <div style={{fontSize:10,color:isLiveRound(board)?'#86efac':'#8ea0ad',fontWeight:900,letterSpacing:'0.09em'}}>{isLiveRound(board)?'OPEN':'CLOSED'}</div>
           </div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-            {isLiveRound(board)&&<button onClick={()=>closeBoard(board)} style={{...S.gho,padding:'8px 10px',fontSize:12}}>Close Board</button>}
+            {isLiveRound(board)&&<button onClick={()=>closeBoard(board)} style={{...S.gho,padding:'8px 10px',fontSize:12}}>Day Finished</button>}
             {!scorecards.length&&<button onClick={()=>deleteBoard(board)} style={{...S.dan,padding:'8px 10px',fontSize:12}}>Delete</button>}
           </div>
         </div>;
