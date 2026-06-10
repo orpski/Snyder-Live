@@ -1,4 +1,4 @@
-<!-- SNYDER GOLF v4.08 -->
+<!-- SNYDER GOLF v4.09 -->
 <!-- =========================================================
      DOCUMENT SETUP
      ========================================================= -->
@@ -70,59 +70,9 @@ window.onerror=function(msg,src,line,col,err){
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script>
-// Snyder Golf v4.08 League loader/root-cause fix
-// The Money table bug was inside league-section.js, not app.js. Earlier fixes patched app/index
-// after render, but the League script itself kept calculating/rendering the stale polluted balance.
-// This loader fetches league-section.js as source, removes the bad Money balance overlay inside the
-// Money data block, then compiles it once before loading app.js.
-(function(){
-  'use strict';
-  var errBox=function(message){
-    var b=document.getElementById('err');
-    if(b){b.style.display='block';b.textContent=message;}
-  };
-  function fixLeagueMoneySource(src){
-    src=String(src||'').replace(/^\uFEFF/, '');
-    var start=src.indexOf('const moneyData=players.map(p=>{');
-    var end=start>=0?src.indexOf('const totalPaid=',start):-1;
-    if(start>=0&&end>start){
-      var block=src.slice(start,end);
-      // Force the root calculation to be display-simple only:
-      // paid from payments table, owed from entry + extra rounds + confirmed snakes, balance = paid - owed.
-      block=block.replace(/const paid\s*=\s*[^;]*;/, "const paid=Number((payments[p.id]?.paid)||0)||0;");
-      block=block.replace(/const owed\s*=\s*[^;]*;/, "const owed=calcOwed(p.id);");
-      block=block.replace(/const balance\s*=\s*[^;]*;/, "const balance=paid-owed;");
-      src=src.slice(0,start)+block+src.slice(end);
-    }
-    // Remove older DOM/adjustment hooks if any accidentally got inserted into league-section.js.
-    src=src.replace(/window\.snyderReloadSweepstakeBalanceAdjustments\s*&&\s*window\.snyderReloadSweepstakeBalanceAdjustments\([^;]*;?/g,'');
-    return src;
-  }
-  function loadApp(){
-    var s=document.createElement('script');
-    s.type='text/babel';
-    s.src='app.js?v=4.08';
-    document.body.appendChild(s);
-  }
-  fetch('./league-section.js?v=4.08-root-money-fix',{cache:'no-store'})
-    .then(function(res){
-      if(!res.ok)throw new Error('Could not load league-section.js: '+res.status);
-      return res.text();
-    })
-    .then(function(src){
-      var fixed=fixLeagueMoneySource(src);
-      var compiled=Babel.transform(fixed,{presets:['react']}).code;
-      (0,eval)(compiled);
-      window.__SNYDER_LEAGUE_MONEY_SOURCE_FIXED='v4.08';
-      loadApp();
-    })
-    .catch(function(e){
-      console.error(e);
-      errBox('ERROR: League section failed to load/fix\n'+(e&&e.stack||e));
-    });
-})();
-</script>
+<script type="text/babel" src="league-section.js?v=4.09"></script>
+<script type="text/babel" src="app.js?v=4.09"></script>
+<script src="money-fix.js?v=4.09"></script>
 
 </body>
 </html>
