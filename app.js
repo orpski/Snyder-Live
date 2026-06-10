@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.00
+// SNYDER GOLF v4.01
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.00',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.01',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -2039,7 +2039,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v4.00" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v4.00</span>
+          <span aria-label="App version v4.01" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v4.01</span>
         </button>
       </div>
 
@@ -6314,7 +6314,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(!sw.enabled||!sw.final||!sw.payments.length)return;
     sweepstakeLeagueSettlementRef.current=key;
     setSweepstakeLeagueSettlement({status:'checking',changes:[],skipped:[]});
-    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.00`;
+    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.01`;
     try{
       const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').eq('note',markerNote).limit(1);
       if(logMarkerError)throw logMarkerError;
@@ -8520,7 +8520,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.01`;
     const playable=(linked||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
     if(!playable.length)return {already:false,changes:[],skipped:[]};
     const roundIds=playable.map(r=>r.id);
@@ -8629,16 +8629,18 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey}`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.01`;
+    const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
+    const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.01`;
+    const legacyReverseNote=`Day sweepstake League balance reversal ${markerKey}`;
     const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNote}`).limit(1);
     if(reverseCheckError)throw reverseCheckError;
     if(existingReverse&&existingReverse.length)return {reversed:false,already:true,count:0};
-    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNote}`);
+    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`);
     if(logError)throw logError;
     const rows=(logs||[]).filter(r=>r&&r.player_id&&Math.abs(parseFloat(r.amount)||0)>0);
     if(!rows.length)return {reversed:false,count:0};
-    const ids=Array.from(new Set(rows.map(r=>normaliseId(r.player_id)).filter(Boolean)));
     const deltaById={};
     const nameById={};
     rows.forEach(row=>{
@@ -10519,13 +10521,14 @@ function BreakingNewsModal(){
 
 // =========================================================
 // League sweepstake balance overlay / repair
-// Keeps payments.paid as real cash paid only, while still reflecting
-// sweepstake wins/losses in the visible League balance column.
-// v4.00 also repairs legacy sweepstake settlements that previously altered payments.paid.
+// v4.01:
+// - Payments.paid is real cash only.
+// - Last 24h sweepstake/repair mutations to payments.paid are reset.
+// - Deleted day sweepstakes are ignored by checking only active Day Leaderboard boards.
 // =========================================================
 (function installSweepstakeBalanceOverlay(){
   if(typeof window==='undefined')return;
-  const state={loaded:false,loading:false,byName:{},legacyPaidByName:{},paidByName:{},timer:null,repairing:false,repaired:false};
+  const state={loaded:false,loading:false,byName:{},paidByName:{},timer:null,repairing:false,repaired:false};
   function cleanName(v){return String(v||'').trim().toLowerCase().replace(/\s+/g,' ');}
   function round2(v){return Math.round((parseFloat(v)||0)*100)/100;}
   function parseMoneyText(text){
@@ -10546,53 +10549,76 @@ function BreakingNewsModal(){
   function moneyPaidText(v){return '£'+moneyBody(v);}
   function dayKeyFromName(name){const m=String(name||'').match(/\[DAY:([A-Z0-9]{5,8})\]/);return m&&m[1]?m[1]:null;}
   function dayKeyFromNote(note){const m=String(note||'').match(/league-day-balance-([A-Z0-9]{5,8})/);return m&&m[1]?m[1]:null;}
-  function isAdjustmentOnly(row){return /adjustment-only|v4\.00/i.test(String(row&&row.note||''))||/adjustment only/i.test(String(row&&row.action||''));}
+  function isAdjustmentOnly(row){return /adjustment-only|v4\.0[0-9]/i.test(String(row&&row.note||''))||/adjustment only/i.test(String(row&&row.action||''));}
   function isSweepLog(row){return row&&(row.action==='Sweepstake balance'||row.action==='Sweepstake balance reversal');}
-  async function fetchValidDayKeys(){
+  async function fetchActiveDayBoardKeys(){
     try{
       const {data,error}=await window.sb.from('cup_rounds').select('name,course_name');
       if(error)throw error;
       const keys=new Set();
-      (data||[]).forEach(r=>{const k=dayKeyFromName(r&&r.name);if(k)keys.add(k);});
+      (data||[]).forEach(r=>{
+        // Important: linked scorecards can keep [DAY:xxxxx] in the name after the board is deleted.
+        // Only the Day Leaderboard board itself keeps the sweepstake alive.
+        if(String(r&&r.course_name||'')!=='Day Leaderboard')return;
+        const k=dayKeyFromName(r&&r.name);
+        if(k)keys.add(k);
+      });
       return keys;
     }catch(e){return new Set();}
   }
-  async function repairLegacyPaidColumn(logs){
+  function last24Iso(){return new Date(Date.now()-24*60*60*1000).toISOString();}
+  async function resetPaidColumnTo24hBaseline(){
     if(state.repairing||state.repaired||!window.sb||!window.sb.from)return;
     state.repairing=true;
     try{
-      const repairNote='Sweepstake legacy paid column repair v4.00';
+      const repairNote='Sweepstake paid 24h reset v4.01';
       const {data:done,error:doneError}=await window.sb.from('payment_log').select('id').eq('note',repairNote).limit(1);
       if(doneError)throw doneError;
       if(done&&done.length){state.repaired=true;return;}
-      const deltaById={};
+      const {data:logs,error:logError}=await window.sb.from('payment_log')
+        .select('player_id,player_name,amount,action,note,created_at')
+        .gte('created_at',last24Iso())
+        .in('action',['Sweepstake balance','Sweepstake paid repair']);
+      if(logError)throw logError;
+      const changedById={};
       const nameById={};
       (logs||[]).forEach(row=>{
-        if(!isSweepLog(row)||isAdjustmentOnly(row)||!row.player_id)return;
+        if(!row||!row.player_id)return;
+        const action=String(row.action||'');
+        const note=String(row.note||'');
+        let changedPaid=false;
+        if(action==='Sweepstake paid repair')changedPaid=true;
+        // Older sweepstake settlements changed payments.paid. New adjustment-only rows must not be reversed here.
+        if(action==='Sweepstake balance'&&!isAdjustmentOnly(row))changedPaid=true;
+        if(!changedPaid)return;
         const id=String(row.player_id);
         const amt=round2(row.amount);
         if(!amt)return;
-        // Older builds changed payments.paid by this amount. Undo it so paid is real cash only.
-        deltaById[id]=round2((deltaById[id]||0)-amt);
+        changedById[id]=round2((changedById[id]||0)+amt);
         nameById[id]=row.player_name||'Player';
       });
-      const ids=Object.keys(deltaById).filter(id=>Math.abs(deltaById[id])>0.0001);
+      const ids=Object.keys(changedById).filter(id=>Math.abs(changedById[id])>0.0001);
       if(!ids.length){state.repaired=true;return;}
       const {data:payments,error:payError}=await window.sb.from('payments').select('player_id,paid').in('player_id',ids);
       if(payError)throw payError;
       const paidById={};
       (payments||[]).forEach(p=>{paidById[String(p.player_id)]=round2(p.paid);});
-      const upserts=ids.map(id=>({player_id:id,paid:round2((paidById[id]||0)+deltaById[id])}));
+      const upserts=ids.map(id=>({player_id:id,paid:round2((paidById[id]||0)-changedById[id])}));
       const {error:upsertError}=await window.sb.from('payments').upsert(upserts,{onConflict:'player_id'});
       if(upsertError)throw upsertError;
-      const logRows=ids.map(id=>({player_id:id,player_name:nameById[id]||'Player',action:'Sweepstake paid repair',amount:deltaById[id],note:repairNote}));
-      const {error:logError}=await window.sb.from('payment_log').insert(logRows);
-      if(logError)throw logError;
+      const logRows=ids.map(id=>({
+        player_id:id,
+        player_name:nameById[id]||'Player',
+        action:'Sweepstake paid reset',
+        amount:round2(-changedById[id]),
+        note:repairNote
+      }));
+      const {error:insertError}=await window.sb.from('payment_log').insert(logRows);
+      if(insertError)throw insertError;
       state.repaired=true;
       state.loaded=false;
-      setTimeout(loadAdjustments,700);
     }catch(e){
-      // Do not break the League page if the repair cannot run. The visible overlay still protects the balance display.
+      console.warn('Sweepstake paid reset failed',e);
       state.repaired=true;
     }finally{state.repairing=false;}
   }
@@ -10601,38 +10627,39 @@ function BreakingNewsModal(){
     state.loading=true;
     try{
       if(!window.sb||!window.sb.from)return;
-      const [validDayKeys,{data,error},{data:payments,payError}]=await Promise.all([
-        fetchValidDayKeys(),
-        window.sb.from('payment_log').select('player_id,player_name,amount,action,note').in('action',['Sweepstake balance','Sweepstake balance reversal']).limit(2000),
-        window.sb.from('payments').select('player_id,paid')
+      await resetPaidColumnTo24hBaseline();
+      const [activeDayKeys,logResult,payResult,playerResult]=await Promise.all([
+        fetchActiveDayBoardKeys(),
+        window.sb.from('payment_log').select('player_id,player_name,amount,action,note').in('action',['Sweepstake balance','Sweepstake balance reversal']).limit(5000),
+        window.sb.from('payments').select('player_id,paid'),
+        window.sb.from('players').select('id,name')
       ]);
-      if(error)throw error;
+      if(logResult.error)throw logResult.error;
+      const playerNameById={};
+      (playerResult.data||[]).forEach(p=>{if(p&&p.id)playerNameById[String(p.id)]=cleanName(p.name);});
+      const paidByName={};
+      (payResult.data||[]).forEach(p=>{
+        const nm=playerNameById[String(p.player_id)];
+        if(nm)paidByName[nm]=round2(p.paid);
+      });
       const byName={};
-      const legacyPaidByName={};
-      (data||[]).forEach(row=>{
-        if(!isSweepLog(row))return;
-        const name=cleanName(row&&row.player_name);
-        if(!name)return;
-        const amount=round2(row.amount);
+      (logResult.data||[]).forEach(row=>{
+        if(!isSweepLog(row)||!isAdjustmentOnly(row))return;
         const note=String(row.note||'');
         const dayKey=dayKeyFromNote(note);
-        const deletedDay=dayKey&&!validDayKeys.has(dayKey);
-        if(!deletedDay)byName[name]=round2((byName[name]||0)+amount);
-        if(!isAdjustmentOnly(row))legacyPaidByName[name]=round2((legacyPaidByName[name]||0)+amount);
+        if(dayKey&&!activeDayKeys.has(dayKey))return; // deleted day sweepstake/test: ignore it completely
+        const nm=playerNameById[String(row.player_id)]||cleanName(row.player_name);
+        if(!nm)return;
+        byName[nm]=round2((byName[nm]||0)+(round2(row.amount)||0));
       });
-      const paidByName={};
-      // player names are not on payments, so this is corrected in the row using the visible name + legacyPaidByName.
       state.byName=byName;
-      state.legacyPaidByName=legacyPaidByName;
       state.paidByName=paidByName;
       state.loaded=true;
       patchLeagueMoneyRows();
-      repairLegacyPaidColumn(data||[]);
     }catch(e){
+      console.warn('Sweepstake adjustment load failed',e);
       state.loaded=true;
-    }finally{
-      state.loading=false;
-    }
+    }finally{state.loading=false;}
   }
   function patchLeagueMoneyRows(){
     if(!state.loaded)return;
@@ -10642,6 +10669,9 @@ function BreakingNewsModal(){
     });
     rows.forEach(row=>{
       const nameCell=row.children[0];
+      const entryCell=row.children[1];
+      const roundsCell=row.children[2];
+      const snakeCell=row.children[3];
       const paidCell=row.children[4];
       const balanceCell=row.children[5];
       if(!nameCell||!paidCell||!balanceCell)return;
@@ -10649,19 +10679,12 @@ function BreakingNewsModal(){
       const playerName=cleanName(nameEl?nameEl.textContent:nameCell.textContent);
       if(!playerName)return;
       const adj=round2(state.byName[playerName]||0);
-      const legacyPaid=round2(state.legacyPaidByName[playerName]||0);
-      if(!row.dataset.snyderBasePaid){
-        row.dataset.snyderBasePaid=String(parseMoneyText(paidCell.textContent));
-      }
-      if(!row.dataset.snyderBaseBalance){
-        row.dataset.snyderBaseBalance=String(parseMoneyText(balanceCell.textContent));
-      }
-      const basePaid=round2(row.dataset.snyderBasePaid);
-      const baseBalance=round2(row.dataset.snyderBaseBalance);
-      const fixedPaid=round2(basePaid-legacyPaid);
-      const fixedBaseBalance=round2(baseBalance-legacyPaid);
-      const next=round2(fixedBaseBalance+adj);
-      paidCell.textContent=moneyPaidText(fixedPaid);
+      const actualPaid=state.paidByName[playerName];
+      const paid=actualPaid!=null?round2(actualPaid):parseMoneyText(paidCell.textContent);
+      const owed=round2(parseMoneyText(entryCell&&entryCell.textContent)+parseMoneyText(roundsCell&&roundsCell.textContent)+parseMoneyText(snakeCell&&snakeCell.textContent));
+      const baseBalance=round2(paid-owed);
+      const next=round2(baseBalance+adj);
+      paidCell.textContent=moneyPaidText(paid);
       const valueEl=balanceCell.querySelector('div');
       const labelEl=balanceCell.querySelectorAll('div')[1];
       if(valueEl){
