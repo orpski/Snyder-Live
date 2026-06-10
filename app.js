@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.98
+// SNYDER GOLF v3.99
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.98',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.99',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -2039,7 +2039,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.98" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.98</span>
+          <span aria-label="App version v3.99" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.99</span>
         </button>
       </div>
 
@@ -6365,13 +6365,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         setSweepstakeLeagueSettlement({status:'skipped',changes:[],skipped});
         return;
       }
-      const {data:existing,error:paymentError}=await sb.from('payments').select('player_id,paid').in('player_id',ids);
-      if(paymentError)throw paymentError;
-      const existingPaid={};
-      (existing||[]).forEach(p=>{existingPaid[normaliseId(p.player_id)]=parseFloat(p.paid)||0;});
-      const upserts=ids.map(id=>({player_id:id,paid:Math.round(((existingPaid[id]||0)+deltas[id])*100)/100}));
-      const {error:upsertError}=await sb.from('payments').upsert(upserts,{onConflict:'player_id'});
-      if(upsertError)throw upsertError;
+      // Sweepstake winnings are balance adjustments, not real money paid in.
+      // Do not change payments.paid here: the League paid column must stay as actual payments only.
       const logRows=ids.map(id=>({
         player_id:id,
         player_name:(details[id]&&details[id].player&&details[id].player.name)||'Player',
@@ -8565,13 +8560,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     });
     const ids=Object.keys(deltas).filter(id=>Math.abs(deltas[id])>0.0001);
     if(ids.length){
-      const {data:existing,error:paymentError}=await sb.from('payments').select('player_id,paid').in('player_id',ids);
-      if(paymentError)throw paymentError;
-      const existingPaid={};
-      (existing||[]).forEach(p=>{existingPaid[normaliseId(p.player_id)]=parseFloat(p.paid)||0;});
-      const upserts=ids.map(id=>({player_id:id,paid:Math.round(((existingPaid[id]||0)+deltas[id])*100)/100}));
-      const {error:upsertError}=await sb.from('payments').upsert(upserts,{onConflict:'player_id'});
-      if(upsertError)throw upsertError;
+      // Day sweepstake winnings are balance adjustments, not real money paid in.
+      // Do not change payments.paid here: the League paid column must stay as actual payments only.
       const logRows=ids.map(id=>({
         player_id:id,
         player_name:(details[id]&&details[id].player&&details[id].player.name)||'Player',
@@ -8649,10 +8639,6 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const rows=(logs||[]).filter(r=>r&&r.player_id&&Math.abs(parseFloat(r.amount)||0)>0);
     if(!rows.length)return {reversed:false,count:0};
     const ids=Array.from(new Set(rows.map(r=>normaliseId(r.player_id)).filter(Boolean)));
-    const {data:existing,error:paymentError}=await sb.from('payments').select('player_id,paid').in('player_id',ids);
-    if(paymentError)throw paymentError;
-    const paidById={};
-    (existing||[]).forEach(row=>{paidById[normaliseId(row.player_id)]=parseFloat(row.paid)||0;});
     const deltaById={};
     const nameById={};
     rows.forEach(row=>{
@@ -8661,11 +8647,9 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
       deltaById[id]=(deltaById[id]||0)-amount;
       nameById[id]=row.player_name||'Player';
     });
-    const upserts=Object.keys(deltaById).map(id=>({player_id:id,paid:Math.round(((paidById[id]||0)+deltaById[id])*100)/100}));
-    if(upserts.length){
-      const {error:upsertError}=await sb.from('payments').upsert(upserts,{onConflict:'player_id'});
-      if(upsertError)throw upsertError;
-      const logRows=Object.keys(deltaById).map(id=>({
+    const reversedIds=Object.keys(deltaById).filter(id=>Math.abs(deltaById[id]||0)>0.0001);
+    if(reversedIds.length){
+      const logRows=reversedIds.map(id=>({
         player_id:id,
         player_name:nameById[id]||'Player',
         action:'Sweepstake balance reversal',
@@ -8675,7 +8659,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
       const {error:reverseLogError}=await sb.from('payment_log').insert(logRows);
       if(reverseLogError)throw reverseLogError;
     }
-    return {reversed:true,count:upserts.length};
+    return {reversed:true,count:reversedIds.length};
   }
   async function deleteBoard(board){
     if(!board||!board.id)return;
@@ -10530,6 +10514,114 @@ function BreakingNewsModal(){
     document.body
   );
 }
+
+
+
+// =========================================================
+// League sweepstake balance overlay
+// Keeps payments.paid as real cash paid only, while still reflecting
+// sweepstake wins/losses in the visible League balance column.
+// =========================================================
+(function installSweepstakeBalanceOverlay(){
+  if(typeof window==='undefined')return;
+  const state={loaded:false,loading:false,byName:{},timer:null};
+  function cleanName(v){return String(v||'').trim().toLowerCase().replace(/\s+/g,' ');}
+  function parseMoneyText(text){
+    const raw=String(text||'').replace(/,/g,'');
+    const neg=/^-|owes|−/.test(raw.trim())||raw.includes('-£');
+    const m=raw.match(/£\s*([0-9]+(?:\.[0-9]+)?)/);
+    if(!m)return 0;
+    const val=parseFloat(m[1])||0;
+    return neg?-val:val;
+  }
+  function moneyText(v){
+    const n=Math.round((parseFloat(v)||0)*100)/100;
+    const body=Number.isInteger(Math.abs(n))?String(Math.abs(n)):Math.abs(n).toFixed(2);
+    if(n>0)return '+£'+body;
+    if(n<0)return '-£'+body;
+    return '£0';
+  }
+  async function loadAdjustments(){
+    if(state.loading)return;
+    state.loading=true;
+    try{
+      if(!window.sb||!window.sb.from)return;
+      const {data,error}=await window.sb.from('payment_log').select('player_name,amount,action,note').in('action',['Sweepstake balance','Sweepstake balance reversal']).limit(1000);
+      if(error)throw error;
+      const byName={};
+      (data||[]).forEach(row=>{
+        const name=cleanName(row&&row.player_name);
+        if(!name)return;
+        const amount=parseFloat(row.amount)||0;
+        byName[name]=(byName[name]||0)+amount;
+      });
+      state.byName=byName;
+      state.loaded=true;
+      patchLeagueMoneyRows();
+    }catch(e){
+      state.loaded=true;
+    }finally{
+      state.loading=false;
+    }
+  }
+  function patchLeagueMoneyRows(){
+    if(!state.loaded)return;
+    const rows=Array.from(document.querySelectorAll('div')).filter(el=>{
+      const st=el&&el.style;
+      return st&&String(st.gridTemplateColumns||'').includes('44px 52px 52px 52px 72px')&&el.children&&el.children.length>=6;
+    });
+    rows.forEach(row=>{
+      const nameCell=row.children[0];
+      const paidCell=row.children[4];
+      const balanceCell=row.children[5];
+      if(!nameCell||!paidCell||!balanceCell)return;
+      const nameEl=nameCell.querySelector('div');
+      const playerName=cleanName(nameEl?nameEl.textContent:nameCell.textContent);
+      if(!playerName)return;
+      const adj=Math.round((state.byName[playerName]||0)*100)/100;
+      if(!row.dataset.snyderBaseBalance){
+        row.dataset.snyderBaseBalance=String(parseMoneyText(balanceCell.textContent));
+      }
+      const base=parseFloat(row.dataset.snyderBaseBalance)||0;
+      const next=Math.round((base+adj)*100)/100;
+      const valueEl=balanceCell.querySelector('div');
+      const labelEl=balanceCell.querySelectorAll('div')[1];
+      if(valueEl){
+        valueEl.textContent=moneyText(next);
+        valueEl.style.color=next>0?'#60b8f0':next<0?'#f87171':'#d4af37';
+      }
+      if(labelEl){
+        labelEl.textContent=next>0?'in credit':next<0?'owes':'settled';
+        labelEl.style.color=next>0?'#4a8a5a':next<0?'#7a3a3a':'#8ea0ad';
+      }
+      let note=balanceCell.querySelector('[data-snyder-sweepstake-adjustment="true"]');
+      if(adj){
+        if(!note){
+          note=document.createElement('div');
+          note.dataset.snyderSweepstakeAdjustment='true';
+          note.style.fontSize='8px';
+          note.style.marginTop='1px';
+          note.style.color='rgba(96,184,240,0.70)';
+          note.style.fontWeight='800';
+          balanceCell.appendChild(note);
+        }
+        note.textContent='sweep '+moneyText(adj);
+      }else if(note){
+        note.remove();
+      }
+    });
+  }
+  function schedule(){
+    clearTimeout(state.timer);
+    state.timer=setTimeout(()=>{
+      if(!state.loaded)loadAdjustments();
+      else patchLeagueMoneyRows();
+    },120);
+  }
+  window.snyderReloadSweepstakeBalanceAdjustments=function(){state.loaded=false;loadAdjustments();};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule); else schedule();
+  try{new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});}catch(e){}
+})();
 
 // =========================================================
 // React mount / app bootstrap
