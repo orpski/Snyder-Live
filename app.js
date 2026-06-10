@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.95
+// SNYDER GOLF v3.96
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.95',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.96',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -2450,15 +2450,18 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     grouped.forEach(g=>g.from.sort((a,b)=>b.amount-a.amount||String(a.name).localeCompare(String(b.name))));
     return {rows,payments,grouped,totalEntry:amountPence*3,playerCount:rows.length,amountPence};
   }
-  function compactPayersText(group){
+  function compactPayersText(group,totalPlayers=0){
     const from=group&&group.from||[];
+    const to=group&&group.to||'winner';
     if(!from.length)return '';
     const same=from.every(x=>x.amount===from[0].amount);
     if(same){
-      const names=from.map(x=>x.name).join(', ');
-      return `${from.length} payer${from.length===1?'':'s'} · ${moneyFromPence(from[0].amount)} each · ${names}`;
+      const amount=moneyFromPence(from[0].amount);
+      if(totalPlayers>1&&from.length>=totalPlayers-1)return `Everyone owes ${to} ${amount}`;
+      if(from.length===1)return `${from[0].name} owes ${to} ${amount}`;
+      return `${from.map(x=>x.name).join(', ')} owe ${to} ${amount} each`;
     }
-    return from.map(x=>`${x.name} ${moneyFromPence(x.amount)}`).join(' · ');
+    return from.map(x=>`${x.name} owes ${to} ${moneyFromPence(x.amount)}`).join(' · ');
   }
   function DayLeaderboardModal({rd}){
     if(!rd)return null;
@@ -2503,33 +2506,32 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
               </div>
             )):<div style={{padding:18,textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.58)'}}>No scores entered yet.</div>}
           </div>
-          <div style={{...S.card,marginBottom:10,borderColor:'rgba(245,158,11,0.46)',background:'linear-gradient(135deg,rgba(245,158,11,0.18),rgba(255,255,255,0.05))'}}>
-            <div style={{fontSize:16,color:'#fff',fontWeight:950}}>Sweepstake</div>
-            <div style={{fontSize:11,color:'#fbbf24',fontWeight:900,marginTop:3}}>{moneyFromPence(parseInt(cfg&&cfg.amountPence)||200)} front / back / overall · Admin locked</div>
-            {potRows.map(pot=>(
-              <div key={pot.key} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'9px 0',borderTop:'1px solid rgba(255,255,255,0.08)',marginTop:8}}>
-                <div>
-                  <div style={{fontSize:13,color:'#fff',fontWeight:900}}>{pot.label}</div>
-                  <div style={{fontSize:10,color:'rgba(255,255,255,0.55)'}}>Pot {moneyFromPence(pot.basePotTotal||0)} · {pot.entrantCount||0} entered{pot.payoutAmountPence>0&&pot.winner?<span> · winner up {moneyFromPence(pot.winnerUpPence||0)}</span>:null}</div>
+          <div style={{...S.card,marginBottom:10,borderColor:'rgba(96,184,240,0.26)',background:'linear-gradient(180deg,rgba(13,37,72,0.92),rgba(8,24,48,0.92))'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:10,marginBottom:8}}>
+              <div style={{fontSize:16,color:'#fff',fontWeight:950}}>Sweepstake</div>
+              <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,textAlign:'right'}}>{compactSettlement.playerCount} entered · {moneyFromPence(parseInt(cfg&&cfg.amountPence)||200)} each pot</div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr',gap:7}}>
+              {potRows.map(pot=>(
+                <div key={pot.key} style={{display:'grid',gridTemplateColumns:'72px minmax(0,1fr) auto',gap:8,alignItems:'center',padding:'9px 10px',borderRadius:12,background:'rgba(255,255,255,0.055)',border:'1px solid rgba(255,255,255,0.08)'}}>
+                  <div style={{fontSize:12,color:'#90ccf0',fontWeight:950}}>{pot.label}</div>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:13,color:pot.rollover?'#fbbf24':'#fff',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{sweepstakeWinnerText(pot)}</div>
+                    {sweepstakeReasonText(pot)&&<div style={{fontSize:10,color:'rgba(255,255,255,0.62)',fontWeight:800,marginTop:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{sweepstakeReasonText(pot)}</div>}
+                  </div>
+                  <div style={{fontSize:16,color:pot.winnerUpPence>0?'#86efac':'rgba(255,255,255,0.45)',fontWeight:950,textAlign:'right'}}>{pot.winnerUpPence>0?`+${moneyFromPence(pot.winnerUpPence).replace('£','£')}`:'-'}</div>
                 </div>
-                <div style={{fontSize:13,color:'#fbbf24',fontWeight:950,textAlign:'right'}}>{sweepstakeWinnerText(pot)} <span style={{color:'rgba(255,255,255,0.62)'}}>{pot.best?`(${pot.best} pts)`:''}</span>{pot.payoutAmountPence>0&&pot.winner&&<div style={{fontSize:10,color:'#86efac',fontWeight:900,marginTop:2}}>Up {moneyFromPence(pot.winnerUpPence||0)} · pot {moneyFromPence(pot.payoutAmountPence||0)}</div>}{sweepstakeReasonText(pot)&&<div style={{fontSize:10,color:'rgba(255,255,255,0.70)',fontWeight:800,marginTop:2}}>{sweepstakeReasonText(pot)}</div>}{pot.rolloverIn>0&&pot.key==='overall'&&<div style={{fontSize:10,color:'#86efac',fontWeight:900,marginTop:2}}>Includes rollover {moneyFromPence(pot.rolloverIn)}</div>}</div>
-              </div>
-            ))}
-            <div style={{marginTop:12,padding:'10px 10px',borderRadius:12,background:'rgba(2,8,23,0.30)',border:'1px solid rgba(255,255,255,0.10)'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:8}}>
-                <div>
-                  <div style={{fontSize:13,color:'#fff',fontWeight:950}}>Who pays who</div>
-                  <div style={{fontSize:10,color:'rgba(255,255,255,0.58)'}}>{dayClosed?'Final net settlement':'Projected net settlement until admin presses Day Finished'}</div>
-                </div>
-                <div style={{fontSize:11,color:'#fbbf24',fontWeight:950,textAlign:'right'}}>{compactSettlement.playerCount} player{compactSettlement.playerCount===1?'':'s'} · {moneyFromPence(compactSettlement.totalEntry)} in</div>
+              ))}
+            </div>
+            <div style={{marginTop:12,padding:'10px 10px',borderRadius:14,background:'rgba(96,184,240,0.08)',border:'1px solid rgba(96,184,240,0.16)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:6}}>
+                <div style={{fontSize:13,color:'#fff',fontWeight:950}}>Payments</div>
+                <div style={{fontSize:10,color:'rgba(255,255,255,0.58)',fontWeight:800,textAlign:'right'}}>{dayClosed?'Final':'Projected until Day Finished'}</div>
               </div>
               {compactSettlement.grouped.length?compactSettlement.grouped.map(group=>(
-                <div key={group.toId} style={{padding:'8px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'baseline'}}>
-                    <div style={{fontSize:13,color:'#fff',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{group.to} receives</div>
-                    <div style={{fontSize:15,color:'#86efac',fontWeight:950}}>{moneyFromPence(group.total)}</div>
-                  </div>
-                  <div style={{fontSize:10,color:'rgba(255,255,255,0.62)',lineHeight:1.35,marginTop:3}}>{compactPayersText(group)}</div>
+                <div key={group.toId} style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'center',padding:'8px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
+                  <div style={{fontSize:12,color:'#dbeafe',fontWeight:850,lineHeight:1.35}}>{compactPayersText(group,compactSettlement.playerCount)}</div>
+                  <div style={{fontSize:14,color:'#86efac',fontWeight:950,whiteSpace:'nowrap'}}>{moneyFromPence(group.total)}</div>
                 </div>
               )):<div style={{padding:'8px 0',borderTop:'1px solid rgba(255,255,255,0.08)',fontSize:12,color:'rgba(255,255,255,0.62)'}}>No payments yet.</div>}
             </div>
