@@ -1,5 +1,5 @@
-// SNYDER GOLF v4.10 service worker
-const CACHE_NAME = "snyder-golf-v4-10";
+// SNYDER GOLF v4.11 service worker
+const CACHE_NAME = "snyder-golf-v4-11";
 const ASSETS = ['./','./index.html','./styles.css','./league-section.js','./app.js','./manifest-live.json','./snyder-golf-logo.png','./snyder-golf-logo-clean.png','./icon-golf-192.png','./icon-golf-512.png','./icon-live-192.png','./icon-live-512.png','./notification-badge-v2.png','./money-fix.js','./course-whitley-bay.png','./course-tynemouth.svg','./course-quinta-do-lago.png','./course-ombria.png'];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.map(key => key !== CACHE_NAME ? caches.delete(key) : null))).then(() => self.clients.claim())); });
@@ -30,7 +30,7 @@ self.addEventListener('push', event => {
   const options = {
     body: data.body || '',
     icon: data.icon || './icon-golf-192.png',
-    badge: './notification-badge-v2.png','./money-fix.js',
+    badge: './notification-badge-v2.png',
     tag: data.tag || data.type || 'snyder-live',
     renotify: true,
     vibrate: [120, 70, 120],
