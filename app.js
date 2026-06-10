@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.96
+// SNYDER GOLF v3.97
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.96',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.97',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -2414,38 +2414,38 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     const amountPence=parseInt(cfg&&cfg.amountPence)||200;
     const entrantIds=daySweepstakeEntrantIdSet(rd);
     const nameMap=contextualNameMapFromRows(boardRows||[]);
-    const rows=(boardRows||[]).filter(r=>r&&r.id&&(!entrantIds||entrantIds.has(normaliseId(r.id)))).map(r=>({id:r.id,name:nameFromContextMap(nameMap,r.id,r.name||'Player'),paid:amountPence*3,winnings:0,net:-(amountPence*3),wins:[]}));
+    const rows=(boardRows||[]).filter(r=>r&&r.id&&(!entrantIds||entrantIds.has(normaliseId(r.id)))).map(r=>({id:r.id,name:nameFromContextMap(nameMap,r.id,r.name||'Player'),wins:[],owes:0,receives:0,net:0}));
     const byId={};
     rows.forEach(r=>{byId[normaliseId(r.id)]=r;});
-    (potRows||[]).forEach(pot=>{
-      if(pot&&pot.rollover)return;
-      const winner=(pot&&pot.winner)?pot.winner:((pot&&pot.winners||[])[0]);
-      const row=winner&&byId[normaliseId(winner.id)];
-      if(!row)return;
-      const win=parseInt(pot&&pot.payoutAmountPence)||0;
-      if(win<=0)return;
-      row.winnings+=win;
-      row.wins.push({label:pot.label,amount:win,points:winner.potTotal,reason:pot.reason||''});
-    });
-    rows.forEach(r=>{r.net=r.winnings-r.paid;});
-    const creditors=rows.filter(r=>r.net>0).map(r=>({...r,remaining:r.net}));
-    const debtors=rows.filter(r=>r.net<0).map(r=>({...r,remaining:-r.net}));
+    const board=dayCompBoardFor(rounds,rd);
+    const dayClosed=board&&!isLiveRound(board);
     const payments=[];
-    let i=0,j=0;
-    while(i<debtors.length&&j<creditors.length){
-      const amount=Math.min(debtors[i].remaining,creditors[j].remaining);
-      if(amount>0)payments.push({from:debtors[i].name,to:creditors[j].name,fromId:debtors[i].id,toId:creditors[j].id,amount});
-      debtors[i].remaining-=amount;
-      creditors[j].remaining-=amount;
-      if(debtors[i].remaining<=0)i++;
-      if(creditors[j].remaining<=0)j++;
-    }
+    (potRows||[]).forEach(pot=>{
+      if(!pot||pot.rollover||pot.manualDecision)return;
+      // During a live day, keep payments simple: show the current front/back pot only.
+      // Overall only becomes payable once the admin presses Day Finished.
+      if(!dayClosed&&pot.key==='overall')return;
+      const winner=pot.winner||(pot.winners||[])[0];
+      const winnerRow=winner&&byId[normaliseId(winner.id)];
+      if(!winnerRow)return;
+      const entrants=rows.filter(r=>normaliseId(r.id)!==normaliseId(winnerRow.id));
+      if(!entrants.length)return;
+      winnerRow.wins.push({label:pot.label,amount:amountPence*entrants.length,points:winner.potTotal,reason:pot.reason||''});
+      winnerRow.receives+=amountPence*entrants.length;
+      entrants.forEach(payer=>{
+        payer.owes+=amountPence;
+        payments.push({from:payer.name,to:winnerRow.name,fromId:payer.id,toId:winnerRow.id,amount:amountPence,potKey:pot.key,potLabel:pot.label});
+      });
+    });
+    rows.forEach(r=>{r.net=(parseInt(r.receives)||0)-(parseInt(r.owes)||0);});
     const grouped=[];
     payments.forEach(pay=>{
       let group=grouped.find(g=>normaliseId(g.toId)===normaliseId(pay.toId));
       if(!group){group={to:pay.to,toId:pay.toId,total:0,from:[]};grouped.push(group);}
       group.total+=pay.amount;
-      group.from.push({name:pay.from,id:pay.fromId,amount:pay.amount});
+      const existing=group.from.find(x=>normaliseId(x.id)===normaliseId(pay.fromId));
+      if(existing)existing.amount+=pay.amount;
+      else group.from.push({name:pay.from,id:pay.fromId,amount:pay.amount});
     });
     grouped.forEach(g=>g.from.sort((a,b)=>b.amount-a.amount||String(a.name).localeCompare(String(b.name))));
     return {rows,payments,grouped,totalEntry:amountPence*3,playerCount:rows.length,amountPence};
@@ -2457,8 +2457,8 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     const same=from.every(x=>x.amount===from[0].amount);
     if(same){
       const amount=moneyFromPence(from[0].amount);
-      if(totalPlayers>1&&from.length>=totalPlayers-1)return `Everyone owes ${to} ${amount}`;
       if(from.length===1)return `${from[0].name} owes ${to} ${amount}`;
+      if(totalPlayers>5&&from.length>=totalPlayers-1)return `Everyone owes ${to} ${amount}`;
       return `${from.map(x=>x.name).join(', ')} owe ${to} ${amount} each`;
     }
     return from.map(x=>`${x.name} owes ${to} ${moneyFromPence(x.amount)}`).join(' · ');
