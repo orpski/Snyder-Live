@@ -1,29 +1,30 @@
-// SNYDER GOLF v4.11 League Money display repair
-// Lightweight DOM repair only: does not wrap React, does not capture clicks,
-// does not write to Supabase, and does not change payments.paid.
+// SNYDER GOLF v4.12 League Money display repair
+// Fixes the v4.11 issue where the Balance column could disappear on narrow screens.
+// Display-only: no Supabase writes, no React wrapping, no click interception.
 (function(){
   'use strict';
-  if(window.__snyderMoneyFixV411)return;
-  window.__snyderMoneyFixV411=true;
+  if(window.__snyderMoneyFixV412)return;
+  window.__snyderMoneyFixV412=true;
 
   var scheduled=false;
-  var runs=0;
+  var runCount=0;
+  var COLS='minmax(72px,1fr) 36px 44px 44px 44px 58px';
 
-  function normText(el){
+  function text(el){
     return String((el&&el.textContent)||'').replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();
   }
   function kids(el){
     return Array.prototype.slice.call((el&&el.children)||[]).filter(function(x){return x&&x.nodeType===1;});
   }
-  function valueFromMoney(text){
-    var s=String(text||'').replace(/,/g,'').replace(/−/g,'-').replace(/\u00a0/g,' ');
+  function money(textValue){
+    var s=String(textValue||'').replace(/,/g,'').replace(/−/g,'-').replace(/\u00a0/g,' ');
     var m=s.match(/([+\-])?\s*£\s*([0-9]+(?:\.[0-9]+)?)/);
     if(!m)return 0;
     var n=parseFloat(m[2]);
     if(!isFinite(n))return 0;
     return m[1]==='-'?-n:n;
   }
-  function fmtMoney(v){
+  function fmt(v){
     var n=Math.round((Number(v)||0)*100)/100;
     var a=Math.abs(n);
     var body=Number.isInteger(a)?String(a):a.toFixed(2);
@@ -31,111 +32,100 @@
     if(n<0)return '-£'+body;
     return '£0';
   }
-  function isHeader(row){
+  function status(v){return v>0?'in credit':v<0?'owes':'settled';}
+  function isMoneyHeader(row){
     var c=kids(row);
     if(c.length!==6)return false;
-    var t=c.map(function(x){return normText(x).toLowerCase();});
-    return t[0]==='player' && t[1]==='entry' && t[2]==='rounds' && t[3]==='snake' && (t[4]==='paid'||t[4]==='paid in') && t[5]==='balance';
+    var t=c.map(function(x){return text(x).toLowerCase();});
+    return t[0]==='player'&&t[1]==='entry'&&t[2]==='rounds'&&t[3]==='snake'&&(t[4]==='paid'||t[4]==='paid in');
   }
-  function isMoneyRow(row){
+  function isPlayerRow(row){
     var c=kids(row);
     if(c.length!==6)return false;
-    var first=normText(c[0]).toLowerCase();
-    if(!first || first==='player')return false;
-    if(first.indexOf('round')===-1)return false;
-    if(normText(c[1]).indexOf('£')===-1)return false;
-    if(normText(c[4]).indexOf('£')===-1)return false;
-    return true;
+    var first=text(c[0]).toLowerCase();
+    if(!first||first==='player'||first.indexOf('round')===-1)return false;
+    return text(c[1]).indexOf('£')!==-1 && text(c[4]).indexOf('£')!==-1;
+  }
+  function applyGrid(row,isHeader){
+    row.style.display='grid';
+    row.style.gridTemplateColumns=COLS;
+    row.style.gap='2px';
+    row.style.alignItems='center';
+    row.style.boxSizing='border-box';
+    row.style.width='100%';
+    row.style.overflow='visible';
+    if(!isHeader)row.style.padding='10px 8px';
+    var c=kids(row);
+    c.forEach(function(cell,idx){
+      cell.style.minWidth='0';
+      cell.style.boxSizing='border-box';
+      cell.style.overflow='visible';
+      cell.style.whiteSpace=idx===0?'normal':'nowrap';
+      cell.style.textAlign=idx===0?'left':(idx===5?'right':'center');
+      if(idx>0)cell.style.fontSize=isHeader?'8px':'12px';
+    });
   }
   function writeBalance(cell,balance){
     if(!cell)return;
     var n=Math.round((Number(balance)||0)*100)/100;
-    cell.textContent='';
+    var colour=n>0?'#60b8f0':n<0?'#f87171':'#d4af37';
+    var subColour=n>0?'#4a8a5a':n<0?'#7a3a3a':'#8ea0ad';
+    cell.style.display='block';
+    cell.style.visibility='visible';
+    cell.style.opacity='1';
     cell.style.textAlign='right';
-    cell.style.minWidth='72px';
-    var top=document.createElement('div');
-    top.textContent=fmtMoney(n);
-    top.style.fontSize='18px';
-    top.style.fontWeight='700';
-    top.style.lineHeight='1.12';
-    top.style.color=n>0?'#60b8f0':n<0?'#f87171':'#d4af37';
-    var bottom=document.createElement('div');
-    bottom.textContent=n>0?'in credit':n<0?'owes':'settled';
-    bottom.style.fontSize='9px';
-    bottom.style.lineHeight='1.15';
-    bottom.style.color=n>0?'#4a8a5a':n<0?'#7a3a3a':'#8ea0ad';
-    cell.appendChild(top);
-    cell.appendChild(bottom);
+    cell.style.minWidth='58px';
+    cell.style.whiteSpace='nowrap';
+    cell.innerHTML='<div style="font-size:16px;font-weight:800;line-height:1.05;color:'+colour+'">'+fmt(n)+'</div>'+
+      '<div style="font-size:8px;line-height:1.1;color:'+subColour+'">'+status(n)+'</div>';
   }
-  function patchMoneyTable(){
-    runs++;
-    var patchedRows=0;
+  function patch(){
+    runCount++;
+    var rowsFixed=0;
     try{
-      var all=Array.prototype.slice.call(document.querySelectorAll('div'));
-      var headers=all.filter(isHeader);
+      var divs=Array.prototype.slice.call(document.querySelectorAll('div'));
+      var headers=divs.filter(isMoneyHeader);
       headers.forEach(function(header){
         var table=header.parentElement;
         if(!table)return;
-        table.style.border='1px solid rgba(96,184,240,0.22)';
-        table.style.borderRadius='14px';
-        table.style.overflow='hidden';
+        table.style.overflow='visible';
         table.style.width='100%';
-        var headerCells=kids(header);
-        header.style.display='grid';
-        header.style.gridTemplateColumns='minmax(124px,1fr) 44px 52px 52px 52px 76px';
-        header.style.gap='4px';
-        header.style.alignItems='center';
-        if(headerCells[4])headerCells[4].textContent='Paid';
-        if(headerCells[5])headerCells[5].textContent='Balance';
+        table.style.maxWidth='100%';
+        table.style.boxSizing='border-box';
+        applyGrid(header,true);
+        var hc=kids(header);
+        if(hc[4])hc[4].textContent='Paid';
+        if(hc[5])hc[5].textContent='Balance';
         kids(table).forEach(function(row){
           if(row===header)return;
           var c=kids(row);
-          var rowText=normText(row).toLowerCase();
-          if(c.length===6 && !normText(c[0]) && rowText.indexOf('owes')!==-1){
-            row.style.display='none';
-            return;
-          }
-          if(!isMoneyRow(row))return;
-          var entry=valueFromMoney(normText(c[1]))||10;
-          var rounds=valueFromMoney(normText(c[2]));
-          var snake=valueFromMoney(normText(c[3]));
-          var paid=valueFromMoney(normText(c[4]));
+          var lower=text(row).toLowerCase();
+          if(c.length===6 && !text(c[0]) && lower.indexOf('owes')!==-1){row.style.display='none';return;}
+          if(!isPlayerRow(row))return;
+          var entry=money(text(c[1]))||10;
+          var rounds=money(text(c[2]));
+          var snake=money(text(c[3]));
+          var paid=money(text(c[4]));
           var balance=Math.round((paid-entry-rounds-snake)*100)/100;
-          row.style.display='grid';
-          row.style.gridTemplateColumns='minmax(124px,1fr) 44px 52px 52px 52px 76px';
-          row.style.gap='4px';
-          row.style.alignItems='center';
-          row.style.padding='11px 10px';
+          applyGrid(row,false);
           row.style.borderLeft=balance>0?'4px solid #60b8f0':balance<0?'4px solid #ef4444':'4px solid rgba(96,184,240,0.22)';
-          [1,2,3,4].forEach(function(i){if(c[i]){c[i].style.textAlign='center';c[i].style.minWidth='0';}});
           writeBalance(c[5],balance);
-          row.setAttribute('data-money-v411','paid='+paid+' entry='+entry+' rounds='+rounds+' snake='+snake+' balance='+balance);
-          patchedRows++;
+          row.setAttribute('data-money-v412','paid='+paid+' entry='+entry+' rounds='+rounds+' snake='+snake+' balance='+balance);
+          rowsFixed++;
         });
       });
-      if(patchedRows){
-        window.__snyderMoneyFixV411LastRun={runs:runs,rows:patchedRows,at:new Date().toISOString()};
-      }
-    }catch(e){
-      console.warn('Snyder money fix v4.11 skipped safely',e);
-    }
+      if(rowsFixed)window.__snyderMoneyFixV412LastRun={runs:runCount,rows:rowsFixed,at:new Date().toISOString()};
+    }catch(e){console.warn('Snyder money fix v4.12 skipped safely',e);}
   }
   function schedule(){
     if(scheduled)return;
     scheduled=true;
-    setTimeout(function(){scheduled=false;patchMoneyTable();},80);
+    setTimeout(function(){scheduled=false;patch();},100);
   }
-  window.snyderFixLeagueMoneyBalances=patchMoneyTable;
+  window.snyderFixLeagueMoneyBalances=patch;
   window.snyderReloadSweepstakeBalanceAdjustments=schedule;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule);else schedule();
-  var count=0;
-  var timer=setInterval(function(){
-    patchMoneyTable();
-    count++;
-    if(count>120)clearInterval(timer);
-  },300);
-  try{
-    var obs=new MutationObserver(schedule);
-    obs.observe(document.body,{childList:true,subtree:true,characterData:true});
-  }catch(e){}
+  var ticks=0;
+  var timer=setInterval(function(){patch();ticks++;if(ticks>160)clearInterval(timer);},250);
+  try{new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,characterData:true});}catch(e){}
 })();
