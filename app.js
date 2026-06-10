@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.25
+// SNYDER GOLF v4.26
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.25',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.26',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -2403,11 +2403,14 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     // The Day Leaderboard board is only a shared cache. A stale board-level opt-in must
     // never pull an opted-out player (e.g. James Milner) back into the sweepstake.
     const linkedState=canonicalDaySweepstakeEntryState(rd,linkedDaySweepstakeEntryStateFromRows(allRows,boardRounds,{includeLocal:true}));
-    const linkedIds=sweepstakeEntryIdsFromState(linkedState);
-    if(linkedState&&linkedState.size)return linkedIds||new Set();
     const boardState=canonicalDaySweepstakeEntryState(rd,board?sweepstakeEntryStateFromRows(allRows,board):null);
-    const boardIds=sweepstakeEntryIdsFromState(boardState);
-    if(boardState&&boardState.size)return boardIds||new Set();
+    // v4.26: merge all linked scorecard entrant states with the shared board cache.
+    // v4.25 accidentally let each device overwrite the board with only that device's
+    // current scorecard entrants. This keeps Paolo/Slug and Test/Ben together while
+    // still letting any explicit opt-out (for example James) win over stale opt-ins.
+    const mergedSourceState=mergeSweepstakeEntryStateMaps(boardState,linkedState);
+    const mergedSourceIds=sweepstakeEntryIdsFromState(mergedSourceState);
+    if(mergedSourceState&&mergedSourceState.size)return mergedSourceIds||new Set();
     const ids=new Set();
     let hasExplicit=false;
     boardRounds.forEach(r=>{
@@ -2526,11 +2529,11 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
           let rows=normaliseFoursomesScoreRows(res.data||[]);
           const roundPlayers=(rpRes&&!rpRes.error&&rpRes.data)||[];
           const currentBoardState=canonicalSweepstakeEntryStateFromRoundPlayers(board?sweepstakeEntryStateFromRows(rows,board):null,roundPlayers);
-          // v4.25: include local entry choices here. v4.20 worked on the creator device because
-          // the opt-out lived in that device's local scorecard state. We now use that state
-          // to repair/sync the Day Leaderboard board so every other device sees it too.
+          // v4.26: merge, do not replace. Each joined scorecard can contribute only its own
+          // entrants, so the board must accumulate Paolo/Slug + Test/Ben rather than being
+          // overwritten by whichever device opens it last. Explicit opt-outs still win.
           const linkedState=canonicalSweepstakeEntryStateFromRoundPlayers(linkedDaySweepstakeEntryStateFromRows(rows,playable,{includeLocal:true}),roundPlayers);
-          const mergedState=linkedState||canonicalSweepstakeEntryStateFromRoundPlayers(mergedDaySweepstakeEntryStateFromRows(rows,board,playable,{includeLocal:true}),roundPlayers);
+          const mergedState=canonicalSweepstakeEntryStateFromRoundPlayers(mergeSweepstakeEntryStateMaps(currentBoardState,linkedState,mergedDaySweepstakeEntryStateFromRows(rows,board,playable,{includeLocal:false})),roundPlayers);
           if(board&&mergedState&&(!currentBoardState||!sweepstakeEntryStatesEqual(currentBoardState,mergedState))){
             const all=Array.from(mergedState.keys());
             const included=all.filter(id=>mergedState.get(id));
