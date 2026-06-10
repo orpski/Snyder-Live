@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.97
+// SNYDER GOLF v3.98
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.97',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.98',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -2039,7 +2039,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.94" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.94</span>
+          <span aria-label="App version v3.98" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.98</span>
         </button>
       </div>
 
@@ -8635,11 +8635,72 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
       flash('Could not finish day sweepstake: '+(e.message||String(e)),'error');
     }
   }
+  async function reverseDaySweepstakeLeagueBalances(board){
+    if(!board||!board.id||!sb)return {reversed:false,count:0};
+    const key=dayCompKeyFromRound(board);
+    const markerKey=`league-day-balance-${key||board.id}`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey}`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey}`;
+    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').eq('note',reverseNote).limit(1);
+    if(reverseCheckError)throw reverseCheckError;
+    if(existingReverse&&existingReverse.length)return {reversed:false,already:true,count:0};
+    const {data:logs,error:logError}=await sb.from('payment_log').select('*').eq('note',markerNote);
+    if(logError)throw logError;
+    const rows=(logs||[]).filter(r=>r&&r.player_id&&Math.abs(parseFloat(r.amount)||0)>0);
+    if(!rows.length)return {reversed:false,count:0};
+    const ids=Array.from(new Set(rows.map(r=>normaliseId(r.player_id)).filter(Boolean)));
+    const {data:existing,error:paymentError}=await sb.from('payments').select('player_id,paid').in('player_id',ids);
+    if(paymentError)throw paymentError;
+    const paidById={};
+    (existing||[]).forEach(row=>{paidById[normaliseId(row.player_id)]=parseFloat(row.paid)||0;});
+    const deltaById={};
+    const nameById={};
+    rows.forEach(row=>{
+      const id=normaliseId(row.player_id);
+      const amount=parseFloat(row.amount)||0;
+      deltaById[id]=(deltaById[id]||0)-amount;
+      nameById[id]=row.player_name||'Player';
+    });
+    const upserts=Object.keys(deltaById).map(id=>({player_id:id,paid:Math.round(((paidById[id]||0)+deltaById[id])*100)/100}));
+    if(upserts.length){
+      const {error:upsertError}=await sb.from('payments').upsert(upserts,{onConflict:'player_id'});
+      if(upsertError)throw upsertError;
+      const logRows=Object.keys(deltaById).map(id=>({
+        player_id:id,
+        player_name:nameById[id]||'Player',
+        action:'Sweepstake balance reversal',
+        amount:Math.round(deltaById[id]*100)/100,
+        note:reverseNote
+      }));
+      const {error:reverseLogError}=await sb.from('payment_log').insert(logRows);
+      if(reverseLogError)throw reverseLogError;
+    }
+    return {reversed:true,count:upserts.length};
+  }
   async function deleteBoard(board){
-    if(!window.confirm('Delete this empty day sweepstake? Scorecards already joined to it will stay as normal rounds.'))return;
+    if(!board||!board.id)return;
+    const finished=!isLiveRound(board);
+    let reversed=false;
+    if(finished){
+      const reverse=window.confirm('This day sweepstake has finished. Cancel the League balance winnings before deleting it? Press OK to reverse the winnings, or Cancel to delete the sweepstake only.');
+      if(reverse){
+        try{
+          const result=await reverseDaySweepstakeLeagueBalances(board);
+          reversed=!!(result&&result.reversed);
+        }catch(e){
+          flash('Could not reverse sweepstake balances: '+(e.message||String(e)),'error');
+          return;
+        }
+      }
+    }
+    if(!window.confirm(finished?'Delete this finished day sweepstake from Scores? The actual scorecards will stay as normal rounds.':'Delete this empty day sweepstake? Scorecards already joined to it will stay as normal rounds.'))return;
+    const scoreDelete=await sb.from('cup_scores').delete().eq('round_id',board.id);
+    if(scoreDelete.error){flash(scoreDelete.error.message||'Could not delete sweepstake scores','error');return;}
+    await sb.from('cup_groups').delete().eq('round_id',board.id);
+    await sb.from('cup_round_players').delete().eq('round_id',board.id);
     const{error}=await sb.from('cup_rounds').delete().eq('id',board.id);
     if(error){flash(error.message||'Could not delete board','error');return;}
-    await load();flash('Day sweepstake deleted');
+    await load();flash(reversed?'Day sweepstake deleted and League balances reversed':'Day sweepstake deleted');
   }
   return(
     <div>
@@ -8691,7 +8752,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
           </div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
             {isLiveRound(board)&&<button onClick={()=>closeBoard(board)} style={{...S.gho,padding:'8px 10px',fontSize:12}}>Day Finished</button>}
-            {!scorecards.length&&<button onClick={()=>deleteBoard(board)} style={{...S.dan,padding:'8px 10px',fontSize:12}}>Delete</button>}
+            {(!scorecards.length||!isLiveRound(board))&&<button onClick={()=>deleteBoard(board)} style={{...S.dan,padding:'8px 10px',fontSize:12}}>Delete</button>}
           </div>
         </div>;
       })}
