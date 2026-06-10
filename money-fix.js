@@ -1,23 +1,35 @@
-// SNYDER GOLF v4.12 League Money display repair
-// Fixes the v4.11 issue where the Balance column could disappear on narrow screens.
+// SNYDER GOLF v4.13 League Money display repair
+// Root cause fix: parse only the first £ amount in each cell.
+// Example: "£12\n6 extra" must be read as 12, not 126.
 // Display-only: no Supabase writes, no React wrapping, no click interception.
 (function(){
   'use strict';
-  if(window.__snyderMoneyFixV412)return;
-  window.__snyderMoneyFixV412=true;
+  if(window.__snyderMoneyFixV413)return;
+  window.__snyderMoneyFixV413=true;
 
   var scheduled=false;
   var runCount=0;
-  var COLS='minmax(72px,1fr) 36px 44px 44px 44px 58px';
+  var COLS='minmax(86px,1fr) 42px 50px 50px 50px 64px';
 
-  function text(el){
+  function cleanText(el){
     return String((el&&el.textContent)||'').replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();
   }
   function kids(el){
     return Array.prototype.slice.call((el&&el.children)||[]).filter(function(x){return x&&x.nodeType===1;});
   }
-  function money(textValue){
-    var s=String(textValue||'').replace(/,/g,'').replace(/−/g,'-').replace(/\u00a0/g,' ');
+  function firstMoneyText(cell){
+    if(!cell)return '';
+    var childList=kids(cell);
+    // Prefer the top visible value div, e.g. "£12" rather than the sub-label "6 extra".
+    for(var i=0;i<childList.length;i++){
+      var t=cleanText(childList[i]);
+      if(t.indexOf('£')!==-1)return t;
+    }
+    return cleanText(cell);
+  }
+  function moneyFromCell(cell){
+    var s=firstMoneyText(cell).replace(/,/g,'').replace(/−/g,'-').replace(/\u00a0/g,' ');
+    // Only the first money amount after a pound sign counts. Ignore labels like "6 extra" or "x2".
     var m=s.match(/([+\-])?\s*£\s*([0-9]+(?:\.[0-9]+)?)/);
     if(!m)return 0;
     var n=parseFloat(m[2]);
@@ -36,27 +48,27 @@
   function isMoneyHeader(row){
     var c=kids(row);
     if(c.length!==6)return false;
-    var t=c.map(function(x){return text(x).toLowerCase();});
-    return t[0]==='player'&&t[1]==='entry'&&t[2]==='rounds'&&t[3]==='snake'&&(t[4]==='paid'||t[4]==='paid in');
+    var t=c.map(function(x){return cleanText(x).toLowerCase();});
+    return t[0]==='player'&&t[1]==='entry'&&t[2]==='rounds'&&t[3]==='snake'&&(t[4]==='paid'||t[4]==='paid in')&&t[5]==='balance';
   }
   function isPlayerRow(row){
     var c=kids(row);
     if(c.length!==6)return false;
-    var first=text(c[0]).toLowerCase();
+    var first=cleanText(c[0]).toLowerCase();
     if(!first||first==='player'||first.indexOf('round')===-1)return false;
-    return text(c[1]).indexOf('£')!==-1 && text(c[4]).indexOf('£')!==-1;
+    return cleanText(c[1]).indexOf('£')!==-1 && cleanText(c[4]).indexOf('£')!==-1;
   }
   function applyGrid(row,isHeader){
     row.style.display='grid';
     row.style.gridTemplateColumns=COLS;
-    row.style.gap='2px';
+    row.style.gap='3px';
     row.style.alignItems='center';
     row.style.boxSizing='border-box';
     row.style.width='100%';
+    row.style.maxWidth='100%';
     row.style.overflow='visible';
     if(!isHeader)row.style.padding='10px 8px';
-    var c=kids(row);
-    c.forEach(function(cell,idx){
+    kids(row).forEach(function(cell,idx){
       cell.style.minWidth='0';
       cell.style.boxSizing='border-box';
       cell.style.overflow='visible';
@@ -74,9 +86,9 @@
     cell.style.visibility='visible';
     cell.style.opacity='1';
     cell.style.textAlign='right';
-    cell.style.minWidth='58px';
+    cell.style.minWidth='64px';
     cell.style.whiteSpace='nowrap';
-    cell.innerHTML='<div style="font-size:16px;font-weight:800;line-height:1.05;color:'+colour+'">'+fmt(n)+'</div>'+
+    cell.innerHTML='<div style="font-size:16px;font-weight:800;line-height:1.05;color:'+colour+'">'+fmt(n)+'</div>'+ 
       '<div style="font-size:8px;line-height:1.1;color:'+subColour+'">'+status(n)+'</div>';
   }
   function patch(){
@@ -99,23 +111,23 @@
         kids(table).forEach(function(row){
           if(row===header)return;
           var c=kids(row);
-          var lower=text(row).toLowerCase();
-          if(c.length===6 && !text(c[0]) && lower.indexOf('owes')!==-1){row.style.display='none';return;}
+          var lower=cleanText(row).toLowerCase();
+          if(c.length===6 && !cleanText(c[0]) && lower.indexOf('owes')!==-1){row.style.display='none';return;}
           if(!isPlayerRow(row))return;
-          var entry=money(text(c[1]))||10;
-          var rounds=money(text(c[2]));
-          var snake=money(text(c[3]));
-          var paid=money(text(c[4]));
+          var entry=moneyFromCell(c[1])||10;
+          var rounds=moneyFromCell(c[2]);
+          var snake=moneyFromCell(c[3]);
+          var paid=moneyFromCell(c[4]);
           var balance=Math.round((paid-entry-rounds-snake)*100)/100;
           applyGrid(row,false);
           row.style.borderLeft=balance>0?'4px solid #60b8f0':balance<0?'4px solid #ef4444':'4px solid rgba(96,184,240,0.22)';
           writeBalance(c[5],balance);
-          row.setAttribute('data-money-v412','paid='+paid+' entry='+entry+' rounds='+rounds+' snake='+snake+' balance='+balance);
+          row.setAttribute('data-money-v413','paid='+paid+' entry='+entry+' rounds='+rounds+' snake='+snake+' balance='+balance);
           rowsFixed++;
         });
       });
-      if(rowsFixed)window.__snyderMoneyFixV412LastRun={runs:runCount,rows:rowsFixed,at:new Date().toISOString()};
-    }catch(e){console.warn('Snyder money fix v4.12 skipped safely',e);}
+      if(rowsFixed)window.__snyderMoneyFixV413LastRun={runs:runCount,rows:rowsFixed,at:new Date().toISOString()};
+    }catch(e){console.warn('Snyder money fix v4.13 skipped safely',e);}
   }
   function schedule(){
     if(scheduled)return;
@@ -126,6 +138,6 @@
   window.snyderReloadSweepstakeBalanceAdjustments=schedule;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule);else schedule();
   var ticks=0;
-  var timer=setInterval(function(){patch();ticks++;if(ticks>160)clearInterval(timer);},250);
+  var timer=setInterval(function(){patch();ticks++;if(ticks>200)clearInterval(timer);},250);
   try{new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,characterData:true});}catch(e){}
 })();
