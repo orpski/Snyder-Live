@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.03
+// SNYDER GOLF v4.04
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.03',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.04',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -2039,7 +2039,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v4.03" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v4.03</span>
+          <span aria-label="App version v4.04" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v4.04</span>
         </button>
       </div>
 
@@ -6314,7 +6314,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(!sw.enabled||!sw.final||!sw.payments.length)return;
     sweepstakeLeagueSettlementRef.current=key;
     setSweepstakeLeagueSettlement({status:'checking',changes:[],skipped:[]});
-    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.03`;
+    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.04`;
     try{
       const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').eq('note',markerNote).limit(1);
       if(logMarkerError)throw logMarkerError;
@@ -8520,7 +8520,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.03`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.04`;
     const playable=(linked||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
     if(!playable.length)return {already:false,changes:[],skipped:[]};
     const roundIds=playable.map(r=>r.id);
@@ -8629,10 +8629,10 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.03`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.04`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.03`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.04`;
     const legacyReverseNote=`Day sweepstake League balance reversal ${markerKey}`;
     const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNote}`).limit(1);
     if(reverseCheckError)throw reverseCheckError;
@@ -10521,7 +10521,8 @@ function BreakingNewsModal(){
 
 // =========================================================
 // League money balance stabiliser
-// v4.03:
+// v4.04:
+// - Fixes the v4.03 Money page crash caused by reading missing cells.
 // - Money balances are forced back to the simple, correct calculation:
 //   paid cash - entry - extra rounds - snake = balance.
 // - This does not use sweepstake/test adjustment logs and does not alter Paid.
@@ -10529,11 +10530,11 @@ function BreakingNewsModal(){
 // =========================================================
 (function installLeagueMoneyBalanceStabiliser(){
   if(typeof window==='undefined')return;
-  const state={timer:null,interval:null,observer:null};
+  const state={timer:null,interval:null,observer:null,patching:false};
   function round2(v){return Math.round((parseFloat(v)||0)*100)/100;}
   function parseMoneyText(text){
     const raw=String(text||'').replace(/,/g,'').replace(/\u00a0/g,' ');
-    const m=raw.match(/£\s*([0-9]+(?:\.[0-9]+)?)/);
+    const m=raw.match(/[+\-−]?\s*£\s*([0-9]+(?:\.[0-9]+)?)/);
     if(!m)return 0;
     return parseFloat(m[1])||0;
   }
@@ -10549,71 +10550,91 @@ function BreakingNewsModal(){
   }
   function setTextAndStyle(el,text,style){
     if(!el)return;
-    el.textContent=text;
+    if(el.textContent!==text)el.textContent=text;
     Object.keys(style||{}).forEach(k=>{el.style[k]=style[k];});
   }
+  function rowCells(row){
+    if(!row||!row.children)return [];
+    return Array.from(row.children).slice(0,6);
+  }
+  function cellText(c){return String(c&&c.textContent||'').trim();}
   function looksLikeMoneyRow(row){
-    if(!row||!row.children||row.children.length<6)return false;
-    const cells=Array.from(row.children).slice(0,6).map(c=>String(c.textContent||'').trim());
-    if(!cells[1].includes('£'))return false; // Entry
-    if(!cells[4].includes('£'))return false; // Paid
-    if(!/(settled|owes|credit|[+\-−]£|£0)/i.test(cells[5]))return false; // Balance
+    const cells=rowCells(row);
+    if(cells.length<6)return false;
+    const text=cells.map(cellText);
+    if(!text[0]||/^player$/i.test(text[0]))return false;
+    if(!text[1].includes('£'))return false; // Entry
+    if(!text[2].includes('£'))return false; // Extra rounds
+    if(!text[3].includes('£'))return false; // Snake
+    if(!text[4].includes('£'))return false; // Paid
+    if(!/(settled|owes|credit|[+\-−]£|£0|paid in)/i.test(text[5]))return false; // Balance
     return true;
   }
   function patchHeaderRows(){
     Array.from(document.querySelectorAll('div')).forEach(row=>{
-      if(!row||!row.children||row.children.length<6)return;
-      const cells=Array.from(row.children).slice(0,6);
-      const text=cells.map(c=>String(c.textContent||'').trim().toLowerCase());
+      const cells=rowCells(row);
+      if(cells.length<6)return;
+      const text=cells.map(c=>cellText(c).toLowerCase());
       if(text[0]==='player'&&text[1]==='entry'&&text[2]==='rounds'&&text[3]==='snake'){
-        if(text[4]==='£0'||text[4]==='paid in')cells[4].textContent='Paid';
+        if(text[4]==='£0'||text[4]==='paid in'||text[4]==='paid in cash')cells[4].textContent='Paid';
       }
     });
   }
   function patchLeagueMoneyRows(){
-    patchHeaderRows();
-    const rows=Array.from(document.querySelectorAll('div')).filter(looksLikeMoneyRow);
-    rows.forEach(row=>{
-      const cells=Array.from(row.children).slice(0,6);
-      const entry=parseMoneyText(cells[1].textContent);
-      const rounds=parseMoneyText(cells[2].textContent);
-      const snake=parseMoneyText(cells[3].textContent);
-      const paid=round2(parseMoneyText(cells[4].textContent));
-      const owed=round2(entry+rounds+snake);
-      const next=round2(paid-owed);
+    if(state.patching)return;
+    state.patching=true;
+    try{
+      patchHeaderRows();
+      const rows=Array.from(document.querySelectorAll('div')).filter(looksLikeMoneyRow);
+      rows.forEach(row=>{
+        const cells=rowCells(row);
+        // The League page can re-render while this patch is running. Guard every row
+        // so a half-rendered row cannot crash the Money screen again.
+        if(cells.length<6)return;
+        const entry=parseMoneyText(cellText(cells[1]));
+        const rounds=parseMoneyText(cellText(cells[2]));
+        const snake=parseMoneyText(cellText(cells[3]));
+        const paid=round2(parseMoneyText(cellText(cells[4])));
+        const owed=round2(entry+rounds+snake);
+        const next=round2(paid-owed);
 
-      // Remove any old sweepstake adjustment note that was being stacked into the balance.
-      Array.from(cells[5].children).forEach((child,idx)=>{
-        if(idx>1)child.remove();
-      });
+        // Remove any old sweepstake/repair adjustment note that was being stacked into the balance.
+        Array.from(cells[5].children||[]).forEach((child,idx)=>{
+          if(idx>1&&child&&child.remove)child.remove();
+        });
 
-      let valueEl=cells[5].children[0];
-      let labelEl=cells[5].children[1];
-      if(!valueEl){
-        valueEl=document.createElement('div');
-        cells[5].appendChild(valueEl);
-      }
-      if(!labelEl){
-        labelEl=document.createElement('div');
-        cells[5].appendChild(labelEl);
-      }
+        let valueEl=cells[5].children&&cells[5].children[0];
+        let labelEl=cells[5].children&&cells[5].children[1];
+        if(!valueEl){
+          valueEl=document.createElement('div');
+          cells[5].appendChild(valueEl);
+        }
+        if(!labelEl){
+          labelEl=document.createElement('div');
+          cells[5].appendChild(labelEl);
+        }
 
-      setTextAndStyle(valueEl,balanceText(next),{
-        fontSize:'18px',
-        color:next>0?'#60b8f0':next<0?'#f87171':'#d4af37',
-        textAlign:'right'
+        setTextAndStyle(valueEl,balanceText(next),{
+          fontSize:'18px',
+          color:next>0?'#60b8f0':next<0?'#f87171':'#d4af37',
+          textAlign:'right'
+        });
+        setTextAndStyle(labelEl,next>0?'in credit':next<0?'owes':'settled',{
+          fontSize:'9px',
+          color:next>0?'#4a8a5a':next<0?'#7a3a3a':'#8ea0ad',
+          textAlign:'right'
+        });
+        row.setAttribute('data-snyder-money-fixed','v4.04');
       });
-      setTextAndStyle(labelEl,next>0?'in credit':next<0?'owes':'settled',{
-        fontSize:'9px',
-        color:next>0?'#4a8a5a':next<0?'#7a3a3a':'#8ea0ad',
-        textAlign:'right'
-      });
-      row.setAttribute('data-snyder-money-fixed','v4.03');
-    });
+    }catch(e){
+      console.warn('Snyder Money balance stabiliser skipped safely',e);
+    }finally{
+      state.patching=false;
+    }
   }
   function schedule(){
     clearTimeout(state.timer);
-    state.timer=setTimeout(patchLeagueMoneyRows,40);
+    state.timer=setTimeout(patchLeagueMoneyRows,60);
   }
   window.snyderReloadSweepstakeBalanceAdjustments=schedule;
   window.snyderFixLeagueMoneyBalances=patchLeagueMoneyRows;
