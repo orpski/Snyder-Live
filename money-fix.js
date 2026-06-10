@@ -1,10 +1,10 @@
-// SNYDER GOLF v4.16 League Money display repair
+// SNYDER GOLF v4.17 League Money display repair
 // Adds completed Day Sweepstake net to the Money table without changing payments.paid.
 // Balance = Paid + Sweepstake net - Entry - Extra Rounds - Snakes.
 (function(){
   'use strict';
-  if(window.__snyderMoneyFixV416)return;
-  window.__snyderMoneyFixV416=true;
+  if(window.__snyderMoneyFixV417)return;
+  window.__snyderMoneyFixV417=true;
 
   var scheduled=false;
   var runCount=0;
@@ -14,6 +14,7 @@
   var sweepById={};
   var lastSweepLoad=0;
   var COLS='minmax(92px,1fr) 54px 50px 58px 48px 64px';
+  var FIX_VERSION='v4.17';
   var SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
   var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 
@@ -110,7 +111,7 @@
     if(c.length!==6&&c.length!==7)return false;
     var first=cleanText(c[0]).toLowerCase();
     if(!first||first==='player'||first.indexOf('round')===-1)return false;
-    // The original League row has a hidden entry cell, but v4.16 removes it visually.
+    // The original League row has a hidden entry cell, but v4.17 removes it visually.
     return cleanText(row).indexOf('£')!==-1;
   }
   function normaliseMoneyRow(row){
@@ -173,8 +174,8 @@
       '<div style="font-size:8px;line-height:1.05;color:#8ea0ad;text-align:center;width:100%;margin-top:1px">'+(sub||'')+'</div>';
   }
   function ensureEntryNote(table){
-    if(!table||table.getAttribute('data-money-entry-note')==='v4.16')return;
-    table.setAttribute('data-money-entry-note','v4.16');
+    if(!table||table.getAttribute('data-money-entry-note')==='v4.17')return;
+    table.setAttribute('data-money-entry-note','v4.17');
     try{
       var note=document.createElement('div');
       note.textContent='Balance includes £10 entry fee, extra rounds, snakes and completed Day Sweepstakes.';
@@ -245,16 +246,40 @@
           if(!isPlayerRow(row))return;
           var original=kids(row);
           var entry=10;
-          var rounds=0, snake=0, paid=0;
-          if(original.length===7){
+          var rounds=NaN, snake=NaN, paid=NaN;
+          // v4.17: make the repair idempotent. v4.16 overwrote the Entry cell with Rounds,
+          // then a later pass parsed the already-repaired row as if Entry still existed.
+          // Store the original money inputs on the row the first time we see them, and reuse them
+          // on every later MutationObserver/interval pass so Rounds/Snake cannot be cleared.
+          if(row.getAttribute('data-money-base-rounds')!==null){
+            rounds=parseFloat(row.getAttribute('data-money-base-rounds'))||0;
+            snake=parseFloat(row.getAttribute('data-money-base-snake'))||0;
+            paid=parseFloat(row.getAttribute('data-money-base-paid'))||0;
+          }else if(original.length===7){
             rounds=moneyFromCell(original[2]);
             snake=moneyFromCell(original[3]);
             paid=moneyFromCell(original[5]);
           }else{
-            rounds=moneyFromCell(original[2]);
-            snake=moneyFromCell(original[3]);
-            paid=moneyFromCell(original[4]);
+            var header=kids(header||row.parentElement&&row.parentElement.firstElementChild);
+            var rowText=cleanText(row).toLowerCase();
+            // Original League order is Player, Entry, Rounds, Snake, Paid, Balance.
+            // Already-repaired order is Player, Rounds, Snake, Sweep, Paid, Balance.
+            // Detect repaired rows from our data flag or the visible sweep sub-label.
+            var alreadyRepaired=row.getAttribute('data-money-repaired')==='v4.17' || rowText.indexOf(' sweep ')!==-1 || cleanText(original[3]).toLowerCase().indexOf('sweep')!==-1;
+            if(alreadyRepaired){
+              rounds=moneyFromCell(original[1]);
+              snake=moneyFromCell(original[2]);
+              paid=moneyFromCell(original[4]);
+            }else{
+              rounds=moneyFromCell(original[2]);
+              snake=moneyFromCell(original[3]);
+              paid=moneyFromCell(original[4]);
+            }
           }
+          rounds=round2(rounds); snake=round2(snake); paid=round2(paid);
+          row.setAttribute('data-money-base-rounds',String(rounds));
+          row.setAttribute('data-money-base-snake',String(snake));
+          row.setAttribute('data-money-base-paid',String(paid));
           var c=normaliseMoneyRow(row);
           if(c.length!==6)return;
           var sweep=sweepNetForRow(row,c);
@@ -266,12 +291,13 @@
           writeAmountCell(c[3],sweep,'sweep');
           writePlainMoneyCell(c[4],paid,'paid','#60b8f0');
           writeBalance(c[5],balance);
-          row.setAttribute('data-money-v416','paid='+paid+' sweep='+sweep+' entry='+entry+' rounds='+rounds+' snake='+snake+' balance='+balance);
+          row.setAttribute('data-money-repaired','v4.17');
+          row.setAttribute('data-money-v417','paid='+paid+' sweep='+sweep+' entry='+entry+' rounds='+rounds+' snake='+snake+' balance='+balance);
           rowsFixed++;
         });
       });
-      if(rowsFixed)window.__snyderMoneyFixV416LastRun={runs:runCount,rows:rowsFixed,sweepLoaded:sweepLoaded,at:new Date().toISOString()};
-    }catch(e){console.warn('Snyder money fix v4.16 skipped safely',e);}
+      if(rowsFixed)window.__snyderMoneyFixV417LastRun={runs:runCount,rows:rowsFixed,sweepLoaded:sweepLoaded,at:new Date().toISOString()};
+    }catch(e){console.warn('Snyder money fix v4.17 skipped safely',e);}
   }
   function schedule(){
     if(scheduled)return;
