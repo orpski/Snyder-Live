@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.26
+// SNYDER GOLF v4.28
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.26',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.28',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -2039,7 +2039,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v4.25" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v4.25</span>
+          <span aria-label="App version v4.28" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v4.28</span>
         </button>
       </div>
 
@@ -2399,13 +2399,13 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     const allRows=sourceRows?normaliseFoursomesScoreRows(sourceRows):normaliseFoursomesScoreRows([...(scores||[]),...(publicScores||[])]);
     const board=dayCompBoardFor(rounds,rd);
     const boardRounds=dayCompRoundsFor(rounds,rd).filter(r=>!isDayCompBoardRound(r));
-    // v4.25: restore the v4.20 local opt-out behaviour, then sync it to the board. Linked scorecards plus local choices are the source of truth for who actually opted in.
+    // v4.28: restore the v4.20 local opt-out behaviour, then sync it to the board. Linked scorecards plus local choices are the source of truth for who actually opted in.
     // The Day Leaderboard board is only a shared cache. A stale board-level opt-in must
     // never pull an opted-out player (e.g. James Milner) back into the sweepstake.
     const linkedState=canonicalDaySweepstakeEntryState(rd,linkedDaySweepstakeEntryStateFromRows(allRows,boardRounds,{includeLocal:true}));
     const boardState=canonicalDaySweepstakeEntryState(rd,board?sweepstakeEntryStateFromRows(allRows,board):null);
-    // v4.26: merge all linked scorecard entrant states with the shared board cache.
-    // v4.25 accidentally let each device overwrite the board with only that device's
+    // v4.28: merge all linked scorecard entrant states with the shared board cache.
+    // v4.28 accidentally let each device overwrite the board with only that device's
     // current scorecard entrants. This keeps Paolo/Slug and Test/Ben together while
     // still letting any explicit opt-out (for example James) win over stale opt-ins.
     const mergedSourceState=mergeSweepstakeEntryStateMaps(boardState,linkedState);
@@ -2508,61 +2508,107 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
   }
   function DayLeaderboardModal({rd}){
     if(!rd)return null;
+    const dayKey=dayCompKeyFromRound(rd);
     const board=dayCompBoardFor(rounds,rd);
     const playable=playableDayCompRounds(rounds,rd).sort((a,b)=>roundStartDate(a)-roundStartDate(b));
     const [freshDayRows,setFreshDayRows]=useState(null);
+    const [freshDayRounds,setFreshDayRounds]=useState(null);
+    const [freshDayGroups,setFreshDayGroups]=useState(null);
+    const [freshDayRoundPlayers,setFreshDayRoundPlayers]=useState(null);
     const [freshLoading,setFreshLoading]=useState(false);
+    const effectiveDayRounds=(freshDayRounds&&freshDayRounds.length)?freshDayRounds:dayCompRoundsFor(rounds,rd);
+    const effectiveBoard=effectiveDayRounds.find(isDayCompBoardRound)||board;
+    const effectivePlayable=effectiveDayRounds.filter(r=>r&&!isDayCompBoardRound(r)).sort((a,b)=>roundStartDate(a)-roundStartDate(b));
+    function freshDayLeaderboardRows(){
+      if(!freshDayRows||!freshDayRounds||!freshDayRounds.length)return null;
+      const boardRoundIds=new Set(freshDayRounds.map(r=>r&&r.id).filter(Boolean));
+      const totals={};const holes={};const holePoints={};const seen=new Set();
+      const aliasMap={};const nameMap={};
+      function setAlias(alias,canonical){const a=normaliseId(alias);const c=normaliseId(canonical);if(a&&c)aliasMap[a]=c;}
+      function canonicalId(pid){const key=normaliseId(pid);return aliasMap[key]||key;}
+      Object.values(freshDayRoundPlayers||{}).flat().forEach(raw=>{
+        const rp=mapRoundPlayerForScorecard(raw,isSnyderCupRound((freshDayRounds||[]).find(r=>r&&r.id===raw.round_id)));
+        const canonical=normaliseId(rp.user_id||rp.guest_id||rp.cup_player_id||rp.id||raw.user_id||raw.guest_id||raw.id);
+        [rp.id,rp.user_id,rp.guest_id,rp.cup_player_id,raw.id,raw.user_id,raw.guest_id].filter(Boolean).forEach(id=>setAlias(id,canonical));
+        if(canonical){
+          if(totals[canonical]==null)totals[canonical]=0;
+          nameMap[canonical]=(rp.display_name&&rp.display_name!=='Player'?rp.display_name:null)||rp.name||nameMap[canonical];
+        }
+      });
+      (freshDayGroups||[]).forEach(g=>{
+        (g.player_ids||[]).forEach(pid=>{const id=canonicalId(pid);if(id&&totals[id]==null)totals[id]=0;});
+      });
+      normaliseFoursomesScoreRows(freshDayRows||[]).filter(sc=>boardRoundIds.has(sc.round_id)&&!isMetaScoreRow(sc)&&!isFoursomesTeamPlayerId(sc.player_id)).forEach(sc=>{
+        addLeaderboardScore(totals,holes,holePoints,seen,canonicalId(sc.player_id),sc.hole_number,sc.stableford_points);
+      });
+      return Object.keys(totals).map(pid=>({id:pid,name:nameMap[pid]||getDisplayName(pid),total:totals[pid]||0,holes:holes[pid]?holes[pid].size:0,_holePoints:holePoints[pid]||{}})).sort(compareStablefordLeaderboardRows);
+    }
     useEffect(()=>{
       let cancelled=false;
       async function refreshDaySweepstakeSource(){
         try{
-          if(!rd||!sb)return;
-          const ids=Array.from(new Set([board&&board.id,...playable.map(r=>r&&r.id)].filter(Boolean)));
-          if(!ids.length)return;
+          if(!rd||!sb||!dayKey)return;
           setFreshLoading(true);
-          const [res,rpRes]=await Promise.all([
+          let allDayRounds=dayCompRoundsFor(rounds,rd);
+          try{
+            const roundRes=await sb.from('cup_rounds').select('*').ilike('name','%[DAY:'+dayKey+']%');
+            if(!roundRes.error&&Array.isArray(roundRes.data)&&roundRes.data.length){
+              allDayRounds=roundRes.data.filter(r=>dayCompKeyFromRound(r)===dayKey).sort((a,b)=>roundStartDate(a)-roundStartDate(b));
+            }
+          }catch(e){}
+          const freshBoard=allDayRounds.find(isDayCompBoardRound)||board||rd;
+          const freshPlayable=allDayRounds.filter(r=>r&&!isDayCompBoardRound(r));
+          const ids=Array.from(new Set([freshBoard&&freshBoard.id,...freshPlayable.map(r=>r&&r.id)].filter(Boolean)));
+          if(!ids.length)return;
+          const [res,rpRes,groupRes]=await Promise.all([
             sb.from('cup_scores').select('*').in('round_id',ids),
-            playable.length?sb.from('cup_round_players').select('*').in('round_id',playable.map(r=>r.id)):Promise.resolve({data:[],error:null})
+            sb.from('cup_round_players').select('*').in('round_id',ids),
+            sb.from('cup_groups').select('*').in('round_id',ids)
           ]);
           if(cancelled)return;
           if(res.error){setFreshDayRows(null);return;}
           let rows=normaliseFoursomesScoreRows(res.data||[]);
           const roundPlayers=(rpRes&&!rpRes.error&&rpRes.data)||[];
-          const currentBoardState=canonicalSweepstakeEntryStateFromRoundPlayers(board?sweepstakeEntryStateFromRows(rows,board):null,roundPlayers);
-          // v4.26: merge, do not replace. Each joined scorecard can contribute only its own
-          // entrants, so the board must accumulate Paolo/Slug + Test/Ben rather than being
-          // overwritten by whichever device opens it last. Explicit opt-outs still win.
-          const linkedState=canonicalSweepstakeEntryStateFromRoundPlayers(linkedDaySweepstakeEntryStateFromRows(rows,playable,{includeLocal:true}),roundPlayers);
-          const mergedState=canonicalSweepstakeEntryStateFromRoundPlayers(mergeSweepstakeEntryStateMaps(currentBoardState,linkedState,mergedDaySweepstakeEntryStateFromRows(rows,board,playable,{includeLocal:false})),roundPlayers);
-          if(board&&mergedState&&(!currentBoardState||!sweepstakeEntryStatesEqual(currentBoardState,mergedState))){
+          const roundPlayerMap={};
+          roundPlayers.forEach(rp=>{const rid=rp&&rp.round_id;if(!rid)return;(roundPlayerMap[rid]=roundPlayerMap[rid]||[]).push(rp);});
+          const currentBoardState=canonicalSweepstakeEntryStateFromRoundPlayers(freshBoard?sweepstakeEntryStateFromRows(rows,freshBoard):null,roundPlayers);
+          const linkedState=canonicalSweepstakeEntryStateFromRoundPlayers(linkedDaySweepstakeEntryStateFromRows(rows,freshPlayable,{includeLocal:true}),roundPlayers);
+          const allLinkedState=canonicalSweepstakeEntryStateFromRoundPlayers(mergedDaySweepstakeEntryStateFromRows(rows,freshBoard,freshPlayable,{includeLocal:false}),roundPlayers);
+          const mergedState=canonicalSweepstakeEntryStateFromRoundPlayers(mergeSweepstakeEntryStateMaps(currentBoardState,linkedState,allLinkedState),roundPlayers);
+          if(freshBoard&&mergedState&&(!currentBoardState||!sweepstakeEntryStatesEqual(currentBoardState,mergedState))){
             const all=Array.from(mergedState.keys());
             const included=all.filter(id=>mergedState.get(id));
-            await saveSweepstakeEntryIdsToCloud(board.id,included,all);
+            await saveSweepstakeEntryIdsToCloud(freshBoard.id,included,all);
             const refreshed=await sb.from('cup_scores').select('*').in('round_id',ids);
             if(!cancelled&&!refreshed.error)rows=normaliseFoursomesScoreRows(refreshed.data||rows);
           }
-          if(!cancelled)setFreshDayRows(rows);
-        }catch(e){if(!cancelled)setFreshDayRows(null);}
+          if(!cancelled){
+            setFreshDayRounds(allDayRounds);
+            setFreshDayGroups((groupRes&&!groupRes.error&&groupRes.data)||[]);
+            setFreshDayRoundPlayers(roundPlayerMap);
+            setFreshDayRows(rows);
+          }
+        }catch(e){if(!cancelled){setFreshDayRows(null);setFreshDayRounds(null);}}
         finally{if(!cancelled)setFreshLoading(false);}
       }
       refreshDaySweepstakeSource();
       return()=>{cancelled=true;};
-    },[rd&&rd.id,board&&board.id,playable.map(r=>r&&r.id).join('|')]);
+    },[rd&&rd.id,dayKey]);
     const daySourceRows=freshDayRows||null;
-    const boardRows=leaderboardForRound(rd);
+    const boardRows=freshDayLeaderboardRows()||leaderboardForRound(rd);
     const dayNameMap=contextualNameMapFromRows(boardRows||[]);
     const potRows=daySweepstakePotRows(rd,boardRows,daySourceRows);
     const compactSettlement=compactDaySweepstakeSettlement(rd,boardRows,potRows,daySourceRows);
     const cfg=daySweepstakeConfigForLive(rd,daySourceRows);
-    const allDone=playable.length>0&&playable.every(isCompletedRound);
-    const dayClosed=board&&!isLiveRound(board);
+    const allDone=effectivePlayable.length>0&&effectivePlayable.every(isCompletedRound);
+    const dayClosed=effectiveBoard&&!isLiveRound(effectiveBoard);
     return(
       <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.84)',zIndex:1200,padding:'max(24px,8vh) 14px 14px',overflowY:'auto'}}>
         <div style={{maxWidth:560,margin:'0 auto'}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,marginBottom:12}}>
             <div>
               <div style={{fontSize:20,color:'#fff',fontWeight:950}}>{dayCompDisplayName(rounds,rd)}</div>
-              <div style={{fontSize:12,color:'#90ccf0'}}>Day leaderboard · {playable.length} scorecard{playable.length===1?'':'s'} joined{freshLoading?' · syncing':''}</div>
+              <div style={{fontSize:12,color:'#90ccf0'}}>Day leaderboard · {effectivePlayable.length} scorecard{effectivePlayable.length===1?'':'s'} joined{freshLoading?' · syncing':''}</div>
             </div>
             <button onClick={()=>setDayScorecardRound(null)} style={{...S.gho,padding:'7px 12px',fontSize:12}}>Close</button>
           </div>
@@ -2572,7 +2618,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                 <div style={{fontSize:16,color:'#fff',fontWeight:950}}>Full day table</div>
                 <div style={{fontSize:11,color:'#90ccf0'}}>{allDone?'All linked scorecards are in. Admin can press Day Finished.':'Live until admin presses Day Finished.'}</div>
               </div>
-              <div style={{fontSize:11,color:isLiveRound(board)?'#86efac':'#8ea0ad',fontWeight:950,letterSpacing:'0.08em'}}>{isLiveRound(board)?'OPEN':'FINISHED'}</div>
+              <div style={{fontSize:11,color:isLiveRound(board)?'#86efac':'#8ea0ad',fontWeight:950,letterSpacing:'0.08em'}}>{isLiveRound(effectiveBoard)?'OPEN':'FINISHED'}</div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'30px minmax(0,1fr) 42px 42px 46px 42px',gap:6,padding:'7px 0',borderBottom:'1px solid rgba(255,255,255,0.12)',fontSize:10,color:'#90ccf0',fontWeight:950,letterSpacing:'0.05em'}}>
               <div>#</div><div>Player</div><div style={{textAlign:'right'}}>F9</div><div style={{textAlign:'right'}}>B9</div><div style={{textAlign:'right'}}>Total</div><div style={{textAlign:'right'}}>Holes</div>
@@ -6506,7 +6552,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(!sw.enabled||!sw.final||!sw.payments.length)return;
     sweepstakeLeagueSettlementRef.current=key;
     setSweepstakeLeagueSettlement({status:'checking',changes:[],skipped:[]});
-    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.25`;
+    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.28`;
     try{
       const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').eq('note',markerNote).limit(1);
       if(logMarkerError)throw logMarkerError;
@@ -8657,7 +8703,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
 
     // Day Sweepstake entrants are separate from the full day leaderboard.
     // Prefer the central participant map saved on the Day Leaderboard board.
-    // Fallback to older per-scorecard entry rows for boards created before v4.25.
+    // Fallback to older per-scorecard entry rows for boards created before v4.28.
     const entrantIds=new Set();
     let hasExplicitEntries=false;
     const linkedState=canonicalSweepstakeEntryStateFromRoundPlayers(linkedDaySweepstakeEntryStateFromRows(scoreRows||[],playable,{includeLocal:false}),roundPlayers||[]);
@@ -8738,7 +8784,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.25`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.28`;
     const legacyMarkerNoteV420=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.20`;
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
@@ -8862,12 +8908,12 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.25`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.28`;
     const legacyMarkerNoteV420=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.20`;
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.25`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.28`;
     const legacyReverseNoteV420=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.20`;
     const legacyReverseNoteV419=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.19`;
     const legacyReverseNote=`Day sweepstake League balance reversal ${markerKey}`;
