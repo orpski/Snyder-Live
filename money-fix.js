@@ -1,10 +1,10 @@
-// SNYDER GOLF v4.15 League Money display repair
+// SNYDER GOLF v4.16 League Money display repair
 // Adds completed Day Sweepstake net to the Money table without changing payments.paid.
 // Balance = Paid + Sweepstake net - Entry - Extra Rounds - Snakes.
 (function(){
   'use strict';
-  if(window.__snyderMoneyFixV415)return;
-  window.__snyderMoneyFixV415=true;
+  if(window.__snyderMoneyFixV416)return;
+  window.__snyderMoneyFixV416=true;
 
   var scheduled=false;
   var runCount=0;
@@ -13,7 +13,7 @@
   var sweepByName={};
   var sweepById={};
   var lastSweepLoad=0;
-  var COLS='minmax(86px,1fr) 42px 50px 50px 62px 50px 68px';
+  var COLS='minmax(92px,1fr) 54px 50px 58px 48px 64px';
   var SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
   var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 
@@ -103,22 +103,25 @@
     var c=kids(row);
     if(c.length!==6&&c.length!==7)return false;
     var t=c.map(function(x){return cleanText(x).toLowerCase();});
-    return t[0]==='player'&&t[1]==='entry'&&t[2]==='rounds'&&t[3]==='snake'&&(t.indexOf('paid')!==-1||t.indexOf('paid in')!==-1);
+    return t[0]==='player'&&(t.indexOf('rounds')!==-1)&&(t.indexOf('snake')!==-1)&&(t.indexOf('paid')!==-1||t.indexOf('paid in')!==-1);
   }
   function isPlayerRow(row){
     var c=kids(row);
     if(c.length!==6&&c.length!==7)return false;
     var first=cleanText(c[0]).toLowerCase();
     if(!first||first==='player'||first.indexOf('round')===-1)return false;
-    return cleanText(c[1]).indexOf('£')!==-1;
+    // The original League row has a hidden entry cell, but v4.16 removes it visually.
+    return cleanText(row).indexOf('£')!==-1;
   }
-  function ensureSevenCells(row){
+  function normaliseMoneyRow(row){
     var c=kids(row);
-    if(c.length===7)return c;
-    if(c.length!==6)return c;
-    var sweep=document.createElement('div');
-    row.insertBefore(sweep,c[4]);
-    return kids(row);
+    // If an older v4.15 repair has inserted a 7th cell, remove the dedicated Entry cell.
+    // Original/order becomes: Player, Rounds, Snake, Sweep, Paid, Balance.
+    if(c.length===7){
+      if(c[1]&&c[1].remove)c[1].remove();
+      c=kids(row);
+    }
+    return c;
   }
   function styleCell(cell,idx,isHeader){
     if(!cell)return;
@@ -126,18 +129,18 @@
     cell.style.boxSizing='border-box';
     cell.style.overflow='visible';
     cell.style.whiteSpace=idx===0?'normal':'nowrap';
-    cell.style.textAlign=idx===0?'left':(idx===6?'right':'center');
+    cell.style.textAlign=idx===0?'left':(idx===5?'right':'center');
     cell.style.height='100%';
     cell.style.display='flex';
     cell.style.flexDirection='column';
     cell.style.justifyContent='center';
-    cell.style.alignItems=idx===0?'flex-start':(idx===6?'flex-end':'center');
+    cell.style.alignItems=idx===0?'flex-start':(idx===5?'flex-end':'center');
     if(idx>0)cell.style.fontSize=isHeader?'8px':'12px';
     kids(cell).forEach(function(child,childIdx){
       child.style.margin='0';
       child.style.padding='0';
       child.style.lineHeight=childIdx===0?'1.05':'1.05';
-      child.style.textAlign=idx===6?'right':(idx===0?'left':'center');
+      child.style.textAlign=idx===5?'right':(idx===0?'left':'center');
       child.style.width='100%';
     });
   }
@@ -151,8 +154,37 @@
     row.style.maxWidth='100%';
     row.style.overflow='visible';
     row.style.minHeight=isHeader?'30px':'58px';
-    row.style.padding=isHeader?'7px 6px':'8px 6px';
+    row.style.padding=isHeader?'7px 5px':'8px 5px';
     kids(row).forEach(function(cell,idx){styleCell(cell,idx,isHeader);});
+  }
+  function writePlainMoneyCell(cell,value,sub,colour){
+    if(!cell)return;
+    var n=round2(value);
+    var amount=n?('£'+(Number.isInteger(Math.abs(n))?String(Math.abs(n)):Math.abs(n).toFixed(2))):'—';
+    cell.style.display='flex';
+    cell.style.flexDirection='column';
+    cell.style.justifyContent='center';
+    cell.style.alignItems='center';
+    cell.style.visibility='visible';
+    cell.style.opacity='1';
+    cell.style.textAlign='center';
+    cell.style.whiteSpace='nowrap';
+    cell.innerHTML='<div style="font-size:12px;font-weight:850;line-height:1.05;color:'+(colour||'#dbeafe')+';text-align:center;width:100%">'+amount+'</div>'+
+      '<div style="font-size:8px;line-height:1.05;color:#8ea0ad;text-align:center;width:100%;margin-top:1px">'+(sub||'')+'</div>';
+  }
+  function ensureEntryNote(table){
+    if(!table||table.getAttribute('data-money-entry-note')==='v4.16')return;
+    table.setAttribute('data-money-entry-note','v4.16');
+    try{
+      var note=document.createElement('div');
+      note.textContent='Balance includes £10 entry fee, extra rounds, snakes and completed Day Sweepstakes.';
+      note.style.fontSize='10px';
+      note.style.color='#8ea0ad';
+      note.style.textAlign='center';
+      note.style.padding='7px 8px';
+      note.style.borderTop='1px solid rgba(96,184,240,0.12)';
+      table.appendChild(note);
+    }catch(e){}
   }
   function writeAmountCell(cell,value,sub,mainColour){
     if(!cell)return;
@@ -199,10 +231,11 @@
         table.style.width='100%';
         table.style.maxWidth='100%';
         table.style.boxSizing='border-box';
-        var hc=ensureSevenCells(header);
-        if(hc.length===7){
-          hc[0].textContent='Player';hc[1].textContent='Entry';hc[2].textContent='Rounds';hc[3].textContent='Snake';hc[4].textContent='Sweep';hc[5].textContent='Paid';hc[6].textContent='Balance';
+        var hc=normaliseMoneyRow(header);
+        if(hc.length===6){
+          hc[0].textContent='Player';hc[1].textContent='Rounds';hc[2].textContent='Snake';hc[3].textContent='Sweep';hc[4].textContent='Paid';hc[5].textContent='Balance';
           applyGrid(header,true);
+          ensureEntryNote(table);
         }
         kids(table).forEach(function(row){
           if(row===header)return;
@@ -210,24 +243,35 @@
           var lower=cleanText(row).toLowerCase();
           if(before.length>=6 && !cleanText(before[0]) && lower.indexOf('owes')!==-1){row.style.display='none';return;}
           if(!isPlayerRow(row))return;
-          var c=ensureSevenCells(row);
-          if(c.length!==7)return;
-          var entry=moneyFromCell(c[1])||10;
-          var rounds=moneyFromCell(c[2]);
-          var snake=moneyFromCell(c[3]);
-          var paid=moneyFromCell(c[5]);
+          var original=kids(row);
+          var entry=10;
+          var rounds=0, snake=0, paid=0;
+          if(original.length===7){
+            rounds=moneyFromCell(original[2]);
+            snake=moneyFromCell(original[3]);
+            paid=moneyFromCell(original[5]);
+          }else{
+            rounds=moneyFromCell(original[2]);
+            snake=moneyFromCell(original[3]);
+            paid=moneyFromCell(original[4]);
+          }
+          var c=normaliseMoneyRow(row);
+          if(c.length!==6)return;
           var sweep=sweepNetForRow(row,c);
           var balance=round2(paid+sweep-entry-rounds-snake);
           applyGrid(row,false);
           row.style.borderLeft=balance>0?'4px solid #60b8f0':balance<0?'4px solid #ef4444':'4px solid rgba(96,184,240,0.22)';
-          writeAmountCell(c[4],sweep,'sweep');
-          writeBalance(c[6],balance);
-          row.setAttribute('data-money-v415','paid='+paid+' sweep='+sweep+' entry='+entry+' rounds='+rounds+' snake='+snake+' balance='+balance);
+          writePlainMoneyCell(c[1],rounds,rounds?'extra':'rounds','#dbeafe');
+          writePlainMoneyCell(c[2],snake,snake?'snake':'snake','#fb923c');
+          writeAmountCell(c[3],sweep,'sweep');
+          writePlainMoneyCell(c[4],paid,'paid','#60b8f0');
+          writeBalance(c[5],balance);
+          row.setAttribute('data-money-v416','paid='+paid+' sweep='+sweep+' entry='+entry+' rounds='+rounds+' snake='+snake+' balance='+balance);
           rowsFixed++;
         });
       });
-      if(rowsFixed)window.__snyderMoneyFixV415LastRun={runs:runCount,rows:rowsFixed,sweepLoaded:sweepLoaded,at:new Date().toISOString()};
-    }catch(e){console.warn('Snyder money fix v4.15 skipped safely',e);}
+      if(rowsFixed)window.__snyderMoneyFixV416LastRun={runs:runCount,rows:rowsFixed,sweepLoaded:sweepLoaded,at:new Date().toISOString()};
+    }catch(e){console.warn('Snyder money fix v4.16 skipped safely',e);}
   }
   function schedule(){
     if(scheduled)return;
