@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.01
+// SNYDER GOLF v4.02
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.01',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.02',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -2039,7 +2039,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v4.01" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v4.01</span>
+          <span aria-label="App version v4.02" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v4.02</span>
         </button>
       </div>
 
@@ -6314,7 +6314,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(!sw.enabled||!sw.final||!sw.payments.length)return;
     sweepstakeLeagueSettlementRef.current=key;
     setSweepstakeLeagueSettlement({status:'checking',changes:[],skipped:[]});
-    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.01`;
+    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.02`;
     try{
       const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').eq('note',markerNote).limit(1);
       if(logMarkerError)throw logMarkerError;
@@ -8520,7 +8520,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.01`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.02`;
     const playable=(linked||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
     if(!playable.length)return {already:false,changes:[],skipped:[]};
     const roundIds=playable.map(r=>r.id);
@@ -8629,10 +8629,10 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.01`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.02`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.01`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.02`;
     const legacyReverseNote=`Day sweepstake League balance reversal ${markerKey}`;
     const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNote}`).limit(1);
     if(reverseCheckError)throw reverseCheckError;
@@ -10520,16 +10520,15 @@ function BreakingNewsModal(){
 
 
 // =========================================================
-// League sweepstake balance overlay / repair
-// v4.01:
-// - Payments.paid is real cash only.
-// - Last 24h sweepstake/repair mutations to payments.paid are reset.
-// - Deleted day sweepstakes are ignored by checking only active Day Leaderboard boards.
+// League money balance stabiliser
+// v4.02:
+// - Stops old sweepstake/test adjustment logs from being added on top of balances.
+// - Money page now shows the safe base calculation only: paid cash - entry/round/snake fees.
+// - This immediately removes the bad -£112/-£84 style balances caused by duplicate test logs.
 // =========================================================
-(function installSweepstakeBalanceOverlay(){
+(function installLeagueMoneyBalanceStabiliser(){
   if(typeof window==='undefined')return;
-  const state={loaded:false,loading:false,byName:{},paidByName:{},timer:null,repairing:false,repaired:false};
-  function cleanName(v){return String(v||'').trim().toLowerCase().replace(/\s+/g,' ');}
+  const state={timer:null};
   function round2(v){return Math.round((parseFloat(v)||0)*100)/100;}
   function parseMoneyText(text){
     const raw=String(text||'').replace(/,/g,'');
@@ -10546,145 +10545,21 @@ function BreakingNewsModal(){
     if(n<0)return '-£'+moneyBody(n);
     return '£0';
   }
-  function moneyPaidText(v){return '£'+moneyBody(v);}
-  function dayKeyFromName(name){const m=String(name||'').match(/\[DAY:([A-Z0-9]{5,8})\]/);return m&&m[1]?m[1]:null;}
-  function dayKeyFromNote(note){const m=String(note||'').match(/league-day-balance-([A-Z0-9]{5,8})/);return m&&m[1]?m[1]:null;}
-  function isAdjustmentOnly(row){return /adjustment-only|v4\.0[0-9]/i.test(String(row&&row.note||''))||/adjustment only/i.test(String(row&&row.action||''));}
-  function isSweepLog(row){return row&&(row.action==='Sweepstake balance'||row.action==='Sweepstake balance reversal');}
-  async function fetchActiveDayBoardKeys(){
-    try{
-      const {data,error}=await window.sb.from('cup_rounds').select('name,course_name');
-      if(error)throw error;
-      const keys=new Set();
-      (data||[]).forEach(r=>{
-        // Important: linked scorecards can keep [DAY:xxxxx] in the name after the board is deleted.
-        // Only the Day Leaderboard board itself keeps the sweepstake alive.
-        if(String(r&&r.course_name||'')!=='Day Leaderboard')return;
-        const k=dayKeyFromName(r&&r.name);
-        if(k)keys.add(k);
-      });
-      return keys;
-    }catch(e){return new Set();}
-  }
-  function last24Iso(){return new Date(Date.now()-24*60*60*1000).toISOString();}
-  async function resetPaidColumnTo24hBaseline(){
-    if(state.repairing||state.repaired||!window.sb||!window.sb.from)return;
-    state.repairing=true;
-    try{
-      const repairNote='Sweepstake paid 24h reset v4.01';
-      const {data:done,error:doneError}=await window.sb.from('payment_log').select('id').eq('note',repairNote).limit(1);
-      if(doneError)throw doneError;
-      if(done&&done.length){state.repaired=true;return;}
-      const {data:logs,error:logError}=await window.sb.from('payment_log')
-        .select('player_id,player_name,amount,action,note,created_at')
-        .gte('created_at',last24Iso())
-        .in('action',['Sweepstake balance','Sweepstake paid repair']);
-      if(logError)throw logError;
-      const changedById={};
-      const nameById={};
-      (logs||[]).forEach(row=>{
-        if(!row||!row.player_id)return;
-        const action=String(row.action||'');
-        const note=String(row.note||'');
-        let changedPaid=false;
-        if(action==='Sweepstake paid repair')changedPaid=true;
-        // Older sweepstake settlements changed payments.paid. New adjustment-only rows must not be reversed here.
-        if(action==='Sweepstake balance'&&!isAdjustmentOnly(row))changedPaid=true;
-        if(!changedPaid)return;
-        const id=String(row.player_id);
-        const amt=round2(row.amount);
-        if(!amt)return;
-        changedById[id]=round2((changedById[id]||0)+amt);
-        nameById[id]=row.player_name||'Player';
-      });
-      const ids=Object.keys(changedById).filter(id=>Math.abs(changedById[id])>0.0001);
-      if(!ids.length){state.repaired=true;return;}
-      const {data:payments,error:payError}=await window.sb.from('payments').select('player_id,paid').in('player_id',ids);
-      if(payError)throw payError;
-      const paidById={};
-      (payments||[]).forEach(p=>{paidById[String(p.player_id)]=round2(p.paid);});
-      const upserts=ids.map(id=>({player_id:id,paid:round2((paidById[id]||0)-changedById[id])}));
-      const {error:upsertError}=await window.sb.from('payments').upsert(upserts,{onConflict:'player_id'});
-      if(upsertError)throw upsertError;
-      const logRows=ids.map(id=>({
-        player_id:id,
-        player_name:nameById[id]||'Player',
-        action:'Sweepstake paid reset',
-        amount:round2(-changedById[id]),
-        note:repairNote
-      }));
-      const {error:insertError}=await window.sb.from('payment_log').insert(logRows);
-      if(insertError)throw insertError;
-      state.repaired=true;
-      state.loaded=false;
-    }catch(e){
-      console.warn('Sweepstake paid reset failed',e);
-      state.repaired=true;
-    }finally{state.repairing=false;}
-  }
-  async function loadAdjustments(){
-    if(state.loading)return;
-    state.loading=true;
-    try{
-      if(!window.sb||!window.sb.from)return;
-      await resetPaidColumnTo24hBaseline();
-      const [activeDayKeys,logResult,payResult,playerResult]=await Promise.all([
-        fetchActiveDayBoardKeys(),
-        window.sb.from('payment_log').select('player_id,player_name,amount,action,note').in('action',['Sweepstake balance','Sweepstake balance reversal']).limit(5000),
-        window.sb.from('payments').select('player_id,paid'),
-        window.sb.from('players').select('id,name')
-      ]);
-      if(logResult.error)throw logResult.error;
-      const playerNameById={};
-      (playerResult.data||[]).forEach(p=>{if(p&&p.id)playerNameById[String(p.id)]=cleanName(p.name);});
-      const paidByName={};
-      (payResult.data||[]).forEach(p=>{
-        const nm=playerNameById[String(p.player_id)];
-        if(nm)paidByName[nm]=round2(p.paid);
-      });
-      const byName={};
-      (logResult.data||[]).forEach(row=>{
-        if(!isSweepLog(row)||!isAdjustmentOnly(row))return;
-        const note=String(row.note||'');
-        const dayKey=dayKeyFromNote(note);
-        if(dayKey&&!activeDayKeys.has(dayKey))return; // deleted day sweepstake/test: ignore it completely
-        const nm=playerNameById[String(row.player_id)]||cleanName(row.player_name);
-        if(!nm)return;
-        byName[nm]=round2((byName[nm]||0)+(round2(row.amount)||0));
-      });
-      state.byName=byName;
-      state.paidByName=paidByName;
-      state.loaded=true;
-      patchLeagueMoneyRows();
-    }catch(e){
-      console.warn('Sweepstake adjustment load failed',e);
-      state.loaded=true;
-    }finally{state.loading=false;}
-  }
   function patchLeagueMoneyRows(){
-    if(!state.loaded)return;
     const rows=Array.from(document.querySelectorAll('div')).filter(el=>{
       const st=el&&el.style;
       return st&&String(st.gridTemplateColumns||'').includes('44px 52px 52px 52px 72px')&&el.children&&el.children.length>=6;
     });
     rows.forEach(row=>{
-      const nameCell=row.children[0];
       const entryCell=row.children[1];
       const roundsCell=row.children[2];
       const snakeCell=row.children[3];
       const paidCell=row.children[4];
       const balanceCell=row.children[5];
-      if(!nameCell||!paidCell||!balanceCell)return;
-      const nameEl=nameCell.querySelector('div');
-      const playerName=cleanName(nameEl?nameEl.textContent:nameCell.textContent);
-      if(!playerName)return;
-      const adj=round2(state.byName[playerName]||0);
-      const actualPaid=state.paidByName[playerName];
-      const paid=actualPaid!=null?round2(actualPaid):parseMoneyText(paidCell.textContent);
-      const owed=round2(parseMoneyText(entryCell&&entryCell.textContent)+parseMoneyText(roundsCell&&roundsCell.textContent)+parseMoneyText(snakeCell&&snakeCell.textContent));
-      const baseBalance=round2(paid-owed);
-      const next=round2(baseBalance+adj);
-      paidCell.textContent=moneyPaidText(paid);
+      if(!entryCell||!roundsCell||!snakeCell||!paidCell||!balanceCell)return;
+      const paid=round2(parseMoneyText(paidCell.textContent));
+      const owed=round2(parseMoneyText(entryCell.textContent)+parseMoneyText(roundsCell.textContent)+parseMoneyText(snakeCell.textContent));
+      const next=round2(paid-owed);
       const valueEl=balanceCell.querySelector('div');
       const labelEl=balanceCell.querySelectorAll('div')[1];
       if(valueEl){
@@ -10695,31 +10570,14 @@ function BreakingNewsModal(){
         labelEl.textContent=next>0?'in credit':next<0?'owes':'settled';
         labelEl.style.color=next>0?'#4a8a5a':next<0?'#7a3a3a':'#8ea0ad';
       }
-      let note=balanceCell.querySelector('[data-snyder-sweepstake-adjustment="true"]');
-      if(adj){
-        if(!note){
-          note=document.createElement('div');
-          note.dataset.snyderSweepstakeAdjustment='true';
-          note.style.fontSize='8px';
-          note.style.marginTop='1px';
-          note.style.color='rgba(96,184,240,0.70)';
-          note.style.fontWeight='800';
-          balanceCell.appendChild(note);
-        }
-        note.textContent='sweep '+moneyText(adj);
-      }else if(note){
-        note.remove();
-      }
+      Array.from(balanceCell.querySelectorAll('[data-snyder-sweepstake-adjustment="true"]')).forEach(n=>n.remove());
     });
   }
   function schedule(){
     clearTimeout(state.timer);
-    state.timer=setTimeout(()=>{
-      if(!state.loaded)loadAdjustments();
-      else patchLeagueMoneyRows();
-    },120);
+    state.timer=setTimeout(patchLeagueMoneyRows,120);
   }
-  window.snyderReloadSweepstakeBalanceAdjustments=function(){state.loaded=false;state.repaired=false;loadAdjustments();};
+  window.snyderReloadSweepstakeBalanceAdjustments=schedule;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule); else schedule();
   try{new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});}catch(e){}
 })();
