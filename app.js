@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.23
+// SNYDER GOLF v4.24
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.23',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.24',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -2039,7 +2039,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v4.23" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v4.23</span>
+          <span aria-label="App version v4.24" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v4.24</span>
         </button>
       </div>
 
@@ -2399,11 +2399,15 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     const allRows=sourceRows?normaliseFoursomesScoreRows(sourceRows):normaliseFoursomesScoreRows([...(scores||[]),...(publicScores||[])]);
     const board=dayCompBoardFor(rounds,rd);
     const boardRounds=dayCompRoundsFor(rounds,rd).filter(r=>!isDayCompBoardRound(r));
-    // Use the Day Leaderboard board + all linked scorecard entry rows as one source of truth.
-    // Then canonicalise player aliases (round-player id, user_id, guest_id) before extracting entrants.
-    // This is critical: an opt-out saved against one alias must beat an opt-in saved against another alias.
-    const mergedState=canonicalDaySweepstakeEntryState(rd,mergedDaySweepstakeEntryStateFromRows(allRows,board,boardRounds,{includeLocal:!sourceRows}));
-    if(mergedState&&mergedState.size)return sweepstakeEntryIdsFromState(mergedState);
+    // v4.24: linked scorecards are the source of truth for who actually opted in.
+    // The Day Leaderboard board is only a shared cache. A stale board-level opt-in must
+    // never pull an opted-out player (e.g. James Milner) back into the sweepstake.
+    const linkedState=canonicalDaySweepstakeEntryState(rd,linkedDaySweepstakeEntryStateFromRows(allRows,boardRounds,{includeLocal:!sourceRows}));
+    const linkedIds=sweepstakeEntryIdsFromState(linkedState);
+    if(linkedState&&linkedState.size)return linkedIds||new Set();
+    const boardState=canonicalDaySweepstakeEntryState(rd,board?sweepstakeEntryStateFromRows(allRows,board):null);
+    const boardIds=sweepstakeEntryIdsFromState(boardState);
+    if(boardState&&boardState.size)return boardIds||new Set();
     const ids=new Set();
     let hasExplicit=false;
     boardRounds.forEach(r=>{
@@ -2522,7 +2526,8 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
           let rows=normaliseFoursomesScoreRows(res.data||[]);
           const roundPlayers=(rpRes&&!rpRes.error&&rpRes.data)||[];
           const currentBoardState=canonicalSweepstakeEntryStateFromRoundPlayers(board?sweepstakeEntryStateFromRows(rows,board):null,roundPlayers);
-          const mergedState=canonicalSweepstakeEntryStateFromRoundPlayers(mergedDaySweepstakeEntryStateFromRows(rows,board,playable,{includeLocal:false}),roundPlayers);
+          const linkedState=canonicalSweepstakeEntryStateFromRoundPlayers(linkedDaySweepstakeEntryStateFromRows(rows,playable,{includeLocal:false}),roundPlayers);
+          const mergedState=linkedState||canonicalSweepstakeEntryStateFromRoundPlayers(mergedDaySweepstakeEntryStateFromRows(rows,board,playable,{includeLocal:false}),roundPlayers);
           if(board&&mergedState&&(!currentBoardState||!sweepstakeEntryStatesEqual(currentBoardState,mergedState))){
             const all=Array.from(mergedState.keys());
             const included=all.filter(id=>mergedState.get(id));
@@ -3314,6 +3319,16 @@ function mergedDaySweepstakeEntryStateFromRows(rows,board,linkedRounds,{includeL
     if(cloudBoard)states.push(cloudBoard);
     if(includeLocal){const localBoard=loadLocalSweepstakeEntryState(board.id);if(localBoard)states.push(localBoard);}
   }
+  (linkedRounds||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r)).forEach(r=>{
+    const cloud=sweepstakeEntryStateFromRows(rows||[],r);
+    if(cloud)states.push(cloud);
+    if(includeLocal){const local=loadLocalSweepstakeEntryState(r.id);if(local)states.push(local);}
+  });
+  return mergeSweepstakeEntryStateMaps.apply(null,states);
+}
+
+function linkedDaySweepstakeEntryStateFromRows(rows,linkedRounds,{includeLocal=false}={}){
+  const states=[];
   (linkedRounds||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r)).forEach(r=>{
     const cloud=sweepstakeEntryStateFromRows(rows||[],r);
     if(cloud)states.push(cloud);
@@ -6485,7 +6500,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(!sw.enabled||!sw.final||!sw.payments.length)return;
     sweepstakeLeagueSettlementRef.current=key;
     setSweepstakeLeagueSettlement({status:'checking',changes:[],skipped:[]});
-    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.23`;
+    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.24`;
     try{
       const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').eq('note',markerNote).limit(1);
       if(logMarkerError)throw logMarkerError;
@@ -8636,10 +8651,11 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
 
     // Day Sweepstake entrants are separate from the full day leaderboard.
     // Prefer the central participant map saved on the Day Leaderboard board.
-    // Fallback to older per-scorecard entry rows for boards created before v4.23.
+    // Fallback to older per-scorecard entry rows for boards created before v4.24.
     const entrantIds=new Set();
     let hasExplicitEntries=false;
-    const mergedState=canonicalSweepstakeEntryStateFromRoundPlayers(mergedDaySweepstakeEntryStateFromRows(scoreRows||[],board,playable,{includeLocal:false}),roundPlayers||[]);
+    const linkedState=canonicalSweepstakeEntryStateFromRoundPlayers(linkedDaySweepstakeEntryStateFromRows(scoreRows||[],playable,{includeLocal:false}),roundPlayers||[]);
+    const mergedState=linkedState||canonicalSweepstakeEntryStateFromRoundPlayers(mergedDaySweepstakeEntryStateFromRows(scoreRows||[],board,playable,{includeLocal:false}),roundPlayers||[]);
     const boardEntryIds=sweepstakeEntryIdsFromState(mergedState);
     if(boardEntryIds&&boardEntryIds.size){
       hasExplicitEntries=true;
@@ -8716,7 +8732,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.23`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.24`;
     const legacyMarkerNoteV420=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.20`;
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
@@ -8738,7 +8754,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(leaguePlayersError)throw leaguePlayersError;
     let finalScoreRows=scoreRows||[];
     const existingBoardState=canonicalSweepstakeEntryStateFromRoundPlayers(sweepstakeEntryStateFromRows(finalScoreRows,board),roundPlayers||[]);
-    const mergedState=canonicalSweepstakeEntryStateFromRoundPlayers(mergedDaySweepstakeEntryStateFromRows(finalScoreRows,board,playable,{includeLocal:false}),roundPlayers||[]);
+    const linkedState=canonicalSweepstakeEntryStateFromRoundPlayers(linkedDaySweepstakeEntryStateFromRows(finalScoreRows,playable,{includeLocal:false}),roundPlayers||[]);
+    const mergedState=linkedState||canonicalSweepstakeEntryStateFromRoundPlayers(mergedDaySweepstakeEntryStateFromRows(finalScoreRows,board,playable,{includeLocal:false}),roundPlayers||[]);
     if(mergedState&&(!existingBoardState||!sweepstakeEntryStatesEqual(existingBoardState,mergedState))){
       const all=Array.from(mergedState.keys());
       const included=all.filter(id=>mergedState.get(id));
@@ -8839,12 +8856,12 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.23`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.24`;
     const legacyMarkerNoteV420=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.20`;
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.23`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.24`;
     const legacyReverseNoteV420=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.20`;
     const legacyReverseNoteV419=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.19`;
     const legacyReverseNote=`Day sweepstake League balance reversal ${markerKey}`;
