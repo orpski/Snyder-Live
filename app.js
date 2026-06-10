@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.07
+// SNYDER GOLF v4.08
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.07',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.08',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -10518,153 +10518,6 @@ function BreakingNewsModal(){
 }
 
 
-
-// =========================================================
-// League money balance stabiliser
-// v4.07:
-// - Fixes the Money table display after the v4.03/v4.07 repair attempts.
-// - Uses the visible simple columns only: Paid - Entry - Rounds - Snake.
-// - Hides broken old repair/adjustment rows with no player name.
-// - Does not read or write Supabase data and does not touch payments.paid.
-// =========================================================
-(function installLeagueMoneyBalanceStabiliser(){
-  if(typeof window==='undefined')return;
-  const state={timer:null,interval:null,observer:null,patching:false};
-  function round2(v){return Math.round((parseFloat(v)||0)*100)/100;}
-  function parseMoneyText(text){
-    const raw=String(text||'').replace(/,/g,'').replace(/\u00a0/g,' ');
-    const m=raw.match(/[+\-−]?\s*£\s*([0-9]+(?:\.[0-9]+)?)/);
-    if(!m)return 0;
-    return parseFloat(m[1])||0;
-  }
-  function moneyBody(v){
-    const n=round2(Math.abs(v));
-    return Number.isInteger(n)?String(n):n.toFixed(2);
-  }
-  function balanceText(v){
-    const n=round2(v);
-    if(n>0)return '+£'+moneyBody(n);
-    if(n<0)return '-£'+moneyBody(n);
-    return '£0';
-  }
-  function cellText(c){return String(c&&c.textContent||'').trim();}
-  function directCells(row){
-    if(!row||!row.children)return [];
-    return Array.from(row.children).filter(el=>el&&el.nodeType===1);
-  }
-  function setTextAndStyle(el,text,style){
-    if(!el)return;
-    if(el.textContent!==text)el.textContent=text;
-    Object.keys(style||{}).forEach(k=>{el.style[k]=style[k];});
-  }
-  function isMoneyGrid(row){
-    if(!row||!row.style)return false;
-    const inline=String(row.style.gridTemplateColumns||'');
-    const computed=(window.getComputedStyle?String(getComputedStyle(row).gridTemplateColumns||''):'');
-    const cols=(inline||computed).trim();
-    if(!cols)return false;
-    const cells=directCells(row);
-    if(cells.length!==6)return false;
-    const joined=cells.map(cellText).join(' | ').toLowerCase();
-    if(joined.includes('prize pot')||joined.includes('curry pot'))return false;
-    return row.style.display==='grid'||(window.getComputedStyle&&getComputedStyle(row).display==='grid');
-  }
-  function isMoneyHeader(row){
-    const cells=directCells(row);
-    if(cells.length!==6)return false;
-    const t=cells.map(c=>cellText(c).toLowerCase());
-    return t[0]==='player'&&t[1]==='entry'&&t[2]==='rounds'&&t[3]==='snake';
-  }
-  function isPlayerMoneyRow(row){
-    const cells=directCells(row);
-    if(cells.length!==6)return false;
-    const player=cellText(cells[0]);
-    const lower=player.toLowerCase();
-    if(!player||lower==='player'||lower.includes('paid in')||lower.includes('outstanding'))return false;
-    // Player cell is normally "Name\n14 rounds". A broken repair row has no player/rounds.
-    if(!/round/.test(lower))return false;
-    const entry=cellText(cells[1]);
-    const paid=cellText(cells[4]);
-    return entry.includes('£')&&paid.includes('£');
-  }
-  function ensureBalanceCell(cell,next){
-    if(!cell)return;
-    Array.from(cell.children||[]).forEach((child,idx)=>{if(idx>1&&child&&child.remove)child.remove();});
-    let valueEl=cell.children&&cell.children[0];
-    let labelEl=cell.children&&cell.children[1];
-    if(!valueEl){valueEl=document.createElement('div');cell.appendChild(valueEl);}
-    if(!labelEl){labelEl=document.createElement('div');cell.appendChild(labelEl);}
-    cell.style.textAlign='right';
-    setTextAndStyle(valueEl,balanceText(next),{
-      fontSize:'18px',
-      color:next>0?'#60b8f0':next<0?'#f87171':'#d4af37',
-      textAlign:'right'
-    });
-    setTextAndStyle(labelEl,next>0?'in credit':next<0?'owes':'settled',{
-      fontSize:'9px',
-      color:next>0?'#4a8a5a':next<0?'#7a3a3a':'#8ea0ad',
-      textAlign:'right'
-    });
-  }
-  function patchLeagueMoneyRows(){
-    if(state.patching)return;
-    state.patching=true;
-    try{
-      const grids=Array.from(document.querySelectorAll('div')).filter(isMoneyGrid);
-      grids.forEach(row=>{
-        const cells=directCells(row);
-        if(isMoneyHeader(row)){
-          cells[4].textContent='Paid';
-          cells[5].textContent='Balance';
-          row.setAttribute('data-snyder-money-fixed','v4.07-header');
-          return;
-        }
-        const playerTxt=cellText(cells[0]);
-        const joined=cells.map(cellText).join(' ').toLowerCase();
-        // Old repair/adjustment overlays can appear as blank rows with only an amount.
-        if(!playerTxt&&joined.includes('owes')){
-          row.style.display='none';
-          row.setAttribute('data-snyder-money-hidden','v4.07-empty-repair-row');
-          return;
-        }
-        if(!isPlayerMoneyRow(row))return;
-        const entry=parseMoneyText(cellText(cells[1]))||10;
-        const rounds=parseMoneyText(cellText(cells[2]));
-        const snake=parseMoneyText(cellText(cells[3]));
-        const paid=round2(parseMoneyText(cellText(cells[4])));
-        const owed=round2(entry+rounds+snake);
-        const next=round2(paid-owed);
-        ensureBalanceCell(cells[5],next);
-        row.style.borderLeft=next>0?'4px solid #60b8f0':next<0?'4px solid #ef4444':'4px solid rgba(96,184,240,0.22)';
-        row.setAttribute('data-snyder-money-fixed','v4.07');
-        row.setAttribute('data-snyder-money-paid',String(paid));
-        row.setAttribute('data-snyder-money-owed',String(owed));
-        row.setAttribute('data-snyder-money-balance',String(next));
-      });
-    }catch(e){
-      console.warn('Snyder Money balance stabiliser skipped safely',e);
-    }finally{
-      state.patching=false;
-    }
-  }
-  function schedule(){
-    clearTimeout(state.timer);
-    state.timer=setTimeout(patchLeagueMoneyRows,80);
-  }
-  window.snyderReloadSweepstakeBalanceAdjustments=schedule;
-  window.snyderFixLeagueMoneyBalances=patchLeagueMoneyRows;
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule); else schedule();
-  try{
-    state.observer=new MutationObserver(schedule);
-    state.observer.observe(document.body,{childList:true,subtree:true,characterData:true});
-  }catch(e){}
-  let ticks=0;
-  state.interval=setInterval(()=>{
-    ticks+=1;
-    patchLeagueMoneyRows();
-    if(ticks>120)clearInterval(state.interval);
-  },250);
-})();
 
 // =========================================================
 // React mount / app bootstrap

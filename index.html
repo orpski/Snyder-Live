@@ -1,4 +1,4 @@
-<!-- SNYDER GOLF v4.07 -->
+<!-- SNYDER GOLF v4.08 -->
 <!-- =========================================================
      DOCUMENT SETUP
      ========================================================= -->
@@ -70,131 +70,59 @@ window.onerror=function(msg,src,line,col,err){
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script type="text/babel" src="league-section.js?v=4.07"></script>
 <script>
-// Snyder Golf v4.07 League Money wrapper
-// Diagnosed fix: the League Money component was still rendering a stale/polluted balance value,
-// even though the visible Entry/Rounds/Snake/Paid columns were correct. This wrapper patches the
-// rendered Money rows from those visible columns after every League render. It is display-only and
-// never writes to Supabase or payments.paid.
+// Snyder Golf v4.08 League loader/root-cause fix
+// The Money table bug was inside league-section.js, not app.js. Earlier fixes patched app/index
+// after render, but the League script itself kept calculating/rendering the stale polluted balance.
+// This loader fetches league-section.js as source, removes the bad Money balance overlay inside the
+// Money data block, then compiles it once before loading app.js.
 (function(){
   'use strict';
-  if(window.__snyderLeagueMoneyWrapperV407)return;
-  window.__snyderLeagueMoneyWrapperV407=true;
-
-  function text(el){return String((el&&el.textContent)||'').replace(/\u00a0/g,' ').trim();}
-  function children(el){return Array.from((el&&el.children)||[]).filter(function(x){return x&&x.nodeType===1;});}
-  function amount(value){
-    var raw=String(value||'').replace(/,/g,'').replace(/−/g,'-').replace(/\u00a0/g,' ');
-    var m=raw.match(/-?\s*£\s*([0-9]+(?:\.[0-9]+)?)/);
-    if(!m)return 0;
-    var n=parseFloat(m[1]);
-    if(!isFinite(n))return 0;
-    return /^\s*-/.test(raw)?-n:n;
-  }
-  function money(n){
-    n=Math.round((Number(n)||0)*100)/100;
-    var a=Math.abs(n);
-    var body=Number.isInteger(a)?String(a):a.toFixed(2);
-    if(n>0)return '+£'+body;
-    if(n<0)return '-£'+body;
-    return '£0';
-  }
-  function writeBalance(cell,balance){
-    if(!cell)return;
-    var kids=children(cell);
-    var big=kids[0]||document.createElement('div');
-    var small=kids[1]||document.createElement('div');
-    if(!kids[0])cell.appendChild(big);
-    if(!kids[1])cell.appendChild(small);
-    while(children(cell).length>2){cell.removeChild(children(cell)[2]);}
-    cell.style.textAlign='right';
-    big.textContent=money(balance);
-    big.style.fontSize='18px';
-    big.style.fontWeight='400';
-    big.style.textAlign='right';
-    big.style.color=balance>0?'#60b8f0':balance<0?'#f87171':'#d4af37';
-    small.textContent=balance>0?'in credit':balance<0?'owes':'settled';
-    small.style.fontSize='9px';
-    small.style.textAlign='right';
-    small.style.color=balance>0?'#4a8a5a':balance<0?'#7a3a3a':'#8ea0ad';
-  }
-  function isHeader(row){
-    var c=children(row);
-    if(c.length!==6)return false;
-    var labels=c.map(function(x){return text(x).toLowerCase();});
-    return labels[0]==='player'&&labels[1]==='entry'&&labels[2]==='rounds'&&labels[3]==='snake';
-  }
-  function isPlayerRow(row){
-    var c=children(row);
-    if(c.length!==6)return false;
-    var player=text(c[0]).toLowerCase();
-    if(!player||player==='player'||player.indexOf('round')===-1)return false;
-    return text(c[1]).indexOf('£')!==-1&&text(c[4]).indexOf('£')!==-1;
-  }
-  function patchMoneyTable(){
-    try{
-      var all=Array.from(document.querySelectorAll('div'));
-      all.filter(isHeader).forEach(function(header){
-        var hc=children(header);
-        hc[4].textContent='Paid';
-        hc[5].textContent='Balance';
-        var table=header.parentElement;
-        if(!table)return;
-        children(table).forEach(function(row){
-          if(row===header)return;
-          var c=children(row);
-          if(c.length!==6)return;
-          var joined=c.map(text).join(' ').toLowerCase();
-          if(!text(c[0])&&joined.indexOf('owes')!==-1){row.style.display='none';return;}
-          if(!isPlayerRow(row))return;
-          var entry=amount(text(c[1]))||10;
-          var rounds=amount(text(c[2]));
-          var snake=amount(text(c[3]));
-          var paid=amount(text(c[4]));
-          var balance=Math.round((paid-entry-rounds-snake)*100)/100;
-          writeBalance(c[5],balance);
-          row.style.borderLeft=balance>0?'4px solid #60b8f0':balance<0?'4px solid #ef4444':'4px solid rgba(96,184,240,0.22)';
-          row.setAttribute('data-snyder-money-v407','paid='+paid+' owed='+(entry+rounds+snake)+' balance='+balance);
-        });
-      });
-    }catch(e){console.warn('Snyder v4.07 money patch skipped safely',e);}
-  }
-  function burst(){
-    patchMoneyTable();
-    setTimeout(patchMoneyTable,50);
-    setTimeout(patchMoneyTable,150);
-    setTimeout(patchMoneyTable,400);
-    setTimeout(patchMoneyTable,900);
-  }
-  window.snyderFixLeagueMoneyBalances=patchMoneyTable;
-  window.snyderReloadSweepstakeBalanceAdjustments=burst;
-
-  function installWrapper(){
-    if(!window.React||!window.LeagueView){setTimeout(installWrapper,50);return;}
-    if(window.LeagueView.__snyderMoneyWrappedV407)return;
-    var React=window.React;
-    var Original=window.LeagueView;
-    function LeagueViewMoneyFixed(props){
-      React.useEffect(function(){
-        burst();
-        var fast=setInterval(patchMoneyTable,120);
-        var slow=setInterval(patchMoneyTable,1000);
-        return function(){clearInterval(fast);clearInterval(slow);};
-      },[]);
-      React.useEffect(function(){burst();});
-      return React.createElement(Original,props);
+  var errBox=function(message){
+    var b=document.getElementById('err');
+    if(b){b.style.display='block';b.textContent=message;}
+  };
+  function fixLeagueMoneySource(src){
+    src=String(src||'').replace(/^\uFEFF/, '');
+    var start=src.indexOf('const moneyData=players.map(p=>{');
+    var end=start>=0?src.indexOf('const totalPaid=',start):-1;
+    if(start>=0&&end>start){
+      var block=src.slice(start,end);
+      // Force the root calculation to be display-simple only:
+      // paid from payments table, owed from entry + extra rounds + confirmed snakes, balance = paid - owed.
+      block=block.replace(/const paid\s*=\s*[^;]*;/, "const paid=Number((payments[p.id]?.paid)||0)||0;");
+      block=block.replace(/const owed\s*=\s*[^;]*;/, "const owed=calcOwed(p.id);");
+      block=block.replace(/const balance\s*=\s*[^;]*;/, "const balance=paid-owed;");
+      src=src.slice(0,start)+block+src.slice(end);
     }
-    LeagueViewMoneyFixed.__snyderMoneyWrappedV407=true;
-    window.LeagueView=LeagueViewMoneyFixed;
-    burst();
+    // Remove older DOM/adjustment hooks if any accidentally got inserted into league-section.js.
+    src=src.replace(/window\.snyderReloadSweepstakeBalanceAdjustments\s*&&\s*window\.snyderReloadSweepstakeBalanceAdjustments\([^;]*;?/g,'');
+    return src;
   }
-  installWrapper();
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',burst);else burst();
-  try{new MutationObserver(function(){setTimeout(patchMoneyTable,0);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});}catch(e){}
+  function loadApp(){
+    var s=document.createElement('script');
+    s.type='text/babel';
+    s.src='app.js?v=4.08';
+    document.body.appendChild(s);
+  }
+  fetch('./league-section.js?v=4.08-root-money-fix',{cache:'no-store'})
+    .then(function(res){
+      if(!res.ok)throw new Error('Could not load league-section.js: '+res.status);
+      return res.text();
+    })
+    .then(function(src){
+      var fixed=fixLeagueMoneySource(src);
+      var compiled=Babel.transform(fixed,{presets:['react']}).code;
+      (0,eval)(compiled);
+      window.__SNYDER_LEAGUE_MONEY_SOURCE_FIXED='v4.08';
+      loadApp();
+    })
+    .catch(function(e){
+      console.error(e);
+      errBox('ERROR: League section failed to load/fix\n'+(e&&e.stack||e));
+    });
 })();
 </script>
-<script type="text/babel" src="app.js?v=4.07"></script>
 
 </body>
 </html>
