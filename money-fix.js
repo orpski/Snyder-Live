@@ -1,26 +1,29 @@
-// SNYDER GOLF v4.13 League Money display repair
-// Root cause fix: parse only the first £ amount in each cell.
-// Example: "£12\n6 extra" must be read as 12, not 126.
-// Display-only: no Supabase writes, no React wrapping, no click interception.
+// SNYDER GOLF v4.15 League Money display repair
+// Adds completed Day Sweepstake net to the Money table without changing payments.paid.
+// Balance = Paid + Sweepstake net - Entry - Extra Rounds - Snakes.
 (function(){
   'use strict';
-  if(window.__snyderMoneyFixV413)return;
-  window.__snyderMoneyFixV413=true;
+  if(window.__snyderMoneyFixV415)return;
+  window.__snyderMoneyFixV415=true;
 
   var scheduled=false;
   var runCount=0;
-  var COLS='minmax(86px,1fr) 42px 50px 50px 50px 64px';
+  var sweepLoaded=false;
+  var sweepLoading=false;
+  var sweepByName={};
+  var sweepById={};
+  var lastSweepLoad=0;
+  var COLS='minmax(86px,1fr) 42px 50px 50px 62px 50px 68px';
+  var SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
+  var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 
-  function cleanText(el){
-    return String((el&&el.textContent)||'').replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();
-  }
-  function kids(el){
-    return Array.prototype.slice.call((el&&el.children)||[]).filter(function(x){return x&&x.nodeType===1;});
-  }
+  function normaliseName(name){return String(name||'').trim().toLowerCase().replace(/\s+/g,' ');}
+  function round2(v){return Math.round((Number(v)||0)*100)/100;}
+  function cleanText(el){return String((el&&el.textContent)||'').replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();}
+  function kids(el){return Array.prototype.slice.call((el&&el.children)||[]).filter(function(x){return x&&x.nodeType===1;});}
   function firstMoneyText(cell){
     if(!cell)return '';
     var childList=kids(cell);
-    // Prefer the top visible value div, e.g. "£12" rather than the sub-label "6 extra".
     for(var i=0;i<childList.length;i++){
       var t=cleanText(childList[i]);
       if(t.indexOf('£')!==-1)return t;
@@ -29,7 +32,6 @@
   }
   function moneyFromCell(cell){
     var s=firstMoneyText(cell).replace(/,/g,'').replace(/−/g,'-').replace(/\u00a0/g,' ');
-    // Only the first money amount after a pound sign counts. Ignore labels like "6 extra" or "x2".
     var m=s.match(/([+\-])?\s*£\s*([0-9]+(?:\.[0-9]+)?)/);
     if(!m)return 0;
     var n=parseFloat(m[2]);
@@ -37,62 +39,155 @@
     return m[1]==='-'?-n:n;
   }
   function fmt(v){
-    var n=Math.round((Number(v)||0)*100)/100;
-    var a=Math.abs(n);
-    var body=Number.isInteger(a)?String(a):a.toFixed(2);
+    var n=round2(v), a=Math.abs(n), body=Number.isInteger(a)?String(a):a.toFixed(2);
     if(n>0)return '+£'+body;
     if(n<0)return '-£'+body;
     return '£0';
   }
   function status(v){return v>0?'in credit':v<0?'owes':'settled';}
+  function playerNameFromCell(cell){
+    var c=kids(cell);
+    if(c.length)return cleanText(c[0]);
+    return cleanText(cell).replace(/\d+\s*rounds?.*$/i,'').trim();
+  }
+  function getSupabaseClient(){
+    try{
+      if(window.__snyderMoneySupabase)return window.__snyderMoneySupabase;
+      if(window.supabase&&window.supabase.createClient){
+        window.__snyderMoneySupabase=window.supabase.createClient(SURL,SKEY);
+        return window.__snyderMoneySupabase;
+      }
+    }catch(e){}
+    return null;
+  }
+  async function loadSweepstakeNets(force){
+    var now=Date.now();
+    if(sweepLoading)return;
+    if(!force&&sweepLoaded&&(now-lastSweepLoad)<60000)return;
+    var client=getSupabaseClient();
+    if(!client)return;
+    sweepLoading=true;
+    try{
+      var res=await client.from('payment_log').select('player_id,player_name,action,amount,note').or('action.eq.Sweepstake balance,action.eq.Sweepstake balance reversal').limit(1000);
+      if(res.error)throw res.error;
+      var byId={}, byName={};
+      (res.data||[]).forEach(function(row){
+        if(!row)return;
+        var action=String(row.action||'');
+        var note=String(row.note||'');
+        // Only completed Day Sweepstakes should affect League Money automatically.
+        // Normal scorecard/old test sweepstakes stay out unless they used the Day marker.
+        if(note.indexOf('Day sweepstake League balance settlement')===-1 && note.indexOf('Day sweepstake League balance reversal')===-1)return;
+        var amount=round2(parseFloat(row.amount)||0);
+        if(!amount)return;
+        var id=String(row.player_id||'').trim();
+        var name=normaliseName(row.player_name||'');
+        if(id)byId[id]=round2((byId[id]||0)+amount);
+        if(name)byName[name]=round2((byName[name]||0)+amount);
+      });
+      sweepById=byId;
+      sweepByName=byName;
+      sweepLoaded=true;
+      lastSweepLoad=Date.now();
+      schedule();
+    }catch(e){console.warn('Snyder sweepstake net load skipped safely',e);}
+    finally{sweepLoading=false;}
+  }
+  function sweepNetForRow(row,cells){
+    var id=String(row.getAttribute('data-league-player-id')||row.getAttribute('data-player-id')||'').trim();
+    if(id&&Object.prototype.hasOwnProperty.call(sweepById,id))return sweepById[id];
+    var name=normaliseName(playerNameFromCell(cells[0]));
+    return round2(sweepByName[name]||0);
+  }
   function isMoneyHeader(row){
     var c=kids(row);
-    if(c.length!==6)return false;
+    if(c.length!==6&&c.length!==7)return false;
     var t=c.map(function(x){return cleanText(x).toLowerCase();});
-    return t[0]==='player'&&t[1]==='entry'&&t[2]==='rounds'&&t[3]==='snake'&&(t[4]==='paid'||t[4]==='paid in')&&t[5]==='balance';
+    return t[0]==='player'&&t[1]==='entry'&&t[2]==='rounds'&&t[3]==='snake'&&(t.indexOf('paid')!==-1||t.indexOf('paid in')!==-1);
   }
   function isPlayerRow(row){
     var c=kids(row);
-    if(c.length!==6)return false;
+    if(c.length!==6&&c.length!==7)return false;
     var first=cleanText(c[0]).toLowerCase();
     if(!first||first==='player'||first.indexOf('round')===-1)return false;
-    return cleanText(c[1]).indexOf('£')!==-1 && cleanText(c[4]).indexOf('£')!==-1;
+    return cleanText(c[1]).indexOf('£')!==-1;
+  }
+  function ensureSevenCells(row){
+    var c=kids(row);
+    if(c.length===7)return c;
+    if(c.length!==6)return c;
+    var sweep=document.createElement('div');
+    row.insertBefore(sweep,c[4]);
+    return kids(row);
+  }
+  function styleCell(cell,idx,isHeader){
+    if(!cell)return;
+    cell.style.minWidth='0';
+    cell.style.boxSizing='border-box';
+    cell.style.overflow='visible';
+    cell.style.whiteSpace=idx===0?'normal':'nowrap';
+    cell.style.textAlign=idx===0?'left':(idx===6?'right':'center');
+    cell.style.height='100%';
+    cell.style.display='flex';
+    cell.style.flexDirection='column';
+    cell.style.justifyContent='center';
+    cell.style.alignItems=idx===0?'flex-start':(idx===6?'flex-end':'center');
+    if(idx>0)cell.style.fontSize=isHeader?'8px':'12px';
+    kids(cell).forEach(function(child,childIdx){
+      child.style.margin='0';
+      child.style.padding='0';
+      child.style.lineHeight=childIdx===0?'1.05':'1.05';
+      child.style.textAlign=idx===6?'right':(idx===0?'left':'center');
+      child.style.width='100%';
+    });
   }
   function applyGrid(row,isHeader){
     row.style.display='grid';
     row.style.gridTemplateColumns=COLS;
     row.style.gap='3px';
-    row.style.alignItems='center';
+    row.style.alignItems='stretch';
     row.style.boxSizing='border-box';
     row.style.width='100%';
     row.style.maxWidth='100%';
     row.style.overflow='visible';
-    if(!isHeader)row.style.padding='10px 8px';
-    kids(row).forEach(function(cell,idx){
-      cell.style.minWidth='0';
-      cell.style.boxSizing='border-box';
-      cell.style.overflow='visible';
-      cell.style.whiteSpace=idx===0?'normal':'nowrap';
-      cell.style.textAlign=idx===0?'left':(idx===5?'right':'center');
-      if(idx>0)cell.style.fontSize=isHeader?'8px':'12px';
-    });
+    row.style.minHeight=isHeader?'30px':'58px';
+    row.style.padding=isHeader?'7px 6px':'8px 6px';
+    kids(row).forEach(function(cell,idx){styleCell(cell,idx,isHeader);});
+  }
+  function writeAmountCell(cell,value,sub,mainColour){
+    if(!cell)return;
+    var n=round2(value);
+    var colour=mainColour||(n>0?'#60b8f0':n<0?'#f87171':'#8ea0ad');
+    cell.style.display='flex';
+    cell.style.flexDirection='column';
+    cell.style.justifyContent='center';
+    cell.style.alignItems='center';
+    cell.style.visibility='visible';
+    cell.style.opacity='1';
+    cell.style.textAlign='center';
+    cell.style.whiteSpace='nowrap';
+    cell.innerHTML='<div style="font-size:12px;font-weight:850;line-height:1.05;color:'+colour+';text-align:center;width:100%">'+fmt(n)+'</div>'+
+      '<div style="font-size:8px;line-height:1.05;color:#8ea0ad;text-align:center;width:100%;margin-top:1px">'+(sub||'sweep')+'</div>';
   }
   function writeBalance(cell,balance){
     if(!cell)return;
-    var n=Math.round((Number(balance)||0)*100)/100;
+    var n=round2(balance);
     var colour=n>0?'#60b8f0':n<0?'#f87171':'#d4af37';
     var subColour=n>0?'#4a8a5a':n<0?'#7a3a3a':'#8ea0ad';
-    cell.style.display='block';
+    cell.style.display='flex';
+    cell.style.flexDirection='column';
+    cell.style.justifyContent='center';
+    cell.style.alignItems='flex-end';
     cell.style.visibility='visible';
     cell.style.opacity='1';
     cell.style.textAlign='right';
-    cell.style.minWidth='64px';
     cell.style.whiteSpace='nowrap';
-    cell.innerHTML='<div style="font-size:16px;font-weight:800;line-height:1.05;color:'+colour+'">'+fmt(n)+'</div>'+ 
-      '<div style="font-size:8px;line-height:1.1;color:'+subColour+'">'+status(n)+'</div>';
+    cell.innerHTML='<div style="font-size:16px;font-weight:850;line-height:1.05;color:'+colour+';text-align:right;width:100%">'+fmt(n)+'</div>'+
+      '<div style="font-size:8px;line-height:1.05;color:'+subColour+';text-align:right;width:100%;margin-top:1px">'+status(n)+'</div>';
   }
   function patch(){
     runCount++;
+    loadSweepstakeNets(false);
     var rowsFixed=0;
     try{
       var divs=Array.prototype.slice.call(document.querySelectorAll('div'));
@@ -104,30 +199,35 @@
         table.style.width='100%';
         table.style.maxWidth='100%';
         table.style.boxSizing='border-box';
-        applyGrid(header,true);
-        var hc=kids(header);
-        if(hc[4])hc[4].textContent='Paid';
-        if(hc[5])hc[5].textContent='Balance';
+        var hc=ensureSevenCells(header);
+        if(hc.length===7){
+          hc[0].textContent='Player';hc[1].textContent='Entry';hc[2].textContent='Rounds';hc[3].textContent='Snake';hc[4].textContent='Sweep';hc[5].textContent='Paid';hc[6].textContent='Balance';
+          applyGrid(header,true);
+        }
         kids(table).forEach(function(row){
           if(row===header)return;
-          var c=kids(row);
+          var before=kids(row);
           var lower=cleanText(row).toLowerCase();
-          if(c.length===6 && !cleanText(c[0]) && lower.indexOf('owes')!==-1){row.style.display='none';return;}
+          if(before.length>=6 && !cleanText(before[0]) && lower.indexOf('owes')!==-1){row.style.display='none';return;}
           if(!isPlayerRow(row))return;
+          var c=ensureSevenCells(row);
+          if(c.length!==7)return;
           var entry=moneyFromCell(c[1])||10;
           var rounds=moneyFromCell(c[2]);
           var snake=moneyFromCell(c[3]);
-          var paid=moneyFromCell(c[4]);
-          var balance=Math.round((paid-entry-rounds-snake)*100)/100;
+          var paid=moneyFromCell(c[5]);
+          var sweep=sweepNetForRow(row,c);
+          var balance=round2(paid+sweep-entry-rounds-snake);
           applyGrid(row,false);
           row.style.borderLeft=balance>0?'4px solid #60b8f0':balance<0?'4px solid #ef4444':'4px solid rgba(96,184,240,0.22)';
-          writeBalance(c[5],balance);
-          row.setAttribute('data-money-v413','paid='+paid+' entry='+entry+' rounds='+rounds+' snake='+snake+' balance='+balance);
+          writeAmountCell(c[4],sweep,'sweep');
+          writeBalance(c[6],balance);
+          row.setAttribute('data-money-v415','paid='+paid+' sweep='+sweep+' entry='+entry+' rounds='+rounds+' snake='+snake+' balance='+balance);
           rowsFixed++;
         });
       });
-      if(rowsFixed)window.__snyderMoneyFixV413LastRun={runs:runCount,rows:rowsFixed,at:new Date().toISOString()};
-    }catch(e){console.warn('Snyder money fix v4.13 skipped safely',e);}
+      if(rowsFixed)window.__snyderMoneyFixV415LastRun={runs:runCount,rows:rowsFixed,sweepLoaded:sweepLoaded,at:new Date().toISOString()};
+    }catch(e){console.warn('Snyder money fix v4.15 skipped safely',e);}
   }
   function schedule(){
     if(scheduled)return;
@@ -135,9 +235,9 @@
     setTimeout(function(){scheduled=false;patch();},100);
   }
   window.snyderFixLeagueMoneyBalances=patch;
-  window.snyderReloadSweepstakeBalanceAdjustments=schedule;
+  window.snyderReloadSweepstakeBalanceAdjustments=function(){loadSweepstakeNets(true);schedule();};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule);else schedule();
   var ticks=0;
-  var timer=setInterval(function(){patch();ticks++;if(ticks>200)clearInterval(timer);},250);
+  var timer=setInterval(function(){patch();ticks++;if(ticks>240)clearInterval(timer);},250);
   try{new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,characterData:true});}catch(e){}
 })();
