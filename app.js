@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.06
+// SNYDER GOLF v4.07
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.06',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.07',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -2039,7 +2039,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v4.06" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v4.06</span>
+          <span aria-label="App version v4.07" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v4.07</span>
         </button>
       </div>
 
@@ -6314,7 +6314,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(!sw.enabled||!sw.final||!sw.payments.length)return;
     sweepstakeLeagueSettlementRef.current=key;
     setSweepstakeLeagueSettlement({status:'checking',changes:[],skipped:[]});
-    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.06`;
+    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.07`;
     try{
       const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').eq('note',markerNote).limit(1);
       if(logMarkerError)throw logMarkerError;
@@ -8520,7 +8520,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.06`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.07`;
     const playable=(linked||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
     if(!playable.length)return {already:false,changes:[],skipped:[]};
     const roundIds=playable.map(r=>r.id);
@@ -8629,10 +8629,10 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.06`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.07`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.06`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.07`;
     const legacyReverseNote=`Day sweepstake League balance reversal ${markerKey}`;
     const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNote}`).limit(1);
     if(reverseCheckError)throw reverseCheckError;
@@ -10521,8 +10521,8 @@ function BreakingNewsModal(){
 
 // =========================================================
 // League money balance stabiliser
-// v4.06:
-// - Fixes the Money table display after the v4.03/v4.06 repair attempts.
+// v4.07:
+// - Fixes the Money table display after the v4.03/v4.07 repair attempts.
 // - Uses the visible simple columns only: Paid - Entry - Rounds - Snake.
 // - Hides broken old repair/adjustment rows with no player name.
 // - Does not read or write Supabase data and does not touch payments.paid.
@@ -10616,7 +10616,7 @@ function BreakingNewsModal(){
         if(isMoneyHeader(row)){
           cells[4].textContent='Paid';
           cells[5].textContent='Balance';
-          row.setAttribute('data-snyder-money-fixed','v4.06-header');
+          row.setAttribute('data-snyder-money-fixed','v4.07-header');
           return;
         }
         const playerTxt=cellText(cells[0]);
@@ -10624,7 +10624,7 @@ function BreakingNewsModal(){
         // Old repair/adjustment overlays can appear as blank rows with only an amount.
         if(!playerTxt&&joined.includes('owes')){
           row.style.display='none';
-          row.setAttribute('data-snyder-money-hidden','v4.06-empty-repair-row');
+          row.setAttribute('data-snyder-money-hidden','v4.07-empty-repair-row');
           return;
         }
         if(!isPlayerMoneyRow(row))return;
@@ -10636,7 +10636,7 @@ function BreakingNewsModal(){
         const next=round2(paid-owed);
         ensureBalanceCell(cells[5],next);
         row.style.borderLeft=next>0?'4px solid #60b8f0':next<0?'4px solid #ef4444':'4px solid rgba(96,184,240,0.22)';
-        row.setAttribute('data-snyder-money-fixed','v4.06');
+        row.setAttribute('data-snyder-money-fixed','v4.07');
         row.setAttribute('data-snyder-money-paid',String(paid));
         row.setAttribute('data-snyder-money-owed',String(owed));
         row.setAttribute('data-snyder-money-balance',String(next));
