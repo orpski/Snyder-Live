@@ -1,4 +1,4 @@
-// SNYDER GOLF v3.99
+// SNYDER GOLF v4.00
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v3.99',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.00',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -2039,7 +2039,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v3.99" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v3.99</span>
+          <span aria-label="App version v4.00" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v4.00</span>
         </button>
       </div>
 
@@ -6314,7 +6314,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(!sw.enabled||!sw.final||!sw.payments.length)return;
     sweepstakeLeagueSettlementRef.current=key;
     setSweepstakeLeagueSettlement({status:'checking',changes:[],skipped:[]});
-    const markerNote=`Sweepstake League balance settlement ${key}`;
+    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.00`;
     try{
       const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').eq('note',markerNote).limit(1);
       if(logMarkerError)throw logMarkerError;
@@ -8520,7 +8520,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey}`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const playable=(linked||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
     if(!playable.length)return {already:false,changes:[],skipped:[]};
     const roundIds=playable.map(r=>r.id);
@@ -8629,12 +8629,12 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey}`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const reverseNote=`Day sweepstake League balance reversal ${markerKey}`;
-    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').eq('note',reverseNote).limit(1);
+    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNote}`).limit(1);
     if(reverseCheckError)throw reverseCheckError;
     if(existingReverse&&existingReverse.length)return {reversed:false,already:true,count:0};
-    const {data:logs,error:logError}=await sb.from('payment_log').select('*').eq('note',markerNote);
+    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNote}`);
     if(logError)throw logError;
     const rows=(logs||[]).filter(r=>r&&r.player_id&&Math.abs(parseFloat(r.amount)||0)>0);
     if(!rows.length)return {reversed:false,count:0};
@@ -10518,14 +10518,16 @@ function BreakingNewsModal(){
 
 
 // =========================================================
-// League sweepstake balance overlay
+// League sweepstake balance overlay / repair
 // Keeps payments.paid as real cash paid only, while still reflecting
 // sweepstake wins/losses in the visible League balance column.
+// v4.00 also repairs legacy sweepstake settlements that previously altered payments.paid.
 // =========================================================
 (function installSweepstakeBalanceOverlay(){
   if(typeof window==='undefined')return;
-  const state={loaded:false,loading:false,byName:{},timer:null};
+  const state={loaded:false,loading:false,byName:{},legacyPaidByName:{},paidByName:{},timer:null,repairing:false,repaired:false};
   function cleanName(v){return String(v||'').trim().toLowerCase().replace(/\s+/g,' ');}
+  function round2(v){return Math.round((parseFloat(v)||0)*100)/100;}
   function parseMoneyText(text){
     const raw=String(text||'').replace(/,/g,'');
     const neg=/^-|owes|−/.test(raw.trim())||raw.includes('-£');
@@ -10534,30 +10536,98 @@ function BreakingNewsModal(){
     const val=parseFloat(m[1])||0;
     return neg?-val:val;
   }
+  function moneyBody(v){const n=round2(v);return Number.isInteger(Math.abs(n))?String(Math.abs(n)):Math.abs(n).toFixed(2);}
   function moneyText(v){
-    const n=Math.round((parseFloat(v)||0)*100)/100;
-    const body=Number.isInteger(Math.abs(n))?String(Math.abs(n)):Math.abs(n).toFixed(2);
-    if(n>0)return '+£'+body;
-    if(n<0)return '-£'+body;
+    const n=round2(v);
+    if(n>0)return '+£'+moneyBody(n);
+    if(n<0)return '-£'+moneyBody(n);
     return '£0';
+  }
+  function moneyPaidText(v){return '£'+moneyBody(v);}
+  function dayKeyFromName(name){const m=String(name||'').match(/\[DAY:([A-Z0-9]{5,8})\]/);return m&&m[1]?m[1]:null;}
+  function dayKeyFromNote(note){const m=String(note||'').match(/league-day-balance-([A-Z0-9]{5,8})/);return m&&m[1]?m[1]:null;}
+  function isAdjustmentOnly(row){return /adjustment-only|v4\.00/i.test(String(row&&row.note||''))||/adjustment only/i.test(String(row&&row.action||''));}
+  function isSweepLog(row){return row&&(row.action==='Sweepstake balance'||row.action==='Sweepstake balance reversal');}
+  async function fetchValidDayKeys(){
+    try{
+      const {data,error}=await window.sb.from('cup_rounds').select('name,course_name');
+      if(error)throw error;
+      const keys=new Set();
+      (data||[]).forEach(r=>{const k=dayKeyFromName(r&&r.name);if(k)keys.add(k);});
+      return keys;
+    }catch(e){return new Set();}
+  }
+  async function repairLegacyPaidColumn(logs){
+    if(state.repairing||state.repaired||!window.sb||!window.sb.from)return;
+    state.repairing=true;
+    try{
+      const repairNote='Sweepstake legacy paid column repair v4.00';
+      const {data:done,error:doneError}=await window.sb.from('payment_log').select('id').eq('note',repairNote).limit(1);
+      if(doneError)throw doneError;
+      if(done&&done.length){state.repaired=true;return;}
+      const deltaById={};
+      const nameById={};
+      (logs||[]).forEach(row=>{
+        if(!isSweepLog(row)||isAdjustmentOnly(row)||!row.player_id)return;
+        const id=String(row.player_id);
+        const amt=round2(row.amount);
+        if(!amt)return;
+        // Older builds changed payments.paid by this amount. Undo it so paid is real cash only.
+        deltaById[id]=round2((deltaById[id]||0)-amt);
+        nameById[id]=row.player_name||'Player';
+      });
+      const ids=Object.keys(deltaById).filter(id=>Math.abs(deltaById[id])>0.0001);
+      if(!ids.length){state.repaired=true;return;}
+      const {data:payments,error:payError}=await window.sb.from('payments').select('player_id,paid').in('player_id',ids);
+      if(payError)throw payError;
+      const paidById={};
+      (payments||[]).forEach(p=>{paidById[String(p.player_id)]=round2(p.paid);});
+      const upserts=ids.map(id=>({player_id:id,paid:round2((paidById[id]||0)+deltaById[id])}));
+      const {error:upsertError}=await window.sb.from('payments').upsert(upserts,{onConflict:'player_id'});
+      if(upsertError)throw upsertError;
+      const logRows=ids.map(id=>({player_id:id,player_name:nameById[id]||'Player',action:'Sweepstake paid repair',amount:deltaById[id],note:repairNote}));
+      const {error:logError}=await window.sb.from('payment_log').insert(logRows);
+      if(logError)throw logError;
+      state.repaired=true;
+      state.loaded=false;
+      setTimeout(loadAdjustments,700);
+    }catch(e){
+      // Do not break the League page if the repair cannot run. The visible overlay still protects the balance display.
+      state.repaired=true;
+    }finally{state.repairing=false;}
   }
   async function loadAdjustments(){
     if(state.loading)return;
     state.loading=true;
     try{
       if(!window.sb||!window.sb.from)return;
-      const {data,error}=await window.sb.from('payment_log').select('player_name,amount,action,note').in('action',['Sweepstake balance','Sweepstake balance reversal']).limit(1000);
+      const [validDayKeys,{data,error},{data:payments,payError}]=await Promise.all([
+        fetchValidDayKeys(),
+        window.sb.from('payment_log').select('player_id,player_name,amount,action,note').in('action',['Sweepstake balance','Sweepstake balance reversal']).limit(2000),
+        window.sb.from('payments').select('player_id,paid')
+      ]);
       if(error)throw error;
       const byName={};
+      const legacyPaidByName={};
       (data||[]).forEach(row=>{
+        if(!isSweepLog(row))return;
         const name=cleanName(row&&row.player_name);
         if(!name)return;
-        const amount=parseFloat(row.amount)||0;
-        byName[name]=(byName[name]||0)+amount;
+        const amount=round2(row.amount);
+        const note=String(row.note||'');
+        const dayKey=dayKeyFromNote(note);
+        const deletedDay=dayKey&&!validDayKeys.has(dayKey);
+        if(!deletedDay)byName[name]=round2((byName[name]||0)+amount);
+        if(!isAdjustmentOnly(row))legacyPaidByName[name]=round2((legacyPaidByName[name]||0)+amount);
       });
+      const paidByName={};
+      // player names are not on payments, so this is corrected in the row using the visible name + legacyPaidByName.
       state.byName=byName;
+      state.legacyPaidByName=legacyPaidByName;
+      state.paidByName=paidByName;
       state.loaded=true;
       patchLeagueMoneyRows();
+      repairLegacyPaidColumn(data||[]);
     }catch(e){
       state.loaded=true;
     }finally{
@@ -10578,12 +10648,20 @@ function BreakingNewsModal(){
       const nameEl=nameCell.querySelector('div');
       const playerName=cleanName(nameEl?nameEl.textContent:nameCell.textContent);
       if(!playerName)return;
-      const adj=Math.round((state.byName[playerName]||0)*100)/100;
+      const adj=round2(state.byName[playerName]||0);
+      const legacyPaid=round2(state.legacyPaidByName[playerName]||0);
+      if(!row.dataset.snyderBasePaid){
+        row.dataset.snyderBasePaid=String(parseMoneyText(paidCell.textContent));
+      }
       if(!row.dataset.snyderBaseBalance){
         row.dataset.snyderBaseBalance=String(parseMoneyText(balanceCell.textContent));
       }
-      const base=parseFloat(row.dataset.snyderBaseBalance)||0;
-      const next=Math.round((base+adj)*100)/100;
+      const basePaid=round2(row.dataset.snyderBasePaid);
+      const baseBalance=round2(row.dataset.snyderBaseBalance);
+      const fixedPaid=round2(basePaid-legacyPaid);
+      const fixedBaseBalance=round2(baseBalance-legacyPaid);
+      const next=round2(fixedBaseBalance+adj);
+      paidCell.textContent=moneyPaidText(fixedPaid);
       const valueEl=balanceCell.querySelector('div');
       const labelEl=balanceCell.querySelectorAll('div')[1];
       if(valueEl){
@@ -10618,7 +10696,7 @@ function BreakingNewsModal(){
       else patchLeagueMoneyRows();
     },120);
   }
-  window.snyderReloadSweepstakeBalanceAdjustments=function(){state.loaded=false;loadAdjustments();};
+  window.snyderReloadSweepstakeBalanceAdjustments=function(){state.loaded=false;state.repaired=false;loadAdjustments();};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule); else schedule();
   try{new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});}catch(e){}
 })();
