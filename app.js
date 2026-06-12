@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.28
+// SNYDER GOLF v4.29
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -121,7 +121,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.28',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.29',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     console.log('[Snyder Notify] sending',type,'to',SNYDER_NOTIFY_EDGE,body);
     if(body.body&&!body.message)body.message=body.body;
@@ -798,10 +798,14 @@ function roundStartDate(round){
 function formatRoundStart(round){
   return roundStartDate(round).toLocaleString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Europe/London'});
 }
-const DAY_COMP_RE=/\s*\[DAY:([A-Z0-9]{5,8})\]\s*$/;
+const DAY_COMP_RE=/\s*\[DAY:([A-Z0-9]{5,8})\]\s*/;
 function dayCompKeyFromRound(round){
-  const m=String(round&&round.name||'').match(DAY_COMP_RE);
-  return m&&m[1]?m[1]:null;
+  const fields=[round&&round.name,round&&round.course_name,round&&round.notes,round&&round.description,round&&round.metadata&&JSON.stringify(round.metadata)];
+  for(const value of fields){
+    const m=String(value||'').match(DAY_COMP_RE);
+    if(m&&m[1])return m[1];
+  }
+  return null;
 }
 function stripDayCompMarker(name){
   return String(name||'').replace(DAY_COMP_RE,'').trim();
@@ -840,6 +844,23 @@ function liveDataRoundIds(rounds,visibleRounds){
     if(dayCompKeyFromRound(r))dayCompRoundsFor(rounds,r).forEach(x=>{if(x&&x.id)ids.add(x.id);});
   });
   return Array.from(ids);
+}
+async function fetchDayCompRoundsFromCloud(dayKey,fallbackRounds=[]){
+  const key=String(dayKey||'').trim().toUpperCase();
+  const merged=new Map();
+  (fallbackRounds||[]).filter(r=>dayCompKeyFromRound(r)===key).forEach(r=>{if(r&&r.id)merged.set(r.id,r);});
+  if(!key||!sb)return Array.from(merged.values()).sort((a,b)=>roundStartDate(a)-roundStartDate(b));
+  const marker='[DAY:'+key+']';
+  const fields=['name','course_name','notes','description'];
+  for(const field of fields){
+    try{
+      const res=await sb.from('cup_rounds').select('*').ilike(field,'%'+marker+'%');
+      if(!res.error&&Array.isArray(res.data)){
+        res.data.filter(r=>dayCompKeyFromRound(r)===key).forEach(r=>{if(r&&r.id)merged.set(r.id,r);});
+      }
+    }catch(e){}
+  }
+  return Array.from(merged.values()).sort((a,b)=>roundStartDate(a)-roundStartDate(b));
 }
 function startOfLocalDay(value){
   const d=value?parseRoundDateValue(value):new Date();
@@ -2039,7 +2060,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span aria-label="App version v4.28" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v4.28</span>
+          <span aria-label="App version v4.29" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:'rgba(255,255,255,0.32)'}}>v4.29</span>
         </button>
       </div>
 
@@ -2345,9 +2366,11 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     }catch(e){}
     return Object.keys(totals).map(pid=>({id:pid,name:nameMap[pid]||getDisplayName(pid),total:totals[pid]||0,holes:holes[pid]?holes[pid].size:0,_holePoints:holePoints[pid]||{}})).sort(compareStablefordLeaderboardRows);
   }
-  function daySweepstakeConfigForLive(rd,sourceRows=null){
-    const board=dayCompBoardFor(rounds,rd);
-    const boardRounds=dayCompKeyFromRound(rd)?dayCompRoundsFor(rounds,rd):[rd];
+  function daySweepstakeConfigForLive(rd,sourceRows=null,sourceRounds=null){
+    const key=dayCompKeyFromRound(rd);
+    const dayRounds=(sourceRounds&&sourceRounds.length)?sourceRounds:(key?dayCompRoundsFor(rounds,rd):[rd]);
+    const board=dayCompBoardFor(dayRounds,rd);
+    const boardRounds=key?dayRounds:[rd];
     const allRows=sourceRows?normaliseFoursomesScoreRows(sourceRows):normaliseFoursomesScoreRows([...(scores||[]),...(publicScores||[])]);
     const boardCfg=board?sweepstakeConfigFromRows(allRows,board):null;
     if(boardCfg&&boardCfg.enabled)return boardCfg;
@@ -2363,10 +2386,15 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     for(let h=start;h<=end;h++)total+=stablefordPointsValue(hp[h]||0);
     return total;
   }
-  function canonicalDaySweepstakeEntryState(rd,state){
+  function canonicalDaySweepstakeEntryState(rd,state,sourceRounds=null,sourceRoundPlayers=null){
     if(!state||!state.size)return state||null;
     const key=dayCompKeyFromRound(rd);
-    const boardRounds=key?dayCompRoundsFor(rounds,rd).filter(r=>!isDayCompBoardRound(r)):[rd];
+    if(sourceRoundPlayers){
+      const allPlayers=Array.isArray(sourceRoundPlayers)?sourceRoundPlayers:Object.values(sourceRoundPlayers||{}).flat();
+      return canonicalSweepstakeEntryStateFromRoundPlayers(state,allPlayers);
+    }
+    const dayRounds=(sourceRounds&&sourceRounds.length)?sourceRounds:(key?dayCompRoundsFor(rounds,rd):[rd]);
+    const boardRounds=key?dayRounds.filter(r=>!isDayCompBoardRound(r)):[rd];
     const aliasToCanonical={};
     function addAlias(alias,canonical){
       const a=normaliseId(alias);const c=normaliseId(canonical);
@@ -2393,19 +2421,20 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     });
     return out.size?out:null;
   }
-  function daySweepstakeEntrantIdSet(rd,sourceRows=null){
+  function daySweepstakeEntrantIdSet(rd,sourceRows=null,sourceRounds=null,sourceRoundPlayers=null){
     const key=dayCompKeyFromRound(rd);
     if(!key)return null;
     const allRows=sourceRows?normaliseFoursomesScoreRows(sourceRows):normaliseFoursomesScoreRows([...(scores||[]),...(publicScores||[])]);
-    const board=dayCompBoardFor(rounds,rd);
-    const boardRounds=dayCompRoundsFor(rounds,rd).filter(r=>!isDayCompBoardRound(r));
-    // v4.28: restore the v4.20 local opt-out behaviour, then sync it to the board. Linked scorecards plus local choices are the source of truth for who actually opted in.
+    const dayRounds=(sourceRounds&&sourceRounds.length)?sourceRounds:dayCompRoundsFor(rounds,rd);
+    const board=dayCompBoardFor(dayRounds,rd);
+    const boardRounds=dayRounds.filter(r=>!isDayCompBoardRound(r));
+    // v4.29: restore the v4.20 local opt-out behaviour, then sync it to the board. Linked scorecards plus local choices are the source of truth for who actually opted in.
     // The Day Leaderboard board is only a shared cache. A stale board-level opt-in must
     // never pull an opted-out player (e.g. James Milner) back into the sweepstake.
-    const linkedState=canonicalDaySweepstakeEntryState(rd,linkedDaySweepstakeEntryStateFromRows(allRows,boardRounds,{includeLocal:true}));
-    const boardState=canonicalDaySweepstakeEntryState(rd,board?sweepstakeEntryStateFromRows(allRows,board):null);
-    // v4.28: merge all linked scorecard entrant states with the shared board cache.
-    // v4.28 accidentally let each device overwrite the board with only that device's
+    const linkedState=canonicalDaySweepstakeEntryState(rd,linkedDaySweepstakeEntryStateFromRows(allRows,boardRounds,{includeLocal:!sourceRows}),dayRounds,sourceRoundPlayers);
+    const boardState=canonicalDaySweepstakeEntryState(rd,board?sweepstakeEntryStateFromRows(allRows,board):null,dayRounds,sourceRoundPlayers);
+    // v4.29: merge all linked scorecard entrant states with the shared board cache.
+    // v4.29 accidentally let each device overwrite the board with only that device's
     // current scorecard entrants. This keeps Paolo/Slug and Test/Ben together while
     // still letting any explicit opt-out (for example James) win over stale opt-ins.
     const mergedSourceState=mergeSweepstakeEntryStateMaps(boardState,linkedState);
@@ -2414,20 +2443,21 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     const ids=new Set();
     let hasExplicit=false;
     boardRounds.forEach(r=>{
-      const explicitState=canonicalDaySweepstakeEntryState(rd,mergeSweepstakeEntryStateMaps(sweepstakeEntryStateFromRows(allRows,r),loadLocalSweepstakeEntryState(r&&r.id)));
+      const explicitState=canonicalDaySweepstakeEntryState(rd,mergeSweepstakeEntryStateMaps(sweepstakeEntryStateFromRows(allRows,r),sourceRows?null:loadLocalSweepstakeEntryState(r&&r.id)),dayRounds,sourceRoundPlayers);
       const explicit=sweepstakeEntryIdsFromState(explicitState);
       if(explicit){hasExplicit=true;explicit.forEach(id=>ids.add(normaliseId(id)));}
       else if(!hasExplicit){
-        const rp=(publicRoundPlayers[r.id]||[]).map(x=>mapRoundPlayerForScorecard(x,isSnyderCupRound(r)));
+        const sourceRp=sourceRoundPlayers?(sourceRoundPlayers[r.id]||[]):(publicRoundPlayers[r.id]||[]);
+        const rp=(sourceRp||[]).map(x=>mapRoundPlayerForScorecard(x,isSnyderCupRound(r)));
         rp.forEach(p=>{const id=normaliseId((p.user_id||p.guest_id||p.id));if(id)ids.add(id);});
       }
     });
     return hasExplicit?ids:(ids.size?ids:null);
   }
-  function daySweepstakePotRows(rd,boardRows,sourceRows=null){
-    const cfg=daySweepstakeConfigForLive(rd,sourceRows);
+  function daySweepstakePotRows(rd,boardRows,sourceRows=null,sourceRounds=null,sourceRoundPlayers=null){
+    const cfg=daySweepstakeConfigForLive(rd,sourceRows,sourceRounds);
     const amountPence=parseInt(cfg&&cfg.amountPence)||200;
-    const entrantIds=daySweepstakeEntrantIdSet(rd,sourceRows)
+    const entrantIds=daySweepstakeEntrantIdSet(rd,sourceRows,sourceRounds,sourceRoundPlayers)
     const sweepRows=(boardRows||[]).filter(r=>r&&r.id&&(!entrantIds||entrantIds.has(normaliseId(r.id))));
     const dayNameMap=contextualNameMapFromRows(boardRows||[]);
     const sweepNameMap=contextualNameMapFromRows(sweepRows||[]);
@@ -2453,10 +2483,10 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     const overall=makePot({key:'overall',label:'Overall',start:1,end:18},rolloverIn);
     return [front,back,overall];
   }
-  function compactDaySweepstakeSettlement(rd,boardRows,potRows,sourceRows=null){
-    const cfg=daySweepstakeConfigForLive(rd,sourceRows);
+  function compactDaySweepstakeSettlement(rd,boardRows,potRows,sourceRows=null,sourceRounds=null,sourceRoundPlayers=null){
+    const cfg=daySweepstakeConfigForLive(rd,sourceRows,sourceRounds);
     const amountPence=parseInt(cfg&&cfg.amountPence)||200;
-    const entrantIds=daySweepstakeEntrantIdSet(rd,sourceRows)
+    const entrantIds=daySweepstakeEntrantIdSet(rd,sourceRows,sourceRounds,sourceRoundPlayers)
     const nameMap=contextualNameMapFromRows(boardRows||[]);
     const rows=(boardRows||[]).filter(r=>r&&r.id&&(!entrantIds||entrantIds.has(normaliseId(r.id)))).map(r=>({id:r.id,name:nameFromContextMap(nameMap,r.id,r.name||'Player'),wins:[],owes:0,receives:0,net:0}));
     const byId={};
@@ -2549,13 +2579,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
         try{
           if(!rd||!sb||!dayKey)return;
           setFreshLoading(true);
-          let allDayRounds=dayCompRoundsFor(rounds,rd);
-          try{
-            const roundRes=await sb.from('cup_rounds').select('*').ilike('name','%[DAY:'+dayKey+']%');
-            if(!roundRes.error&&Array.isArray(roundRes.data)&&roundRes.data.length){
-              allDayRounds=roundRes.data.filter(r=>dayCompKeyFromRound(r)===dayKey).sort((a,b)=>roundStartDate(a)-roundStartDate(b));
-            }
-          }catch(e){}
+          const allDayRounds=await fetchDayCompRoundsFromCloud(dayKey,dayCompRoundsFor(rounds,rd));
           const freshBoard=allDayRounds.find(isDayCompBoardRound)||board||rd;
           const freshPlayable=allDayRounds.filter(r=>r&&!isDayCompBoardRound(r));
           const ids=Array.from(new Set([freshBoard&&freshBoard.id,...freshPlayable.map(r=>r&&r.id)].filter(Boolean)));
@@ -2597,9 +2621,9 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
     const daySourceRows=freshDayRows||null;
     const boardRows=freshDayLeaderboardRows()||leaderboardForRound(rd);
     const dayNameMap=contextualNameMapFromRows(boardRows||[]);
-    const potRows=daySweepstakePotRows(rd,boardRows,daySourceRows);
-    const compactSettlement=compactDaySweepstakeSettlement(rd,boardRows,potRows,daySourceRows);
-    const cfg=daySweepstakeConfigForLive(rd,daySourceRows);
+    const potRows=daySweepstakePotRows(rd,boardRows,daySourceRows,effectiveDayRounds,freshDayRoundPlayers);
+    const compactSettlement=compactDaySweepstakeSettlement(rd,boardRows,potRows,daySourceRows,effectiveDayRounds,freshDayRoundPlayers);
+    const cfg=daySweepstakeConfigForLive(rd,daySourceRows,effectiveDayRounds);
     const allDone=effectivePlayable.length>0&&effectivePlayable.every(isCompletedRound);
     const dayClosed=effectiveBoard&&!isLiveRound(effectiveBoard);
     return(
@@ -6552,7 +6576,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(!sw.enabled||!sw.final||!sw.payments.length)return;
     sweepstakeLeagueSettlementRef.current=key;
     setSweepstakeLeagueSettlement({status:'checking',changes:[],skipped:[]});
-    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.28`;
+    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.29`;
     try{
       const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').eq('note',markerNote).limit(1);
       if(logMarkerError)throw logMarkerError;
@@ -8703,7 +8727,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
 
     // Day Sweepstake entrants are separate from the full day leaderboard.
     // Prefer the central participant map saved on the Day Leaderboard board.
-    // Fallback to older per-scorecard entry rows for boards created before v4.28.
+    // Fallback to older per-scorecard entry rows for boards created before v4.29.
     const entrantIds=new Set();
     let hasExplicitEntries=false;
     const linkedState=canonicalSweepstakeEntryStateFromRoundPlayers(linkedDaySweepstakeEntryStateFromRows(scoreRows||[],playable,{includeLocal:false}),roundPlayers||[]);
@@ -8784,15 +8808,17 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.28`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.29`;
+    const legacyMarkerNoteV428=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.28`;
     const legacyMarkerNoteV420=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.20`;
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const playable=(linked||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
+    const linkedRounds=key?await fetchDayCompRoundsFromCloud(key,linked||[]):(linked||[]);
+    const playable=(linkedRounds||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
     if(!playable.length)return {already:false,changes:[],skipped:[]};
     const roundIds=playable.map(r=>r.id);
-    const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`).limit(1);
+    const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`).limit(1);
     if(logMarkerError)throw logMarkerError;
     if(logMarkers&&logMarkers.length)return {already:true,changes:[],skipped:[]};
     const [{data:roundPlayers,error:roundPlayersError},{data:scoreRows,error:scoreRowsError},{data:leaguePlayers,error:leaguePlayersError},linkResult]=await Promise.all([
@@ -8815,7 +8841,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
       const refreshed=await sb.from('cup_scores').select('*').in('round_id',[board.id,...roundIds]);
       if(!refreshed.error)finalScoreRows=refreshed.data||finalScoreRows;
     }
-    const settlement=buildDaySweepstakeSettlement(board,linked,roundPlayers||[],finalScoreRows);
+    const settlement=buildDaySweepstakeSettlement(board,linkedRounds,roundPlayers||[],finalScoreRows);
     const links=(linkResult&&linkResult.links)||{};
     const skipped=[];
     const deltas={};
@@ -8884,8 +8910,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
   async function closeBoard(board){
     if(!window.confirm('Mark this day sweepstake as finished? Do this only once the last scorecard is in. This will also add the final sweepstake to League balances.'))return;
     const key=dayCompKeyFromRound(board);
-    const linked=(rounds||[]).filter(r=>dayCompKeyFromRound(r)===key);
     try{
+      const linked=key?await fetchDayCompRoundsFromCloud(key,(rounds||[]).filter(r=>dayCompKeyFromRound(r)===key)):[board].filter(Boolean);
       const settlement=await settleDaySweepstakeLeagueBalances(board,linked);
       for(const r of linked){
         if(isLiveRound(r)){
@@ -8908,19 +8934,21 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.28`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.29`;
+    const legacyMarkerNoteV428=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.28`;
     const legacyMarkerNoteV420=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.20`;
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.28`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.29`;
+    const legacyReverseNoteV428=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.28`;
     const legacyReverseNoteV420=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.20`;
     const legacyReverseNoteV419=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.19`;
     const legacyReverseNote=`Day sweepstake League balance reversal ${markerKey}`;
-    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNoteV420},note.eq.${legacyReverseNoteV419},note.eq.${legacyReverseNote}`).limit(1);
+    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNoteV428},note.eq.${legacyReverseNoteV420},note.eq.${legacyReverseNoteV419},note.eq.${legacyReverseNote}`).limit(1);
     if(reverseCheckError)throw reverseCheckError;
     if(existingReverse&&existingReverse.length)return {reversed:false,already:true,count:0};
-    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`);
+    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`);
     if(logError)throw logError;
     const rows=(logs||[]).filter(r=>r&&r.player_id&&Math.abs(parseFloat(r.amount)||0)>0);
     if(!rows.length)return {reversed:false,count:0};
