@@ -15,6 +15,17 @@ function urlBase64ToUint8Array(base64String){
   for(let i=0;i<rawData.length;++i)outputArray[i]=rawData.charCodeAt(i);
   return outputArray;
 }
+function pushSubscriptionUsesKey(subscription,publicKey){
+  try{
+    const current=subscription&&subscription.options&&subscription.options.applicationServerKey;
+    if(!current||!publicKey)return true;
+    const desired=urlBase64ToUint8Array(publicKey);
+    const actual=new Uint8Array(current);
+    if(actual.length!==desired.length)return false;
+    for(let i=0;i<actual.length;i++)if(actual[i]!==desired[i])return false;
+    return true;
+  }catch(e){return true;}
+}
 function scoreNotificationText(name,points){
   const pts=Number(points)||0;
   if(pts>=40)return{title:'Score submitted',body:`🔥 ${name} has submitted ${pts} points. Bandit behaviour.`};
@@ -70,15 +81,16 @@ async function getReadyServiceWorker(){
 
 async function saveLeaguePushSubscription({replace=false}={}){
   const registration=await getReadyServiceWorker();
+  const vapidKey=window.SNYDER_VAPID_PUBLIC_KEY||LEAGUE_VAPID_PUBLIC_KEY;
   let subscription=await registration.pushManager.getSubscription();
-  if(subscription&&replace){
+  if(subscription&&(replace||!pushSubscriptionUsesKey(subscription,vapidKey))){
     await subscription.unsubscribe();
     subscription=null;
   }
   if(!subscription){
     subscription=await registration.pushManager.subscribe({
       userVisibleOnly:true,
-      applicationServerKey:urlBase64ToUint8Array(LEAGUE_VAPID_PUBLIC_KEY),
+      applicationServerKey:urlBase64ToUint8Array(vapidKey),
     });
   }
   const sub=subscription.toJSON();
@@ -92,6 +104,20 @@ async function saveLeaguePushSubscription({replace=false}={}){
     updated_at:new Date().toISOString(),
   },{onConflict:'endpoint'}).select('id').single();
   if(error||!saved)throw new Error(error?.message||'No saved row returned');
+  try{
+    if(sub.endpoint&&sub.keys&&sub.keys.p256dh&&sub.keys.auth){
+      await sb.from(window.SNYDER_PUSH_TABLE||'live_push_subscriptions').upsert({
+        endpoint:sub.endpoint,
+        p256dh:sub.keys.p256dh,
+        auth:sub.keys.auth,
+        user_id:null,
+        app:'snyder-live',
+        source:'snyder-league-pwa',
+        user_agent:navigator.userAgent||null,
+        updated_at:new Date().toISOString()
+      },{onConflict:'endpoint'});
+    }
+  }catch(e){}
   try{localStorage.setItem('leagueNotificationsEnabled','true');}catch(e){}
   return saved;
 }
@@ -293,6 +319,14 @@ function LeagueView({onExit,cupUsers=[]}){
 
   async function sendLeaguePush(payload){
     try{
+      if(window.sendSnyderLeagueNotification){
+        await window.sendSnyderLeagueNotification(payload);
+        return;
+      }
+      if(window.snyderNotificationsTestMode&&window.snyderNotificationsTestMode()){
+        console.log('[Snyder League Notify] TEST MODE blocked',payload);
+        return;
+      }
       await sb.functions.invoke('send-league-notification',{body:payload});
     }catch(e){
       // Do not block score submission if push fails. Admin/users can still approve and view scores normally.
