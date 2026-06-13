@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.38
+// SNYDER GOLF v4.39
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -154,7 +154,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.38',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.39',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -203,7 +203,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.38',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.39',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -2156,7 +2156,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v4.38" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.38</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v4.39" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.39</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -6707,14 +6707,15 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     if(!sw.enabled||!sw.final||!sw.payments.length)return;
     sweepstakeLeagueSettlementRef.current=key;
     setSweepstakeLeagueSettlement({status:'checking',changes:[],skipped:[]});
-    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.38`;
+    const markerNote=`Sweepstake League balance settlement ${key} | adjustment-only | v4.39`;
+    const legacyMarkerNoteV438=`Sweepstake League balance settlement ${key} | adjustment-only | v4.38`;
     const legacyMarkerNoteV437=`Sweepstake League balance settlement ${key} | adjustment-only | v4.37`;
     const legacyMarkerNoteV436=`Sweepstake League balance settlement ${key} | adjustment-only | v4.36`;
     const legacyMarkerNoteV435=`Sweepstake League balance settlement ${key} | adjustment-only | v4.35`;
     const legacyMarkerNoteV434=`Sweepstake League balance settlement ${key} | adjustment-only | v4.34`;
     const legacyMarkerNoteV433=`Sweepstake League balance settlement ${key} | adjustment-only | v4.33`;
     try{
-      const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433}`).limit(1);
+      const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433}`).limit(1);
       if(logMarkerError)throw logMarkerError;
       if(logMarkers&&logMarkers.length){
         setSweepstakeLeagueSettlement({status:'done',already:true,changes:[],skipped:[]});
@@ -8859,6 +8860,59 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const matches=(leaguePlayers||[]).filter(p=>dayLeagueFirstName(p&&p.name)===first);
     return matches.length===1?matches[0]:null;
   }
+  function dayFinishDateKey(value){
+    const d=value?new Date(value):new Date();
+    if(Number.isNaN(d.getTime())){
+      const now=new Date();
+      return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    }
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function daySnakeDateKey(board,playable){
+    const first=(playable||[]).slice().sort((a,b)=>roundStartDate(a)-roundStartDate(b))[0]||board;
+    return dayFinishDateKey(roundStartDate(first));
+  }
+  function buildDaySnakeCandidates(board,linked,roundPlayers,scoreRows,leaguePlayers,snakeLog,links){
+    const playable=(linked||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
+    const roundIds=new Set(playable.map(r=>r&&r.id).filter(Boolean));
+    const holderIds=snakeHolderIdsFromScoreRows(scoreRows||[],18,roundIds);
+    const aliasMap={};
+    const personMap={};
+    function addAlias(alias,canonical){
+      const a=normaliseId(alias);const c=normaliseId(canonical);
+      if(a&&c)aliasMap[a]=c;
+    }
+    (roundPlayers||[]).filter(rp=>roundIds.has(rp&&rp.round_id)).forEach(raw=>{
+      const person=mapRoundPlayerForScorecard(raw,false);
+      const canonical=normaliseId(person.id||person.user_id||person.guest_id||person.round_player_id||raw.user_id||raw.guest_id||raw.id);
+      if(!canonical)return;
+      personMap[canonical]=person;
+      [person.id,person.user_id,person.guest_id,person.round_player_id,raw.id,raw.user_id,raw.guest_id,canonical].filter(Boolean).forEach(id=>addAlias(id,canonical));
+      scoreAliasesForPerson(person).forEach(id=>addAlias(id,canonical));
+    });
+    const dateKey=daySnakeDateKey(board,playable);
+    const candidates=[];
+    holderIds.forEach(rawId=>{
+      const canonical=aliasMap[normaliseId(rawId)]||normaliseId(rawId);
+      if(!canonical||candidates.some(c=>normaliseId(c.id)===canonical))return;
+      const scorecardPlayer=personMap[canonical]||{id:canonical,name:getDisplayName(canonical)||'Player'};
+      const leaguePlayer=daySweepstakeIsGuest(scorecardPlayer)?null:findDayLeaguePlayer(scorecardPlayer,leaguePlayers||[],links);
+      const existing=leaguePlayer?(snakeLog||[]).find(s=>normaliseId(s&&s.player_id)===normaliseId(leaguePlayer.id)&&dayFinishDateKey(s&&s.date)===dateKey):null;
+      const alreadyConfirmed=!!(existing&&existing.confirmed===true);
+      candidates.push({
+        id:canonical,
+        name:dayLeaguePlayerName(scorecardPlayer),
+        scorecardPlayer,
+        leaguePlayer,
+        dateKey,
+        existing,
+        alreadyConfirmed,
+        alreadyPending:!!(existing&&!alreadyConfirmed),
+        add:!!(leaguePlayer&&!alreadyConfirmed)
+      });
+    });
+    return candidates.sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  }
   function buildDaySweepstakeSettlement(board,linked,roundPlayers,scoreRows){
     const cfg=sweepstakeConfigFromRows(scoreRows||[],board);
     const amountPence=parseInt(cfg&&cfg.amountPence)||200;
@@ -8983,17 +9037,24 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
       const playable=linked.filter(r=>r&&r.id&&!isDayCompBoardRound(r));
       if(!playable.length){flash('No scorecards have joined this day sweepstake yet','error');return;}
       const ids=Array.from(new Set([boardRound&&boardRound.id,...playable.map(r=>r&&r.id)].filter(Boolean)));
-      const [scoreRes,rpRes]=await Promise.all([
+      const [scoreRes,rpRes,leagueRes,snakeRes,linkResult]=await Promise.all([
         sb.from('cup_scores').select('*').in('round_id',ids),
-        sb.from('cup_round_players').select('*').in('round_id',playable.map(r=>r.id))
+        sb.from('cup_round_players').select('*').in('round_id',playable.map(r=>r.id)),
+        sb.from('players').select('*').order('name',{ascending:true}),
+        sb.from('snake_log').select('*').order('created_at',{ascending:false}),
+        fetchLeaguePlayerLinks(sb)
       ]);
       if(scoreRes.error)throw scoreRes.error;
       if(rpRes.error)throw rpRes.error;
+      if(leagueRes.error)throw leagueRes.error;
+      if(snakeRes.error)throw snakeRes.error;
       const scoreRows=normaliseFoursomesScoreRows(scoreRes.data||[]);
       const roundPlayers=rpRes.data||[];
       const settlement=buildDaySweepstakeSettlement(boardRound,linked,roundPlayers,scoreRows);
       const leaderboardRows=buildDayFinishLeaderboardRows(linked,roundPlayers,scoreRows);
-      setFinishPreview({board:boardRound,linked,playable,scoreRows,roundPlayers,settlement,leaderboardRows});
+      const links=(linkResult&&linkResult.links)||{};
+      const snakeCandidates=buildDaySnakeCandidates(boardRound,linked,roundPlayers,scoreRows,leagueRes.data||[],snakeRes.data||[],links);
+      setFinishPreview({board:boardRound,linked,playable,scoreRows,roundPlayers,settlement,leaderboardRows,snakeCandidates});
     }catch(e){
       console.error('Day sweepstake preview failed',e);
       flash('Could not prepare finish summary: '+(e.message||String(e)),'error');
@@ -9005,7 +9066,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.38`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.39`;
+    const legacyMarkerNoteV438=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.38`;
     const legacyMarkerNoteV437=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.37`;
     const legacyMarkerNoteV436=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.36`;
     const legacyMarkerNoteV435=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.35`;
@@ -9024,7 +9086,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const playable=(linkedRounds||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
     if(!playable.length)return {already:false,changes:[],skipped:[]};
     const roundIds=playable.map(r=>r.id);
-    const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`).limit(1);
+    const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`).limit(1);
     if(logMarkerError)throw logMarkerError;
     if(logMarkers&&logMarkers.length)return {already:true,changes:[],skipped:[]};
     const [{data:roundPlayers,error:roundPlayersError},{data:scoreRows,error:scoreRowsError},{data:leaguePlayers,error:leaguePlayersError},linkResult]=await Promise.all([
@@ -9126,6 +9188,40 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
       });
     }catch(e){}
   }
+  async function addDayFinishedSnakes(preview){
+    const selected=(preview&&preview.snakeCandidates||[]).filter(s=>s&&s.add&&s.leaguePlayer&&s.dateKey);
+    const results=[];
+    for(const snake of selected){
+      const leagueId=normaliseId(snake.leaguePlayer&&snake.leaguePlayer.id);
+      if(!leagueId)continue;
+      const {data:existing,error:existingError}=await sb.from('snake_log')
+        .select('*')
+        .eq('player_id',leagueId)
+        .eq('date',snake.dateKey)
+        .limit(1);
+      if(existingError)throw existingError;
+      const row=(existing||[])[0];
+      if(row&&row.confirmed===true){
+        results.push({name:snake.leaguePlayer.name,action:'already'});
+        continue;
+      }
+      if(row&&row.id){
+        const {error:updateError}=await sb.from('snake_log').update({confirmed:true}).eq('id',row.id);
+        if(updateError)throw updateError;
+        results.push({name:snake.leaguePlayer.name,action:'confirmed'});
+        continue;
+      }
+      const {error:insertError}=await sb.from('snake_log').insert({
+        player_id:snake.leaguePlayer.id,
+        player_name:snake.leaguePlayer.name,
+        date:snake.dateKey,
+        confirmed:true
+      });
+      if(insertError)throw insertError;
+      results.push({name:snake.leaguePlayer.name,action:'added'});
+    }
+    return results;
+  }
   async function closeBoard(board,preview=null){
     const key=dayCompKeyFromRound(board);
     const wasLive=isLiveRound(board);
@@ -9133,6 +9229,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     try{
       const linked=(preview&&preview.linked)|| (key?await fetchDayCompRoundsFromCloud(key,(rounds||[]).filter(r=>dayCompKeyFromRound(r)===key)):[board].filter(Boolean));
       const settlement=await settleDaySweepstakeLeagueBalances(board,linked);
+      const snakeResults=preview?await addDayFinishedSnakes(preview):[];
       for(const r of linked){
         if(isLiveRound(r)){
           const {error:updateError}=await sb.from('cup_rounds').update({status:'complete'}).eq('id',r.id);
@@ -9143,10 +9240,13 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
       setFinishPreview(null);
       await load();
       try{if(window.snyderReloadSweepstakeBalanceAdjustments)window.snyderReloadSweepstakeBalanceAdjustments();}catch(e){}
-      if(settlement.already)flash('Day sweepstake finished - League balances already updated');
-      else if((settlement.changes||[]).length)flash('Day sweepstake finished - League balances updated');
+      const snakeAdded=snakeResults.filter(r=>r.action==='added'||r.action==='confirmed').length;
+      const snakeAlready=snakeResults.filter(r=>r.action==='already').length;
+      const snakeText=snakeAdded?` + ${snakeAdded} snake${snakeAdded===1?'':'s'} added`:(snakeAlready?' + snake already logged':'');
+      if(settlement.already)flash('Day sweepstake finished - League balances already updated'+snakeText);
+      else if((settlement.changes||[]).length)flash('Day sweepstake finished - League balances updated'+snakeText);
       else if((settlement.skipped||[]).length)flash('Day sweepstake finished - guests/unlinked/manual payments shown');
-      else flash('Day sweepstake finished');
+      else flash('Day sweepstake finished'+snakeText);
     }catch(e){
       console.error('Day sweepstake finish failed',e);
       flash('Could not finish day sweepstake: '+(e.message||String(e)),'error');
@@ -9158,7 +9258,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.38`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.39`;
+    const legacyMarkerNoteV438=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.38`;
     const legacyMarkerNoteV437=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.37`;
     const legacyMarkerNoteV436=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.36`;
     const legacyMarkerNoteV435=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.35`;
@@ -9173,7 +9274,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.38`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.39`;
+    const legacyReverseNoteV438=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.38`;
     const legacyReverseNoteV437=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.37`;
     const legacyReverseNoteV436=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.36`;
     const legacyReverseNoteV435=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.35`;
@@ -9187,10 +9289,10 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyReverseNoteV420=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.20`;
     const legacyReverseNoteV419=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.19`;
     const legacyReverseNote=`Day sweepstake League balance reversal ${markerKey}`;
-    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNoteV437},note.eq.${legacyReverseNoteV436},note.eq.${legacyReverseNoteV435},note.eq.${legacyReverseNoteV434},note.eq.${legacyReverseNoteV433},note.eq.${legacyReverseNoteV432},note.eq.${legacyReverseNoteV431},note.eq.${legacyReverseNoteV430},note.eq.${legacyReverseNoteV429},note.eq.${legacyReverseNoteV428},note.eq.${legacyReverseNoteV420},note.eq.${legacyReverseNoteV419},note.eq.${legacyReverseNote}`).limit(1);
+    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNoteV438},note.eq.${legacyReverseNoteV437},note.eq.${legacyReverseNoteV436},note.eq.${legacyReverseNoteV435},note.eq.${legacyReverseNoteV434},note.eq.${legacyReverseNoteV433},note.eq.${legacyReverseNoteV432},note.eq.${legacyReverseNoteV431},note.eq.${legacyReverseNoteV430},note.eq.${legacyReverseNoteV429},note.eq.${legacyReverseNoteV428},note.eq.${legacyReverseNoteV420},note.eq.${legacyReverseNoteV419},note.eq.${legacyReverseNote}`).limit(1);
     if(reverseCheckError)throw reverseCheckError;
     if(existingReverse&&existingReverse.length)return {reversed:false,already:true,count:0};
-    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`);
+    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`);
     if(logError)throw logError;
     const rows=(logs||[]).filter(r=>r&&r.player_id&&Math.abs(parseFloat(r.amount)||0)>0);
     if(!rows.length)return {reversed:false,count:0};
@@ -9301,6 +9403,24 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
                 {!finishPreview.settlement.rows.filter(r=>r.net!==0).length&&<div style={{padding:'8px 0',borderTop:'1px solid rgba(255,255,255,0.08)',fontSize:12,color:'rgba(255,255,255,0.62)'}}>No sweepstake balance changes.</div>}
                 <div style={{fontSize:10,color:'rgba(255,255,255,0.54)',lineHeight:1.35,marginTop:7}}>Only opted-in players are settled. Opted-out players can appear on the leaderboard but not in these balances.</div>
               </div>
+            </div>
+            <div style={{...S.card,marginBottom:10,borderColor:'rgba(34,197,94,0.26)',background:'linear-gradient(180deg,rgba(21,96,66,0.24),rgba(8,24,48,0.94))'}}>
+              <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'baseline',marginBottom:8}}>
+                <div style={{fontSize:16,color:'#fff',fontWeight:950}}>Snake check</div>
+                <div style={{fontSize:11,color:'#86efac',fontWeight:950}}>Max one per player per day</div>
+              </div>
+              {(finishPreview.snakeCandidates||[]).length?(finishPreview.snakeCandidates||[]).map((snake,idx)=>(
+                <label key={snake.id||idx} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 0',borderTop:'1px solid rgba(255,255,255,0.08)',cursor:snake.leaguePlayer&&!snake.alreadyConfirmed?'pointer':'default'}}>
+                  <input type="checkbox" disabled={!snake.leaguePlayer||snake.alreadyConfirmed} checked={!!snake.add} onChange={e=>setFinishPreview(prev=>prev?{...prev,snakeCandidates:(prev.snakeCandidates||[]).map(s=>normaliseId(s.id)===normaliseId(snake.id)?{...s,add:e.target.checked}:s)}:prev)} style={{width:18,height:18,accentColor:'#22c55e',flexShrink:0}}/>
+                  <div style={{minWidth:0,flex:1}}>
+                    <div style={{fontSize:13,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{snake.name}</div>
+                    <div style={{fontSize:10,color:snake.alreadyConfirmed?'#fbbf24':snake.alreadyPending?'#86efac':snake.leaguePlayer?'#90ccf0':'#f87171',fontWeight:850,marginTop:2}}>
+                      {snake.alreadyConfirmed?'Already logged for this day':snake.alreadyPending?'Pending snake will be confirmed':snake.leaguePlayer?'Add confirmed snake charge':'Not matched to League'}
+                    </div>
+                  </div>
+                </label>
+              )):<div style={{padding:'9px 0',borderTop:'1px solid rgba(255,255,255,0.08)',fontSize:12,color:'rgba(255,255,255,0.62)'}}>No snake marked on the linked scorecards.</div>}
+              <div style={{fontSize:10,color:'rgba(255,255,255,0.54)',lineHeight:1.35,marginTop:7}}>Untick this if the day was not playing snake. If the player already has a snake for this date, the app will not create another one.</div>
             </div>
             <button onClick={()=>closeBoard(finishPreview.board,finishPreview)} disabled={finishing} style={{...S.pri,width:'100%',padding:13,opacity:finishing?0.58:1}}>{finishing?'Finishing...':(isLiveRound(finishPreview.board)?'Confirm Finish Day':'Confirm League Balances')}</button>
           </div>
