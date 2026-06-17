@@ -42,7 +42,7 @@ The frontend never stores England Golf passwords. It sends them to `england-golf
 
 ## Daily Sync
 
-`.github/workflows/england-golf-handicap-sync.yml` runs once per day and can also be triggered manually from GitHub Actions.
+`.github/workflows/england-golf-handicap-sync.yml` runs once per day at 02:30 UK time during BST and can also be triggered manually from GitHub Actions.
 
 The job:
 

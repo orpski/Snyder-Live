@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
       .from("cup_users")
       .update({
         england_golf_member_no: String(username).trim(),
-        england_golf_sync_error: loginCheck.needsSyncConfirmation ? "Saved new login details. Waiting for next sync to confirm at 2am." : null,
+        england_golf_sync_error: loginCheck.needsSyncConfirmation ? "Saved new login details. Waiting for next sync to confirm at 2:30am." : null,
       })
       .eq("id", userId);
 
