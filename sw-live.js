@@ -1,9 +1,18 @@
-// SNYDER GOLF v4.46 service worker
-const CACHE_NAME = "snyder-golf-v4-46";
+// SNYDER GOLF v4.47 service worker
+const CACHE_NAME = "snyder-golf-v4-47";
 const ASSETS = ['./','./index.html','./styles.css','./league-section.js','./app.js','./manifest-live.json','./snyder-golf-logo.png','./snyder-golf-logo-clean.png','./icon-golf-192.png','./icon-golf-512.png','./icon-live-192.png','./icon-live-512.png','./notification-badge-v2.png','./money-fix.js','./course-whitley-bay.png','./course-tynemouth.svg','./course-quinta-do-lago.png','./course-ombria.png'];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.map(key => key !== CACHE_NAME ? caches.delete(key) : null))).then(() => self.clients.claim())); });
-self.addEventListener('fetch', event => { if (event.request.method !== 'GET') return; event.respondWith(fetch(event.request).then(response => { const clone = response.clone(); caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone)); return response; }).catch(() => caches.match(event.request).then(cached => cached || caches.match('./index.html')))); });
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  const isAppScript = url.pathname.endsWith('/app.js') || url.pathname.endsWith('/league-section.js') || url.pathname.endsWith('/money-fix.js');
+  if (isAppScript) {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }).catch(() => caches.match(event.request).then(cached => cached || caches.match('./' + url.pathname.split('/').pop()))));
+    return;
+  }
+  event.respondWith(fetch(event.request).then(response => { const clone = response.clone(); caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone)); return response; }).catch(() => caches.match(event.request).then(cached => cached || caches.match('./index.html'))));
+});
 async function mutedRoundIds(){
   try{
     const cache=await caches.open(CACHE_NAME);
