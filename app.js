@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.53
+// SNYDER GOLF v4.54
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -154,7 +154,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.53',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.54',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -203,7 +203,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.53',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.54',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -271,6 +271,10 @@ const LOGO='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAYAAAB5fY51AA
 // These are safe local presets that can be imported into Supabase from Admin.
 // =========================================================
 const WHITLEY_BAY_BADGE='course-whitley-bay.png';
+const SWEEPSTAKE_LOGO='sweepstake-logo.png';
+function SweepstakeLogo({size=58,hero=false,style={}}){
+  return <img src={SWEEPSTAKE_LOGO} alt="Sweep Stake" style={{width:hero?'min(280px,78vw)':size,height:hero?'auto':size,objectFit:'contain',display:'block',flexShrink:0,filter:'drop-shadow(0 8px 18px rgba(0,0,0,0.42))',...style}}/>;
+}
 const WHITLEY_BAY_PRESETS=[
   {name:'Whitley Bay Golf Club - White Tee',location:'Whitley Bay',image_url:WHITLEY_BAY_BADGE,course_rating:72.7,slope_rating:135,holes:[
     {hole:1,par:5,stroke_index:12,yards:476},{hole:2,par:4,stroke_index:2,yards:422},{hole:3,par:3,stroke_index:18,yards:172},{hole:4,par:4,stroke_index:14,yards:377},{hole:5,par:4,stroke_index:4,yards:391},{hole:6,par:5,stroke_index:8,yards:515},{hole:7,par:4,stroke_index:6,yards:374},{hole:8,par:4,stroke_index:16,yards:352},{hole:9,par:3,stroke_index:10,yards:155},{hole:10,par:4,stroke_index:15,yards:356},{hole:11,par:4,stroke_index:5,yards:414},{hole:12,par:5,stroke_index:1,yards:582},{hole:13,par:3,stroke_index:17,yards:162},{hole:14,par:4,stroke_index:11,yards:390},{hole:15,par:4,stroke_index:9,yards:384},{hole:16,par:4,stroke_index:3,yards:409},{hole:17,par:3,stroke_index:13,yards:189},{hole:18,par:5,stroke_index:7,yards:459}
@@ -1996,13 +2000,13 @@ function App(){
       <div style={{...S.card,...NO_SELECT,marginBottom:8,cursor:'pointer',opacity:0.9}} onClick={()=>isDay?setDayScorecardRound(rd):openRound(rd)}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
           <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
-            <CourseBadge course={courses.find(co=>co.id===rd.course_id)} round={rd} size={34}/>
+            {isDay?<SweepstakeLogo size={42}/>:<CourseBadge course={courses.find(co=>co.id===rd.course_id)} round={rd} size={34}/>}
             <div style={{minWidth:0}}>
               <div style={{fontSize:14,color:'#fff',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{isDay?dayCompDisplayName(rounds,rd):roundDisplayName(rd)}</div>
               <div style={{fontSize:11,color:'#60b8f0'}}>{isDay?'Final sweepstake results':'Round started: '+formatRoundStart(rd)}</div>
             </div>
           </div>
-          <div style={{fontSize:11,color:isDay?'#92400e':'#1b5e20',background:isDay?'rgba(245,158,11,0.16)':'rgba(27,94,32,0.15)',borderRadius:6,padding:'3px 8px',fontWeight:600,flexShrink:0}}>{isDay?'Sweepstake':'Completed'}</div>
+          <div style={{fontSize:11,color:isDay?'#fff':'#1b5e20',background:isDay?'rgba(245,158,11,0.20)':'rgba(27,94,32,0.15)',borderRadius:6,padding:isDay?'3px 5px':'3px 8px',fontWeight:600,flexShrink:0,display:'flex',alignItems:'center',gap:4}}>{isDay&&<SweepstakeLogo size={24}/>} {isDay?'Sweepstake':'Completed'}</div>
         </div>
       </div>
     );
@@ -2173,7 +2177,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v4.53" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.53</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v4.54" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.54</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -2848,9 +2852,12 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
         <div ref={dayScrollRef} style={{height:'100dvh',maxHeight:'100vh',overflowY:'auto',overscrollBehaviorY:'none',WebkitOverflowScrolling:'touch',touchAction:'pan-y',padding:'max(10px,env(safe-area-inset-top)) 10px 10px'}}>
         <div style={{maxWidth:540,margin:'0 auto'}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:8}}>
-            <div>
-              <div style={{fontSize:18,color:'#fff',fontWeight:950,textShadow:'0 0 18px rgba(96,184,240,0.22)'}}>{dayCompDisplayName(rounds,rd)}</div>
-              <div style={{fontSize:12,color:'#90ccf0',fontWeight:800}}>Day leaderboard · {effectivePlayable.length} scorecard{effectivePlayable.length===1?'':'s'} joined</div>
+            <div style={{display:'flex',alignItems:'center',gap:9,minWidth:0}}>
+              <SweepstakeLogo size={54}/>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:18,color:'#fff',fontWeight:950,textShadow:'0 0 18px rgba(96,184,240,0.22)'}}>{dayCompDisplayName(rounds,rd)}</div>
+                <div style={{fontSize:12,color:'#90ccf0',fontWeight:800}}>Day leaderboard · {effectivePlayable.length} scorecard{effectivePlayable.length===1?'':'s'} joined</div>
+              </div>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:7,flexShrink:0}}>
               <button onClick={refreshDayLeaderboardNow} disabled={dayRefreshing} style={{...S.gho,padding:'6px 9px',fontSize:12,opacity:dayRefreshing?0.62:1}}>{dayRefreshing?'Syncing':'Refresh'}</button>
@@ -2881,7 +2888,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
           </div>
           <div style={{...S.card,padding:12,marginBottom:8,borderColor:'rgba(245,158,11,0.28)',background:'linear-gradient(180deg,rgba(75,50,12,0.38),rgba(8,24,48,0.94))',boxShadow:'0 12px 26px rgba(245,158,11,0.08)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8,marginBottom:7}}>
-              <div style={{fontSize:15,color:'#fff',fontWeight:950}}>Sweepstake</div>
+              <div style={{display:'flex',alignItems:'center',gap:8}}><SweepstakeLogo size={46}/><div style={{fontSize:15,color:'#fff',fontWeight:950}}>Sweepstake</div></div>
               <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,textAlign:'right'}}>{compactSettlement.playerCount} entered · {moneyFromPence(parseInt(cfg&&cfg.amountPence)||200)} each pot</div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr',gap:6}}>
@@ -3016,13 +3023,13 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
       <div style={{...S.card,...NO_SELECT,marginBottom:8,cursor:'pointer',opacity:0.9,borderColor:isSweepstakeBoard?'rgba(251,191,36,0.28)':undefined}} onClick={open}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
           <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
-            <CourseBadge course={courses.find(co=>co.id===rd.course_id)} round={rd} size={34}/>
+            {isSweepstakeBoard?<SweepstakeLogo size={42}/>:<CourseBadge course={courses.find(co=>co.id===rd.course_id)} round={rd} size={34}/>}
             <div style={{minWidth:0}}>
               <div style={{fontSize:14,color:'#fff',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{title}</div>
               <div style={{fontSize:11,color:isSweepstakeBoard?'#fbbf24':'#60b8f0'}}>{isSweepstakeBoard?'Final sweepstake results':'Round started: '+formatRoundStart(rd)}</div>
             </div>
           </div>
-          <div style={{fontSize:11,color:isSweepstakeBoard?'#fff':'#1b5e20',background:isSweepstakeBoard?'rgba(251,191,36,0.36)':'rgba(27,94,32,0.15)',border:isSweepstakeBoard?'1px solid rgba(251,191,36,0.55)':'none',borderRadius:6,padding:'3px 8px',fontWeight:800,flexShrink:0,textShadow:isSweepstakeBoard?'0 1px 2px rgba(0,0,0,0.45)':'none'}}>{isSweepstakeBoard?'Results':'Completed'}</div>
+          <div style={{fontSize:11,color:isSweepstakeBoard?'#fff':'#1b5e20',background:isSweepstakeBoard?'rgba(251,191,36,0.36)':'rgba(27,94,32,0.15)',border:isSweepstakeBoard?'1px solid rgba(251,191,36,0.55)':'none',borderRadius:6,padding:isSweepstakeBoard?'3px 5px':'3px 8px',fontWeight:800,flexShrink:0,textShadow:isSweepstakeBoard?'0 1px 2px rgba(0,0,0,0.45)':'none',display:'flex',alignItems:'center',gap:4}}>{isSweepstakeBoard&&<SweepstakeLogo size={24}/>} {isSweepstakeBoard?'Results':'Completed'}</div>
         </div>
       </div>
     );
@@ -3110,7 +3117,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                 </>}
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',borderTop:'1px solid rgba(255,255,255,0.08)',paddingTop:10}}>
                   <div style={{fontSize:11,color:'rgba(255,255,255,0.5)'}}>{mp?((mp.mode==='foursomes'?'Foursomes matchplay':mp.mode==='singles'?'Singles matchplay':'Matchplay')+' - Tap to view'):(dayCompKeyFromRound(rd)?(playableDayCompRounds(rounds,rd).length+' scorecards on sweepstake board - Tap to view'):(rdGroups.length+' group'+(rdGroups.length!==1?'s':'')+' live - Tap to view'))}</div>
-                  <button onClick={e=>{e.stopPropagation();dayCompKeyFromRound(rd)?setDayScorecardRound(rd):openRound(rd);}} style={{...S.pri,padding:'7px 10px',fontSize:11}}>{dayCompKeyFromRound(rd)?'Day Table':'Check Scorecard'}</button>
+                  <button onClick={e=>{e.stopPropagation();dayCompKeyFromRound(rd)?setDayScorecardRound(rd):openRound(rd);}} style={{...S.pri,padding:dayCompKeyFromRound(rd)?'4px 8px':'7px 10px',fontSize:11,display:'flex',alignItems:'center',gap:5}}>{dayCompKeyFromRound(rd)&&<SweepstakeLogo size={28}/>} {dayCompKeyFromRound(rd)?'Day Table':'Check Scorecard'}</button>
                 </div>
               </div>
             );
@@ -3123,7 +3130,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
             <div style={{fontSize:18,color:'#fff',fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.03em',marginBottom:10}}>Completed Scores</div>
             {completedDayBoards.length>0&&(
               <div style={{marginBottom:16}}>
-                <div style={{fontSize:11,color:'#fbbf24',letterSpacing:'0.15em',fontWeight:700,marginBottom:10}}>SWEEPSTAKES</div>
+                <div style={{display:'flex',alignItems:'center',gap:7,fontSize:11,color:'#fbbf24',letterSpacing:'0.15em',fontWeight:700,marginBottom:10}}><SweepstakeLogo size={34}/> SWEEPSTAKES</div>
                 {completedDayBoards.map(rd=><CompletedCard key={rd.id} rd={rd}/>)}
               </div>
             )}
@@ -4854,7 +4861,8 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
           </div>
           <div style={{padding:16}}>
             <div style={{...S.card,borderColor:'rgba(96,184,240,0.35)',background:'rgba(96,184,240,0.10)',marginBottom:12}}>
-              <div style={{fontSize:20,color:'#fff',fontWeight:950,marginBottom:6}}>Are you joining the day sweepstake?</div>
+              <div style={{display:'flex',justifyContent:'center',padding:'4px 0 14px'}}><SweepstakeLogo hero={true}/></div>
+              <div style={{fontSize:20,color:'#fff',fontWeight:950,marginBottom:6,textAlign:'center'}}>Are you joining the day sweepstake?</div>
               <div style={{fontSize:13,color:'#90ccf0',lineHeight:1.4}}>{dayCompDisplayName(rounds,promptDayBoard)}</div>
               {dayBoardSweepstakeConfig(promptDayBoard).enabled&&<div style={{marginTop:8,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.12)',border:'1px solid rgba(245,158,11,0.25)',fontSize:12,color:'#fbbf24',lineHeight:1.35}}>Joining enters you into the same front, back and overall sweepstake.</div>}
             </div>
@@ -5005,9 +5013,12 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
           )}
           {!isMatchplayOnlySetup()&&<div style={{padding:'12px 14px',background:setup.sweepstake&&setup.sweepstake.enabled?'rgba(245,158,11,0.12)':'rgba(255,255,255,0.06)',borderRadius:10,marginBottom:16,border:'1px solid '+(setup.sweepstake&&setup.sweepstake.enabled?'rgba(245,158,11,0.35)':'rgba(255,255,255,0.12)')}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
-              <div>
-                <div style={{fontSize:14,color:'#fff',fontWeight:800}}>Sweepstake</div>
-                <div style={{fontSize:11,color:'#fbbf24',marginTop:2}}>{daySweepstakeLocked?'This day sweepstake uses one amount for front, back and overall.':'Optional side pot from Stableford only: front, back and overall.'}</div>
+              <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
+                <SweepstakeLogo size={54}/>
+                <div>
+                  <div style={{fontSize:14,color:'#fff',fontWeight:800}}>Sweepstake</div>
+                  <div style={{fontSize:11,color:'#fbbf24',marginTop:2}}>{daySweepstakeLocked?'This day sweepstake uses one amount for front, back and overall.':'Optional side pot from Stableford only: front, back and overall.'}</div>
+                </div>
               </div>
               <div onClick={()=>{if(!daySweepstakeLocked)setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),enabled:!(q.sweepstake&&q.sweepstake.enabled)}}));}} style={{width:48,height:28,borderRadius:14,background:(setup.sweepstake&&setup.sweepstake.enabled)||daySweepstakeLocked?'#d97706':'rgba(255,255,255,0.2)',cursor:daySweepstakeLocked?'default':'pointer',position:'relative',transition:'background 0.2s',flexShrink:0,opacity:daySweepstakeLocked?0.9:1}}>
                 <div style={{position:'absolute',top:3,left:(setup.sweepstake&&setup.sweepstake.enabled)||daySweepstakeLocked?22:3,width:22,height:22,borderRadius:'50%',background:'#fff',transition:'left 0.2s'}}/>
@@ -6851,7 +6862,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return `league-balance-${round&&round.id||'round'}-${scope==='group'?(activeGroupId||'group'):'all'}`;
   }
   function normalSweepstakeSettlementNotes(key){
-    return ['v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
+    return ['v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
   }
   function signedMoneyFromPence(pence){
     const n=parseInt(pence)||0;
@@ -7016,7 +7027,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const title=reviewTitle||'💰 Sweepstake';
     return <div style={{...S.card,margin:compact?'0 0 10px':16,background:payUp?'linear-gradient(135deg,rgba(245,158,11,0.30),rgba(10,21,40,0.96))':'linear-gradient(135deg,rgba(245,158,11,0.18),rgba(255,255,255,0.05))',borderColor:'rgba(245,158,11,0.55)',boxShadow:payUp?'0 14px 36px rgba(245,158,11,0.18)':'none'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:10}}>
-        <div><div style={{fontSize:payUp?21:16,color:'#fff',fontWeight:950}}>{title}</div><div style={{fontSize:11,color:'#fbbf24'}}>Stableford side pots · {moneyFromPence(sw.amountPence)} front/back/overall · {sw.scope==='round'?'all groups':'this group'} · {sw.playerCount} players</div></div>
+        <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><SweepstakeLogo size={payUp?72:56}/><div><div style={{fontSize:payUp?21:16,color:'#fff',fontWeight:950}}>{title}</div><div style={{fontSize:11,color:'#fbbf24'}}>Stableford side pots · {moneyFromPence(sw.amountPence)} front/back/overall · {sw.scope==='round'?'all groups':'this group'} · {sw.playerCount} players</div></div></div>
       </div>
       {!sw.final&&<div style={{padding:'8px 10px',borderRadius:10,background:'rgba(96,184,240,0.12)',border:'1px solid rgba(96,184,240,0.22)',fontSize:12,color:'#dbeafe',fontWeight:800,marginBottom:8}}>Live standings only — final net settlement appears after 18 holes.</div>}
       {sw.pots.map(pot=><div key={pot.key} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'7px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
@@ -7419,7 +7430,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   function SweepstakeMoneyButton(){
     const sw=sweepstakePlayerRows();
     if(!sw.enabled)return null;
-    return <button aria-label="Open sweepstake standings" title="Sweepstake" onClick={()=>{refreshScoresFromCloud(false);setShowSweepstake(true);}} style={{width:38,height:38,borderRadius:10,border:'1px solid rgba(245,158,11,0.45)',background:'rgba(245,158,11,0.14)',color:'#fbbf24',fontSize:20,fontWeight:950,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,lineHeight:1}}>💰</button>;
+    return <button aria-label="Open sweepstake standings" title="Sweepstake" onClick={()=>{refreshScoresFromCloud(false);setShowSweepstake(true);}} style={{width:42,height:42,borderRadius:11,border:'1px solid rgba(132,204,22,0.55)',background:'rgba(0,0,0,0.34)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,padding:2,overflow:'hidden'}}><SweepstakeLogo size={36} style={{filter:'none'}}/></button>;
   }
   function ScorecardNotificationButton(){
     if(!round||!round.id||!isLiveRound(round))return null;
@@ -8575,7 +8586,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.78)',zIndex:9998,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={e=>{if(e.target===e.currentTarget)setShowSweepstake(false);}}>
           <div style={{width:'100%',maxWidth:520,maxHeight:'82vh',overflowY:'auto',background:'#0d2548',borderTop:'1px solid rgba(255,255,255,0.16)',borderRadius:'18px 18px 0 0',padding:16}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-              <div><div style={{fontSize:18,color:'#fff',fontWeight:900}}>Sweepstake Money</div><div style={{fontSize:12,color:'#fbbf24'}}>Net settlement only · {sweepstakePlayerRows().scope==='round'?'whole round / all groups':'my group only'}</div></div>
+              <div style={{display:'flex',alignItems:'center',gap:10}}><SweepstakeLogo size={62}/><div><div style={{fontSize:18,color:'#fff',fontWeight:900}}>Sweepstake Money</div><div style={{fontSize:12,color:'#fbbf24'}}>Net settlement only · {sweepstakePlayerRows().scope==='round'?'whole round / all groups':'my group only'}</div></div></div>
               <button onClick={()=>setShowSweepstake(false)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Close</button>
             </div>
             <SweepstakePanel compact={false}/>
@@ -9298,7 +9309,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.53`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.54`;
+    const legacyMarkerNoteV453=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.53`;
     const legacyMarkerNoteV452=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.52`;
     const legacyMarkerNoteV451=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.51`;
     const legacyMarkerNoteV450=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.50`;
@@ -9332,7 +9344,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const playable=(linkedRounds||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
     if(!playable.length)return {already:false,changes:[],skipped:[]};
     const roundIds=playable.map(r=>r.id);
-    const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`).limit(1);
+    const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV453},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`).limit(1);
     if(logMarkerError)throw logMarkerError;
     if(logMarkers&&logMarkers.length)return {already:true,changes:[],skipped:[]};
     const [{data:roundPlayers,error:roundPlayersError},{data:scoreRows,error:scoreRowsError},{data:leaguePlayers,error:leaguePlayersError},linkResult]=await Promise.all([
@@ -9515,7 +9527,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.53`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.54`;
+    const legacyMarkerNoteV453=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.53`;
     const legacyMarkerNoteV452=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.52`;
     const legacyMarkerNoteV451=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.51`;
     const legacyMarkerNoteV450=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.50`;
@@ -9545,7 +9558,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.53`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.54`;
+    const legacyReverseNoteV453=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.53`;
     const legacyReverseNoteV452=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.52`;
     const legacyReverseNoteV451=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.51`;
     const legacyReverseNoteV450=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.50`;
@@ -9574,10 +9588,10 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyReverseNoteV420=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.20`;
     const legacyReverseNoteV419=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.19`;
     const legacyReverseNote=`Day sweepstake League balance reversal ${markerKey}`;
-    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNoteV452},note.eq.${legacyReverseNoteV451},note.eq.${legacyReverseNoteV450},note.eq.${legacyReverseNoteV449},note.eq.${legacyReverseNoteV448},note.eq.${legacyReverseNoteV447},note.eq.${legacyReverseNoteV446},note.eq.${legacyReverseNoteV445},note.eq.${legacyReverseNoteV444},note.eq.${legacyReverseNoteV443},note.eq.${legacyReverseNoteV442},note.eq.${legacyReverseNoteV441},note.eq.${legacyReverseNoteV440},note.eq.${legacyReverseNoteV439},note.eq.${legacyReverseNoteV438},note.eq.${legacyReverseNoteV437},note.eq.${legacyReverseNoteV436},note.eq.${legacyReverseNoteV435},note.eq.${legacyReverseNoteV434},note.eq.${legacyReverseNoteV433},note.eq.${legacyReverseNoteV432},note.eq.${legacyReverseNoteV431},note.eq.${legacyReverseNoteV430},note.eq.${legacyReverseNoteV429},note.eq.${legacyReverseNoteV428},note.eq.${legacyReverseNoteV420},note.eq.${legacyReverseNoteV419},note.eq.${legacyReverseNote}`).limit(1);
+    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNoteV453},note.eq.${legacyReverseNoteV452},note.eq.${legacyReverseNoteV451},note.eq.${legacyReverseNoteV450},note.eq.${legacyReverseNoteV449},note.eq.${legacyReverseNoteV448},note.eq.${legacyReverseNoteV447},note.eq.${legacyReverseNoteV446},note.eq.${legacyReverseNoteV445},note.eq.${legacyReverseNoteV444},note.eq.${legacyReverseNoteV443},note.eq.${legacyReverseNoteV442},note.eq.${legacyReverseNoteV441},note.eq.${legacyReverseNoteV440},note.eq.${legacyReverseNoteV439},note.eq.${legacyReverseNoteV438},note.eq.${legacyReverseNoteV437},note.eq.${legacyReverseNoteV436},note.eq.${legacyReverseNoteV435},note.eq.${legacyReverseNoteV434},note.eq.${legacyReverseNoteV433},note.eq.${legacyReverseNoteV432},note.eq.${legacyReverseNoteV431},note.eq.${legacyReverseNoteV430},note.eq.${legacyReverseNoteV429},note.eq.${legacyReverseNoteV428},note.eq.${legacyReverseNoteV420},note.eq.${legacyReverseNoteV419},note.eq.${legacyReverseNote}`).limit(1);
     if(reverseCheckError)throw reverseCheckError;
     if(existingReverse&&existingReverse.length)return {reversed:false,already:true,count:0};
-    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`);
+    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV453},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`);
     if(logError)throw logError;
     const rows=(logs||[]).filter(r=>r&&r.player_id&&Math.abs(parseFloat(r.amount)||0)>0);
     if(!rows.length)return {reversed:false,count:0};
@@ -9634,9 +9648,12 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
         <div style={{position:'fixed',inset:0,background:'linear-gradient(180deg,rgba(4,12,28,0.94),rgba(2,8,23,0.91))',zIndex:1400,padding:'max(20px,6vh) 14px 14px',overflowY:'auto'}}>
           <div style={{maxWidth:560,margin:'0 auto'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,marginBottom:12}}>
-              <div>
-                <div style={{fontSize:20,color:'#fff',fontWeight:950}}>{isLiveRound(finishPreview.board)?'Finish day?':'Check balances?'}</div>
-                <div style={{fontSize:12,color:'#90ccf0',fontWeight:850,marginTop:2}}>{dayCompDisplayName(rounds,finishPreview.board)} · check before League balances update</div>
+              <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
+                <SweepstakeLogo size={66}/>
+                <div>
+                  <div style={{fontSize:20,color:'#fff',fontWeight:950}}>{isLiveRound(finishPreview.board)?'Finish day?':'Check balances?'}</div>
+                  <div style={{fontSize:12,color:'#90ccf0',fontWeight:850,marginTop:2}}>{dayCompDisplayName(rounds,finishPreview.board)} · check before League balances update</div>
+                </div>
               </div>
               <button onClick={()=>!finishing&&setFinishPreview(null)} disabled={finishing} style={{...S.gho,padding:'7px 12px',fontSize:12,opacity:finishing?0.55:1}}>Cancel</button>
             </div>
@@ -9661,7 +9678,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
             </div>
             <div style={{...S.card,marginBottom:10,borderColor:'rgba(245,158,11,0.28)',background:'linear-gradient(180deg,rgba(75,50,12,0.38),rgba(8,24,48,0.94))'}}>
               <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'baseline',marginBottom:8}}>
-                <div style={{fontSize:16,color:'#fff',fontWeight:950}}>Sweepstake check</div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}><SweepstakeLogo size={48}/><div style={{fontSize:16,color:'#fff',fontWeight:950}}>Sweepstake check</div></div>
                 <div style={{fontSize:11,color:'#fbbf24',fontWeight:950}}>{finishPreview.settlement.entrantCount} entered · {moneyFromPence(finishPreview.settlement.amountPence)} each pot</div>
               </div>
               {(finishPreview.settlement.pots||[]).map(pot=>(
@@ -9712,7 +9729,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
         </div>
       )}
       <div style={{...S.card,marginBottom:16,borderColor:'rgba(96,184,240,0.25)',background:'rgba(96,184,240,0.08)'}}>
-        <div style={{fontSize:17,color:'#fff',fontWeight:900,marginBottom:6}}>Create Day Sweepstake</div>
+        <div style={{display:'flex',justifyContent:'center',marginBottom:10}}><SweepstakeLogo hero={true} style={{maxWidth:230}}/></div>
+        <div style={{fontSize:17,color:'#fff',fontWeight:900,marginBottom:6,textAlign:'center'}}>Create Day Sweepstake</div>
         <div style={{fontSize:12,color:'#90ccf0',lineHeight:1.4,marginBottom:12}}>Set this up before the first tee time. Players then join this fixed sweepstake from Start Round.</div>
         <label style={S.lbl}>Sweepstake Name</label>
         <input style={{...S.inp,marginBottom:10}} value={name} onChange={e=>setName(e.target.value)} placeholder="Saturday Sweepstake"/>
@@ -9742,7 +9760,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
         </div>
         <button onClick={createBoard} disabled={saving} style={{...S.pri,width:'100%',padding:12,opacity:saving?0.6:1}}>{saving?'Creating...':'Create Day Sweepstake'}</button>
       </div>
-      <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.12em',marginBottom:8}}>DAY SWEEPSTAKES</div>
+      <div style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.12em',marginBottom:8}}><SweepstakeLogo size={40}/> DAY SWEEPSTAKES</div>
       {!boards.length&&<div style={{...S.card,fontSize:13,color:'#8ea0ad',textAlign:'center'}}>No day sweepstakes yet.</div>}
       {boards.map(board=>{
         const linked=(rounds||[]).filter(r=>dayCompKeyFromRound(r)===dayCompKeyFromRound(board));
@@ -9750,10 +9768,13 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
         const boardSweepstake=sweepstakeConfigFromRows(scores||[],board);
         return <div key={board.id} style={{...S.card,marginBottom:10}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:8}}>
-            <div style={{minWidth:0}}>
+            <div style={{display:'flex',alignItems:'center',gap:9,minWidth:0}}>
+              <SweepstakeLogo size={50}/>
+              <div style={{minWidth:0}}>
               <div style={{fontSize:15,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{dayCompDisplayName(rounds,board)}</div>
               {boardSweepstake.enabled&&<div style={{fontSize:11,color:'#fbbf24',fontWeight:900,marginTop:4}}>Sweepstake on · {moneyFromPence((parseInt(boardSweepstake.amountPence)||200)*3)} max loss · {boardSweepstake.scope==='group'?'by group':'whole board'}</div>}
               <div style={{fontSize:11,color:'#90ccf0',marginTop:2}}>{scorecards.length} scorecard{scorecards.length===1?'':'s'} joined · {board.status}</div>
+              </div>
             </div>
             <div style={{fontSize:10,color:isLiveRound(board)?'#86efac':'#8ea0ad',fontWeight:900,letterSpacing:'0.09em'}}>{isLiveRound(board)?'OPEN':'CLOSED'}</div>
           </div>
