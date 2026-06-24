@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.52
+// SNYDER GOLF v4.53
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -154,7 +154,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.52',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.53',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -203,7 +203,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.52',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.53',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -282,6 +282,15 @@ const WHITLEY_BAY_PRESETS=[
     {hole:1,par:5,stroke_index:10,yards:375},{hole:2,par:5,stroke_index:14,yards:388},{hole:3,par:3,stroke_index:16,yards:149},{hole:4,par:4,stroke_index:18,yards:310},{hole:5,par:4,stroke_index:8,yards:340},{hole:6,par:5,stroke_index:4,yards:458},{hole:7,par:4,stroke_index:2,yards:358},{hole:8,par:4,stroke_index:6,yards:322},{hole:9,par:3,stroke_index:12,yards:142},{hole:10,par:4,stroke_index:9,yards:319},{hole:11,par:4,stroke_index:13,yards:340},{hole:12,par:5,stroke_index:1,yards:522},{hole:13,par:3,stroke_index:15,yards:161},{hole:14,par:4,stroke_index:3,yards:372},{hole:15,par:4,stroke_index:5,yards:326},{hole:16,par:5,stroke_index:7,yards:370},{hole:17,par:3,stroke_index:17,yards:118},{hole:18,par:5,stroke_index:11,yards:384}
   ]}
 ];
+const GOSWICK_BADGE='course-goswick.png';
+const GOSWICK_PRESETS=[
+  {name:'Goswick Golf Club - White Tee',location:'Berwick-upon-Tweed, Northumberland',image_url:GOSWICK_BADGE,course_rating:73.0,slope_rating:129,holes:[
+    {hole:1,par:4,stroke_index:5,yards:392},{hole:2,par:3,stroke_index:17,yards:162},{hole:3,par:4,stroke_index:7,yards:412},{hole:4,par:5,stroke_index:15,yards:531},{hole:5,par:4,stroke_index:1,yards:420},{hole:6,par:5,stroke_index:13,yards:528},{hole:7,par:4,stroke_index:9,yards:387},{hole:8,par:4,stroke_index:3,yards:422},{hole:9,par:3,stroke_index:11,yards:198},{hole:10,par:4,stroke_index:2,yards:420},{hole:11,par:5,stroke_index:12,yards:513},{hole:12,par:4,stroke_index:8,yards:365},{hole:13,par:3,stroke_index:10,yards:176},{hole:14,par:4,stroke_index:6,yards:394},{hole:15,par:3,stroke_index:16,yards:151},{hole:16,par:4,stroke_index:4,yards:416},{hole:17,par:5,stroke_index:14,yards:490},{hole:18,par:4,stroke_index:18,yards:268}
+  ]},
+  {name:'Goswick Golf Club - Yellow Tee',location:'Berwick-upon-Tweed, Northumberland',image_url:GOSWICK_BADGE,course_rating:71.9,slope_rating:127,holes:[
+    {hole:1,par:4,stroke_index:5,yards:370},{hole:2,par:3,stroke_index:17,yards:152},{hole:3,par:4,stroke_index:7,yards:397},{hole:4,par:5,stroke_index:15,yards:496},{hole:5,par:4,stroke_index:1,yards:414},{hole:6,par:5,stroke_index:13,yards:518},{hole:7,par:4,stroke_index:9,yards:382},{hole:8,par:4,stroke_index:3,yards:401},{hole:9,par:3,stroke_index:11,yards:190},{hole:10,par:4,stroke_index:2,yards:417},{hole:11,par:5,stroke_index:12,yards:504},{hole:12,par:4,stroke_index:8,yards:357},{hole:13,par:3,stroke_index:10,yards:154},{hole:14,par:4,stroke_index:6,yards:371},{hole:15,par:3,stroke_index:16,yards:137},{hole:16,par:4,stroke_index:4,yards:397},{hole:17,par:5,stroke_index:14,yards:481},{hole:18,par:4,stroke_index:18,yards:259}
+  ]}
+];
 const TYNEMOUTH_BADGE='course-tynemouth.svg';
 const TYNEMOUTH_PRESETS=[
   {name:'Tynemouth Golf Club - White Tee',location:'North Shields',image_url:TYNEMOUTH_BADGE,course_rating:70.4,slope_rating:137,holes:[
@@ -333,7 +342,7 @@ function courseTeeFromName(name){const m=String(name||'').match(/\s*-\s*([^-]+?)
 function getCourseName(course,round){return cleanCourseName((course&&course.name)||(round&&round.course_name)||'');}
 function getCourseDisplayName(course,round){return getCourseName(course,round);}
 function courseKey(course){return cleanCourseName(course&&course.name).toLowerCase()+'|'+(courseTeeFromName(course&&course.name)||course&&course.tee||'White').toLowerCase();}
-function isProtectedCourse(course){const name=cleanCourseName(course&&course.name).toLowerCase();return name==='whitley bay golf club'||name.includes('whitley bay golf club')||name==='tynemouth golf club'||name.includes('tynemouth golf club')||name==='quinta do lago north course'||name.includes('quinta do lago north course')||name==='quinta do lago south course'||name.includes('quinta do lago south course')||name==='ombria golf course'||name.includes('ombria golf course');}
+function isProtectedCourse(course){const name=cleanCourseName(course&&course.name).toLowerCase();return name==='whitley bay golf club'||name.includes('whitley bay golf club')||name==='goswick golf club'||name.includes('goswick golf club')||name==='tynemouth golf club'||name.includes('tynemouth golf club')||name==='quinta do lago north course'||name.includes('quinta do lago north course')||name==='quinta do lago south course'||name.includes('quinta do lago south course')||name==='ombria golf course'||name.includes('ombria golf course');}
 function presetIdForCourse(preset){return 'preset-'+cleanCourseName(preset.name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'-'+(courseTeeFromName(preset.name)||preset.tee||'white').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
 function isRealDbId(id){return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id||''));}
 function safeCourseIdForDb(course,setupCourseId){const id=(course&&course.id)||setupCourseId||null;return isRealDbId(id)?id:null;}
@@ -354,7 +363,7 @@ function courseSummaryLine(course,round,holes){
 function hasCourseRatingValue(value){return Number.isFinite(parseFloat(value));}
 function hasCourseHoles(course){return Array.isArray(course&&course.holes)&&course.holes.length>0;}
 function mergePresetCourses(dbCourses){
-  const presets=[...WHITLEY_BAY_PRESETS,...TYNEMOUTH_PRESETS,...QUINTA_DO_LAGO_PRESETS,...OMBRIA_PRESETS].map(preset=>{
+  const presets=[...WHITLEY_BAY_PRESETS,...GOSWICK_PRESETS,...TYNEMOUTH_PRESETS,...QUINTA_DO_LAGO_PRESETS,...OMBRIA_PRESETS].map(preset=>{
     const tee=courseTeeFromName(preset.name)||preset.tee||'White';
     return {...preset,id:preset.id||presetIdForCourse(preset),tee};
   });
@@ -421,6 +430,7 @@ function getCourseBadge(course,round){
   if(course&&course.image_url)return course.image_url;
   const name=getCourseName(course,round).toLowerCase();
   if(name.includes('whitley bay'))return WHITLEY_BAY_BADGE;
+  if(name.includes('goswick'))return GOSWICK_BADGE;
   if(name.includes('tynemouth'))return TYNEMOUTH_BADGE;
   if(name.includes('quinta'))return QUINTA_DO_LAGO_BADGE;
   if(name.includes('ombria'))return OMBRIA_BADGE;
@@ -2163,7 +2173,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v4.52" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.52</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v4.53" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.53</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -6841,7 +6851,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return `league-balance-${round&&round.id||'round'}-${scope==='group'?(activeGroupId||'group'):'all'}`;
   }
   function normalSweepstakeSettlementNotes(key){
-    return ['v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
+    return ['v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
   }
   function signedMoneyFromPence(pence){
     const n=parseInt(pence)||0;
@@ -9288,7 +9298,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.52`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.53`;
+    const legacyMarkerNoteV452=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.52`;
     const legacyMarkerNoteV451=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.51`;
     const legacyMarkerNoteV450=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.50`;
     const legacyMarkerNoteV449=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.49`;
@@ -9321,7 +9332,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const playable=(linkedRounds||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
     if(!playable.length)return {already:false,changes:[],skipped:[]};
     const roundIds=playable.map(r=>r.id);
-    const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`).limit(1);
+    const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`).limit(1);
     if(logMarkerError)throw logMarkerError;
     if(logMarkers&&logMarkers.length)return {already:true,changes:[],skipped:[]};
     const [{data:roundPlayers,error:roundPlayersError},{data:scoreRows,error:scoreRowsError},{data:leaguePlayers,error:leaguePlayersError},linkResult]=await Promise.all([
@@ -9504,7 +9515,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.52`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.53`;
+    const legacyMarkerNoteV452=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.52`;
     const legacyMarkerNoteV451=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.51`;
     const legacyMarkerNoteV450=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.50`;
     const legacyMarkerNoteV449=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.49`;
@@ -9533,7 +9545,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.52`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.53`;
+    const legacyReverseNoteV452=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.52`;
     const legacyReverseNoteV451=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.51`;
     const legacyReverseNoteV450=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.50`;
     const legacyReverseNoteV449=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.49`;
@@ -9561,10 +9574,10 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyReverseNoteV420=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.20`;
     const legacyReverseNoteV419=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.19`;
     const legacyReverseNote=`Day sweepstake League balance reversal ${markerKey}`;
-    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNoteV451},note.eq.${legacyReverseNoteV450},note.eq.${legacyReverseNoteV449},note.eq.${legacyReverseNoteV448},note.eq.${legacyReverseNoteV447},note.eq.${legacyReverseNoteV446},note.eq.${legacyReverseNoteV445},note.eq.${legacyReverseNoteV444},note.eq.${legacyReverseNoteV443},note.eq.${legacyReverseNoteV442},note.eq.${legacyReverseNoteV441},note.eq.${legacyReverseNoteV440},note.eq.${legacyReverseNoteV439},note.eq.${legacyReverseNoteV438},note.eq.${legacyReverseNoteV437},note.eq.${legacyReverseNoteV436},note.eq.${legacyReverseNoteV435},note.eq.${legacyReverseNoteV434},note.eq.${legacyReverseNoteV433},note.eq.${legacyReverseNoteV432},note.eq.${legacyReverseNoteV431},note.eq.${legacyReverseNoteV430},note.eq.${legacyReverseNoteV429},note.eq.${legacyReverseNoteV428},note.eq.${legacyReverseNoteV420},note.eq.${legacyReverseNoteV419},note.eq.${legacyReverseNote}`).limit(1);
+    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNoteV452},note.eq.${legacyReverseNoteV451},note.eq.${legacyReverseNoteV450},note.eq.${legacyReverseNoteV449},note.eq.${legacyReverseNoteV448},note.eq.${legacyReverseNoteV447},note.eq.${legacyReverseNoteV446},note.eq.${legacyReverseNoteV445},note.eq.${legacyReverseNoteV444},note.eq.${legacyReverseNoteV443},note.eq.${legacyReverseNoteV442},note.eq.${legacyReverseNoteV441},note.eq.${legacyReverseNoteV440},note.eq.${legacyReverseNoteV439},note.eq.${legacyReverseNoteV438},note.eq.${legacyReverseNoteV437},note.eq.${legacyReverseNoteV436},note.eq.${legacyReverseNoteV435},note.eq.${legacyReverseNoteV434},note.eq.${legacyReverseNoteV433},note.eq.${legacyReverseNoteV432},note.eq.${legacyReverseNoteV431},note.eq.${legacyReverseNoteV430},note.eq.${legacyReverseNoteV429},note.eq.${legacyReverseNoteV428},note.eq.${legacyReverseNoteV420},note.eq.${legacyReverseNoteV419},note.eq.${legacyReverseNote}`).limit(1);
     if(reverseCheckError)throw reverseCheckError;
     if(existingReverse&&existingReverse.length)return {reversed:false,already:true,count:0};
-    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`);
+    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`);
     if(logError)throw logError;
     const rows=(logs||[]).filter(r=>r&&r.player_id&&Math.abs(parseFloat(r.amount)||0)>0);
     if(!rows.length)return {reversed:false,count:0};
