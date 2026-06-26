@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.55
+// SNYDER GOLF v4.56
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -154,7 +154,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.55',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.56',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -203,7 +203,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.55',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.56',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -2177,7 +2177,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v4.55" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.55</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v4.56" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.56</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -4313,7 +4313,8 @@ function defaultDaySweepstakeName(){
 // Round setup, player selection, joining live rounds and launch into scorecard
 // =========================================================
 function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSelectedRound,load,isAdmin,currentUser,cupUsers,guests,selectedRound,holeScores,setHoleScores,promptStartRoundAuth}){
-  const[step,setStep]=useState('playerCount');
+  const[step,setStep]=useState('setup');
+  const[setupQuestion,setSetupQuestion]=useState('day');
   const[activeRound,setActiveRound]=useState(null);
   const[activeGroup,setActiveGroup]=useState(null);
   const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:0.95,dayCompMode:'none',dayCompKey:'',sweepstake:{enabled:false,amountPence:200,scope:'round'},matchplay:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,keepStableford:true}});
@@ -4595,6 +4596,49 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   function isFoursomesSetup(){return !!(setup.matchplay&&setup.matchplay.enabled&&setup.matchplay.mode==='foursomes');}
   function isSinglesMatchplaySetup(){return !!(setup.matchplay&&setup.matchplay.enabled&&setup.matchplay.mode==='singles');}
   function isMatchplayOnlySetup(){return !!(setup.matchplay&&setup.matchplay.enabled&&setup.matchplay.mode==='singles'&&setup.matchplay.keepStableford===false);}
+  function chooseWizardPreset(mode,range='1-4'){
+    setPlayerRange(range);
+    resetGroupsForRange(range);
+    setSetup(q=>{
+      const clean=cleanMatchplaySetup(q.matchplay||{},participants);
+      if(mode==='singles')return {...q,is_private:false,matchplay:{...clean,enabled:true,mode:'singles',keepStableford:true}};
+      if(mode==='foursomes')return {...q,is_private:false,sweepstake:{...(q.sweepstake||{}),enabled:false},matchplay:{...clean,enabled:true,mode:'foursomes',teamAName:clean.teamAName||'Team 1',teamBName:clean.teamBName||'Team 2',keepStableford:false}};
+      return {...q,is_private:false,matchplay:{...clean,enabled:false,mode:'doubles',keepStableford:true}};
+    });
+    setSetupQuestion('course');
+  }
+  function setupQuestionOrder(){
+    const order=[];
+    if(promptDayBoard&&!dayJoinPromptDone&&(setup.dayCompMode||'none')==='none'&&!isMatchplayOnlySetup())order.push('day');
+    order.push('format','course');
+    if(!isFoursomesSetup())order.push('players');
+    if(isSinglesMatchplaySetup())order.push('singlesMode');
+    if(isFoursomesSetup())order.push('foursomesTeams');
+    if(!isMatchplayOnlySetup())order.push(setup.dayCompMode==='join'?'dayEntries':'sweepstake');
+    if(!isFoursomesSetup()&&!isSinglesMatchplaySetup()&&isSingleGroupDay&&participants.length===4)order.push('sideMatch');
+    order.push('summary');
+    return order;
+  }
+  function activeSetupQuestion(){
+    const order=setupQuestionOrder();
+    return order.includes(setupQuestion)?setupQuestion:order[0];
+  }
+  function goSetupQuestion(delta){
+    const order=setupQuestionOrder();
+    const current=activeSetupQuestion();
+    const idx=Math.max(0,order.indexOf(current));
+    setSetupQuestion(order[Math.max(0,Math.min(order.length-1,idx+delta))]);
+  }
+  function canAdvanceSetupQuestion(q=activeSetupQuestion()){
+    if(q==='course')return !!setup.course_id;
+    if(q==='players'){
+      if(isSinglesMatchplaySetup())return participants.length===2&&participants.some(p=>normaliseId(p.id)===normaliseId(currentUser&&currentUser.id));
+      return participants.length>0&&participants.some(p=>normaliseId(p.id)===normaliseId(currentUser&&currentUser.id));
+    }
+    if(q==='dayEntries')return !participants.length||daySweepstakeSelectedIds.length>0;
+    if(q==='foursomesTeams')return !!String(setup.matchplay&&setup.matchplay.teamAName||'').trim()&&!!String(setup.matchplay&&setup.matchplay.teamBName||'').trim();
+    return true;
+  }
   function blockingLiveRound(){
     return myLiveRounds.find(r=>!clearedLiveRoundIds.some(id=>normaliseId(id)===normaliseId(r.id)))||null;
   }
@@ -4944,6 +4988,202 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   // Round setup screen
   // ---------------------------------------------------------
   if(step==='setup'){
+    const q=activeSetupQuestion();
+    const order=setupQuestionOrder();
+    const qIndex=Math.max(0,order.indexOf(q));
+    const isLastQuestion=q==='summary';
+    const questionTitle={
+      day:'Are you in the day sweepstake?',
+      format:'What type of round?',
+      course:'What course and tee?',
+      players:isSinglesMatchplaySetup()?'Who is playing the singles match?':'Who is playing?',
+      singlesMode:'How should the singles match score?',
+      foursomesTeams:'Set up the foursomes teams',
+      sweepstake:'Do you want a sweepstake?',
+      dayEntries:'Who is in the sweepstake?',
+      sideMatch:'Any side matchplay?',
+      summary:'Ready to go live?'
+    }[q]||'Start a Round';
+    const nextLabel=isLastQuestion?(isFoursomesSetup()?'Start Foursomes Match - Go Live!':'Start Round - Go Live!'):'Next';
+    const goNext=()=>{if(isLastQuestion)startRound();else goSetupQuestion(1);};
+    const optionButton=(active,title,sub,onClick,extra={})=><button onClick={onClick} style={{border:'1px solid '+(active?'rgba(96,184,240,0.70)':'rgba(255,255,255,0.12)'),background:active?'rgba(96,184,240,0.22)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:13,padding:'13px 12px',textAlign:'left',fontSize:15,fontWeight:950,cursor:'pointer',...extra}}><span style={{display:'block'}}>{title}</span>{sub&&<span style={{display:'block',fontSize:11,color:active?'#bfdbfe':'rgba(255,255,255,0.62)',fontWeight:750,marginTop:3,lineHeight:1.35}}>{sub}</span>}</button>;
+    const personRows=(bucket,groupIdx)=>bucket.map(p=>(
+      <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,marginTop:8,padding:'10px 12px',background:'rgba(255,255,255,0.06)',borderRadius:10}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:14,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.display_name||p.name}</div>
+          <div style={{fontSize:11,color:'#60b8f0'}}>{p.is_casual?'Casual - '+(p.playing_handicap||0)+' fixed shots':'EG HCP '+parseFloat(p.handicap_index??p.current_handicap??0).toFixed(1)+' - '+(p.playing_handicap||0)+' shots'}</div>
+          <label style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:6,fontSize:11,color:'rgba(255,255,255,0.7)'}}><input type="checkbox" checked={!!p.is_casual} onChange={()=>toggleCasualPlayer(groupIdx,p.id)}/> Casual golfer</label>
+        </div>
+        <HandicapPicker value={p.is_casual?(p.fixed_playing_handicap??p.playing_handicap):(p.handicap_index??p.current_handicap)} onChange={v=>updateGroupHandicap(groupIdx,p.id,v)} style={{width:76,padding:'4px 8px',fontSize:13}} label={(p.display_name||p.name||'Player')+(p.is_casual?' Playing shots':' EG Handicap')} step={p.is_casual?1:0.1} min={0} max={54} defaultValue={p.is_casual?18:8}/>
+        <button onClick={()=>removeFromGroup(groupIdx,p.id)} style={{...S.dan,padding:'4px 10px',fontSize:12}}>x</button>
+      </div>
+    ));
+    const selectedFormat=isFoursomesSetup()?'foursomes':isSinglesMatchplaySetup()?'singles':(!isSingleGroupDay?'groups':'normal');
+    return(
+      <div style={{minHeight:'100vh',paddingBottom:40}}>
+        <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
+          <button onClick={()=>qIndex>0?goSetupQuestion(-1):setView('home')} style={{...S.gho,padding:'6px 12px',fontSize:13}}>{qIndex>0?'Back':'Home'}</button>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:16,color:'#fff',fontWeight:900}}>Start a Round</div>
+            <div style={{fontSize:10,color:'#60b8f0',fontWeight:900,letterSpacing:'0.10em'}}>QUESTION {qIndex+1} OF {order.length}</div>
+          </div>
+        </div>
+        <div style={{padding:16}}>
+          <div style={{height:6,borderRadius:999,background:'rgba(255,255,255,0.08)',overflow:'hidden',marginBottom:12}}><div style={{height:'100%',width:(((qIndex+1)/order.length)*100)+'%',background:'linear-gradient(90deg,#0070BB,#60b8f0)',borderRadius:999}}/></div>
+          <div style={{...S.card,marginBottom:12,borderColor:'rgba(96,184,240,0.30)',background:'linear-gradient(135deg,rgba(0,112,187,0.14),rgba(255,255,255,0.055))'}}>
+            <div style={{fontSize:22,color:'#fff',fontWeight:950,marginBottom:6,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em'}}>{questionTitle}</div>
+            <div style={{fontSize:12,color:'#90ccf0',lineHeight:1.42}}>Answer this and press Next. The setup won’t let you go live until the important bits are done.</div>
+          </div>
+
+          {q==='day'&&<div style={{...S.card,marginBottom:12}}>
+            <div style={{display:'flex',justifyContent:'center',padding:'2px 0 12px'}}><SweepstakeLogo hero={true} style={{maxWidth:260}}/></div>
+            <div style={{fontSize:16,color:'#fff',fontWeight:950,textAlign:'center',marginBottom:6}}>{promptDayBoard?dayCompDisplayName(rounds,promptDayBoard):'No day sweepstake found'}</div>
+            {promptDayBoard&&dayBoardSweepstakeConfig(promptDayBoard).enabled&&<div style={{fontSize:12,color:'#fbbf24',lineHeight:1.35,textAlign:'center',marginBottom:12}}>Joining enters players into the front 9, back 9 and overall sweepstake.</div>}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <button onClick={()=>{setSetup(q=>({...q,dayCompMode:'join',dayCompKey:dayCompKeyFromRound(promptDayBoard)||''}));setDayJoinPromptDone(true);setSetupQuestion('format');}} style={{...S.pri,padding:12,fontSize:13}}>Yes, join</button>
+              <button onClick={()=>{setDayJoinPromptDone(true);setSetup(q=>({...q,dayCompMode:'none',dayCompKey:''}));setSetupQuestion('format');}} style={{...S.gho,padding:12,fontSize:13}}>No thanks</button>
+            </div>
+          </div>}
+
+          {q==='format'&&<div style={{display:'grid',gap:10,marginBottom:12}}>
+            {optionButton(selectedFormat==='normal','Standard Round','Normal scoring and Stableford points',()=>chooseWizardPreset('normal','1-4'),{fontSize:18,background:selectedFormat==='normal'?'linear-gradient(135deg,rgba(22,163,74,0.92),rgba(12,88,50,0.82))':'rgba(255,255,255,0.06)'})}
+            {optionButton(selectedFormat==='singles','Head-to-head matchplay','Two players. You can keep Stableford points as well, or use matchplay only.',()=>chooseWizardPreset('singles','1-4'))}
+            {optionButton(selectedFormat==='foursomes','Foursomes matchplay','Two teams, one score column per team.',()=>chooseWizardPreset('foursomes','1-4'))}
+            <div style={{...S.card,padding:12,background:selectedFormat==='groups'?'rgba(96,184,240,0.16)':'rgba(255,255,255,0.045)',borderColor:selectedFormat==='groups'?'rgba(96,184,240,0.48)':'rgba(255,255,255,0.10)'}}>
+              <div style={{fontSize:15,color:'#fff',fontWeight:950,marginBottom:7}}>Multiple groups</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:7}}>
+                {['5-8','9-12','13-16'].map(r=><button key={r} onClick={()=>chooseWizardPreset('normal',r)} style={{border:'1px solid '+(playerRange===r?'rgba(96,184,240,0.70)':'rgba(255,255,255,0.12)'),background:playerRange===r?'rgba(96,184,240,0.24)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:10,padding:'9px 5px',fontSize:12,fontWeight:950}}>{r}</button>)}
+              </div>
+            </div>
+          </div>}
+
+          {q==='course'&&<div style={{...S.card,marginBottom:12}}>
+            <label style={S.lbl}>Course</label>
+            <select style={{...S.inp,marginBottom:12}} value={setup.course_name} onChange={e=>chooseCourse(e.target.value)}>
+              <option value="">Select course...</option>
+              {courseOptions.map(co=><option key={co.name} value={co.name}>{co.name}</option>)}
+            </select>
+            <label style={S.lbl}>Tee</label>
+            <select style={{...S.inp,marginBottom:12}} value={setup.tee} onChange={e=>chooseTee(e.target.value)} disabled={!setup.course_name}>
+              {(availableTees.length?availableTees:['White','Yellow','Red','Orange']).map(t=><option key={t}>{t}</option>)}
+            </select>
+            {selectedCourse&&<div style={{fontSize:12,color:'#90ccf0',lineHeight:1.45}}>Rating {selectedCourse.course_rating||'-'} · Slope {selectedCourse.slope_rating||'-'} · Par {(selectedCourse.holes||[]).reduce((t,h)=>t+(parseInt(h.par)||0),0)||'-'} · {courseSummaryLine(selectedCourse,{tee:setup.tee},selectedCourse.holes)}</div>}
+            <div style={{marginTop:12}}>
+              <label style={S.lbl}>Handicap allowance</label>
+              <select value={setup.allowance} onChange={e=>setSetup(q=>({...q,allowance:parseFloat(e.target.value)||1}))} style={{...S.inp,marginBottom:0}}>
+                <option value={0.95}>95% competition</option>
+                <option value={1}>Full shots</option>
+              </select>
+            </div>
+          </div>}
+
+          {q==='players'&&<div style={{marginBottom:12}}>
+            <div style={{...S.card,marginBottom:10}}>
+              <div style={{fontSize:13,color:'#90ccf0',lineHeight:1.4,marginBottom:10}}>{isSinglesMatchplaySetup()?'Add exactly 2 players. Add yourself first so the scorecard has a signed-in scorer.':'Add the players. If someone has no England Golf handicap, tick Casual golfer and set fixed shots.'}</div>
+              {isSingleGroupDay&&currentUser&&!participants.find(p=>normaliseId(p.id)===normaliseId(currentUser.id))&&<button onClick={()=>addPersonToGroup({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap},0)} style={{...S.gho,width:'100%',marginBottom:10,fontSize:13}}>+ Add yourself</button>}
+              {isSingleGroupDay&&<button onClick={()=>{setPickerGroup(0);setShowPicker(true);}} style={{...S.pri,width:'100%',fontSize:13}}>+ Add Player</button>}
+            </div>
+            {isSingleGroupDay?(
+              <div>{participants.length===0&&<div style={{...S.card,fontSize:13,color:'rgba(255,255,255,0.5)',textAlign:'center'}}>No players added yet</div>}{personRows(participants,0)}</div>
+            ):(
+              <div style={{display:'grid',gap:10}}>{groupSetup.map((bucket,groupIdx)=><div key={groupIdx} style={{...S.card,background:'rgba(255,255,255,0.04)'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:8}}>
+                  <div style={{fontSize:16,color:'#fff',fontWeight:900}}>Group {groupLetter(groupIdx+1)}</div>
+                  <button onClick={()=>{setPickerGroup(groupIdx);setShowPicker(true);}} style={{...S.pri,padding:'6px 12px',fontSize:12}}>+ Add</button>
+                </div>
+                {currentUser&&!participants.find(p=>normaliseId(p.id)===normaliseId(currentUser.id))&&<button onClick={()=>addPersonToGroup({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap},groupIdx)} style={{...S.gho,width:'100%',fontSize:12,padding:'8px 10px',marginBottom:8}}>+ Add yourself here</button>}
+                {bucket.length===0&&<div style={{fontSize:12,color:'rgba(255,255,255,0.45)'}}>No players added yet</div>}
+                {personRows(bucket,groupIdx)}
+              </div>)}</div>
+            )}
+          </div>}
+
+          {q==='singlesMode'&&<div style={{display:'grid',gap:10,marginBottom:12}}>
+            {optionButton(setup.matchplay&&setup.matchplay.keepStableford!==false,'Matchplay + Stableford points','Best of both: match result and normal points leaderboard.',()=>setSetup(q=>({...q,matchplay:{...cleanMatchplaySetup(q.matchplay||{},participants),enabled:true,mode:'singles',keepStableford:true}})))}
+            {optionButton(setup.matchplay&&setup.matchplay.keepStableford===false,'Matchplay only','No Stableford sweepstake or points for this round.',()=>setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),enabled:false},matchplay:{...cleanMatchplaySetup(q.matchplay||{},participants),enabled:true,mode:'singles',keepStableford:false}})))}
+          </div>}
+
+          {q==='foursomesTeams'&&<div style={{...S.card,marginBottom:12}}>
+            <label style={S.lbl}>Team 1 name</label>
+            <input value={(setup.matchplay&&setup.matchplay.teamAName)||''} onChange={e=>updateMatchplayField('teamAName',e.target.value)} placeholder='e.g. Paolo & James' style={{...S.inp,marginBottom:10}}/>
+            <label style={S.lbl}>Team 2 name</label>
+            <input value={(setup.matchplay&&setup.matchplay.teamBName)||''} onChange={e=>updateMatchplayField('teamBName',e.target.value)} placeholder="e.g. The Reids" style={{...S.inp,marginBottom:10}}/>
+            <label style={S.lbl}>Shots</label>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <select value={(parseInt(setup.matchplay&&setup.matchplay.teamAShots)||0)>0?'A':((parseInt(setup.matchplay&&setup.matchplay.teamBShots)||0)>0?'B':'none')} onChange={e=>setSetup(q=>{const clean=cleanMatchplaySetup(q.matchplay||{},participants);const receiver=e.target.value;const current=Math.max(parseInt(clean.teamAShots)||0,parseInt(clean.teamBShots)||0,receiver==='none'?0:1);return {...q,matchplay:{...clean,enabled:true,mode:'foursomes',teamAShots:receiver==='A'?current:0,teamBShots:receiver==='B'?current:0}};})} style={{...S.inp,marginBottom:0}}>
+                <option value="none">No shots</option><option value="A">Team 1 gets shots</option><option value="B">Team 2 gets shots</option>
+              </select>
+              <select value={Math.max(parseInt(setup.matchplay&&setup.matchplay.teamAShots)||0,parseInt(setup.matchplay&&setup.matchplay.teamBShots)||0)} onChange={e=>setSetup(q=>{const clean=cleanMatchplaySetup(q.matchplay||{},participants);const n=parseInt(e.target.value)||0;let receiver=(parseInt(clean.teamAShots)||0)>0?'A':((parseInt(clean.teamBShots)||0)>0?'B':'none');if(n===0)receiver='none';if(n>0&&receiver==='none')receiver='B';return {...q,matchplay:{...clean,enabled:true,mode:'foursomes',teamAShots:receiver==='A'?n:0,teamBShots:receiver==='B'?n:0}};})} style={{...S.inp,marginBottom:0}}>
+                {Array.from({length:19},(_,i)=>i).map(n=><option key={n} value={n}>{n} {n===1?'shot':'shots'}</option>)}
+              </select>
+            </div>
+          </div>}
+
+          {q==='sweepstake'&&<div style={{...S.card,marginBottom:12}}>
+            <div style={{display:'flex',justifyContent:'center',marginBottom:10}}><SweepstakeLogo hero={true} style={{maxWidth:210}}/></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
+              <button onClick={()=>setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),enabled:true}}))} style={{...S.pri,padding:11,fontSize:13,opacity:setup.sweepstake&&setup.sweepstake.enabled?1:0.78}}>Yes</button>
+              <button onClick={()=>setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),enabled:false}}))} style={{...S.gho,padding:11,fontSize:13}}>No</button>
+            </div>
+            {setup.sweepstake&&setup.sweepstake.enabled&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <input type="number" min="0" step="0.5" value={(setup.sweepstake&&setup.sweepstake.amountPence)===''?'':((parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||0)/100)} onChange={e=>updateSetupSweepstakeAmount(e.target.value)} style={{...S.inp,marginBottom:0}} placeholder="£ per pot"/>
+              <select value={(setup.sweepstake&&setup.sweepstake.scope)||'round'} onChange={e=>setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),scope:e.target.value==='group'?'group':'round'}}))} style={{...S.inp,marginBottom:0}}>
+                <option value="round">Whole round</option><option value="group">By group</option>
+              </select>
+              <div style={{gridColumn:'1 / -1',fontSize:11,color:'#fbbf24',lineHeight:1.35}}>Max loss per player: {moneyFromPence((parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||0)*3)}.</div>
+            </div>}
+          </div>}
+
+          {q==='dayEntries'&&<div style={{...S.card,marginBottom:12,borderColor:'rgba(245,158,11,0.38)',background:'rgba(245,158,11,0.10)'}}>
+            <div style={{fontSize:12,color:'#fbbf24',lineHeight:1.35,marginBottom:10}}>Anyone left out still appears on the scorecard and day leaderboard, but not in the sweepstake pots or payments.</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+              <button onClick={()=>{setDaySweepstakeEntryMode('all');setDaySweepstakeEntryIds([]);}} style={{border:'1px solid '+(daySweepstakeEntryMode==='all'?'rgba(245,158,11,0.65)':'rgba(255,255,255,0.12)'),background:daySweepstakeEntryMode==='all'?'rgba(245,158,11,0.22)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:10,padding:'9px 8px',fontSize:12,fontWeight:950}}>All players</button>
+              <button onClick={()=>{setDaySweepstakeEntryMode('custom');setDaySweepstakeEntryIds(ids=>ids&&ids.length?ids:daySweepstakePlayerIds);}} style={{border:'1px solid '+(daySweepstakeEntryMode==='custom'?'rgba(96,184,240,0.65)':'rgba(255,255,255,0.12)'),background:daySweepstakeEntryMode==='custom'?'rgba(96,184,240,0.22)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:10,padding:'9px 8px',fontSize:12,fontWeight:950}}>Choose</button>
+            </div>
+            {daySweepstakeEntryMode==='custom'&&participants.map(p=>{const id=normaliseId(p.id);const checked=daySweepstakeSelectedIds.includes(id);return <label key={id} style={{display:'flex',alignItems:'center',gap:9,padding:'9px 10px',marginTop:7,borderRadius:10,background:checked?'rgba(245,158,11,0.15)':'rgba(255,255,255,0.05)',fontSize:13,color:'#fff',fontWeight:850}}><input type="checkbox" checked={checked} onChange={()=>toggleDaySweepstakeEntry(p.id)}/><span style={{flex:1}}>{p.display_name||p.name||'Player'}</span><span style={{fontSize:10,color:checked?'#fbbf24':'rgba(255,255,255,0.45)',fontWeight:950}}>{checked?'IN':'OUT'}</span></label>;})}
+            <div style={{fontSize:11,color:'#dbeafe',marginTop:9,fontWeight:800}}>{daySweepstakeSelectedIds.length} of {participants.length} in sweepstake</div>
+          </div>}
+
+          {q==='sideMatch'&&<div style={{...S.card,marginBottom:12}}>
+            <div style={{fontSize:12,color:'#90ccf0',lineHeight:1.35,marginBottom:10}}>Four players detected. You can add a doubles matchplay side game, or skip it.</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+              <button onClick={toggleMatchplaySetup} style={{...S.pri,padding:11,fontSize:13,opacity:setup.matchplay&&setup.matchplay.enabled?1:0.78}}>{setup.matchplay&&setup.matchplay.enabled?'Side match on':'Turn on'}</button>
+              <button onClick={()=>setSetup(q=>({...q,matchplay:{...cleanMatchplaySetup(q.matchplay||{},participants),enabled:false,mode:'doubles',keepStableford:true}}))} style={{...S.gho,padding:11,fontSize:13}}>No side match</button>
+            </div>
+            {setup.matchplay&&setup.matchplay.enabled&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>{participants.map(p=>{const id=normaliseId(p.id);const teamA=(setup.matchplay.teamA||[]).map(normaliseId).includes(id);const teamB=(setup.matchplay.teamB||[]).map(normaliseId).includes(id);return <div key={p.id} style={{background:'rgba(0,0,0,0.18)',border:'1px solid rgba(255,255,255,0.10)',borderRadius:10,padding:8}}><div style={{fontSize:12,color:'#fff',fontWeight:850,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginBottom:7}}>{gameFirstName(p.display_name||p.name||'Player')}</div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}><button onClick={()=>setMatchplayTeam(p.id,'A')} style={{border:'1px solid '+(teamA?'rgba(251,191,36,0.6)':'rgba(255,255,255,0.12)'),background:teamA?'rgba(251,191,36,0.22)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:8,padding:'7px 5px',fontSize:11,fontWeight:900}}>Team A</button><button onClick={()=>setMatchplayTeam(p.id,'B')} style={{border:'1px solid '+(teamB?'rgba(96,184,240,0.6)':'rgba(255,255,255,0.12)'),background:teamB?'rgba(96,184,240,0.22)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:8,padding:'7px 5px',fontSize:11,fontWeight:900}}>Team B</button></div></div>;})}</div>}
+          </div>}
+
+          {q==='summary'&&<div style={{...S.card,marginBottom:12}}>
+            <label style={S.lbl}>Round name (optional)</label>
+            <input style={{...S.inp,marginBottom:12}} value={setup.name} onChange={e=>setSetup(q=>({...q,name:e.target.value}))} placeholder={"e.g. "+(currentUser?currentUser.display_name.split(' ')[0]+"'s Round":"Saturday Morning")}/>
+            <div style={{display:'grid',gap:8,fontSize:13,color:'#fff'}}>
+              <div><b>Format:</b> {isFoursomesSetup()?'Foursomes':isSinglesMatchplaySetup()?(isMatchplayOnlySetup()?'Singles matchplay only':'Singles matchplay + points'):(!isSingleGroupDay?playerRangeLabel(playerRange):'Standard round')}</div>
+              <div><b>Course:</b> {setup.course_name||'Not chosen'} · {setup.tee||'White'} tee</div>
+              {!isFoursomesSetup()&&<div><b>Players:</b> {participants.length}</div>}
+              {!isMatchplayOnlySetup()&&<div><b>Sweepstake:</b> {setup.dayCompMode==='join'?'Joined day sweepstake':(setup.sweepstake&&setup.sweepstake.enabled?moneyFromPence(parseInt(setup.sweepstake.amountPence)||0)+' per pot':'No')}</div>}
+            </div>
+          </div>}
+
+          {openRoundBlock&&(
+            <div style={{...S.card,marginTop:12,borderColor:isSameLocalDay(roundStartValue(openRoundBlock),Date.now())?'rgba(239,68,68,0.45)':'rgba(245,158,11,0.45)',background:isSameLocalDay(roundStartValue(openRoundBlock),Date.now())?'rgba(239,68,68,0.12)':'rgba(245,158,11,0.12)'}}>
+              <div style={{fontSize:15,color:'#fff',fontWeight:900,marginBottom:5}}>{isSameLocalDay(roundStartValue(openRoundBlock),Date.now())?'You already have a live round open today':'You have an unfinished round from a previous day'}</div>
+              <div style={{fontSize:12,color:'#90ccf0',marginBottom:10}}>{roundDisplayName(openRoundBlock)} - {formatRoundStart(openRoundBlock)}</div>
+              <div style={{display:'grid',gridTemplateColumns:openRoundBlockCanDelete?'1fr 1fr':'1fr',gap:8,marginBottom:8}}>
+                <button onClick={finishBlockedRound} style={{...S.pri,padding:'10px 8px',fontSize:13,background:'#0a8a4a'}}>Finish Round</button>
+                {openRoundBlockCanDelete&&<button onClick={deleteBlockedRound} style={{...S.dan,padding:'10px 8px',fontSize:13}}>Delete Round</button>}
+              </div>
+              <button onClick={()=>continueRound(openRoundBlock)} style={{...S.gho,width:'100%',fontSize:13}}>Go to open round</button>
+            </div>
+          )}
+
+          <button onClick={goNext} disabled={saving||!canAdvanceSetupQuestion(q)||(isLastQuestion&&!setup.course_id)} style={{...S.pri,width:'100%',padding:14,fontSize:15,marginTop:12,opacity:saving||!canAdvanceSetupQuestion(q)||(isLastQuestion&&!setup.course_id)?0.5:1}}>
+            {saving?'Starting...':nextLabel}
+          </button>
+          {!isLastQuestion&&<button onClick={()=>goSetupQuestion(1)} disabled={!canAdvanceSetupQuestion(q)} style={{...S.gho,width:'100%',padding:10,fontSize:12,marginTop:8,opacity:canAdvanceSetupQuestion(q)?1:0.55}}>Skip / use current answer</button>}
+        </div>
+        {showPicker&&<PeoplePicker currentUser={currentUser} cupUsers={cupUsers} guests={guests} flash={flash} onAdd={addP} onClose={()=>setShowPicker(false)} alreadyAdded={participants.map(p=>p.id)}/>}
+      </div>
+    );
     return(
       <div style={{minHeight:'100vh',paddingBottom:40}}>
         <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
@@ -5178,7 +5418,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
         <div style={{fontSize:16,color:'#fff'}}>Play Golf</div>
       </div>
       <div style={{padding:16}}>
-        <div style={{...S.card,marginBottom:12,cursor:'pointer',textAlign:'center',padding:24}} onClick={()=>currentUser?setStep('playerCount'):(promptStartRoundAuth&&promptStartRoundAuth())}>
+        <div style={{...S.card,marginBottom:12,cursor:'pointer',textAlign:'center',padding:24}} onClick={()=>currentUser?setStep('setup'):(promptStartRoundAuth&&promptStartRoundAuth())}>
           <div style={{fontSize:16,color:'#fff',marginBottom:4}}>Start a New Round</div>
           <div style={{fontSize:13,color:'#60b8f0'}}>Pick a course, add players, go live</div>
         </div>
@@ -6862,7 +7102,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return `league-balance-${round&&round.id||'round'}-${scope==='group'?(activeGroupId||'group'):'all'}`;
   }
   function normalSweepstakeSettlementNotes(key){
-    return ['v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
+    return ['v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
   }
   function signedMoneyFromPence(pence){
     const n=parseInt(pence)||0;
@@ -9310,7 +9550,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.55`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.56`;
+    const legacyMarkerNoteV455=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.55`;
     const legacyMarkerNoteV454=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.54`;
     const legacyMarkerNoteV453=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.53`;
     const legacyMarkerNoteV452=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.52`;
@@ -9346,7 +9587,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const playable=(linkedRounds||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
     if(!playable.length)return {already:false,changes:[],skipped:[]};
     const roundIds=playable.map(r=>r.id);
-    const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV454},note.eq.${legacyMarkerNoteV453},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`).limit(1);
+    const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV455},note.eq.${legacyMarkerNoteV454},note.eq.${legacyMarkerNoteV453},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`).limit(1);
     if(logMarkerError)throw logMarkerError;
     if(logMarkers&&logMarkers.length)return {already:true,changes:[],skipped:[]};
     const [{data:roundPlayers,error:roundPlayersError},{data:scoreRows,error:scoreRowsError},{data:leaguePlayers,error:leaguePlayersError},linkResult]=await Promise.all([
@@ -9529,7 +9770,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.55`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.56`;
+    const legacyMarkerNoteV455=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.55`;
     const legacyMarkerNoteV454=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.54`;
     const legacyMarkerNoteV453=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.53`;
     const legacyMarkerNoteV452=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.52`;
@@ -9561,7 +9803,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.55`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.56`;
+    const legacyReverseNoteV455=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.55`;
     const legacyReverseNoteV454=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.54`;
     const legacyReverseNoteV453=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.53`;
     const legacyReverseNoteV452=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.52`;
@@ -9592,10 +9835,10 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyReverseNoteV420=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.20`;
     const legacyReverseNoteV419=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.19`;
     const legacyReverseNote=`Day sweepstake League balance reversal ${markerKey}`;
-    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNoteV454},note.eq.${legacyReverseNoteV453},note.eq.${legacyReverseNoteV452},note.eq.${legacyReverseNoteV451},note.eq.${legacyReverseNoteV450},note.eq.${legacyReverseNoteV449},note.eq.${legacyReverseNoteV448},note.eq.${legacyReverseNoteV447},note.eq.${legacyReverseNoteV446},note.eq.${legacyReverseNoteV445},note.eq.${legacyReverseNoteV444},note.eq.${legacyReverseNoteV443},note.eq.${legacyReverseNoteV442},note.eq.${legacyReverseNoteV441},note.eq.${legacyReverseNoteV440},note.eq.${legacyReverseNoteV439},note.eq.${legacyReverseNoteV438},note.eq.${legacyReverseNoteV437},note.eq.${legacyReverseNoteV436},note.eq.${legacyReverseNoteV435},note.eq.${legacyReverseNoteV434},note.eq.${legacyReverseNoteV433},note.eq.${legacyReverseNoteV432},note.eq.${legacyReverseNoteV431},note.eq.${legacyReverseNoteV430},note.eq.${legacyReverseNoteV429},note.eq.${legacyReverseNoteV428},note.eq.${legacyReverseNoteV420},note.eq.${legacyReverseNoteV419},note.eq.${legacyReverseNote}`).limit(1);
+    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNoteV455},note.eq.${legacyReverseNoteV454},note.eq.${legacyReverseNoteV453},note.eq.${legacyReverseNoteV452},note.eq.${legacyReverseNoteV451},note.eq.${legacyReverseNoteV450},note.eq.${legacyReverseNoteV449},note.eq.${legacyReverseNoteV448},note.eq.${legacyReverseNoteV447},note.eq.${legacyReverseNoteV446},note.eq.${legacyReverseNoteV445},note.eq.${legacyReverseNoteV444},note.eq.${legacyReverseNoteV443},note.eq.${legacyReverseNoteV442},note.eq.${legacyReverseNoteV441},note.eq.${legacyReverseNoteV440},note.eq.${legacyReverseNoteV439},note.eq.${legacyReverseNoteV438},note.eq.${legacyReverseNoteV437},note.eq.${legacyReverseNoteV436},note.eq.${legacyReverseNoteV435},note.eq.${legacyReverseNoteV434},note.eq.${legacyReverseNoteV433},note.eq.${legacyReverseNoteV432},note.eq.${legacyReverseNoteV431},note.eq.${legacyReverseNoteV430},note.eq.${legacyReverseNoteV429},note.eq.${legacyReverseNoteV428},note.eq.${legacyReverseNoteV420},note.eq.${legacyReverseNoteV419},note.eq.${legacyReverseNote}`).limit(1);
     if(reverseCheckError)throw reverseCheckError;
     if(existingReverse&&existingReverse.length)return {reversed:false,already:true,count:0};
-    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV454},note.eq.${legacyMarkerNoteV453},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`);
+    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV455},note.eq.${legacyMarkerNoteV454},note.eq.${legacyMarkerNoteV453},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`);
     if(logError)throw logError;
     const rows=(logs||[]).filter(r=>r&&r.player_id&&Math.abs(parseFloat(r.amount)||0)>0);
     if(!rows.length)return {reversed:false,count:0};
