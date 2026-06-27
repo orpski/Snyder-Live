@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.56
+// SNYDER GOLF v4.57
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -154,7 +154,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.56',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.57',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -203,7 +203,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.56',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.57',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -943,7 +943,7 @@ async function fetchDayCompRoundsFromCloud(dayKey,fallbackRounds=[]){
   const fields=['name','course_name','notes','description'];
   for(const field of fields){
     try{
-      const res=await sb.from('cup_rounds').select('*').ilike(field,'%'+marker+'%');
+      const res=await sb.from('cup_rounds').select('*').ilike(field,'%'+marker+'%').range(0,9999);
       if(!res.error&&Array.isArray(res.data)){
         res.data.filter(r=>dayCompKeyFromRound(r)===key).forEach(r=>{if(r&&r.id)merged.set(r.id,r);});
       }
@@ -1815,10 +1815,10 @@ function App(){
     const[players,courses,rounds,groups,competitions,scores,cupUsers,guests,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches]=await Promise.all([
       sb.from('cup_players').select('*').then(r=>r.data||[]),
       sb.from('cup_courses').select('*').then(r=>r.data||[]),
-      sb.from('cup_rounds').select('*').order('created_at',{ascending:false}).then(r=>r.data||[]),
-      sb.from('cup_groups').select('*').then(r=>r.data||[]),
+      sb.from('cup_rounds').select('*').order('created_at',{ascending:false}).range(0,9999).then(r=>r.data||[]),
+      sb.from('cup_groups').select('*').range(0,9999).then(r=>r.data||[]),
       sb.from('cup_competitions').select('*').then(r=>r.data||[]),
-      sb.from('cup_scores').select('*').then(r=>r.data||[]),
+      sb.from('cup_scores').select('*').range(0,9999).then(r=>r.data||[]),
       sb.from('cup_users').select('*').then(r=>r.data||[]),
       sb.from('cup_guests').select('*').then(r=>r.data||[]),
       sb.from('snyder_cups').select('*').order('created_at',{ascending:false}).then(r=>r.data||[]).catch(()=>[]),
@@ -2177,7 +2177,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v4.56" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.56</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v4.57" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.57</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -3449,7 +3449,8 @@ function groupColour(n){return GROUP_COLOURS[((parseInt(n,10)||1)-1)%GROUP_COLOU
 function groupCountForRange(range){
   if(range==='5-8')return 2;
   if(range==='9-12')return 3;
-  if(range==='13-16'||range==='more')return 4;
+  if(range==='13-16')return 4;
+  if(range==='more')return 5;
   return 1;
 }
 function normaliseId(v){return v==null?'':String(v);}
@@ -4388,8 +4389,8 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
     return {...person,is_casual:false,handicap_index:handicapIndex,current_handicap:handicapIndex,playing_handicap:calcPlayingHandicap(handicapIndex,course,allowance)};
   }
   function resetGroupsForRange(range){
-    const count=groupCountForRange(range);
     const flat=groupSetup.flat();
+    const count=range==='more'?Math.max(5,Math.ceil(flat.length/4)||5):groupCountForRange(range);
     const next=Array.from({length:count},(_,i)=>flat.filter((_,idx)=>Math.floor(idx/4)===i));
     setGroupSetup(next);
     setParticipants(next.flat());
@@ -5052,7 +5053,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
             <div style={{...S.card,padding:12,background:selectedFormat==='groups'?'rgba(96,184,240,0.16)':'rgba(255,255,255,0.045)',borderColor:selectedFormat==='groups'?'rgba(96,184,240,0.48)':'rgba(255,255,255,0.10)'}}>
               <div style={{fontSize:15,color:'#fff',fontWeight:950,marginBottom:7}}>Multiple groups</div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:7}}>
-                {['5-8','9-12','13-16'].map(r=><button key={r} onClick={()=>chooseWizardPreset('normal',r)} style={{border:'1px solid '+(playerRange===r?'rgba(96,184,240,0.70)':'rgba(255,255,255,0.12)'),background:playerRange===r?'rgba(96,184,240,0.24)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:10,padding:'9px 5px',fontSize:12,fontWeight:950}}>{r}</button>)}
+                {[['5-8','5-8'],['9-12','9-12'],['13-16','13-16'],['more','17+']].map(([r,label])=><button key={r} onClick={()=>chooseWizardPreset('normal',r)} style={{border:'1px solid '+(playerRange===r?'rgba(96,184,240,0.70)':'rgba(255,255,255,0.12)'),background:playerRange===r?'rgba(96,184,240,0.24)':'rgba(255,255,255,0.06)',color:'#fff',borderRadius:10,padding:'9px 5px',fontSize:12,fontWeight:950}}>{label}</button>)}
               </div>
             </div>
           </div>}
@@ -5086,15 +5087,18 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
             {isSingleGroupDay?(
               <div>{participants.length===0&&<div style={{...S.card,fontSize:13,color:'rgba(255,255,255,0.5)',textAlign:'center'}}>No players added yet</div>}{personRows(participants,0)}</div>
             ):(
-              <div style={{display:'grid',gap:10}}>{groupSetup.map((bucket,groupIdx)=><div key={groupIdx} style={{...S.card,background:'rgba(255,255,255,0.04)'}}>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:8}}>
-                  <div style={{fontSize:16,color:'#fff',fontWeight:900}}>Group {groupLetter(groupIdx+1)}</div>
-                  <button onClick={()=>{setPickerGroup(groupIdx);setShowPicker(true);}} style={{...S.pri,padding:'6px 12px',fontSize:12}}>+ Add</button>
-                </div>
-                {currentUser&&!participants.find(p=>normaliseId(p.id)===normaliseId(currentUser.id))&&<button onClick={()=>addPersonToGroup({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap},groupIdx)} style={{...S.gho,width:'100%',fontSize:12,padding:'8px 10px',marginBottom:8}}>+ Add yourself here</button>}
-                {bucket.length===0&&<div style={{fontSize:12,color:'rgba(255,255,255,0.45)'}}>No players added yet</div>}
-                {personRows(bucket,groupIdx)}
-              </div>)}</div>
+              <>
+                {playerRange==='more'&&<button onClick={()=>setGroupSetup(g=>[...(g||[]),[]])} style={{...S.gho,width:'100%',fontSize:13,padding:'10px 12px',marginBottom:10}}>+ Add another group</button>}
+                <div style={{display:'grid',gap:10}}>{groupSetup.map((bucket,groupIdx)=><div key={groupIdx} style={{...S.card,background:'rgba(255,255,255,0.04)'}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:8}}>
+                    <div style={{fontSize:16,color:'#fff',fontWeight:900}}>Group {groupLetter(groupIdx+1)}</div>
+                    <button onClick={()=>{setPickerGroup(groupIdx);setShowPicker(true);}} style={{...S.pri,padding:'6px 12px',fontSize:12}}>+ Add</button>
+                  </div>
+                  {currentUser&&!participants.find(p=>normaliseId(p.id)===normaliseId(currentUser.id))&&<button onClick={()=>addPersonToGroup({...currentUser,display_name:currentUser.display_name,current_handicap:currentUser.handicap},groupIdx)} style={{...S.gho,width:'100%',fontSize:12,padding:'8px 10px',marginBottom:8}}>+ Add yourself here</button>}
+                  {bucket.length===0&&<div style={{fontSize:12,color:'rgba(255,255,255,0.45)'}}>No players added yet</div>}
+                  {personRows(bucket,groupIdx)}
+                </div>)}</div>
+              </>
             )}
           </div>}
 
@@ -5343,6 +5347,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
               </div>
             ))}
           </div> : <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:12}}>
+            {playerRange==='more'&&<button onClick={()=>setGroupSetup(g=>[...(g||[]),[]])} style={{...S.gho,width:'100%',fontSize:13,padding:'10px 12px',marginBottom:0}}>+ Add another group</button>}
             {groupSetup.map((bucket,groupIdx)=>(
               <React.Fragment key={groupIdx}>
                 {currentUser&&!participants.find(p=>normaliseId(p.id)===normaliseId(currentUser.id))&&(
@@ -7102,7 +7107,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return `league-balance-${round&&round.id||'round'}-${scope==='group'?(activeGroupId||'group'):'all'}`;
   }
   function normalSweepstakeSettlementNotes(key){
-    return ['v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
+    return ['v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
   }
   function signedMoneyFromPence(pence){
     const n=parseInt(pence)||0;
@@ -9550,7 +9555,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.56`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.57`;
+    const legacyMarkerNoteV456=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.56`;
     const legacyMarkerNoteV455=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.55`;
     const legacyMarkerNoteV454=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.54`;
     const legacyMarkerNoteV453=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.53`;
@@ -9587,7 +9593,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const playable=(linkedRounds||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
     if(!playable.length)return {already:false,changes:[],skipped:[]};
     const roundIds=playable.map(r=>r.id);
-    const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV455},note.eq.${legacyMarkerNoteV454},note.eq.${legacyMarkerNoteV453},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`).limit(1);
+    const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV456},note.eq.${legacyMarkerNoteV455},note.eq.${legacyMarkerNoteV454},note.eq.${legacyMarkerNoteV453},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`).limit(1);
     if(logMarkerError)throw logMarkerError;
     if(logMarkers&&logMarkers.length)return {already:true,changes:[],skipped:[]};
     const [{data:roundPlayers,error:roundPlayersError},{data:scoreRows,error:scoreRowsError},{data:leaguePlayers,error:leaguePlayersError},linkResult]=await Promise.all([
@@ -9770,7 +9776,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.56`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.57`;
+    const legacyMarkerNoteV456=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.56`;
     const legacyMarkerNoteV455=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.55`;
     const legacyMarkerNoteV454=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.54`;
     const legacyMarkerNoteV453=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.53`;
@@ -9803,7 +9810,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.56`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.57`;
+    const legacyReverseNoteV456=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.56`;
     const legacyReverseNoteV455=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.55`;
     const legacyReverseNoteV454=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.54`;
     const legacyReverseNoteV453=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.53`;
@@ -9835,10 +9843,10 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyReverseNoteV420=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.20`;
     const legacyReverseNoteV419=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.19`;
     const legacyReverseNote=`Day sweepstake League balance reversal ${markerKey}`;
-    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNoteV455},note.eq.${legacyReverseNoteV454},note.eq.${legacyReverseNoteV453},note.eq.${legacyReverseNoteV452},note.eq.${legacyReverseNoteV451},note.eq.${legacyReverseNoteV450},note.eq.${legacyReverseNoteV449},note.eq.${legacyReverseNoteV448},note.eq.${legacyReverseNoteV447},note.eq.${legacyReverseNoteV446},note.eq.${legacyReverseNoteV445},note.eq.${legacyReverseNoteV444},note.eq.${legacyReverseNoteV443},note.eq.${legacyReverseNoteV442},note.eq.${legacyReverseNoteV441},note.eq.${legacyReverseNoteV440},note.eq.${legacyReverseNoteV439},note.eq.${legacyReverseNoteV438},note.eq.${legacyReverseNoteV437},note.eq.${legacyReverseNoteV436},note.eq.${legacyReverseNoteV435},note.eq.${legacyReverseNoteV434},note.eq.${legacyReverseNoteV433},note.eq.${legacyReverseNoteV432},note.eq.${legacyReverseNoteV431},note.eq.${legacyReverseNoteV430},note.eq.${legacyReverseNoteV429},note.eq.${legacyReverseNoteV428},note.eq.${legacyReverseNoteV420},note.eq.${legacyReverseNoteV419},note.eq.${legacyReverseNote}`).limit(1);
+    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNoteV456},note.eq.${legacyReverseNoteV455},note.eq.${legacyReverseNoteV454},note.eq.${legacyReverseNoteV453},note.eq.${legacyReverseNoteV452},note.eq.${legacyReverseNoteV451},note.eq.${legacyReverseNoteV450},note.eq.${legacyReverseNoteV449},note.eq.${legacyReverseNoteV448},note.eq.${legacyReverseNoteV447},note.eq.${legacyReverseNoteV446},note.eq.${legacyReverseNoteV445},note.eq.${legacyReverseNoteV444},note.eq.${legacyReverseNoteV443},note.eq.${legacyReverseNoteV442},note.eq.${legacyReverseNoteV441},note.eq.${legacyReverseNoteV440},note.eq.${legacyReverseNoteV439},note.eq.${legacyReverseNoteV438},note.eq.${legacyReverseNoteV437},note.eq.${legacyReverseNoteV436},note.eq.${legacyReverseNoteV435},note.eq.${legacyReverseNoteV434},note.eq.${legacyReverseNoteV433},note.eq.${legacyReverseNoteV432},note.eq.${legacyReverseNoteV431},note.eq.${legacyReverseNoteV430},note.eq.${legacyReverseNoteV429},note.eq.${legacyReverseNoteV428},note.eq.${legacyReverseNoteV420},note.eq.${legacyReverseNoteV419},note.eq.${legacyReverseNote}`).limit(1);
     if(reverseCheckError)throw reverseCheckError;
     if(existingReverse&&existingReverse.length)return {reversed:false,already:true,count:0};
-    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV455},note.eq.${legacyMarkerNoteV454},note.eq.${legacyMarkerNoteV453},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`);
+    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV456},note.eq.${legacyMarkerNoteV455},note.eq.${legacyMarkerNoteV454},note.eq.${legacyMarkerNoteV453},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`);
     if(logError)throw logError;
     const rows=(logs||[]).filter(r=>r&&r.player_id&&Math.abs(parseFloat(r.amount)||0)>0);
     if(!rows.length)return {reversed:false,count:0};
