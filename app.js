@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.61
+// SNYDER GOLF v4.62
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -154,7 +154,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.61',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.62',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -203,7 +203,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.61',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.62',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -275,7 +275,8 @@ const SWEEPSTAKE_LOGO='sweepstake-logo.png';
 function SweepstakeLogo({size=58,hero=false,style={}}){
   return <img src={SWEEPSTAKE_LOGO} alt="Sweep Stake" style={{width:hero?'min(280px,78vw)':size,height:hero?'auto':size,objectFit:'contain',display:'block',flexShrink:0,filter:'drop-shadow(0 8px 18px rgba(0,0,0,0.42))',...style}}/>;
 }
-const WHITLEY_BAY_PRESETS=[
+const WHITLEY_BAY_CARD_UPDATE_CUTOFF='2026-07-06T12:29:54+01:00';
+const WHITLEY_BAY_LEGACY_PRESETS=[
   {name:'Whitley Bay Golf Club - White Tee',location:'Whitley Bay',image_url:WHITLEY_BAY_BADGE,course_rating:72.7,slope_rating:135,holes:[
     {hole:1,par:5,stroke_index:12,yards:476},{hole:2,par:4,stroke_index:2,yards:422},{hole:3,par:3,stroke_index:18,yards:172},{hole:4,par:4,stroke_index:14,yards:377},{hole:5,par:4,stroke_index:4,yards:391},{hole:6,par:5,stroke_index:8,yards:515},{hole:7,par:4,stroke_index:6,yards:374},{hole:8,par:4,stroke_index:16,yards:352},{hole:9,par:3,stroke_index:10,yards:155},{hole:10,par:4,stroke_index:15,yards:356},{hole:11,par:4,stroke_index:5,yards:414},{hole:12,par:5,stroke_index:1,yards:582},{hole:13,par:3,stroke_index:17,yards:162},{hole:14,par:4,stroke_index:11,yards:390},{hole:15,par:4,stroke_index:9,yards:384},{hole:16,par:4,stroke_index:3,yards:409},{hole:17,par:3,stroke_index:13,yards:189},{hole:18,par:5,stroke_index:7,yards:459}
   ]},
@@ -284,6 +285,20 @@ const WHITLEY_BAY_PRESETS=[
   ]},
   {name:'Whitley Bay Golf Club - Red Tee',location:'Whitley Bay',image_url:WHITLEY_BAY_BADGE,course_rating:74.1,slope_rating:134,holes:[
     {hole:1,par:5,stroke_index:10,yards:375},{hole:2,par:5,stroke_index:14,yards:388},{hole:3,par:3,stroke_index:16,yards:149},{hole:4,par:4,stroke_index:18,yards:310},{hole:5,par:4,stroke_index:8,yards:340},{hole:6,par:5,stroke_index:4,yards:458},{hole:7,par:4,stroke_index:2,yards:358},{hole:8,par:4,stroke_index:6,yards:322},{hole:9,par:3,stroke_index:12,yards:142},{hole:10,par:4,stroke_index:9,yards:319},{hole:11,par:4,stroke_index:13,yards:340},{hole:12,par:5,stroke_index:1,yards:522},{hole:13,par:3,stroke_index:15,yards:161},{hole:14,par:4,stroke_index:3,yards:372},{hole:15,par:4,stroke_index:5,yards:326},{hole:16,par:5,stroke_index:7,yards:370},{hole:17,par:3,stroke_index:17,yards:118},{hole:18,par:5,stroke_index:11,yards:384}
+  ]}
+];
+const WHITLEY_BAY_PRESETS=[
+  {name:'Whitley Bay Golf Club - White Tee',location:'Whitley Bay',image_url:WHITLEY_BAY_BADGE,course_rating:72.7,slope_rating:135,holes:[
+    {hole:1,par:5,stroke_index:12,yards:470},{hole:2,par:4,stroke_index:2,yards:416},{hole:3,par:3,stroke_index:16,yards:171},{hole:4,par:4,stroke_index:10,yards:372},{hole:5,par:4,stroke_index:6,yards:377},{hole:6,par:5,stroke_index:8,yards:504},{hole:7,par:4,stroke_index:4,yards:367},{hole:8,par:4,stroke_index:14,yards:349},{hole:9,par:3,stroke_index:18,yards:150},{hole:10,par:4,stroke_index:7,yards:352},{hole:11,par:4,stroke_index:11,yards:410},{hole:12,par:5,stroke_index:1,yards:582},{hole:13,par:3,stroke_index:17,yards:156},{hole:14,par:4,stroke_index:15,yards:384},{hole:15,par:4,stroke_index:9,yards:386},{hole:16,par:4,stroke_index:3,yards:403},{hole:17,par:3,stroke_index:13,yards:187},{hole:18,par:4,stroke_index:5,yards:458}
+  ]},
+  {name:'Whitley Bay Golf Club - Yellow Tee',location:'Whitley Bay',image_url:WHITLEY_BAY_BADGE,course_rating:71.5,slope_rating:127,holes:[
+    {hole:1,par:5,stroke_index:12,yards:463},{hole:2,par:4,stroke_index:2,yards:403},{hole:3,par:3,stroke_index:16,yards:157},{hole:4,par:4,stroke_index:10,yards:366},{hole:5,par:4,stroke_index:6,yards:362},{hole:6,par:5,stroke_index:8,yards:493},{hole:7,par:4,stroke_index:4,yards:358},{hole:8,par:4,stroke_index:14,yards:333},{hole:9,par:3,stroke_index:18,yards:142},{hole:10,par:4,stroke_index:7,yards:333},{hole:11,par:4,stroke_index:11,yards:395},{hole:12,par:5,stroke_index:1,yards:566},{hole:13,par:3,stroke_index:17,yards:150},{hole:14,par:4,stroke_index:15,yards:378},{hole:15,par:4,stroke_index:9,yards:367},{hole:16,par:4,stroke_index:3,yards:399},{hole:17,par:3,stroke_index:13,yards:176},{hole:18,par:4,stroke_index:5,yards:408}
+  ]},
+  {name:'Whitley Bay Golf Club - Orange Tee',location:'Whitley Bay',image_url:WHITLEY_BAY_BADGE,holes:[
+    {hole:1,par:5,stroke_index:12,yards:463},{hole:2,par:4,stroke_index:2,yards:403},{hole:3,par:3,stroke_index:16,yards:157},{hole:4,par:4,stroke_index:10,yards:366},{hole:5,par:4,stroke_index:6,yards:328},{hole:6,par:5,stroke_index:8,yards:493},{hole:7,par:4,stroke_index:4,yards:358},{hole:8,par:4,stroke_index:14,yards:333},{hole:9,par:3,stroke_index:18,yards:142},{hole:10,par:4,stroke_index:7,yards:333},{hole:11,par:4,stroke_index:11,yards:338},{hole:12,par:5,stroke_index:1,yards:566},{hole:13,par:3,stroke_index:17,yards:150},{hole:14,par:4,stroke_index:15,yards:378},{hole:15,par:4,stroke_index:9,yards:330},{hole:16,par:4,stroke_index:3,yards:369},{hole:17,par:3,stroke_index:13,yards:176},{hole:18,par:4,stroke_index:5,yards:408}
+  ]},
+  {name:'Whitley Bay Golf Club - Purple Tee',location:'Whitley Bay',image_url:WHITLEY_BAY_BADGE,holes:[
+    {hole:1,par:5,stroke_index:12,yards:440},{hole:2,par:4,stroke_index:2,yards:366},{hole:3,par:3,stroke_index:16,yards:129},{hole:4,par:4,stroke_index:10,yards:347},{hole:5,par:4,stroke_index:6,yards:346},{hole:6,par:5,stroke_index:8,yards:482},{hole:7,par:4,stroke_index:4,yards:348},{hole:8,par:4,stroke_index:14,yards:293},{hole:9,par:3,stroke_index:18,yards:126},{hole:10,par:4,stroke_index:7,yards:303},{hole:11,par:4,stroke_index:11,yards:390},{hole:12,par:5,stroke_index:1,yards:541},{hole:13,par:3,stroke_index:17,yards:143},{hole:14,par:4,stroke_index:15,yards:343},{hole:15,par:4,stroke_index:9,yards:341},{hole:16,par:4,stroke_index:3,yards:367},{hole:17,par:3,stroke_index:13,yards:137},{hole:18,par:4,stroke_index:5,yards:371}
   ]}
 ];
 const GOSWICK_BADGE='course-goswick.png';
@@ -399,6 +414,16 @@ function findCourseForTee(courses,baseName,tee){
   if(exactKey&&option.tees[exactKey])return option.tees[exactKey];
   const fallbackKey=Object.keys(option.tees||{}).find(k=>normaliseTeeName(k)==='white');
   return (fallbackKey&&option.tees[fallbackKey])||option.course||Object.values(option.tees||{})[0]||null;
+}
+function legacyWhitleyBayCourseForRound(round,course){
+  const base=cleanCourseName((course&&course.name)||(round&&round.course_name)||'');
+  if(base.toLowerCase()!=='whitley bay golf club')return null;
+  const started=Date.parse(roundStartValue(round));
+  const cutoff=Date.parse(WHITLEY_BAY_CARD_UPDATE_CUTOFF);
+  if(!Number.isFinite(started)||!Number.isFinite(cutoff)||started>=cutoff)return null;
+  const tee=(round&&round.tee)||courseTeeFromName(course&&course.name)||course&&course.tee||'White';
+  const legacy=WHITLEY_BAY_LEGACY_PRESETS.find(p=>normaliseTeeName(courseTeeFromName(p.name)||p.tee)===normaliseTeeName(tee))||WHITLEY_BAY_LEGACY_PRESETS[0];
+  return legacy?{...legacy,id:(course&&course.id)||presetIdForCourse(legacy),tee:courseTeeFromName(legacy.name)||legacy.tee||tee}:null;
 }
 function cupDayCourseStorageKey(cupId,day){return 'snyder_cup_day_course_'+String(cupId||'default')+'_'+String(parseInt(day)||1);}
 function saveLocalCupDayCourse(cupId,day,course){try{if(course)localStorage.setItem(cupDayCourseStorageKey(cupId,day),JSON.stringify({course_id:course.id||'',course_db_id:safeCourseIdForDb(course,course.id),course_name:cleanCourseName(course.name)||course.name||'',tee:course.tee||courseTeeFromName(course.name)||'White'}));}catch(e){}}
@@ -2177,7 +2202,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v4.61" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.61</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v4.62" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.62</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -5509,7 +5534,8 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
 // Hole entry, running totals, review pages, sharing and finish-round controls
 // =========================================================
 function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,setView,holeScores,setHoleScores,currentUser}){
-  const course=courses.find(co=>co.id===round.course_id)||findCourseForTee(courses,round.course_name,round.tee);
+  const currentCourse=courses.find(co=>co.id===round.course_id)||findCourseForTee(courses,round.course_name,round.tee);
+  const course=legacyWhitleyBayCourseForRound(round,currentCourse)||currentCourse;
   const holes=course&&course.holes&&course.holes.length>0?course.holes:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1,yards:0}));
   const[allGroups,setAllGroups]=useState(group?[group]:[]);
   const groups=allGroups||[];
@@ -7145,7 +7171,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return `league-balance-${round&&round.id||'round'}-${scope==='group'?(activeGroupId||'group'):'all'}`;
   }
   function normalSweepstakeSettlementNotes(key){
-    return ['v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
+    return ['v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
   }
   function signedMoneyFromPence(pence){
     const n=parseInt(pence)||0;
@@ -9593,7 +9619,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.61`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.62`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9818,7 +9844,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.61`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.62`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9856,7 +9882,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.61`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.62`;
     const legacyReverseNoteV460=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.60`;
     const legacyReverseNoteV459=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.59`;
     const legacyReverseNoteV458=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.58`;
