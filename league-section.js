@@ -127,6 +127,31 @@ function getTotal(s){return getBest8(s).reduce((t,x)=>t+x.points,0)}
 function fmtDate(d){return toLocalDate(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}
 function weekKey(ds){const d=toLocalDate(ds),t=new Date(d);t.setDate(d.getDate()-((d.getDay()+6)%7)+3);const j=new Date(t.getFullYear(),0,4),w=1+Math.round((t-j)/604800000);return`${t.getFullYear()}-W${String(w).padStart(2,'0')}`}
 function scoresInWeek(ps,pp,dateStr){const w=weekKey(dateStr);return(ps||[]).filter(s=>weekKey(s.date)===w).length+(pp||[]).filter(s=>weekKey(s.date)===w).length}
+function scoreDateKey(row){return localDateKey(row&&row.date);}
+function scoreDuplicateKey(row){return `${row&&row.player_id||''}|${scoreDateKey(row)}|${parseInt(row&&row.points)||0}|${row&&row.is_double_chip?'1':'0'}`;}
+function compareScoreKeepOrder(a,b){
+  const ad=Date.parse(a&&a.created_at||a&&a.submitted_at||'')||0;
+  const bd=Date.parse(b&&b.created_at||b&&b.submitted_at||'')||0;
+  if(ad!==bd)return ad-bd;
+  return String(a&&a.id||'').localeCompare(String(b&&b.id||''));
+}
+function splitDuplicateScores(rows){
+  const byKey=new Map();
+  (rows||[]).forEach(row=>{
+    const key=scoreDuplicateKey(row);
+    if(!key||key.indexOf('|')===0)return;
+    if(!byKey.has(key))byKey.set(key,[]);
+    byKey.get(key).push(row);
+  });
+  const keep=[];
+  const duplicates=[];
+  byKey.forEach(list=>{
+    const sorted=[...list].sort(compareScoreKeepOrder);
+    keep.push(sorted[0]);
+    duplicates.push(...sorted.slice(1));
+  });
+  return {keep:keep.sort((a,b)=>toLocalDate(b.date)-toLocalDate(a.date)),duplicates};
+}
 function getRankings(players,scores){
   const r=players.map(p=>{const ps=scores.filter(s=>s.player_id===p.id);return{...p,scores:ps,total:getTotal(ps),best8Ids:new Set(getBest8(ps).map(s=>s.id))}}).sort((a,b)=>b.total-a.total);
   let rank=1;return r.map((p,i)=>{if(i>0&&p.total<r[i-1].total)rank=i+1;return{...p,rank}});
@@ -216,6 +241,7 @@ function LeagueView({onExit,cupUsers=[]}){
   const[notifySupported,setNotifySupported]=useState(false);
   const[tickerText,setTickerText]=useState('League news loading...');
   const[leagueLinks,setLeagueLinks]=useState({});
+  const[approvingIds,setApprovingIds]=useState({});
 
   const leagueTabs=[
     ['standings','🏆','Table'],
@@ -343,7 +369,16 @@ function LeagueView({onExit,cupUsers=[]}){
       sb.from('scores').select('*').order('date',{ascending:false}),
       sb.from('pending_scores').select('*').order('submitted_at',{ascending:false}),
     ]);
-    setPlayers(p||[]);setScores(s||[]);setPending(pnd||[]);setNeedsTickerUpdate(true);
+    const deduped=splitDuplicateScores(s||[]);
+    setPlayers(p||[]);setScores(deduped.keep);setPending(pnd||[]);setNeedsTickerUpdate(true);
+    if(isAdmin&&deduped.duplicates.length){
+      const ids=deduped.duplicates.map(r=>r&&r.id).filter(Boolean);
+      if(ids.length){
+        const{error:dupDeleteError}=await sb.from('scores').delete().in('id',ids);
+        if(dupDeleteError)flash(`Duplicate score cleanup failed: ${dupDeleteError.message}`,'error');
+        else{flash(`Removed ${ids.length} duplicate approved score${ids.length===1?'':'s'}.`);setTimeout(load,250);}
+      }
+    }
     const{data:pay}=await sb.from('payments').select('*');
     if(pay){const map={};pay.forEach(r=>{map[r.player_id]={paid:r.paid};});setPayments(map);}
     const{data:plog}=await sb.from('payment_log').select('*').order('created_at',{ascending:false}).limit(50);
@@ -438,46 +473,70 @@ function LeagueView({onExit,cupUsers=[]}){
     setSfPts('');setSfName('');setSfDoubleChip(false);setSfSnakePlayer('');load();
   }
 
-  async function approve(e){
-    const playedDate=leagueScoreDateKey(e.date);
-    const{data:existingScore,error:existingScoreError}=await sb.from('scores')
-      .select('id')
-      .eq('player_id',e.player_id)
-      .eq('date',playedDate)
-      .limit(1);
-    if(existingScoreError){flash(`Approval failed: ${existingScoreError.message}`,'error');return;}
-    if(existingScore&&existingScore.length){
-      const{error:deleteDuplicatePendingError}=await sb.from('pending_scores').delete().eq('id',e.id);
-      if(deleteDuplicatePendingError){flash(`Duplicate score already approved, but pending row was not removed: ${deleteDuplicatePendingError.message}`,'error');return;}
-      flash(`Skipped duplicate ${e.player_name} score for ${fmtDate(playedDate)}.`);
-      load();
-      return;
-    }
-    const{error:scoreError}=await sb.from('scores').insert({player_id:e.player_id,points:e.points,date:playedDate,is_double_chip:e.is_double_chip||false});
-    if(scoreError){flash(`Approval failed: ${scoreError.message}`,'error');return;}
-    if(e.is_double_chip){
-      const{error:chipError}=await sb.from('players').update({double_chip_used:true}).eq('id',e.player_id);
-      if(chipError){flash(`Score approved, but double chip update failed: ${chipError.message}`,'error');}
-    }
+  async function cleanupApprovedScoreDuplicates(playerId,playedDate){
+    const{data:rows,error}=await sb.from('scores')
+      .select('*')
+      .eq('player_id',playerId)
+      .eq('date',playedDate);
+    if(error)return {ok:false,error};
+    const deduped=splitDuplicateScores(rows||[]);
+    const ids=deduped.duplicates.map(r=>r&&r.id).filter(Boolean);
+    if(!ids.length)return {ok:true,count:0};
+    const{error:deleteError}=await sb.from('scores').delete().in('id',ids);
+    if(deleteError)return {ok:false,error:deleteError};
+    return {ok:true,count:ids.length};
+  }
 
-    // If the submitted score includes a snake claim, keep that claim alive even after the score is approved.
-    // The claim is copied into snake_log as unconfirmed and is shown in Snake Claims until admin confirms/rejects it.
-    if(e.snake_player_id&&e.snake_player_name){
-      const{data:existingClaim,error:claimCheckError}=await sb.from('snake_log')
-        .select('id,confirmed')
-        .eq('player_id',e.snake_player_id)
+  async function approve(e){
+    if(approvingIds[e.id])return;
+    setApprovingIds(prev=>({...prev,[e.id]:true}));
+    const playedDate=leagueScoreDateKey(e.date);
+    try{
+      const{data:claimed,error:claimError}=await sb.from('pending_scores').delete().eq('id',e.id).select('id');
+      if(claimError){flash(`Approval failed: ${claimError.message}`,'error');return;}
+      if(!claimed||!claimed.length){flash('That pending score was already handled.');load();return;}
+
+      const{data:existingScore,error:existingScoreError}=await sb.from('scores')
+        .select('id')
+        .eq('player_id',e.player_id)
         .eq('date',playedDate)
         .limit(1);
-      if(claimCheckError){flash(`Score approved, but snake claim check failed: ${claimCheckError.message}`,'error');}
-      else if(!existingClaim||existingClaim.length===0){
-        const{error:claimInsertError}=await sb.from('snake_log').insert({player_id:e.snake_player_id,player_name:e.snake_player_name,date:playedDate,confirmed:false});
-        if(claimInsertError){flash(`Score approved, but snake claim was not kept: ${claimInsertError.message}`,'error');}
+      if(existingScoreError){flash(`Approval failed: ${existingScoreError.message}`,'error');return;}
+      if(existingScore&&existingScore.length){
+        const cleaned=await cleanupApprovedScoreDuplicates(e.player_id,playedDate);
+        if(!cleaned.ok){flash(`Duplicate score already approved, cleanup failed: ${cleaned.error.message}`,'error');return;}
+        flash(`Skipped duplicate ${e.player_name} score for ${fmtDate(playedDate)}.`);
+        load();
+        return;
       }
-    }
+      const{error:scoreError}=await sb.from('scores').insert({player_id:e.player_id,points:e.points,date:playedDate,is_double_chip:e.is_double_chip||false});
+      if(scoreError){flash(`Approval failed: ${scoreError.message}`,'error');return;}
+      const cleanedAfterInsert=await cleanupApprovedScoreDuplicates(e.player_id,playedDate);
+      if(!cleanedAfterInsert.ok){flash(`Score approved, but duplicate cleanup failed: ${cleanedAfterInsert.error.message}`,'error');}
+      if(e.is_double_chip){
+        const{error:chipError}=await sb.from('players').update({double_chip_used:true}).eq('id',e.player_id);
+        if(chipError){flash(`Score approved, but double chip update failed: ${chipError.message}`,'error');}
+      }
 
-    const{error:deleteError}=await sb.from('pending_scores').delete().eq('id',e.id);
-    if(deleteError){flash(`Score approved, but pending row was not removed: ${deleteError.message}`,'error');return;}
-    flash(`✓ Approved ${e.player_name} — ${e.points} pts${e.is_double_chip?' 🍟🍟 Double chip':''}`);load();
+      // If the submitted score includes a snake claim, keep that claim alive even after the score is approved.
+      // The claim is copied into snake_log as unconfirmed and is shown in Snake Claims until admin confirms/rejects it.
+      if(e.snake_player_id&&e.snake_player_name){
+        const{data:existingClaim,error:claimCheckError}=await sb.from('snake_log')
+          .select('id,confirmed')
+          .eq('player_id',e.snake_player_id)
+          .eq('date',playedDate)
+          .limit(1);
+        if(claimCheckError){flash(`Score approved, but snake claim check failed: ${claimCheckError.message}`,'error');}
+        else if(!existingClaim||existingClaim.length===0){
+          const{error:claimInsertError}=await sb.from('snake_log').insert({player_id:e.snake_player_id,player_name:e.snake_player_name,date:playedDate,confirmed:false});
+          if(claimInsertError){flash(`Score approved, but snake claim was not kept: ${claimInsertError.message}`,'error');}
+        }
+      }
+
+      flash(`✓ Approved ${e.player_name} — ${e.points} pts${e.is_double_chip?' 🍟🍟 Double chip':''}`);load();
+    }finally{
+      setApprovingIds(prev=>{const next={...prev};delete next[e.id];return next;});
+    }
   }
   async function reject(e){await sb.from('pending_scores').delete().eq('id',e.id);flash('Score rejected.','error');setCm(null);load();}
   async function delScore(id){await sb.from('scores').delete().eq('id',id);flash('Score deleted.');setCm(null);load();}
@@ -1916,7 +1975,7 @@ function LeagueView({onExit,cupUsers=[]}){
                 <div style={{fontSize:12,color:'#60b8f0',letterSpacing:'0.12em',textTransform:'uppercase',marginBottom:12}}>Pending Approvals {pending.length>0&&`(${pending.length})`}</div>
                 {pending.length===0
                   ?<div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.10)',borderRadius:10,padding:22,textAlign:'center',color:'#5b7088',fontSize:14,marginBottom:24}}>All clear — no pending scores 🎉</div>
-                  :pending.map(e=>(
+                  :pending.map(e=>{const approving=!!approvingIds[e.id];return(
                   <div key={e.id} style={{background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.22)',borderRadius:10,padding:'14px 16px',marginBottom:8}}>
                     <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
                       <div style={{fontSize:24,color:e.is_double_chip?'#fbbf24':'#fbbf24',minWidth:44,textAlign:'center',background:'rgba(251,191,36,0.12)',borderRadius:8,padding:'4px 8px'}}>{e.points}</div>
@@ -1926,11 +1985,11 @@ function LeagueView({onExit,cupUsers=[]}){
                       </div>
                     </div>
                     <div style={{display:'flex',gap:8}}>
-                      <button onClick={()=>approve(e)} style={{...LeagueS.pri,padding:'10px 20px',fontSize:14,flex:1}}>✓ Approve</button>
+                      <button disabled={approving} onClick={()=>approve(e)} style={{...LeagueS.pri,padding:'10px 20px',fontSize:14,flex:1,opacity:approving?0.55:1}}>{approving?'Approving...':'✓ Approve'}</button>
                       <button onClick={()=>setCm({title:'Reject Score?',body:`Remove ${e.player_name} - ${e.points} pts on ${fmtDate(e.date)}?`,action:'Reject',onConfirm:()=>reject(e)})} style={{...LeagueS.dan,padding:'10px 20px',fontSize:14,flex:1}}>✕ Reject</button>
                     </div>
                   </div>
-                ))}
+                )})}
 
                 <div style={{fontSize:12,color:'#60b8f0',letterSpacing:'0.12em',textTransform:'uppercase',marginBottom:12,marginTop:28}}>All Approved Scores</div>
                 {scores.length===0

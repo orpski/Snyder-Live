@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.65
+// SNYDER GOLF v4.66
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -154,7 +154,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.65',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.66',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -203,7 +203,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.65',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.66',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -2222,7 +2222,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v4.65" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.65</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v4.66" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.66</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -7191,7 +7191,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return `league-balance-${round&&round.id||'round'}-${scope==='group'?(activeGroupId||'group'):'all'}`;
   }
   function normalSweepstakeSettlementNotes(key){
-    return ['v4.65','v4.64','v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
+    return ['v4.66','v4.65','v4.64','v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
   }
   function signedMoneyFromPence(pence){
     const n=parseInt(pence)||0;
@@ -9639,7 +9639,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.65`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.66`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9864,7 +9864,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.65`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.66`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9902,7 +9902,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.65`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.66`;
     const legacyReverseNoteV460=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.60`;
     const legacyReverseNoteV459=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.59`;
     const legacyReverseNoteV458=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.58`;
