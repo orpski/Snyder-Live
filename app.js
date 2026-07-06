@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.63
+// SNYDER GOLF v4.64
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -154,7 +154,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.63',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.64',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -203,7 +203,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.63',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.64',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -418,15 +418,32 @@ function findCourseForTee(courses,baseName,tee){
   const fallbackKey=Object.keys(option.tees||{}).find(k=>normaliseTeeName(k)==='white');
   return (fallbackKey&&option.tees[fallbackKey])||option.course||Object.values(option.tees||{})[0]||null;
 }
-function legacyWhitleyBayCourseForRound(round,course){
+function whitleyBayPresetForTee(tee){
+  const wanted=normaliseTeeName(tee||'White');
+  return WHITLEY_BAY_PRESETS.find(p=>normaliseTeeName(courseTeeFromName(p.name)||p.tee)===wanted)||WHITLEY_BAY_PRESETS[0];
+}
+function whitleyBayLegacyPresetForTee(tee){
+  const wanted=normaliseTeeName(tee||'White');
+  return WHITLEY_BAY_LEGACY_PRESETS.find(p=>normaliseTeeName(courseTeeFromName(p.name)||p.tee)===wanted)||WHITLEY_BAY_LEGACY_PRESETS[0];
+}
+function whitleyBayCourseFromPreset(preset,course,tee){
+  return preset?{...preset,id:(course&&course.id)||presetIdForCourse(preset),tee:courseTeeFromName(preset.name)||preset.tee||tee}:null;
+}
+function hasSavedScoreRowsForRound(round,scoreRows){
+  const roundId=round&&round.id;
+  if(!roundId)return false;
+  return (scoreRows||[]).some(r=>r&&normaliseId(r.round_id)===normaliseId(roundId)&&!isMetaScoreRow(r));
+}
+function whitleyBayCourseForRound(round,course,scoreRows){
   const base=cleanCourseName((course&&course.name)||(round&&round.course_name)||'');
   if(base.toLowerCase()!=='whitley bay golf club')return null;
+  const tee=(round&&round.tee)||courseTeeFromName(course&&course.name)||course&&course.tee||'White';
   const started=Date.parse(roundStartValue(round));
   const cutoff=Date.parse(WHITLEY_BAY_CARD_UPDATE_CUTOFF);
-  if(!Number.isFinite(started)||!Number.isFinite(cutoff)||started>=cutoff)return null;
-  const tee=(round&&round.tee)||courseTeeFromName(course&&course.name)||course&&course.tee||'White';
-  const legacy=WHITLEY_BAY_LEGACY_PRESETS.find(p=>normaliseTeeName(courseTeeFromName(p.name)||p.tee)===normaliseTeeName(tee))||WHITLEY_BAY_LEGACY_PRESETS[0];
-  return legacy?{...legacy,id:(course&&course.id)||presetIdForCourse(legacy),tee:courseTeeFromName(legacy.name)||legacy.tee||tee}:null;
+  if(Number.isFinite(started)&&Number.isFinite(cutoff)&&started<cutoff&&hasSavedScoreRowsForRound(round,scoreRows)){
+    return whitleyBayCourseFromPreset(whitleyBayLegacyPresetForTee(tee),course,tee);
+  }
+  return whitleyBayCourseFromPreset(whitleyBayPresetForTee(tee),course,tee);
 }
 function cupDayCourseStorageKey(cupId,day){return 'snyder_cup_day_course_'+String(cupId||'default')+'_'+String(parseInt(day)||1);}
 function saveLocalCupDayCourse(cupId,day,course){try{if(course)localStorage.setItem(cupDayCourseStorageKey(cupId,day),JSON.stringify({course_id:course.id||'',course_db_id:safeCourseIdForDb(course,course.id),course_name:cleanCourseName(course.name)||course.name||'',tee:course.tee||courseTeeFromName(course.name)||'White'}));}catch(e){}}
@@ -2205,7 +2222,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v4.63" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.63</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v4.64" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.64</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -5538,7 +5555,8 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
 // =========================================================
 function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,setView,holeScores,setHoleScores,currentUser}){
   const currentCourse=courses.find(co=>co.id===round.course_id)||findCourseForTee(courses,round.course_name,round.tee);
-  const course=legacyWhitleyBayCourseForRound(round,currentCourse)||currentCourse;
+  const initialScoreRows=[...(scores||[]),...((round&&round._extraScores)||[])];
+  const course=whitleyBayCourseForRound(round,currentCourse,initialScoreRows)||currentCourse;
   const holes=course&&course.holes&&course.holes.length>0?course.holes:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1,yards:0}));
   const[allGroups,setAllGroups]=useState(group?[group]:[]);
   const groups=allGroups||[];
@@ -5638,7 +5656,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const[overallMode,setOverallMode]=useState('round');
   const[overallRefreshNote,setOverallRefreshNote]=useState('');
   const[cupOverallRoundPlayers,setCupOverallRoundPlayers]=useState([]);
-  const initialScoreRows=[...(scores||[]),...((round&&round._extraScores)||[])];
   const[sweepstakeConfig,setSweepstakeConfig]=useState(sweepstakeConfigFromRows(initialScoreRows,round));
   const[matchplayConfig,setMatchplayConfig]=useState(matchplayConfigFromRows(initialScoreRows,round,group));
   const[showSweepstake,setShowSweepstake]=useState(false);
@@ -7174,7 +7191,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return `league-balance-${round&&round.id||'round'}-${scope==='group'?(activeGroupId||'group'):'all'}`;
   }
   function normalSweepstakeSettlementNotes(key){
-    return ['v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
+    return ['v4.64','v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
   }
   function signedMoneyFromPence(pence){
     const n=parseInt(pence)||0;
@@ -9622,7 +9639,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.63`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.64`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9847,7 +9864,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.63`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.64`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9885,7 +9902,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.63`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.64`;
     const legacyReverseNoteV460=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.60`;
     const legacyReverseNoteV459=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.59`;
     const legacyReverseNoteV458=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.58`;
