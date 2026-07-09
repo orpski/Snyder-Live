@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.71
+// SNYDER GOLF v4.72
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -154,7 +154,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.71',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.72',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -203,7 +203,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.71',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.72',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -516,7 +516,8 @@ function cupRoundGroupNumber(round){
 function cupGroupsForDay(cupMatches,day){
   const dayMatches=(cupMatches||[]).filter(m=>(parseInt(m.day_number)||1)===(parseInt(day)||1));
   const doubles=dayMatches.filter(m=>String(m.match_type||'').toLowerCase()==='doubles');
-  const singles=dayMatches.filter(m=>String(m.match_type||'').toLowerCase()!=='doubles');
+  const stags=dayMatches.filter(isCupStagsMatch);
+  const singles=dayMatches.filter(m=>String(m.match_type||'').toLowerCase()!=='doubles'&&!isCupStagsMatch(m));
   const usedSingles=new Set();
   const groups=doubles.map((dbl,idx)=>{
     const ids=new Set([...(dbl.gold_player_ids||[]),...(dbl.navy_player_ids||[])].map(normaliseId));
@@ -529,6 +530,7 @@ function cupGroupsForDay(cupMatches,day){
     return{day,idx:idx+1,doubles:dbl,singles:linked,players:[...(dbl.gold_player_ids||[]),...(dbl.navy_player_ids||[])]};
   });
   singles.filter(s=>!usedSingles.has(s.id)).forEach(s=>groups.push({day,idx:groups.length+1,doubles:null,singles:[s],players:[...(s.gold_player_ids||[]),...(s.navy_player_ids||[])]}));
+  stags.forEach(s=>groups.push({day,idx:groups.length+1,doubles:null,singles:[s],players:[...(s.gold_player_ids||[]),...(s.navy_player_ids||[])],isStags:true}));
   return groups;
 }
 function cupMatchesDayReleased(cupMatches,day){
@@ -2222,7 +2224,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v4.71" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.71</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v4.72" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.72</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -7191,7 +7193,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return `league-balance-${round&&round.id||'round'}-${scope==='group'?(activeGroupId||'group'):'all'}`;
   }
   function normalSweepstakeSettlementNotes(key){
-    return ['v4.71','v4.70','v4.69','v4.68','v4.67','v4.66','v4.65','v4.64','v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
+    return ['v4.72','v4.71','v4.70','v4.69','v4.68','v4.67','v4.66','v4.65','v4.64','v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
   }
   function signedMoneyFromPence(pence){
     const n=parseInt(pence)||0;
@@ -9639,7 +9641,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.71`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.72`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9864,7 +9866,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.71`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.72`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9902,7 +9904,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.71`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.72`;
     const legacyReverseNoteV460=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.60`;
     const legacyReverseNoteV459=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.59`;
     const legacyReverseNoteV458=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.58`;
@@ -10947,13 +10949,14 @@ function CupDayView({day,course,groups,teams,playersInCup,released,roundForGroup
       const rd=roundForGroup(group.day,group.idx);
       const finesTotal=cupFineTotalForRound(rd,scores);
       const firstMatch=group.doubles||group.singles[0];
+      const isStagsGroup=!!(group.isStags||(group.singles||[]).some(isCupStagsMatch));
       const locked=!released;
       const opening=normaliseId(openingGroup)===normaliseId(day+'-'+group.idx);
       const disabled=!firstMatch||opening||locked;
       const finished=rd&&isCompletedRound(rd);
       return <div key={group.idx} role="button" tabIndex={disabled?-1:0} onClick={()=>{if(!disabled)openCupGroup(group);}} onKeyDown={(e)=>{if(!disabled&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openCupGroup(group);}}} style={{border:finished?'1px solid rgba(248,250,252,0.34)':'1px solid rgba(96,184,240,0.22)',borderRadius:16,background:'linear-gradient(180deg,rgba(0,112,187,0.12),rgba(255,255,255,0.04))',padding:12,marginBottom:14,opacity:disabled?0.58:1,cursor:disabled?'default':'pointer'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
-          <div><div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>GROUP {group.idx}</div><div style={{fontSize:11,color:finished?'#f8fafc':'#8ea0ad',fontWeight:finished?900:500}}>{opening?'Opening scorecard...':rd?finished?'FINISHED':'Scorecard live':locked?'Locked until Go Live':'No scorecard yet'}</div></div>
+          <div><div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>{isStagsGroup?'🦌 THE STAGS':('GROUP '+group.idx)}</div><div style={{fontSize:11,color:finished?'#f8fafc':'#8ea0ad',fontWeight:finished?900:500}}>{opening?'Opening scorecard...':rd?finished?'FINISHED':'Scorecard live':locked?'Locked until Go Live':'No scorecard yet'}</div></div>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <button onClick={(e)=>{e.stopPropagation(); if(rd&&!locked&&openFinesGroup)openFinesGroup(group);}} disabled={!rd||locked} style={{border:'1px solid rgba(212,175,55,0.38)',borderRadius:999,padding:'7px 10px',background:rd&&!locked?'rgba(212,175,55,0.16)':'rgba(255,255,255,0.05)',color:rd&&!locked?'#F5E6A3':'#8ea0ad',fontSize:11,fontWeight:950,cursor:rd&&!locked?'pointer':'default',whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:7}}><span>{EMOJI.moneyWings}</span><span>FINES</span><span style={{fontSize:12,color:rd&&!locked?'#fff':'#8ea0ad',fontWeight:950}}>{EMOJI.pound}{finesTotal}</span></button>
             <div style={{fontSize:11,color:finished?'#f8fafc':(disabled?'#8ea0ad':'#90ccf0'),fontWeight:900,letterSpacing:'0.08em'}}>{locked?'LOCKED':opening?'OPENING':finished?'VIEW FINISHED':'TAP TO OPEN'}</div>
@@ -10961,7 +10964,7 @@ function CupDayView({day,course,groups,teams,playersInCup,released,roundForGroup
         </div>
         <div style={{display:'grid',gap:8}}>
           {group.doubles&&<><div style={{fontSize:11,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em',margin:'2px 0 -2px'}}>DOUBLES MATCH</div><MatchRow match={group.doubles} round={rd} label="DOUBLES MATCH"/></>}
-          {group.singles.map((m,i)=><div key={m.id}><div style={{fontSize:11,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em',margin:'2px 0 6px'}}>SINGLES {i+1}</div><MatchRow match={m} round={rd} label={'SINGLES '+(i+1)}/></div>)}
+          {group.singles.map((m,i)=><div key={m.id}><div style={{fontSize:11,color:isCupStagsMatch(m)?CUP_THEME.red.accent:'#60b8f0',fontWeight:950,letterSpacing:'0.12em',margin:'2px 0 6px'}}>{isCupStagsMatch(m)?'🦌 STAGS GROUP':('SINGLES '+(i+1))}</div><MatchRow match={m} round={rd} label={isCupStagsMatch(m)?'STAGS GROUP':('SINGLES '+(i+1))}/></div>)}
         </div>
       </div>;
     })}
@@ -11188,7 +11191,15 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   }
   const cup=(cupEvents||[])[0];
   const teams=cup?getCupTeams(cup,cupTeams):null;
-  const playersInCup=(cupEventPlayers||[]).filter(p=>cup&&p.cup_id===cup.id);
+  const rawPlayersInCup=(cupEventPlayers||[]).filter(p=>cup&&p.cup_id===cup.id);
+  const cupSlotSort=rows=>[...(rows||[])].sort((a,b)=>{
+    const ca=Date.parse(a.created_at||'')||0,cb=Date.parse(b.created_at||'')||0;
+    return ca-cb||String(a.id||'').localeCompare(String(b.id||''));
+  });
+  const playersInCup=CUP_SLOT_TEAMS.flatMap(t=>{
+    const rows=cupSlotSort(rawPlayersInCup.filter(p=>p.team_key===t.key)).slice(0,parseInt(t.slots)||4);
+    return rows.map((p,i)=>({...p,display_name:cupDefaultSlotName(t.code,i+1),_cupSlot:t.code+(i+1)}));
+  });
   const matches=(cupMatches||[]).filter(m=>cup&&m.cup_id===cup.id);
   const days=(cupDays||[]).filter(d=>cup&&d.cup_id===cup.id);
   const cupDayNumbers=Array.from(new Set([1,2,3,...days.map(d=>parseInt(d.day_number)||1),...matches.map(m=>parseInt(m.day_number)||1)])).filter(Boolean).sort((a,b)=>a-b);
@@ -11351,7 +11362,8 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   function cupDayGroups(day){
     const dayMatches=matches.filter(m=>(parseInt(m.day_number)||1)===(parseInt(day)||1));
     const doubles=dayMatches.filter(m=>String(m.match_type||'').toLowerCase()==='doubles');
-    const singles=dayMatches.filter(m=>String(m.match_type||'').toLowerCase()!=='doubles');
+    const stags=dayMatches.filter(isCupStagsMatch);
+    const singles=dayMatches.filter(m=>String(m.match_type||'').toLowerCase()!=='doubles'&&!isCupStagsMatch(m));
     const usedSingles=new Set();
     const groups=doubles.map((dbl,idx)=>{
       const ids=new Set([...(dbl.gold_player_ids||[]),...(dbl.navy_player_ids||[])].map(normaliseId));
@@ -11364,6 +11376,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
       return{day,idx:idx+1,doubles:dbl,singles:linked,players:[...(dbl.gold_player_ids||[]),...(dbl.navy_player_ids||[])]};
     });
     singles.filter(s=>!usedSingles.has(s.id)).forEach((s,i)=>groups.push({day,idx:groups.length+1,doubles:null,singles:[s],players:[...(s.gold_player_ids||[]),...(s.navy_player_ids||[])]}));
+    stags.forEach(s=>groups.push({day,idx:groups.length+1,doubles:null,singles:[s],players:[...(s.gold_player_ids||[]),...(s.navy_player_ids||[])],isStags:true}));
     return groups;
   }
   function teamPoints(){
