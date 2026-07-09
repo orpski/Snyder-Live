@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.69
+// SNYDER GOLF v4.70
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -154,7 +154,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.69',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.70',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -203,7 +203,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.69',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.70',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -2222,7 +2222,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v4.69" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.69</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v4.70" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.70</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -7191,7 +7191,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return `league-balance-${round&&round.id||'round'}-${scope==='group'?(activeGroupId||'group'):'all'}`;
   }
   function normalSweepstakeSettlementNotes(key){
-    return ['v4.69','v4.68','v4.67','v4.66','v4.65','v4.64','v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
+    return ['v4.70','v4.69','v4.68','v4.67','v4.66','v4.65','v4.64','v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
   }
   function signedMoneyFromPence(pence){
     const n=parseInt(pence)||0;
@@ -9639,7 +9639,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.69`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.70`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9864,7 +9864,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.69`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.70`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9902,7 +9902,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.69`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.70`;
     const legacyReverseNoteV460=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.60`;
     const legacyReverseNoteV459=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.59`;
     const legacyReverseNoteV458=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.58`;
@@ -10281,15 +10281,15 @@ const CUP_THEME={gold:{name:'Team LIV',primary:'#D4AF37',accent:'#F5E6A3',bg:'rg
 const CUP_SLOT_TEAMS=[{key:'gold',code:'A',slots:4,note:'Paolo, Jon, Milner and Novak'},{key:'navy',code:'B',slots:5,note:'Smithy, Hully, Ben, Stokoe and Coburn'},{key:'red',code:'C',slots:3,note:'Sluggy, Kev and Leng'}];
 const CUP_FIXED_MATCHUPS=[
   {day:1,doubles:[['A',1],['A',3],['B',1],['B',2]],singles:[[['A',1],['B',2]],[['A',3],['B',1]]]},
-  {day:1,doubles:[['A',2],['A',4],['B',3],['B',4]],singles:[[['A',2],['B',5]],[['A',4],['B',3]]]},
+  {day:1,doubles:[['A',2],['A',4],['B',3],['B',5]],singles:[[['A',2],['B',5]],[['A',4],['B',3]]]},
   {day:2,doubles:[['A',1],['A',4],['B',5],['B',2]],singles:[[['A',1],['B',5]],[['A',4],['B',2]]]},
   {day:2,doubles:[['A',2],['A',3],['B',1],['B',4]],singles:[[['A',2],['B',1]],[['A',3],['B',4]]]},
   {day:3,doubles:[['A',3],['A',4],['B',5],['B',4]],singles:[[['A',3],['B',5]],[['A',4],['B',4]]]},
   {day:3,doubles:[['A',2],['A',1],['B',3],['B',1]],singles:[[['A',1],['B',1]],[['A',2],['B',3]]]}
 ];
-const CUP_STAGS_ROTATION={1:'Coburn joins The Stags group',2:'Ben joins The Stags group',3:'Hully joins The Stags group'};
+const CUP_STAGS_ROTATION={1:'Stokoe joins The Stags group',2:'Ben joins The Stags group',3:'Hully joins The Stags group'};
 const CUP_STAGS_GROUPS=[
-  {day:1,players:[['C',1],['C',2],['C',3],['B',5]]},
+  {day:1,players:[['C',1],['C',2],['C',3],['B',4]]},
   {day:2,players:[['C',1],['C',2],['C',3],['B',3]]},
   {day:3,players:[['C',1],['C',2],['C',3],['B',2]]}
 ];
@@ -10363,8 +10363,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     return p?playerKey(p):null;
   };
   const slotPlayerName=slot=>{
-    const p=slotPlayer(slot[0],slot[1]);
-    return gameName(cupDisplayName(p)||cupDefaultSlotName(slot[0],slot[1]));
+    return gameName(cupDefaultSlotName(slot[0],slot[1]));
   };
   const renderFixedCupFixtureDay=dayNum=>{
     const groups=CUP_FIXED_MATCHUPS.filter(g=>(parseInt(g.day)||1)===(parseInt(dayNum)||1));
@@ -10531,6 +10530,14 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       if(!ok)return false;
       const rows=cupSlotRows(t.key);
       const slotCount=parseInt(t.slots)||4;
+      for(let i=1;i<=Math.min(rows.length,slotCount);i++){
+        const row=rows[i-1];
+        const wantedName=cupDefaultSlotName(t.code,i);
+        if(row&&String(cupDisplayName(row)||'').trim()!==wantedName){
+          const{error}=await sb.from('snyder_cup_players').update({display_name:wantedName}).eq('id',row.id);
+          if(error){flash(error.message,'error');return false;}
+        }
+      }
       for(let i=rows.length+1;i<=slotCount;i++){
         const{error}=await insertCupPlayer(t.key,cupDefaultSlotName(t.code,i),0);
         if(error){flash(error.message,'error');return false;}
