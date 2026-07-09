@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.67
+// SNYDER GOLF v4.68
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -154,7 +154,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.67',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.68',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -203,7 +203,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.67',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.68',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -2222,7 +2222,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v4.67" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.67</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v4.68" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.68</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -7191,7 +7191,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return `league-balance-${round&&round.id||'round'}-${scope==='group'?(activeGroupId||'group'):'all'}`;
   }
   function normalSweepstakeSettlementNotes(key){
-    return ['v4.67','v4.66','v4.65','v4.64','v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
+    return ['v4.68','v4.67','v4.66','v4.65','v4.64','v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
   }
   function signedMoneyFromPence(pence){
     const n=parseInt(pence)||0;
@@ -9639,7 +9639,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.67`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.68`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9864,7 +9864,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.67`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.68`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9902,7 +9902,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.67`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.68`;
     const legacyReverseNoteV460=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.60`;
     const legacyReverseNoteV459=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.59`;
     const legacyReverseNoteV458=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.58`;
@@ -10362,8 +10362,37 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     const p=slotPlayer(slot[0],slot[1]);
     return p?playerKey(p):null;
   };
+  const slotPlayerName=slot=>{
+    const p=slotPlayer(slot[0],slot[1]);
+    return gameName(cupDisplayName(p)||cupDefaultSlotName(slot[0],slot[1]));
+  };
+  const renderFixedCupFixtureDay=dayNum=>{
+    const groups=CUP_FIXED_MATCHUPS.filter(g=>(parseInt(g.day)||1)===(parseInt(dayNum)||1));
+    const stags=CUP_STAGS_GROUPS.find(g=>(parseInt(g.day)||1)===(parseInt(dayNum)||1));
+    return <div key={'fixed-fixtures-day-'+dayNum} style={{border:'1px solid rgba(255,255,255,0.10)',borderRadius:10,background:'rgba(0,0,0,0.14)',padding:10}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><div style={{fontSize:13,color:'#fff',fontWeight:950,letterSpacing:'0.08em'}}>DAY {dayNum}</div><div style={{fontSize:10,color:'#fbbf24',fontWeight:900}}>LOCKED</div></div>
+      <div style={{display:'grid',gap:8}}>
+        {groups.map((g,idx)=>{
+          const left=g.doubles.slice(0,2).map(slotPlayerName).join(' and ');
+          const right=g.doubles.slice(2,4).map(slotPlayerName).join(' and ');
+          return <div key={'fixed-fixture-'+dayNum+'-'+idx} style={{borderTop:idx?'1px solid rgba(255,255,255,0.08)':'0',paddingTop:idx?8:0}}>
+            <div style={{fontSize:12,color:'#fff',fontWeight:900}}>Group {idx+1}: {left} v {right}</div>
+            <div style={{fontSize:11,color:'#9fb6c9',lineHeight:1.45,marginTop:3}}>Singles: {g.singles.map(pair=>pair.map(slotPlayerName).join(' v ')).join(', ')}</div>
+          </div>;
+        })}
+        {stags&&<div style={{borderTop:'1px solid rgba(255,255,255,0.08)',paddingTop:8}}>
+          <div style={{fontSize:12,color:'#FCA5A5',fontWeight:900}}>Stags: {stags.players.map(slotPlayerName).join(', ')}</div>
+        </div>}
+      </div>
+    </div>;
+  };
   const days=(cupDays||[]).filter(d=>cup&&d.cup_id===cup.id).sort((a,b)=>(a.day_number||0)-(b.day_number||0));
   const matches=(cupMatches||[]).filter(m=>cup&&m.cup_id===cup.id).sort((a,b)=>(a.day_number||0)-(b.day_number||0)||String(a.match_type||'').localeCompare(String(b.match_type||'')));
+  const fixedCupMatchCount=CUP_FIXED_MATCHUPS.reduce((sum,g)=>sum+1+(g.singles||[]).length,0)+CUP_STAGS_GROUPS.length;
+  const cupMatchTemplateKey=m=>[parseInt(m.day_number)||1,String(m.match_type||''),(m.gold_player_ids||[]).join('+'),(m.navy_player_ids||[]).join('+')].join('|');
+  const fixedCupExpectedKeys=cup?fixedScheduleRows(cupPlayers).map(cupMatchTemplateKey).sort():[];
+  const fixedCupSavedKeys=matches.map(cupMatchTemplateKey).sort();
+  const fixedCupInstalled=fixedCupExpectedKeys.length===fixedCupMatchCount&&fixedCupSavedKeys.length===fixedCupExpectedKeys.length&&fixedCupExpectedKeys.every((key,i)=>key===fixedCupSavedKeys[i]);
   const cupDayNumbers=Array.from(new Set([1,2,3,...days.map(d=>parseInt(d.day_number)||1),...matches.map(m=>parseInt(m.day_number)||1)])).filter(Boolean).sort((a,b)=>a-b);
   const adminDays=cupDayNumbers.map(n=>days.find(d=>(parseInt(d.day_number)||1)===n)||{day_number:n,_synthetic:true});
   const matchesByDay=groupCupMatchesByDay(matches,adminDays).filter(group=>group.matches.length);
@@ -10723,7 +10752,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     const slotRows=cupSlotRows(teamKey);
     return <div style={{...S.card,...cupTeamStyle(teamKey),padding:12}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><CupTeamBadge teamKey={teamKey} label={team.name}/><div style={{fontSize:20,color:'#fff',fontWeight:900}}>{slotRows.length}/{slotCount}</div></div>
-      <div style={{fontSize:11,color:'#9fb6c9',marginBottom:8}}>Assign the fixed Cup positions. {slotMeta.note||'The matchups use these slots automatically.'}</div>
+      <div style={{fontSize:11,color:'#9fb6c9',marginBottom:8}}>Set accounts and handicaps for these fixed Cup places. {slotMeta.note||'The locked fixtures use these slots automatically.'}</div>
       {Array.from({length:slotCount},(_,i)=>({slot:i+1,player:slotRows[i]})).map(({slot,player})=>(
         <div key={teamKey+'-slot-'+slot} style={{borderTop:'1px solid rgba(255,255,255,0.08)',padding:'9px 0'}}>
           <div style={{fontSize:11,color:(CUP_THEME[teamKey]||CUP_THEME.gold).accent,fontWeight:950,letterSpacing:'0.10em',marginBottom:6}}>{(team&&team.name)||CUP_THEME[teamKey].name} - {slot} ({slotMeta.code}{slot})</div>
@@ -10734,8 +10763,8 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   }
   return <div>
     <div style={{...S.card,marginBottom:14,background:'linear-gradient(135deg,rgba(212,175,55,0.13),rgba(11,31,77,0.35))'}}>
-      <div style={{fontSize:18,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.07em'}}>SNYDER CUP SETUP</div>
-      <div style={{fontSize:12,color:'#9fb6c9',marginTop:4}}>Professional setup panel: Cup details, squads, days, matches and quick fixes.</div>
+      <div style={{fontSize:18,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.07em'}}>SNYDER CUP ADMIN</div>
+      <div style={{fontSize:12,color:'#9fb6c9',marginTop:4}}>Fixtures are locked. Admin only needs to check handicaps, assign the three courses and send each day live.</div>
       {cup&&<button onClick={resetCompetition} style={{...S.dan,width:'100%',padding:11,fontSize:13,marginTop:12}}>Reset Competition</button>}
     </div>
     {!cup&&<div style={{...S.card,marginBottom:14}}>
@@ -10748,20 +10777,29 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     </div>}
     {cup&&<div>
       <div style={{...S.card,marginBottom:10,padding:10}}>
-        <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>CUP OVERVIEW</div>
+        <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',marginBottom:8}}>CUP CONTROL</div>
         <select style={{...S.inp,marginBottom:8}} value={cup.id} onChange={e=>setSelectedCupId(e.target.value)}>{(cupEvents||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:7,textAlign:'center',marginBottom:10}}><div style={{...S.card,padding:8}}><div style={{fontSize:18,color:'#fff',fontWeight:900}}>{cupPlayers.length}</div><div style={{fontSize:10,color:'#8ea0ad'}}>Players</div></div><div style={{...S.card,padding:8}}><div style={{fontSize:18,color:'#fff',fontWeight:900}}>{days.length}</div><div style={{fontSize:10,color:'#8ea0ad'}}>Days</div></div><div style={{...S.card,padding:8}}><div style={{fontSize:18,color:'#fff',fontWeight:900}}>{matches.length}</div><div style={{fontSize:10,color:'#8ea0ad'}}>Matches</div></div></div>
-        <button onClick={buildFixedCupSchedule} style={{...S.pri,width:'100%',background:'linear-gradient(135deg,#D4AF37,#2563EB)',fontSize:13}}>Build fixed LIV v Boring matchups</button>
-        <div style={{fontSize:10,color:'#9fb6c9',lineHeight:1.35,marginTop:7}}>Creates the LIV, Boring and Stags slots if needed, then fills two scoring groups per day. {CUP_STAGS_ROTATION[1]}, {CUP_STAGS_ROTATION[2]}, {CUP_STAGS_ROTATION[3]}.</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:7,textAlign:'center',marginBottom:10}}>
+          <div style={{border:'1px solid rgba(255,255,255,0.10)',borderRadius:8,padding:8,background:'rgba(0,0,0,0.12)'}}><div style={{fontSize:18,color:'#fff',fontWeight:900}}>{cupPlayers.length}</div><div style={{fontSize:10,color:'#8ea0ad'}}>Players</div></div>
+          <div style={{border:'1px solid rgba(255,255,255,0.10)',borderRadius:8,padding:8,background:'rgba(0,0,0,0.12)'}}><div style={{fontSize:18,color:'#fff',fontWeight:900}}>3</div><div style={{fontSize:10,color:'#8ea0ad'}}>Days</div></div>
+          <div style={{border:'1px solid rgba(255,255,255,0.10)',borderRadius:8,padding:8,background:'rgba(0,0,0,0.12)'}}><div style={{fontSize:18,color:'#fff',fontWeight:900}}>{fixedCupInstalled?'Locked':'Refresh'}</div><div style={{fontSize:10,color:'#8ea0ad'}}>Fixtures</div></div>
+        </div>
+        <button onClick={buildFixedCupSchedule} style={{...S.pri,width:'100%',background:'linear-gradient(135deg,#D4AF37,#2563EB)',fontSize:13}}>{fixedCupInstalled?'Refresh locked fixtures':'Save locked fixtures now'}</button>
+        <div style={{fontSize:10,color:fixedCupInstalled?'#9fb6c9':'#fbbf24',lineHeight:1.35,marginTop:7}}>{fixedCupInstalled?'Saved admin rows match the locked Day 1, Day 2 and Day 3 fixtures.':'Saved admin rows are missing or still show an old schedule. Press the button once to write the locked fixtures.'}</div>
       </div>
-      <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'0 0 8px'}}>TEAMS & PLAYERS</div>
+      <div style={{...S.card,marginBottom:14}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:10}}><div style={{fontSize:14,color:'#fff',fontWeight:900}}>Locked Fixtures</div><div style={{fontSize:10,color:'#fbbf24',fontWeight:900,letterSpacing:'0.10em'}}>SET IN STONE</div></div>
+        <div style={{fontSize:11,color:'#9fb6c9',lineHeight:1.4,marginBottom:10}}>These are the Cup matchups. The only admin jobs are player handicaps, account links, courses and Go Live.</div>
+        <div style={{display:'grid',gap:8}}>{[1,2,3].map(renderFixedCupFixtureDay)}</div>
+      </div>
+      <div style={{fontSize:12,color:'#60b8f0',fontWeight:900,letterSpacing:'0.14em',margin:'0 0 8px'}}>PLAYERS & HANDICAPS</div>
       <div style={{display:'grid',gridTemplateColumns:'1fr',gap:10,marginBottom:14}}>
         {renderTeamAdminCard('gold',teams.gold,goldPlayers)}
         {renderTeamAdminCard('navy',teams.navy,navyPlayers)}
         {renderTeamAdminCard('red',teams.red,redPlayers)}
       </div>
       <div style={{...S.card,marginBottom:14}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}><div style={{fontSize:14,color:'#fff',fontWeight:800}}>Cup Days</div><div style={{fontSize:11,color:'#9fb6c9',fontWeight:800}}>3 fixed days</div></div>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}><div style={{fontSize:14,color:'#fff',fontWeight:800}}>Courses & Day Status</div><div style={{fontSize:11,color:'#9fb6c9',fontWeight:800}}>3 fixed days</div></div>
         {adminDays.map(d=>{const released=isDayReleased(d.day_number);const count=dayMatches(d.day_number).length;const dayCourse=selectedCourseForDay(d.day_number);return <div key={d.id||d.day_number} style={{display:'grid',gap:8,fontSize:13,color:'#60b8f0',padding:'10px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}><span>Day {d.day_number} - {count} matches - {released?'LIVE':'Locked'}</span><div style={{display:'flex',gap:6}}><button onClick={()=>setDayReleased(d.day_number,!released)} disabled={!released&&count===0} style={{...(released?S.gho:S.pri),padding:'5px 9px',fontSize:11,opacity:(!released&&count===0)?0.45:1}}>{released?'Lock Day':'Go Live'}</button><button onClick={()=>deleteDay(d)} disabled={count===0&&d._synthetic} style={{...S.dan,padding:'5px 9px',fontSize:11,opacity:(count===0&&d._synthetic)?0.45:1}}>Delete</button></div></div>
           <div style={{display:'grid',gridTemplateColumns:'1fr',gap:6}}>
@@ -10784,21 +10822,10 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,maxHeight:320,overflowY:'auto',paddingRight:2}}>{(courseFixDraft.holes||[]).map((h,i)=><div key={i} style={{display:'grid',gridTemplateColumns:'26px 1fr 1fr 1fr',gap:4,alignItems:'center'}}><div style={{fontSize:11,color:'#60b8f0',fontWeight:950}}>{i+1}</div><input type="number" value={h.par} onChange={e=>updateCourseFixHole(i,{par:e.target.value})} style={{...S.inp,padding:'4px 3px',fontSize:11,textAlign:'center'}}/><input type="number" value={h.stroke_index} onChange={e=>updateCourseFixHole(i,{stroke_index:e.target.value})} style={{...S.inp,padding:'4px 3px',fontSize:11,textAlign:'center'}}/><input type="number" value={h.yards} onChange={e=>updateCourseFixHole(i,{yards:e.target.value})} style={{...S.inp,padding:'4px 3px',fontSize:11,textAlign:'center'}}/></div>)}</div>
         <button onClick={saveCourseFix} style={{...S.pri,width:'100%',marginTop:10}}>Save day card + recalc shots</button>
       </div>}
-      <div style={{...S.card,marginBottom:14}}>
-        <div style={{fontSize:14,color:'#fff',fontWeight:800,marginBottom:10}}>Fixed Matchup Plan</div>
-        <div style={{fontSize:11,color:'#9fb6c9',lineHeight:1.4,marginBottom:10}}>Once the 12 slots are assigned, press the build button above and the Day 1, Day 2 and Day 3 scoreboards will use the full fixed doubles and singles schedule.</div>
-        <div style={{display:'grid',gap:7}}>
-          {CUP_FIXED_MATCHUPS.map((g,i)=><div key={'fixed-'+i} style={{border:'1px solid rgba(255,255,255,0.10)',borderRadius:10,background:'rgba(0,0,0,0.12)',padding:8}}>
-            <div style={{fontSize:11,color:'#60b8f0',fontWeight:950,letterSpacing:'0.10em'}}>DAY {g.day}</div>
-            <div style={{fontSize:12,color:'#fff',fontWeight:850,marginTop:3}}>{g.doubles.slice(0,2).map(s=>s[0]+s[1]).join('/')} vs {g.doubles.slice(2,4).map(s=>s[0]+s[1]).join('/')}</div>
-            <div style={{fontSize:11,color:'#9fb6c9',marginTop:2}}>{g.singles.map(pair=>pair.map(s=>s[0]+s[1]).join(' vs ')).join(', ')}</div>
-          </div>)}
-        </div>
-      </div>
-      <div style={{fontSize:12,color:'#60b8f0',letterSpacing:'0.12em',fontWeight:800,marginBottom:8}}>MATCHES</div>
-      {matches.length===0?<div style={{...S.card,color:'#8ea0ad',fontSize:13}}>No matches yet.</div>:matchesByDay.map(group=><div key={group.day} style={{marginBottom:14}}>
+      <div style={{fontSize:12,color:'#60b8f0',letterSpacing:'0.12em',fontWeight:800,marginBottom:8}}>SAVED FIXTURE ROWS</div>
+      {!fixedCupInstalled?<div style={{...S.card,color:'#fbbf24',fontSize:13}}>Saved fixture rows need refreshing. Use the button at the top to replace the old admin rows with the locked Day 1, Day 2 and Day 3 fixtures.</div>:matches.length===0?<div style={{...S.card,color:'#8ea0ad',fontSize:13}}>No matches yet.</div>:matchesByDay.map(group=><div key={group.day} style={{marginBottom:14}}>
         <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 8px'}}><div style={{fontSize:15,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {group.day}</div><div style={{height:1,background:'rgba(255,255,255,0.12)',flex:1}}/></div>
-        {group.matches.map(m=><CupMatchCard key={m.id} match={m} cupPlayers={cupPlayers} teams={teams} editable={true} onRemove={removeFromMatch} onDelete={deleteMatch}/>)}
+        {group.matches.map(m=><CupMatchCard key={m.id} match={m} cupPlayers={cupPlayers} teams={teams} editable={false}/>)}
       </div>)}
     </div>}
   </div>;
