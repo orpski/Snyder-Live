@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.79
+// SNYDER GOLF v4.78
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -154,7 +154,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.79',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.78',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -203,7 +203,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.79',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.78',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -2232,7 +2232,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v4.79" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.79</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v4.78" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.78</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -5584,12 +5584,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const p=allRoundPlayers.find(pl=>normaliseId(pl.id)===normaliseId(id))||players.find(pl=>normaliseId(pl.id)===normaliseId(id));
     return p||{id,name:'Player',display_name:'Player',current_handicap:playingHcps[id]||0};
   });
-  function getDisplayName(pid){
-    const key=normaliseId(pid);
-    const pool=[...(grpPlayers||[]),...(allRoundPlayers||[]),...((round&&round._cupDayAllPlayers)||[]),...(players||[])].filter(Boolean);
-    const found=pool.find(p=>scoreAliasesForPerson(p).some(id=>normaliseId(id)===key));
-    return (found&&(found.display_name||found.name||found.username||found.full_name))||'Player';
-  }
   function scorecardPlayerProfile(player){
     if(!player)return {display_name:'Player'};
     const seedIds=[player.id,player.user_id,player.guest_id,player.cup_player_id,player.round_player_id].filter(Boolean).map(normaliseId);
@@ -5944,32 +5938,21 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     suppressFoursomesNotifyRef.current=true;
     setRefreshing(true);
     try{
-      const cupDayRoundIds=round&&round._cupScoring?(round._cupDayRounds||[]).map(r=>r&&r.id).filter(Boolean):[];
-      const refreshRoundIds=Array.from(new Set((cupDayRoundIds.length?cupDayRoundIds:[round.id]).filter(Boolean).map(String)));
-      const multiRound=refreshRoundIds.length>1;
-      const scoreQuery=multiRound?sb.from('cup_scores').select('*').in('round_id',refreshRoundIds):sb.from('cup_scores').select('*').eq('round_id',round.id);
-      const groupQuery=multiRound?sb.from('cup_groups').select('*').in('round_id',refreshRoundIds).order('group_number',{ascending:true}):sb.from('cup_groups').select('*').eq('round_id',round.id).order('group_number',{ascending:true});
-      const playerQuery=round&&round._cupScoring?(multiRound?sb.from('cup_round_players').select('*').in('round_id',refreshRoundIds):sb.from('cup_round_players').select('*').eq('round_id',round.id)):Promise.resolve({data:[],error:null});
-      const [{data,error},{data:groupRows,error:groupError},{data:roundPlayerRows,error:roundPlayerError}]=await Promise.all([
-        scoreQuery,
-        groupQuery,
-        playerQuery
+      const [{data,error},{data:groupRows,error:groupError}]=await Promise.all([
+        sb.from('cup_scores').select('*').eq('round_id',round.id),
+        sb.from('cup_groups').select('*').eq('round_id',round.id).order('group_number',{ascending:true})
       ]);
       if(error)throw error;
       if(groupError)throw groupError;
-      if(roundPlayerError)throw roundPlayerError;
-      if(round&&round._cupScoring)setCupOverallRoundPlayers(roundPlayerRows||[]);
       const rows=normaliseFoursomesScoreRows(data||[]);
-      const groupMetaRows=(groupRows||[]).flatMap(g=>foursomesScoreRowsFromGroupMeta((g&&g.round_id)||round.id,g));
+      const groupMetaRows=(groupRows||[]).flatMap(g=>foursomesScoreRowsFromGroupMeta(round.id,g));
       const allScoreRows=normaliseFoursomesScoreRows([...rows,...groupMetaRows]);
       setCloudScoreRows(allScoreRows);
-      const currentRoundScoreRows=allScoreRows.filter(r=>!r.round_id||String(r.round_id)===String(round.id));
       const scoreRows=allScoreRows.filter(r=>!isMetaScoreRow(r));
-      const currentScoreRows=currentRoundScoreRows.filter(r=>!isMetaScoreRow(r));
-      const snakeRows=rows.filter(r=>!r.round_id||String(r.round_id)===String(round.id)).filter(isSnakeScoreRow);
+      const snakeRows=rows.filter(isSnakeScoreRow);
       const m={};
       const scorePeople=(allRoundPlayers&&allRoundPlayers.length?allRoundPlayers:((group&&group.participants)||[]));
-      currentScoreRows.forEach(s=>{
+      scoreRows.forEach(s=>{
         if(!m[s.hole_number])m[s.hole_number]={};
         aliasesForSavedScoreId(canonicalFoursomesPlayerId(s.player_id),scorePeople).forEach(pid=>{m[s.hole_number][pid]=s.gross_score;});
       });
@@ -5989,7 +5972,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       const refreshedMatchplayConfig=matchplayConfigFromRows(allScoreRows,round,(groupRows&&groupRows[0])||activeScoreGroup||group);
       setMatchplayConfig(prev=>preserveFoursomesTeamNames(refreshedMatchplayConfig,prev));
       if(groupRows&&groupRows.length){
-        setAllGroups(prev=>(groupRows||[]).filter(g=>!g.round_id||String(g.round_id)===String(round.id)).map((g,idx)=>{
+        setAllGroups(prev=>(groupRows||[]).map((g,idx)=>{
           const existing=(prev||[]).find(p=>normaliseId(p.id)===normaliseId(g.id))||{};
           return {...existing,...g,participants:existing.participants||[],player_ids:(existing.player_ids&&existing.player_ids.length?existing.player_ids:g.player_ids),playing_handicaps:g.playing_handicaps||existing.playing_handicaps||{},group_number:g.group_number||idx+1};
         }));
@@ -6101,44 +6084,6 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   function cupOverallPlayerKeys(cp){
     return [cp&&cp.id,cp&&cp.user_id,cp&&cp.guest_id,cp&&cp.round_player_id,cp&&cp.cup_player_id].filter(Boolean).map(normaliseId);
   }
-  function cupScoreRowsSource(){
-    const byKey={};
-    [...(scores||[]),...(cloudScoreRows||[]),...(overallScores||[])].forEach((r,idx)=>{
-      if(!r||isMetaScoreRow(r)||!r.player_id||!r.hole_number)return;
-      const key=[r.round_id||'',normaliseId(r.player_id),parseInt(r.hole_number,10)||0].join('|');
-      byKey[key]={...r,_idx:idx};
-    });
-    return Object.values(byKey).sort((a,b)=>(a._idx||0)-(b._idx||0));
-  }
-  function cupPlayerAliasesForRound(cupId,rd){
-    const key=normaliseId(cupId);
-    const aliases=new Set([key]);
-    const add=v=>{const n=normaliseId(v);if(n)aliases.add(n);};
-    const dayPlayers=(round&&round._cupDayAllPlayers)||[];
-    const pools=[dayPlayers,grpPlayers,allRoundPlayers,players].filter(Array.isArray);
-    const matchNames=new Set();
-    pools.forEach(list=>(list||[]).forEach(p=>{
-      const pAliases=scoreAliasesForPerson(p).map(normaliseId);
-      if(pAliases.includes(key)){
-        scoreAliasesForPerson(p).forEach(add);
-        const nm=String(p.display_name||p.name||p.username||p.full_name||'').trim().toLowerCase();
-        if(nm)matchNames.add(nm);
-      }
-    }));
-    if(!matchNames.size){
-      const nm=String(getDisplayName(cupId)||'').trim().toLowerCase();
-      if(nm&&nm!=='player')matchNames.add(nm);
-    }
-    (cupOverallRoundPlayers||[]).forEach(rp=>{
-      if(rd&&rp.round_id&&String(rp.round_id)!==String(rd.id))return;
-      const rpName=String(rp.display_name||rp.name||'').trim().toLowerCase();
-      const rpAliases=[rp.id,rp.user_id,rp.guest_id,rp.cup_player_id,rp.round_player_id].filter(Boolean).map(normaliseId);
-      if(rpAliases.includes(key)||matchNames.has(rpName)){
-        [rp.id,rp.user_id,rp.guest_id,rp.cup_player_id,rp.round_player_id].forEach(add);
-      }
-    });
-    return Array.from(aliases);
-  }
   function cupOverallPlayerIdForScoreRow(row){
     if(!row)return null;
     const rowPid=normaliseId(row.player_id);
@@ -6178,7 +6123,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       rowsByCup[cpId].holes+=1;
       rowsByCup[cpId].total+=stablefordPointsValue(sc.stableford_points);
     };
-    cupScoreRowsSource().forEach(sc=>{
+    (overallScores&&overallScores.length?overallScores:scores||[]).forEach(sc=>{
       if(sc&&roundIdSet.has(sc.round_id)&&(!round||sc.round_id!==round.id))put(sc,sc.round_id);
     });
     if(round&&round.id){
@@ -6331,7 +6276,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const dayRounds=(round&&round._cupDayRounds)||[];
     if(round&&round._cupScoring&&dayPlayers.length){
       const rows=dayPlayers.map(cp=>{
-        const ids=cupPlayerAliasesForRound(cp.id).concat([cp.user_id,cp.guest_id].filter(Boolean).map(normaliseId));
+        const ids=[cp.id,cp.user_id,cp.guest_id].filter(Boolean).map(normaliseId);
         const name=((cp.display_name||cp.name||cp.username)||'Player').split(' ')[0];
         let total=0;
         const holesDone=new Set();
@@ -6345,13 +6290,10 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           }
         });
         // Other Cup groups for this day use the latest saved scores already loaded in appData.
-        cupScoreRowsSource().forEach(sc=>{
-          const rd=dayRounds.find(r=>r&&r.id===sc.round_id);
-          if(!rd)return;
+        (scores||[]).filter(sc=>!isMetaScoreRow(sc)).forEach(sc=>{
+          if(!dayRounds.some(r=>r&&r.id===sc.round_id))return;
           if(round&&sc.round_id===round.id)return; // avoid double counting current live group
-          const rowKey=sc.round_id+'-'+sc.hole_number;
-          const aliases=cupPlayerAliasesForRound(cp.id,rd).concat(ids);
-          if(aliases.includes(normaliseId(sc.player_id))&&!holesDone.has(rowKey)){total+=stablefordPointsValue(sc.stableford_points);holesDone.add(rowKey);}
+          if(ids.includes(normaliseId(sc.player_id))){total+=stablefordPointsValue(sc.stableford_points);holesDone.add(sc.round_id+'-'+sc.hole_number);}
         });
         return{id:cp.id,name,total,holes:holesDone.size};
       }).sort(compareStablefordLeaderboardRows);
@@ -6467,8 +6409,9 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return gold>navy?leftKey:navy>gold?rightKey:'tie';
   }
   function savedCupScoreRowFor(rd,cupId,holeNum){
-    const keys=cupPlayerAliasesForRound(cupId,rd);
-    const row=cupScoreRowsSource().slice().reverse().find(sc=>rd&&sc.round_id===rd.id&&parseInt(sc.hole_number)===parseInt(holeNum)&&keys.includes(normaliseId(sc.player_id)));
+    const p=[...(round&&round._cupDayAllPlayers||[]),...(grpPlayers||[])].find(cp=>scoreAliasesForPerson(cp).some(id=>normaliseId(id)===normaliseId(cupId)))||{id:cupId};
+    const keys=scoreAliasesForPerson(p).concat([cupId]).filter(Boolean).map(normaliseId);
+    const row=(scores||[]).find(sc=>rd&&sc.round_id===rd.id&&parseInt(sc.hole_number)===parseInt(holeNum)&&keys.includes(normaliseId(sc.player_id)));
     return row||null;
   }
   function savedCupPointFor(rd,cupId,holeNum){
@@ -7263,7 +7206,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return `league-balance-${round&&round.id||'round'}-${scope==='group'?(activeGroupId||'group'):'all'}`;
   }
   function normalSweepstakeSettlementNotes(key){
-    return ['v4.79','v4.78','v4.77','v4.76','v4.75','v4.74','v4.73','v4.72','v4.71','v4.70','v4.69','v4.68','v4.67','v4.66','v4.65','v4.64','v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
+    return ['v4.78','v4.77','v4.76','v4.75','v4.74','v4.73','v4.72','v4.71','v4.70','v4.69','v4.68','v4.67','v4.66','v4.65','v4.64','v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
   }
   function signedMoneyFromPence(pence){
     const n=parseInt(pence)||0;
@@ -9711,7 +9654,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.79`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.78`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9936,7 +9879,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.79`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.78`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9974,7 +9917,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.79`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.78`;
     const legacyReverseNoteV460=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.60`;
     const legacyReverseNoteV459=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.59`;
     const legacyReverseNoteV458=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.58`;
