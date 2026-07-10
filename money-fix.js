@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.83 League Money display repair
+// SNYDER GOLF v4.84 League Money display repair
 // Adds completed Day Sweepstake net to the Money table without changing payments.paid.
 // Balance = Paid + Sweepstake net - Entry - Extra Rounds - Snakes.
 (function(){
@@ -14,7 +14,7 @@
   var sweepById={};
   var lastSweepLoad=0;
   var COLS='minmax(72px,1fr) 42px 42px 46px 42px 54px';
-  var FIX_VERSION='v4.83';
+  var FIX_VERSION='v4.84';
   var SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
   var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 
@@ -115,7 +115,7 @@
     if(c.length!==6&&c.length!==7)return false;
     var first=cleanText(c[0]).toLowerCase();
     if(!first||first==='player'||first.indexOf('round')===-1)return false;
-    // The original League row has a hidden entry cell, but v4.83 removes it visually.
+    // The original League row has a hidden entry cell, but v4.84 removes it visually.
     return cleanText(row).indexOf('£')!==-1;
   }
   function normaliseMoneyRow(row){
@@ -195,8 +195,8 @@
       '<div style="font-size:7px;line-height:1.02;color:#8ea0ad;text-align:center;width:100%;margin-top:1px">'+sub+'</div>';
   }
   function ensureEntryNote(table){
-    if(!table||table.getAttribute('data-money-entry-note')==='v4.83')return;
-    table.setAttribute('data-money-entry-note','v4.83');
+    if(!table||table.getAttribute('data-money-entry-note')==='v4.84')return;
+    table.setAttribute('data-money-entry-note','v4.84');
     try{
       var note=document.createElement('div');
       note.textContent='Balance includes £10 entry fee, extra rounds, snakes and completed sweepstakes.';
@@ -268,7 +268,7 @@
           var original=kids(row);
           var entry=10;
           var rounds=NaN, snake=NaN, paid=NaN;
-          // v4.83: make the repair idempotent. v4.16 overwrote the Entry cell with Rounds,
+          // v4.84: make the repair idempotent. v4.16 overwrote the Entry cell with Rounds,
           // then a later pass parsed the already-repaired row as if Entry still existed.
           // Store the original money inputs on the row the first time we see them, and reuse them
           // on every later MutationObserver/interval pass so Rounds/Snake cannot be cleared.
@@ -286,7 +286,7 @@
             // Original League order is Player, Entry, Rounds, Snake, Paid, Balance.
             // Already-repaired order is Player, Rounds, Snake, Sweep, Paid, Balance.
             // Detect repaired rows from our data flag or the visible sweep sub-label.
-            var alreadyRepaired=row.getAttribute('data-money-repaired')==='v4.83' || rowText.indexOf(' sweep ')!==-1 || cleanText(original[3]).toLowerCase().indexOf('sweep')!==-1;
+            var alreadyRepaired=row.getAttribute('data-money-repaired')==='v4.84' || rowText.indexOf(' sweep ')!==-1 || cleanText(original[3]).toLowerCase().indexOf('sweep')!==-1;
             if(alreadyRepaired){
               rounds=moneyFromCell(original[1]);
               snake=moneyFromCell(original[2]);
@@ -312,13 +312,13 @@
           writeAmountCell(c[3],sweep,'sweep');
           writePlainMoneyCell(c[4],paid,'paid','#60b8f0');
           writeBalance(c[5],balance);
-          row.setAttribute('data-money-repaired','v4.83');
+          row.setAttribute('data-money-repaired','v4.84');
           row.setAttribute('data-money-v419','paid='+paid+' sweep='+sweep+' entry='+entry+' rounds='+rounds+' snake='+snake+' balance='+balance);
           rowsFixed++;
         });
       });
       if(rowsFixed)window.__snyderMoneyFixV419LastRun={runs:runCount,rows:rowsFixed,sweepLoaded:sweepLoaded,at:new Date().toISOString()};
-    }catch(e){console.warn('Snyder money fix v4.83 skipped safely',e);}
+    }catch(e){console.warn('Snyder money fix v4.84 skipped safely',e);}
   }
   function schedule(){
     if(scheduled)return;
