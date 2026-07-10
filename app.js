@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.72
+// SNYDER GOLF v4.73
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -154,7 +154,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.72',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.73',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -203,7 +203,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.72',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.73',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -2224,7 +2224,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v4.72" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.72</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v4.73" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.73</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -7193,7 +7193,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return `league-balance-${round&&round.id||'round'}-${scope==='group'?(activeGroupId||'group'):'all'}`;
   }
   function normalSweepstakeSettlementNotes(key){
-    return ['v4.72','v4.71','v4.70','v4.69','v4.68','v4.67','v4.66','v4.65','v4.64','v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
+    return ['v4.73','v4.72','v4.71','v4.70','v4.69','v4.68','v4.67','v4.66','v4.65','v4.64','v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
   }
   function signedMoneyFromPence(pence){
     const n=parseInt(pence)||0;
@@ -9641,7 +9641,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.72`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.73`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9866,7 +9866,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.72`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.73`;
     const legacyMarkerNoteV460=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.60`;
     const legacyMarkerNoteV459=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.59`;
     const legacyMarkerNoteV458=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.58`;
@@ -9904,7 +9904,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.72`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.73`;
     const legacyReverseNoteV460=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.60`;
     const legacyReverseNoteV459=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.59`;
     const legacyReverseNoteV458=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.58`;
@@ -10296,6 +10296,27 @@ const CUP_STAGS_GROUPS=[
   {day:3,players:[['C',1],['C',2],['C',3],['B',2]]}
 ];
 const CUP_SLOT_DEFAULT_NAMES={A:['Paolo','Jon','Milner','Novak'],B:['Smithy','Hully','Ben','Stokoe','Coburn'],C:['Sluggy','Kev','Leng']};
+function cupCanonicalNameKey(name){
+  return String(name||'').replace(CUP_TEAM_C_STORAGE_PREFIX,'').trim().toLowerCase().replace(/\s+/g,' ');
+}
+function sortCupSlotRows(rows){
+  return [...(rows||[])].sort((a,b)=>{
+    const ca=Date.parse(a&&a.created_at||'')||0,cb=Date.parse(b&&b.created_at||'')||0;
+    return ca-cb||String(a&&a.id||'').localeCompare(String(b&&b.id||''));
+  });
+}
+function cupCanonicalSlotRows(rows,teamKey,code,slotCount){
+  const sorted=sortCupSlotRows((rows||[]).filter(p=>p&&p.team_key===teamKey));
+  const used=new Set();
+  return Array.from({length:parseInt(slotCount)||0},(_,i)=>{
+    const wanted=cupDefaultSlotName(code,i+1);
+    const wantedKey=cupCanonicalNameKey(wanted);
+    let row=sorted.find(p=>!used.has(p.id)&&cupCanonicalNameKey(p.display_name||p.name||p.username||p.email)===wantedKey);
+    if(!row)row=sorted.find(p=>!used.has(p.id));
+    if(row)used.add(row.id);
+    return row?{...row,display_name:wanted,_cupSlot:code+(i+1)}:null;
+  }).filter(Boolean);
+}
 function isCupStagsMatch(match){
   const type=String(match&&match.match_type||'').toLowerCase();
   if(type==='stags')return true;
@@ -10358,11 +10379,11 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   const redPlayers=cupPlayers.filter(p=>p.team_key==='red');
   const cupPlayersByTeam={gold:goldPlayers,navy:navyPlayers,red:redPlayers};
   const playerKey=p=>p?.id||p?.user_id;
-  const sortCupSlotPlayers=rows=>[...(rows||[])].sort((a,b)=>{
-    const ca=Date.parse(a.created_at||'')||0,cb=Date.parse(b.created_at||'')||0;
-    return ca-cb||String(a.id||'').localeCompare(String(b.id||''));
-  });
-  const cupSlotRows=teamKey=>sortCupSlotPlayers(cupPlayersByTeam[teamKey]||[]).slice(0,parseInt((CUP_SLOT_TEAMS.find(t=>t.key===teamKey)||{}).slots)||4);
+  const sortCupSlotPlayers=sortCupSlotRows;
+  const cupSlotRows=teamKey=>{
+    const meta=CUP_SLOT_TEAMS.find(t=>t.key===teamKey)||{code:'?',slots:4};
+    return cupCanonicalSlotRows(cupPlayers||[],teamKey,meta.code,parseInt(meta.slots)||4);
+  };
   const slotPlayer=(code,num)=>{
     const rows=cupSlotRows(cupSlotTeamKey(code));
     return rows[(parseInt(num)||1)-1]||null;
@@ -10556,7 +10577,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     return true;
   }
   function fixedScheduleRows(sourcePlayers=cupPlayers){
-      const rowsByTeam=CUP_SLOT_TEAMS.reduce((acc,t)=>({...acc,[t.key]:sortCupSlotPlayers((sourcePlayers||[]).filter(p=>p.team_key===t.key)).slice(0,parseInt(t.slots)||4)}),{});
+      const rowsByTeam=CUP_SLOT_TEAMS.reduce((acc,t)=>({...acc,[t.key]:cupCanonicalSlotRows(sourcePlayers||[],t.key,t.code,parseInt(t.slots)||4)}),{});
     const idFor=slot=>{
       const p=(rowsByTeam[cupSlotTeamKey(slot[0])]||[])[(parseInt(slot[1])||1)-1];
       return p?playerKey(p):null;
@@ -11192,13 +11213,8 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   const cup=(cupEvents||[])[0];
   const teams=cup?getCupTeams(cup,cupTeams):null;
   const rawPlayersInCup=(cupEventPlayers||[]).filter(p=>cup&&p.cup_id===cup.id);
-  const cupSlotSort=rows=>[...(rows||[])].sort((a,b)=>{
-    const ca=Date.parse(a.created_at||'')||0,cb=Date.parse(b.created_at||'')||0;
-    return ca-cb||String(a.id||'').localeCompare(String(b.id||''));
-  });
   const playersInCup=CUP_SLOT_TEAMS.flatMap(t=>{
-    const rows=cupSlotSort(rawPlayersInCup.filter(p=>p.team_key===t.key)).slice(0,parseInt(t.slots)||4);
-    return rows.map((p,i)=>({...p,display_name:cupDefaultSlotName(t.code,i+1),_cupSlot:t.code+(i+1)}));
+    return cupCanonicalSlotRows(rawPlayersInCup,t.key,t.code,parseInt(t.slots)||4);
   });
   const matches=(cupMatches||[]).filter(m=>cup&&m.cup_id===cup.id);
   const days=(cupDays||[]).filter(d=>cup&&d.cup_id===cup.id);
