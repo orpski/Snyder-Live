@@ -1,4 +1,4 @@
-// SNYDER GOLF v4.100
+// SNYDER GOLF v4.101
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -154,7 +154,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.100',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.101',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -195,15 +195,15 @@ async function sendSnyderLiveNotification(type,payload){
 }
 function snyderLeagueScoreNotificationText(name,points){
   const pts=Number(points)||0;
-  if(pts>=40)return{title:'Score submitted',body:`🔥 ${name} has submitted ${pts} points. Bandit behaviour.`};
-  if(pts>=36)return{title:'Score submitted',body:`⭐ ${name} has submitted ${pts} points. Solid knock.`};
-  if(pts>=30)return{title:'Score submitted',body:`🏌️ ${name} has submitted ${pts} points.`};
-  if(pts>=25)return{title:'Score submitted',body:`😬 ${name} has submitted ${pts} points. Bit of a grind.`};
-  return{title:'Score submitted',body:`💩 ${name} has submitted ${pts} points. Disaster class.`};
+  if(pts>=40)return{title:'Score submitted',body:`ðŸ”¥ ${name} has submitted ${pts} points. Bandit behaviour.`};
+  if(pts>=36)return{title:'Score submitted',body:`â­ ${name} has submitted ${pts} points. Solid knock.`};
+  if(pts>=30)return{title:'Score submitted',body:`ðŸŒï¸ ${name} has submitted ${pts} points.`};
+  if(pts>=25)return{title:'Score submitted',body:`ðŸ˜¬ ${name} has submitted ${pts} points. Bit of a grind.`};
+  return{title:'Score submitted',body:`ðŸ’© ${name} has submitted ${pts} points. Disaster class.`};
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.100',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v4.101',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -807,7 +807,7 @@ function sweepstakeWinnerText(pot){
 }
 function sweepstakeReasonText(pot){
   if(!pot)return '';
-  if(pot.rollover)return 'Still tied after countback — pot rolls over to overall winner';
+  if(pot.rollover)return 'Still tied after countback â€” pot rolls over to overall winner';
   if(pot.manualDecision)return 'Still tied after all countback checks';
   return pot.reason||'';
 }
@@ -1174,8 +1174,8 @@ function HandicapTrendBadge({trend}){
   if(!trend)return null;
   const improved=trend.direction==='down';
   const tone=improved
-    ?{fg:'#9df6bb',bg:'rgba(34,197,94,0.14)',border:'rgba(34,197,94,0.30)',arrow:'↓'}
-    :{fg:'#ffb1b1',bg:'rgba(239,68,68,0.15)',border:'rgba(248,113,113,0.32)',arrow:'↑'};
+    ?{fg:'#9df6bb',bg:'rgba(34,197,94,0.14)',border:'rgba(34,197,94,0.30)',arrow:'â†“'}
+    :{fg:'#ffb1b1',bg:'rgba(239,68,68,0.15)',border:'rgba(248,113,113,0.32)',arrow:'â†‘'};
   return(
     <span aria-label={improved?'Handicap came down':'Handicap went up'} title={(improved?'Down ':'Up ')+formatHeaderHandicap(trend.delta)} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:4,padding:'4px 8px',borderRadius:999,border:'1px solid '+tone.border,background:tone.bg,color:tone.fg,fontSize:12,fontWeight:950,lineHeight:1,verticalAlign:'middle',boxShadow:'inset 0 1px 0 rgba(255,255,255,0.12)',textShadow:'none'}}>
       <span style={{fontSize:14,lineHeight:'12px',fontWeight:950}}>{tone.arrow}</span>
@@ -2112,7 +2112,7 @@ function App(){
   const pullIndicator=(
     <div style={{position:'fixed',top:8,left:'50%',transform:`translateX(-50%) translateY(${homePull?0:-54}px)`,opacity:homePull?1:0,transition:homeRefreshing?'none':'transform 0.18s ease, opacity 0.18s ease',zIndex:9998,pointerEvents:'none'}}>
       <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 13px',borderRadius:999,background:'rgba(13,37,72,0.96)',border:'1px solid rgba(96,184,240,0.26)',boxShadow:'0 12px 28px rgba(0,0,0,0.32)',fontSize:12,color:'#fff',fontWeight:900}}>
-        <span style={{fontSize:15}}>{homeRefreshing?'⟳':homePull>76?'↻':'↓'}</span>
+        <span style={{fontSize:15}}>{homeRefreshing?'âŸ³':homePull>76?'â†»':'â†“'}</span>
         <span>{homeRefreshing?'Refreshing '+pullLabel:homePull>76?'Release to refresh':'Pull down to refresh'}</span>
       </div>
     </div>
@@ -2163,7 +2163,7 @@ function App(){
         <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:8,minWidth:74}}>
           {notifPermission!=='unsupported'&&(
             <button onClick={toggleNotificationsFromHome} aria-label={notificationsEnabled?'Turn notifications off':'Enable notifications'} title={notificationsEnabled?'Turn notifications off':'Enable notifications'} style={{...NO_SELECT,width:34,height:34,borderRadius:'50%',border:notificationsEnabled?'1px solid rgba(34,197,94,0.55)':'1px solid rgba(212,175,55,0.40)',background:notificationsEnabled?'linear-gradient(135deg,rgba(34,197,94,0.22),rgba(15,23,42,0.88))':'rgba(255,255,255,0.06)',color:notificationsEnabled?'#86efac':'#f5d76e',display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,cursor:'pointer',boxShadow:notificationsEnabled?'0 0 0 3px rgba(34,197,94,0.08)':'none',position:'relative'}}>
-              🔔
+              ðŸ””
               {notificationsEnabled&&<span style={{position:'absolute',right:2,top:2,width:8,height:8,borderRadius:'50%',background:'#22c55e',boxShadow:'0 0 8px rgba(34,197,94,0.85)'}}/>}
             </button>
           )}
@@ -2272,7 +2272,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v4.100" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.100</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v4.101" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v4.101</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -2760,7 +2760,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
       if(totalPlayers>5&&from.length>=totalPlayers-1)return `Everyone owes ${to} ${amount}`;
       return `${from.map(x=>x.name).join(', ')} owe ${to} ${amount} each`;
     }
-    return from.map(x=>`${x.name} owes ${to} ${moneyFromPence(x.amount)}`).join(' · ');
+    return from.map(x=>`${x.name} owes ${to} ${moneyFromPence(x.amount)}`).join(' Â· ');
   }
   function DayLeaderboardModal({rd}){
     if(!rd)return null;
@@ -2981,7 +2981,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
               <SweepstakeLogo size={54}/>
               <div style={{minWidth:0}}>
                 <div style={{fontSize:18,color:'#fff',fontWeight:950,textShadow:'0 0 18px rgba(96,184,240,0.22)'}}>{dayCompDisplayName(rounds,rd)}</div>
-                <div style={{fontSize:12,color:'#90ccf0',fontWeight:800}}>Day leaderboard · {effectivePlayable.length} scorecard{effectivePlayable.length===1?'':'s'} joined</div>
+                <div style={{fontSize:12,color:'#90ccf0',fontWeight:800}}>Day leaderboard Â· {effectivePlayable.length} scorecard{effectivePlayable.length===1?'':'s'} joined</div>
               </div>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:7,flexShrink:0}}>
@@ -3017,7 +3017,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
           <div style={{...S.card,padding:12,marginBottom:8,borderColor:'rgba(245,158,11,0.28)',background:'linear-gradient(180deg,rgba(75,50,12,0.38),rgba(8,24,48,0.94))',boxShadow:'0 12px 26px rgba(245,158,11,0.08)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8,marginBottom:7}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}><SweepstakeLogo size={46}/><div style={{fontSize:15,color:'#fff',fontWeight:950}}>Sweepstake</div></div>
-              <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,textAlign:'right'}}>{compactSettlement.playerCount} entered · {moneyFromPence(parseInt(cfg&&cfg.amountPence)||200)} each pot</div>
+              <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,textAlign:'right'}}>{compactSettlement.playerCount} entered Â· {moneyFromPence(parseInt(cfg&&cfg.amountPence)||200)} each pot</div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr',gap:6}}>
               {potRows.map(pot=>(
@@ -3027,7 +3027,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                     <div style={{fontSize:12,color:pot.rollover?'#fbbf24':'#fff',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{daySweepstakeWinnerText(pot,dayClosed)}</div>
                     {daySweepstakeReasonText(pot,dayClosed)&&<div style={{fontSize:10,color:'rgba(255,255,255,0.68)',fontWeight:800,marginTop:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{daySweepstakeReasonText(pot,dayClosed)}</div>}
                   </div>
-                  <div style={{fontSize:16,color:pot.winnerUpPence>0?'#86efac':'rgba(255,255,255,0.45)',fontWeight:950,textAlign:'right'}}>{pot.winnerUpPence>0?`+${moneyFromPence(pot.winnerUpPence).replace('£','£')}`:'-'}</div>
+                  <div style={{fontSize:16,color:pot.winnerUpPence>0?'#86efac':'rgba(255,255,255,0.45)',fontWeight:950,textAlign:'right'}}>{pot.winnerUpPence>0?`+${moneyFromPence(pot.winnerUpPence).replace('Â£','Â£')}`:'-'}</div>
                 </div>
               ))}
             </div>
@@ -3204,7 +3204,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                     const centerScore=leadTeam==='tie'?resultText:'';
                     const aShots=parseInt(mp.teamAShots)||0;
                     const bShots=parseInt(mp.teamBShots)||0;
-                    const shotsText=(aShots||bShots)?(aShots&&bShots?((mp.aName+' get '+aShots+' shot'+(aShots===1?'':'s'))+' · '+(mp.bName+' get '+bShots+' shot'+(bShots===1?'':'s'))):(aShots?(mp.aName+' get '+aShots+' shot'+(aShots===1?'':'s')):(mp.bName+' get '+bShots+' shot'+(bShots===1?'':'s')))):'No shots given';
+                    const shotsText=(aShots||bShots)?(aShots&&bShots?((mp.aName+' get '+aShots+' shot'+(aShots===1?'':'s'))+' Â· '+(mp.bName+' get '+bShots+' shot'+(bShots===1?'':'s'))):(aShots?(mp.aName+' get '+aShots+' shot'+(aShots===1?'':'s')):(mp.bName+' get '+bShots+' shot'+(bShots===1?'':'s')))):'No shots given';
                     const stableRows=mp.mode==='singles'&&mp.keepStableford!==false?leaderboardForRound(rd):[];
                     const stableFor=id=>{const row=stableRows.find(r=>normaliseId(r.id)===normaliseId(id));return row?row.total:0;};
                     const aStable=mp.mode==='singles'?stableFor((mp.teamA||[])[0]):0;
@@ -3216,7 +3216,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
                         <div style={{textAlign:'center',minWidth:0}}>
                           <div style={{fontSize:10,color:'#90ccf0',fontWeight:950,letterSpacing:'0.11em'}}>MATCHPLAY</div>
                           <div style={{fontSize:12,color:'#fff',fontWeight:950,whiteSpace:'normal',overflowWrap:'anywhere',lineHeight:1.12}}><span style={{color:'#fbbf24'}}>{mp.aName}</span> <span style={{color:'rgba(255,255,255,0.48)',fontWeight:900}}>v</span> <span style={{color:'#60b8f0'}}>{mp.bName}</span></div>
-                          <div style={{fontSize:10,color:'#90ccf0',fontWeight:850,marginTop:2}}>{leadTeam==='tie'?centerScore+' · '+mp.sub:mp.sub}</div>
+                          <div style={{fontSize:10,color:'#90ccf0',fontWeight:850,marginTop:2}}>{leadTeam==='tie'?centerScore+' Â· '+mp.sub:mp.sub}</div>
                           <div style={{fontSize:9,color:'rgba(255,255,255,0.58)',fontWeight:800,marginTop:3,whiteSpace:'normal',overflowWrap:'anywhere'}}>{shotsText}</div>
                           {mp.mode==='singles'&&mp.keepStableford!==false&&<div style={{marginTop:6,display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
                             <div style={{border:'1px solid rgba(251,191,36,0.24)',background:'rgba(251,191,36,0.10)',borderRadius:9,padding:'5px 6px'}}><div style={{fontSize:9,color:'#fbbf24',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div><div style={{fontSize:16,color:'#fff',fontWeight:950,lineHeight:1}}>{aStable} <span style={{fontSize:9,color:'#90ccf0'}}>pts</span></div></div>
@@ -3710,6 +3710,50 @@ function parseFineScoreRow(row){
   return {pid:normaliseId(row.player_id),key:parsedHole.key,hole:parsedHole.hole,legacy:false};
 }
 function isFineScoreRow(row){return !!parseFineScoreRow(row);}
+const CUP_DAY_AWARD_PREFIX='__cup_day_award__|';
+const CUP_DAY_AWARD_BASE=990100;
+const CUP_DAY_AWARD_TYPES=[
+  {key:'closest',label:'Closest to the pin',emoji:'\uD83C\uDFAF'},
+  {key:'longest',label:'Longest drive',emoji:'\uD83D\uDCA3'}
+];
+const CUP_SUMMARY_EMOJI={
+  party:'\uD83C\uDF89',
+  golfer:'\uD83C\uDFCC\uFE0F',
+  fire:'\uD83D\uDD25',
+  shirt:'\uD83D\uDC55',
+  beer:'\uD83C\uDF7B',
+  money:'\uD83D\uDCB8',
+  grimace:'\uD83E\uDEE3',
+  target:'\uD83C\uDFAF',
+  bomb:'\uD83D\uDCA3'
+};
+function cupDayAwardHoleNumber(day,key){
+  const idx=Math.max(0,CUP_DAY_AWARD_TYPES.findIndex(a=>a.key===key));
+  return CUP_DAY_AWARD_BASE+((parseInt(day)||1)*10)+idx;
+}
+function makeCupDayAwardPlayerId(key,playerId){
+  return CUP_DAY_AWARD_PREFIX+encodeURIComponent(String(key||''))+'|'+encodeURIComponent(normaliseId(playerId));
+}
+function parseCupDayAwardPlayerId(v){
+  const txt=String(v||'');
+  if(!txt.startsWith(CUP_DAY_AWARD_PREFIX))return null;
+  const parts=txt.split('|');
+  if(parts.length<3)return null;
+  try{return{key:decodeURIComponent(parts[1]||''),playerId:decodeURIComponent(parts.slice(2).join('|')||'')};}
+  catch(e){return null;}
+}
+function parseCupDayAwardScoreRow(row){
+  const parsed=parseCupDayAwardPlayerId(row&&row.player_id);
+  if(!parsed)return null;
+  const hole=parseInt(row&&row.hole_number)||0;
+  const raw=hole-CUP_DAY_AWARD_BASE;
+  const day=Math.floor(raw/10);
+  const idx=raw-(day*10);
+  const def=CUP_DAY_AWARD_TYPES[idx];
+  if(!day||!def||def.key!==parsed.key)return null;
+  return{day,key:parsed.key,playerId:parsed.playerId};
+}
+function isCupDayAwardScoreRow(row){return !!parseCupDayAwardScoreRow(row);}
 const SWEEPSTAKE_SCORE_PREFIX='__sweepstake__|';
 const SWEEPSTAKE_CONFIG_HOLE=950001;
 const SWEEPSTAKE_ENTRY_HOLE=950002;
@@ -4326,9 +4370,9 @@ function moneyFromPence(v){
   const n=Math.round(parseFloat(v)||0);
   const sign=n<0?'-':'';
   const abs=Math.abs(n);
-  return sign+'£'+(abs/100).toFixed(abs%100?2:0);
+  return sign+'Â£'+(abs/100).toFixed(abs%100?2:0);
 }
-function isMetaScoreRow(row){return isSnakeScoreRow(row)||isFineScoreRow(row)||isSweepstakeScoreRow(row)||isMatchplayScoreRow(row)||isMatchplayMetaScoreRow(row);}
+function isMetaScoreRow(row){return isSnakeScoreRow(row)||isFineScoreRow(row)||isCupDayAwardScoreRow(row)||isSweepstakeScoreRow(row)||isMatchplayScoreRow(row)||isMatchplayMetaScoreRow(row);}
 
 function localScoreRowsForRound(roundId){
   const rows=[];
@@ -5011,7 +5055,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       }));
 
       const starterName=((currentUser&&currentUser.display_name)||'Someone').split(' ')[0];
-      const notifyResult=await sendSnyderLiveNotification('round_started',{roundId:rd&&rd.id,status:'created',title:'🏌️ '+starterName+' is LIVE!',body:'Tap for live scores · '+(courseBaseName||roundName||'Snyder Golf'),roundName:roundName,courseName:courseBaseName,createdBy:currentUser&&currentUser.id});
+      const notifyResult=await sendSnyderLiveNotification('round_started',{roundId:rd&&rd.id,status:'created',title:'ðŸŒï¸ '+starterName+' is LIVE!',body:'Tap for live scores Â· '+(courseBaseName||roundName||'Snyder Golf'),roundName:roundName,courseName:courseBaseName,createdBy:currentUser&&currentUser.id});
       if(notifyResult&&!notifyResult.ok)console.warn('Snyder Live notification failed',notifyResult);
       await load();
       const scorerGroup=(createdGroups||[]).find(g=>currentUser&&Array.isArray(g.player_ids)&&g.player_ids.includes(currentUser.id))||(createdGroups||[])[0];
@@ -5099,12 +5143,12 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       );
     }
     const options=[
-      {key:'normal',range:'1-4',title:'🏌️ Normal',sub:'Stableford points and gross scores',mode:'normal'},
-      {key:'singles',range:'1-4',title:'⚔️ Singles',sub:'2-player matchplay',mode:'singles'},
-      {key:'foursomes',range:'1-4',title:'🤝 Foursomes',sub:'2 teams, one ball each',mode:'foursomes'},
-      {key:'5-8',range:'5-8',title:'👥 5-8 players',sub:'2 groups, one leaderboard',mode:'normal'},
-      {key:'9-12',range:'9-12',title:'🏟️ 9-12 players',sub:'3 groups, one leaderboard',mode:'normal'},
-      {key:'13-16',range:'13-16',title:'🎪 13-16 players',sub:'4 groups, one leaderboard',mode:'normal'},
+      {key:'normal',range:'1-4',title:'ðŸŒï¸ Normal',sub:'Stableford points and gross scores',mode:'normal'},
+      {key:'singles',range:'1-4',title:'âš”ï¸ Singles',sub:'2-player matchplay',mode:'singles'},
+      {key:'foursomes',range:'1-4',title:'ðŸ¤ Foursomes',sub:'2 teams, one ball each',mode:'foursomes'},
+      {key:'5-8',range:'5-8',title:'ðŸ‘¥ 5-8 players',sub:'2 groups, one leaderboard',mode:'normal'},
+      {key:'9-12',range:'9-12',title:'ðŸŸï¸ 9-12 players',sub:'3 groups, one leaderboard',mode:'normal'},
+      {key:'13-16',range:'13-16',title:'ðŸŽª 13-16 players',sub:'4 groups, one leaderboard',mode:'normal'},
     ];
     const displayOptions=[
       options.find(o=>o.key==='normal'),
@@ -5215,7 +5259,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
           <div style={{height:6,borderRadius:999,background:'rgba(255,255,255,0.08)',overflow:'hidden',marginBottom:12}}><div style={{height:'100%',width:(((qIndex+1)/order.length)*100)+'%',background:'linear-gradient(90deg,#0070BB,#60b8f0)',borderRadius:999}}/></div>
           <div style={{...S.card,marginBottom:12,borderColor:'rgba(96,184,240,0.30)',background:'linear-gradient(135deg,rgba(0,112,187,0.14),rgba(255,255,255,0.055))'}}>
             <div style={{fontSize:22,color:'#fff',fontWeight:950,marginBottom:6,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.04em'}}>{questionTitle}</div>
-            <div style={{fontSize:12,color:'#90ccf0',lineHeight:1.42}}>Answer this and press Next. The setup won’t let you go live until the important bits are done.</div>
+            <div style={{fontSize:12,color:'#90ccf0',lineHeight:1.42}}>Answer this and press Next. The setup wonâ€™t let you go live until the important bits are done.</div>
           </div>
 
           {q==='day'&&<div style={{...S.card,marginBottom:12}}>
@@ -5250,7 +5294,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
             <select style={{...S.inp,marginBottom:12}} value={setup.tee} onChange={e=>chooseTee(e.target.value)} disabled={!setup.course_name}>
               {(availableTees.length?availableTees:['White','Yellow','Red','Orange']).map(t=><option key={t}>{t}</option>)}
             </select>
-            {selectedCourse&&<div style={{fontSize:12,color:'#90ccf0',lineHeight:1.45}}>Rating {selectedCourse.course_rating||'-'} · Slope {selectedCourse.slope_rating||'-'} · Par {(selectedCourse.holes||[]).reduce((t,h)=>t+(parseInt(h.par)||0),0)||'-'} · {courseSummaryLine(selectedCourse,{tee:setup.tee},selectedCourse.holes)}</div>}
+            {selectedCourse&&<div style={{fontSize:12,color:'#90ccf0',lineHeight:1.45}}>Rating {selectedCourse.course_rating||'-'} Â· Slope {selectedCourse.slope_rating||'-'} Â· Par {(selectedCourse.holes||[]).reduce((t,h)=>t+(parseInt(h.par)||0),0)||'-'} Â· {courseSummaryLine(selectedCourse,{tee:setup.tee},selectedCourse.holes)}</div>}
             <div style={{marginTop:12}}>
               <label style={S.lbl}>Handicap allowance</label>
               <select value={setup.allowance} onChange={e=>setSetup(q=>({...q,allowance:parseFloat(e.target.value)||1}))} style={{...S.inp,marginBottom:0}}>
@@ -5312,7 +5356,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
               <button onClick={()=>setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),enabled:false}}))} style={{...S.gho,padding:11,fontSize:13}}>No</button>
             </div>
             {setup.sweepstake&&setup.sweepstake.enabled&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-              <input type="number" min="0" step="0.5" value={(setup.sweepstake&&setup.sweepstake.amountPence)===''?'':((parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||0)/100)} onChange={e=>updateSetupSweepstakeAmount(e.target.value)} style={{...S.inp,marginBottom:0}} placeholder="£ per pot"/>
+              <input type="number" min="0" step="0.5" value={(setup.sweepstake&&setup.sweepstake.amountPence)===''?'':((parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||0)/100)} onChange={e=>updateSetupSweepstakeAmount(e.target.value)} style={{...S.inp,marginBottom:0}} placeholder="Â£ per pot"/>
               <select value={(setup.sweepstake&&setup.sweepstake.scope)||'round'} onChange={e=>setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),scope:e.target.value==='group'?'group':'round'}}))} style={{...S.inp,marginBottom:0}}>
                 <option value="round">Whole round</option><option value="group">By group</option>
               </select>
@@ -5344,7 +5388,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
             <input style={{...S.inp,marginBottom:12}} value={setup.name} onChange={e=>setSetup(q=>({...q,name:e.target.value}))} placeholder={"e.g. "+(currentUser?currentUser.display_name.split(' ')[0]+"'s Round":"Saturday Morning")}/>
             <div style={{display:'grid',gap:8,fontSize:13,color:'#fff'}}>
               <div><b>Format:</b> {isFoursomesSetup()?'Foursomes':isSinglesMatchplaySetup()?(isMatchplayOnlySetup()?'Singles matchplay only':'Singles matchplay + points'):(!isSingleGroupDay?playerRangeLabel(playerRange):'Standard round')}</div>
-              <div><b>Course:</b> {setup.course_name||'Not chosen'} · {setup.tee||'White'} tee</div>
+              <div><b>Course:</b> {setup.course_name||'Not chosen'} Â· {setup.tee||'White'} tee</div>
               {!isFoursomesSetup()&&<div><b>Players:</b> {participants.length}</div>}
               {!isMatchplayOnlySetup()&&<div><b>Sweepstake:</b> {setup.dayCompMode==='join'?'Joined day sweepstake':(setup.sweepstake&&setup.sweepstake.enabled?moneyFromPence(parseInt(setup.sweepstake.amountPence)||0)+' per pot':'No')}</div>}
             </div>
@@ -5451,7 +5495,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
               </div>
             </div>
             {((setup.sweepstake&&setup.sweepstake.enabled)||daySweepstakeLocked)&&<div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,alignItems:'center'}}>
-              <input type="number" min="0" step="0.5" disabled={setup.dayCompMode==='join'} value={(setup.sweepstake&&setup.sweepstake.amountPence)===''?'':((parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||0)/100)} onChange={e=>updateSetupSweepstakeAmount(e.target.value)} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13,opacity:setup.dayCompMode==='join'?0.72:1}} placeholder="£ per pot"/>
+              <input type="number" min="0" step="0.5" disabled={setup.dayCompMode==='join'} value={(setup.sweepstake&&setup.sweepstake.amountPence)===''?'':((parseInt(setup.sweepstake&&setup.sweepstake.amountPence)||0)/100)} onChange={e=>updateSetupSweepstakeAmount(e.target.value)} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13,opacity:setup.dayCompMode==='join'?0.72:1}} placeholder="Â£ per pot"/>
               <select disabled={daySweepstakeLocked} value={daySweepstakeLocked?'round':((setup.sweepstake&&setup.sweepstake.scope)||'round')} onChange={e=>setSetup(q=>({...q,sweepstake:{...(q.sweepstake||{}),scope:e.target.value==='group'?'group':'round'}}))} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13,opacity:daySweepstakeLocked?0.75:1}}>
                 <option value="round">Whole round / all groups</option>
                 <option value="group">My group only</option>
@@ -5502,7 +5546,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
                     </div>
                   </div>;
                 })}
-                {(setup.matchplay&&setup.matchplay.mode)!=='foursomes'&&<div style={{gridColumn:'1 / -1',fontSize:11,color:'rgba(255,255,255,0.72)',lineHeight:1.35}}>Team A: <b>{(setup.matchplay.teamA||[]).map(id=>gameFirstName((participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).display_name||(participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).name||'')).filter(Boolean).join(' & ')||'Pick 2'}</b> · Team B: <b>{(setup.matchplay.teamB||[]).map(id=>gameFirstName((participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).display_name||(participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).name||'')).filter(Boolean).join(' & ')||'Pick 2'}</b></div>}
+                {(setup.matchplay&&setup.matchplay.mode)!=='foursomes'&&<div style={{gridColumn:'1 / -1',fontSize:11,color:'rgba(255,255,255,0.72)',lineHeight:1.35}}>Team A: <b>{(setup.matchplay.teamA||[]).map(id=>gameFirstName((participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).display_name||(participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).name||'')).filter(Boolean).join(' & ')||'Pick 2'}</b> Â· Team B: <b>{(setup.matchplay.teamB||[]).map(id=>gameFirstName((participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).display_name||(participants.find(p=>normaliseId(p.id)===normaliseId(id))||{}).name||'')).filter(Boolean).join(' & ')||'Pick 2'}</b></div>}
               </div>}
             </div>
           )}
@@ -6689,12 +6733,12 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   }
   function cupGroupScoreLabel(){
     const s=actualCupTeamScore();
-    return CUP_TEAM_KEYS.map(k=>(s[k+'Name']||CUP_THEME[k].name)+' '+fmtCupPoint(s[k]||0)).join(' · ');
+    return CUP_TEAM_KEYS.map(k=>(s[k+'Name']||CUP_THEME[k].name)+' '+fmtCupPoint(s[k]||0)).join(' Â· ');
   }
   function cupProjectedScoreLabel(){
     const s=liveCupProjectedScore();
     if(!s)return 'Projected score';
-    return CUP_TEAM_KEYS.map(k=>(s[k+'Name']||CUP_THEME[k].name)+' '+fmtCupPoint(s[k]||0)).join(' · ');
+    return CUP_TEAM_KEYS.map(k=>(s[k+'Name']||CUP_THEME[k].name)+' '+fmtCupPoint(s[k]||0)).join(' Â· ');
   }
   function cupProjectedLeader(){
     const s=liveCupProjectedScore();
@@ -6832,7 +6876,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     ]);
     if(checked&&pid){
       const name=notifyPlayerName(pid);
-      const res=await sendSnyderLiveNotification('snake_changed',{...notifyPayload(),roundId:round&&round.id,groupId:groupKey,hole:holeNum,playerId:pid,title:'🐍 '+name+' has the snake!',body:notifyHoleOrdinal(holeNum)+' hole · '+notifyRoundName(),playerName:name,roundName:notifyRoundName()});
+      const res=await sendSnyderLiveNotification('snake_changed',{...notifyPayload(),roundId:round&&round.id,groupId:groupKey,hole:holeNum,playerId:pid,title:'ðŸ '+name+' has the snake!',body:notifyHoleOrdinal(holeNum)+' hole Â· '+notifyRoundName(),playerName:name,roundName:notifyRoundName()});
       if(res&&!res.ok)console.warn('Snyder Live snake notification failed',res);
     }
   }
@@ -6912,14 +6956,14 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return grpPlayers.map(p=>{
       const pts=scoreMap?notifyStablefordTotalFromScores(p,holeList,scoreMap):getStablefordTotal(p.id,holeList);
       return notifyPlayerName(p.id)+' '+pts+' pts';
-    }).join(' · ');
+    }).join(' Â· ');
   }
   async function notifyMaybeBirdie(holeNum,pid,gross){
     if(!hasEnteredGross(gross)||gross<1)return {ok:true,skipped:true};
     const hd=getHole(holeNum);
     if(Number(gross)===Number(hd.par)-1){
       const name=notifyPlayerName(pid);
-      const payload={...notifyPayload(),roundId:round&&round.id,groupId:snakeGroupKey(),hole:holeNum,playerId:pid,title:'🐦 '+name+' birdied '+notifyHoleOrdinal(holeNum)+'!',body:'🔥 What a dart · '+notifyRoundName()+(notifyGroupName()?' · '+notifyGroupName():''),playerName:name,roundName:notifyRoundName()};
+      const payload={...notifyPayload(),roundId:round&&round.id,groupId:snakeGroupKey(),hole:holeNum,playerId:pid,title:'ðŸ¦ '+name+' birdied '+notifyHoleOrdinal(holeNum)+'!',body:'ðŸ”¥ What a dart Â· '+notifyRoundName()+(notifyGroupName()?' Â· '+notifyGroupName():''),playerName:name,roundName:notifyRoundName()};
       if(snyderNotifyAlreadyStored('birdie',payload))return {ok:true,skipped:true};
       const res=await sendSnyderLiveNotification('birdie',payload);
       if(res&&res.ok)storeSnyderNotifySent('birdie',payload);
@@ -6932,13 +6976,13 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const allFront9=Array.from({length:9},(_,i)=>i+1).every(h=>grpPlayers.every(p=>notifyGrossFromScores(p,h,updatedScores)!==undefined));
     if(!allFront9)return {ok:true,skipped:true};
     const frontHoles=holes.filter(h=>h.hole<=9);
-    const res=await sendSnyderLiveNotification('front9_scores',{...notifyPayload(),roundId:round&&round.id,groupId:snakeGroupKey(),hole:9,status:'front9-complete',title:'📊 Front 9 is in!',body:notifyScoresForHoles(frontHoles,updatedScores),roundName:notifyRoundName(),groupName:notifyGroupName()});
+    const res=await sendSnyderLiveNotification('front9_scores',{...notifyPayload(),roundId:round&&round.id,groupId:snakeGroupKey(),hole:9,status:'front9-complete',title:'ðŸ“Š Front 9 is in!',body:notifyScoresForHoles(frontHoles,updatedScores),roundName:notifyRoundName(),groupName:notifyGroupName()});
     if(res&&!res.ok)console.warn('Snyder Live front 9 notification failed',res);
     return res;
   }
   async function notifyFinishedScores(){
     const allHoles=holes.filter(h=>h.hole>=1&&h.hole<=18);
-    const res=await sendSnyderLiveNotification('round_finished_scores',{...notifyPayload(),roundId:round&&round.id,groupId:snakeGroupKey(),hole:18,status:'round-finished',title:'🏁 Final scores are in!',body:notifyScoresForHoles(allHoles),roundName:notifyRoundName(),groupName:notifyGroupName()});
+    const res=await sendSnyderLiveNotification('round_finished_scores',{...notifyPayload(),roundId:round&&round.id,groupId:snakeGroupKey(),hole:18,status:'round-finished',title:'ðŸ Final scores are in!',body:notifyScoresForHoles(allHoles),roundName:notifyRoundName(),groupName:notifyGroupName()});
     if(res&&!res.ok)console.warn('Snyder Live finished-round notification failed',res);
     return res;
   }
@@ -6976,7 +7020,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         if(isFoursomesOutcomeMarker(gross)||!hasEnteredGross(gross))return;
         if(Number(gross)===Number(hd.par)-1){
           const name=foursomesTeamNameFromKey(mp,team);
-          sendFoursomesMatchNotification('foursomes_birdie',team+'-'+row.hole,'🐦 '+name+' birdied '+notifyHoleOrdinal(row.hole)+'!','Foursomes birdie · '+notifyRoundName(),{hole:row.hole,teamName:name});
+          sendFoursomesMatchNotification('foursomes_birdie',team+'-'+row.hole,'ðŸ¦ '+name+' birdied '+notifyHoleOrdinal(row.hole)+'!','Foursomes birdie Â· '+notifyRoundName(),{hole:row.hole,teamName:name});
         }
       });
     }
@@ -6989,7 +7033,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       await syncLocalFoursomesScoresToCloud('auto-finish');
       const {error}=await sb.from('cup_rounds').update({status:'complete'}).eq('id',round.id);
       if(error){setCloudError(error.message||'Could not auto-finish foursomes match');foursomesAutoFinishRef.current='';return;}
-      await sendFoursomesMatchNotification('foursomes_won','won-'+mp.winningTeam+'-'+mp.finalScore,'🏁 '+mp.winningName+' win the match!',mp.finalScore+' · '+notifyRoundName(),{hole:mp.lastHole,teamName:mp.winningName,finalScore:mp.finalScore});
+      await sendFoursomesMatchNotification('foursomes_won','won-'+mp.winningTeam+'-'+mp.finalScore,'ðŸ '+mp.winningName+' win the match!',mp.finalScore+' Â· '+notifyRoundName(),{hole:mp.lastHole,teamName:mp.winningName,finalScore:mp.finalScore});
       round.status='complete';
       setFoursomesAutoFinished(true);
       setCloudStatus('Foursomes match finished automatically');
@@ -7387,11 +7431,11 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     return `league-balance-${round&&round.id||'round'}-${scope==='group'?(activeGroupId||'group'):'all'}`;
   }
   function normalSweepstakeSettlementNotes(key){
-    return ['v4.100','v4.99','v4.98','v4.97','v4.96','v4.95','v4.94','v4.93','v4.92','v4.91','v4.90','v4.89','v4.88','v4.87','v4.86','v4.85','v4.84','v4.83','v4.82','v4.78','v4.77','v4.76','v4.75','v4.74','v4.73','v4.72','v4.71','v4.70','v4.69','v4.68','v4.67','v4.66','v4.65','v4.64','v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
+    return ['v4.101','v4.100','v4.99','v4.98','v4.97','v4.96','v4.95','v4.94','v4.93','v4.92','v4.91','v4.90','v4.89','v4.88','v4.87','v4.86','v4.85','v4.84','v4.83','v4.82','v4.78','v4.77','v4.76','v4.75','v4.74','v4.73','v4.72','v4.71','v4.70','v4.69','v4.68','v4.67','v4.66','v4.65','v4.64','v4.63','v4.62','v4.61','v4.60','v4.59','v4.58','v4.57','v4.56','v4.55','v4.54','v4.53','v4.52','v4.51','v4.50','v4.49','v4.48','v4.47','v4.46','v4.45','v4.44','v4.43','v4.42','v4.41','v4.40','v4.39','v4.38','v4.37','v4.36','v4.35','v4.34','v4.33'].map(v=>`Sweepstake League balance settlement ${key} | adjustment-only | ${v}`);
   }
   function signedMoneyFromPence(pence){
     const n=parseInt(pence)||0;
-    if(n===0)return '£0';
+    if(n===0)return 'Â£0';
     return `${n>0?'+':'-'}${moneyFromPence(Math.abs(n))}`;
   }
   function isLeagueSweepstakeMoneyNote(note){
@@ -7450,8 +7494,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         deltas[toId]=(deltas[toId]||0)+pounds;
         if(!details[fromId])details[fromId]={player:fromLeague,lines:[]};
         if(!details[toId])details[toId]={player:toLeague,lines:[]};
-        details[fromId].lines.push(`paid ${toLeague.name} £${pounds.toFixed(2)}`);
-        details[toId].lines.push(`received from ${fromLeague.name} £${pounds.toFixed(2)}`);
+        details[fromId].lines.push(`paid ${toLeague.name} Â£${pounds.toFixed(2)}`);
+        details[toId].lines.push(`received from ${fromLeague.name} Â£${pounds.toFixed(2)}`);
       });
       const ids=Object.keys(deltas).filter(id=>Math.abs(deltas[id])>0.0001);
       if(!ids.length){
@@ -7549,12 +7593,12 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const sw=sweepstakePlayerRows({throughHole,forceEnabled});
     if(isJoinedDaySweepstake)return null;
     if(!sw.enabled)return null;
-    const title=reviewTitle||'💰 Sweepstake';
+    const title=reviewTitle||'ðŸ’° Sweepstake';
     return <div style={{...S.card,margin:compact?'0 0 10px':16,background:payUp?'linear-gradient(135deg,rgba(245,158,11,0.30),rgba(10,21,40,0.96))':'linear-gradient(135deg,rgba(245,158,11,0.18),rgba(255,255,255,0.05))',borderColor:'rgba(245,158,11,0.55)',boxShadow:payUp?'0 14px 36px rgba(245,158,11,0.18)':'none'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:10}}>
-        <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><SweepstakeLogo size={payUp?72:56}/><div><div style={{fontSize:payUp?21:16,color:'#fff',fontWeight:950}}>{title}</div><div style={{fontSize:11,color:'#fbbf24'}}>Stableford side pots · {moneyFromPence(sw.amountPence)} front/back/overall · {sw.scope==='round'?'all groups':'this group'} · {sw.playerCount} players</div></div></div>
+        <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><SweepstakeLogo size={payUp?72:56}/><div><div style={{fontSize:payUp?21:16,color:'#fff',fontWeight:950}}>{title}</div><div style={{fontSize:11,color:'#fbbf24'}}>Stableford side pots Â· {moneyFromPence(sw.amountPence)} front/back/overall Â· {sw.scope==='round'?'all groups':'this group'} Â· {sw.playerCount} players</div></div></div>
       </div>
-      {!sw.final&&<div style={{padding:'8px 10px',borderRadius:10,background:'rgba(96,184,240,0.12)',border:'1px solid rgba(96,184,240,0.22)',fontSize:12,color:'#dbeafe',fontWeight:800,marginBottom:8}}>Live standings only — final net settlement appears after 18 holes.</div>}
+      {!sw.final&&<div style={{padding:'8px 10px',borderRadius:10,background:'rgba(96,184,240,0.12)',border:'1px solid rgba(96,184,240,0.22)',fontSize:12,color:'#dbeafe',fontWeight:800,marginBottom:8}}>Live standings only â€” final net settlement appears after 18 holes.</div>}
       {sw.pots.map(pot=><div key={pot.key} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'7px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
         <div style={{fontSize:12,color:'#fff',fontWeight:800}}>{pot.label}</div>
         <div style={{fontSize:12,color:'#fbbf24',fontWeight:900,textAlign:'right'}}>{sweepstakeWinnerText(pot)||'-'} <span style={{color:'rgba(255,255,255,0.65)'}}>({pot.best||0} pts)</span>{sweepstakeReasonText(pot)&&<div style={{fontSize:10,color:'rgba(255,255,255,0.70)',fontWeight:800,marginTop:2}}>{sweepstakeReasonText(pot)}</div>}{pot.rolloverIn>0&&pot.key==='overall'&&<div style={{fontSize:10,color:'#86efac',fontWeight:900,marginTop:2}}>Includes rollover {moneyFromPence(pot.rolloverIn)}</div>}</div>
@@ -7587,7 +7631,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           </div>;
         })}
         <div style={{marginTop:12,fontSize:payUp?15:12,color:'#fbbf24',fontWeight:950,letterSpacing:'0.08em'}}>WHO PAYS WHO</div>
-        {sw.payments.length?sw.payments.map((p,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:payUp?'11px 0':'8px 0',borderTop:'1px solid rgba(255,255,255,0.10)'}}><span style={{fontSize:payUp?16:13,color:'#fff',fontWeight:payUp?900:500}}>{p.from} → {p.to}</span><span style={{fontSize:payUp?18:13,color:'#fbbf24',fontWeight:950}}>{moneyFromPence(p.amount)}</span></div>):<div style={{fontSize:13,color:'rgba(255,255,255,0.65)',paddingTop:8}}>All square.</div>}
+        {sw.payments.length?sw.payments.map((p,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:payUp?'11px 0':'8px 0',borderTop:'1px solid rgba(255,255,255,0.10)'}}><span style={{fontSize:payUp?16:13,color:'#fff',fontWeight:payUp?900:500}}>{p.from} â†’ {p.to}</span><span style={{fontSize:payUp?18:13,color:'#fbbf24',fontWeight:950}}>{moneyFromPence(p.amount)}</span></div>):<div style={{fontSize:13,color:'rgba(255,255,255,0.65)',paddingTop:8}}>All square.</div>}
         {payUp&&sweepstakeLeagueSettlement&&<div style={{marginTop:12,padding:'10px 11px',borderRadius:12,background:sweepstakeLeagueSettlement.status==='error'?'rgba(239,68,68,0.12)':'rgba(34,197,94,0.10)',border:'1px solid '+(sweepstakeLeagueSettlement.status==='error'?'rgba(248,113,113,0.30)':'rgba(134,239,172,0.24)')}}>
           <div style={{fontSize:12,color:sweepstakeLeagueSettlement.status==='error'?'#fca5a5':'#86efac',fontWeight:950,letterSpacing:'0.07em',textTransform:'uppercase'}}>League balances</div>
           {sweepstakeLeagueSettlement.status==='checking'&&<div style={{fontSize:12,color:'#dbeafe',marginTop:6}}>Updating League balances...</div>}
@@ -7598,7 +7642,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
               <div style={{fontSize:12,color:'#dbeafe',marginTop:6}}>Sweepstake has been added to the League money table.</div>
               {(sweepstakeLeagueSettlement.changes||[]).map(c=><div key={c.player} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'6px 0',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
                 <span style={{fontSize:13,color:'#fff',fontWeight:850}}>{c.player}</span>
-                <span style={{fontSize:13,color:c.delta>=0?'#86efac':'#fca5a5',fontWeight:950}}>{c.delta>=0?'+':'-'}£{Math.abs(c.delta).toFixed(Math.abs(c.delta)%1?2:0)}</span>
+                <span style={{fontSize:13,color:c.delta>=0?'#86efac':'#fca5a5',fontWeight:950}}>{c.delta>=0?'+':'-'}Â£{Math.abs(c.delta).toFixed(Math.abs(c.delta)%1?2:0)}</span>
               </div>)}
             </>:<div style={{fontSize:12,color:'#dbeafe',marginTop:6}}>No League balances changed.</div>}
             {(sweepstakeLeagueSettlement.skipped||[]).length>0&&<div style={{fontSize:11,color:'#fbbf24',lineHeight:1.35,marginTop:7}}>Skipped guest or unlinked sweepstake payments: {sweepstakeLeagueSettlement.skipped.join(', ')}</div>}
@@ -7763,21 +7807,21 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       notifyFoursomesBirdiesForNewRows(mp,prev).catch(e=>console.warn('Snyder Live foursomes birdie notification error',e));
     }
     if(mp.lead>0&&prev.lead<=0){
-      sendFoursomesMatchNotification('foursomes_lead','lead-A-'+mp.lastHole,'🔥 '+mp.aName+' go into the lead!',mp.label+' · '+notifyRoundName(),{hole:mp.lastHole,teamName:mp.aName});
+      sendFoursomesMatchNotification('foursomes_lead','lead-A-'+mp.lastHole,'ðŸ”¥ '+mp.aName+' go into the lead!',mp.label+' Â· '+notifyRoundName(),{hole:mp.lastHole,teamName:mp.aName});
     }else if(mp.lead<0&&prev.lead>=0){
-      sendFoursomesMatchNotification('foursomes_lead','lead-B-'+mp.lastHole,'🔥 '+mp.bName+' go into the lead!',mp.label+' · '+notifyRoundName(),{hole:mp.lastHole,teamName:mp.bName});
+      sendFoursomesMatchNotification('foursomes_lead','lead-B-'+mp.lastHole,'ðŸ”¥ '+mp.bName+' go into the lead!',mp.label+' Â· '+notifyRoundName(),{hole:mp.lastHole,teamName:mp.bName});
     }
     const streakTeam=foursomesWinningStreak(mp.holeRows);
     const prevStreakTeam=foursomesWinningStreak(prev.holeRows);
     if(streakTeam&&streakTeam!==prevStreakTeam){
       const name=foursomesTeamNameFromKey(mp,streakTeam);
-      sendFoursomesMatchNotification('foursomes_rampage','rampage-'+streakTeam+'-'+mp.lastHole,'🚨 '+name+' are on a rampage!',name+' have won 3 holes in a row · '+notifyRoundName(),{hole:mp.lastHole,teamName:name});
+      sendFoursomesMatchNotification('foursomes_rampage','rampage-'+streakTeam+'-'+mp.lastHole,'ðŸš¨ '+name+' are on a rampage!',name+' have won 3 holes in a row Â· '+notifyRoundName(),{hole:mp.lastHole,teamName:name});
     }
     if(mp.isDormie&&!prev.isDormie&&mp.winningTeam){
-      sendFoursomesMatchNotification('foursomes_dormie','dormie-'+mp.winningTeam+'-'+mp.remaining,'🔒 '+mp.winningName+' are dormie!',mp.abs+'UP with '+mp.remaining+' to play · '+notifyRoundName(),{hole:mp.lastHole,teamName:mp.winningName});
+      sendFoursomesMatchNotification('foursomes_dormie','dormie-'+mp.winningTeam+'-'+mp.remaining,'ðŸ”’ '+mp.winningName+' are dormie!',mp.abs+'UP with '+mp.remaining+' to play Â· '+notifyRoundName(),{hole:mp.lastHole,teamName:mp.winningName});
     }
     if(mp.isFinished&&!prev.isFinished&&mp.winningTeam){
-      sendFoursomesMatchNotification('foursomes_won','won-'+mp.winningTeam+'-'+mp.finalScore,'🏁 '+mp.winningName+' win the match!',mp.finalScore+' · '+notifyRoundName(),{hole:mp.lastHole,teamName:mp.winningName,finalScore:mp.finalScore});
+      sendFoursomesMatchNotification('foursomes_won','won-'+mp.winningTeam+'-'+mp.finalScore,'ðŸ '+mp.winningName+' win the match!',mp.finalScore+' Â· '+notifyRoundName(),{hole:mp.lastHole,teamName:mp.winningName,finalScore:mp.finalScore});
     }
     if(mp.isFinished)finishFoursomesMatchAutomatically(mp);
     foursomesNotifyStateRef.current={lead:mp.lead,played:mp.played,lastHole:mp.lastHole,holeRows:mp.holeRows||[],isFinished:mp.isFinished,isDormie:mp.isDormie};
@@ -7793,7 +7837,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:8}}>
         <div>
           <div style={{fontSize:11,color:'#90ccf0',fontWeight:900,letterSpacing:'0.12em'}}>{mp.mode==='foursomes'?'FOURSOMES MATCHPLAY':mp.mode==='singles'?'SINGLES MATCHPLAY':'DOUBLES MATCHPLAY'}</div>
-          <div style={{fontSize:13,color:'rgba(255,255,255,0.72)',marginTop:2}}>{mp.mode==='foursomes'?'Alternate shot · lowest net score wins each hole':mp.mode==='singles'?(mp.keepStableford===false?'Singles matchplay only':'Singles matchplay + Stableford'):'Best Stableford score wins each hole'}</div>
+          <div style={{fontSize:13,color:'rgba(255,255,255,0.72)',marginTop:2}}>{mp.mode==='foursomes'?'Alternate shot Â· lowest net score wins each hole':mp.mode==='singles'?(mp.keepStableford===false?'Singles matchplay only':'Singles matchplay + Stableford'):'Best Stableford score wins each hole'}</div>
         </div>
         <div style={{fontSize:11,color:'#d4af37',fontWeight:950}}>LIVE</div>
       </div>
@@ -7801,7 +7845,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         <div style={{textAlign:'left',fontSize:24,color:leadTeam==='A'?'#fbbf24':'rgba(255,255,255,0.18)',fontWeight:950,lineHeight:1}}>{leadTeam==='A'?upText:''}</div>
         <div style={{textAlign:'center',minWidth:0}}>
           <div style={{fontSize:15,color:'#fff',fontWeight:950,whiteSpace:'normal',overflowWrap:'anywhere',lineHeight:1.12}}>{mp.aName} <span style={{color:'rgba(255,255,255,0.45)'}}>v</span> {mp.bName}</div>
-          <div style={{fontSize:11,color:'#90ccf0',fontWeight:800,marginTop:3}}>{leadTeam==='tie'?mp.label+' · '+mp.sub:mp.sub}</div>
+          <div style={{fontSize:11,color:'#90ccf0',fontWeight:800,marginTop:3}}>{leadTeam==='tie'?mp.label+' Â· '+mp.sub:mp.sub}</div>
           {mp.mode==='singles'&&<div style={{fontSize:10,color:'rgba(255,255,255,0.62)',fontWeight:850,marginTop:3}}>{(mp.teamAShots||mp.teamBShots)?((mp.teamAShots?mp.aName+' get '+mp.teamAShots+' shot'+(mp.teamAShots===1?'':'s'):mp.bName+' get '+mp.teamBShots+' shot'+(mp.teamBShots===1?'':'s'))):'No shots given'}</div>}
           {mp.mode==='singles'&&mp.keepStableford!==false&&<div style={{marginTop:7,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
             <div style={{background:'rgba(251,191,36,0.10)',border:'1px solid rgba(251,191,36,0.22)',borderRadius:10,padding:'6px 8px'}}><div style={{fontSize:10,color:'#fbbf24',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>{getRunningMatchplayPlayer((mp.teamA||[])[0],holes.length)} <span style={{fontSize:10,color:'#90ccf0'}}>pts</span></div></div>
@@ -7823,7 +7867,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       <div style={{textAlign:'center',minWidth:0}}>
         <div style={{fontSize:10,color:'#90ccf0',fontWeight:950,letterSpacing:'0.1em'}}>MATCHPLAY</div>
         <div style={{fontSize:12,color:'#fff',fontWeight:950,whiteSpace:'normal',overflowWrap:'anywhere',lineHeight:1.12}}><span style={{color:'#fbbf24'}}>{mp.aName}</span> <span style={{color:'rgba(255,255,255,0.48)',fontWeight:900}}>v</span> <span style={{color:'#60b8f0'}}>{mp.bName}</span></div>
-        <div style={{fontSize:10,color:'#90ccf0',fontWeight:850,marginTop:2}}>{leadTeam==='tie'?mp.label+' · '+mp.sub:mp.sub}</div>
+        <div style={{fontSize:10,color:'#90ccf0',fontWeight:850,marginTop:2}}>{leadTeam==='tie'?mp.label+' Â· '+mp.sub:mp.sub}</div>
         {mp.mode==='singles'&&<div style={{fontSize:10,color:'rgba(255,255,255,0.62)',fontWeight:850,marginTop:3}}>{(mp.teamAShots||mp.teamBShots)?((mp.teamAShots?mp.aName+' get '+mp.teamAShots+' shot'+(mp.teamAShots===1?'':'s'):mp.bName+' get '+mp.teamBShots+' shot'+(mp.teamBShots===1?'':'s'))):'No shots given'}</div>}
         {mp.mode==='singles'&&mp.keepStableford!==false&&<div style={{marginTop:7,display:'grid',gridTemplateColumns:'1fr 1fr',gap:7}}>
           <div style={{background:'rgba(251,191,36,0.10)',border:'1px solid rgba(251,191,36,0.22)',borderRadius:9,padding:'5px 7px'}}><div style={{fontSize:9,color:'#fbbf24',fontWeight:950,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mp.aName}</div><div style={{fontSize:16,color:'#fff',fontWeight:950}}>{getRunningMatchplayPlayer((mp.teamA||[])[0],holes.length)} <span style={{fontSize:9,color:'#90ccf0'}}>pts</span></div></div>
@@ -7846,7 +7890,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const opts=Array.from({length:10},(_,i)=>Math.max(1,hd.par-2)+i);
     const modal=(<div style={{position:'fixed',inset:0,width:'100vw',maxWidth:'100vw',overflow:'hidden',background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:16,boxSizing:'border-box'}} onClick={e=>{if(e.target===e.currentTarget)setInputHole(null);}}>
       <div style={{background:'#0d2548',border:'1px solid rgba(255,255,255,0.2)',borderRadius:16,padding:16,width:'100%',maxWidth:'min(340px,calc(100vw - 32px))',boxSizing:'border-box'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}><div><div style={{fontSize:12,color:'#60b8f0',textTransform:'uppercase'}}>Hole {holeNum} · Par {hd.par}</div><div style={{fontSize:22,color:'#fff',fontWeight:900}}>{name}</div></div><button onClick={()=>setInputHole(null)} style={{background:'none',border:'none',color:'#fff',fontSize:24,cursor:'pointer'}}>×</button></div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}><div><div style={{fontSize:12,color:'#60b8f0',textTransform:'uppercase'}}>Hole {holeNum} Â· Par {hd.par}</div><div style={{fontSize:22,color:'#fff',fontWeight:900}}>{name}</div></div><button onClick={()=>setInputHole(null)} style={{background:'none',border:'none',color:'#fff',fontSize:24,cursor:'pointer'}}>Ã—</button></div>
         <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:10,marginBottom:10}}>{opts.map(s=>{const isSel=dv===s;return <button key={s} onClick={()=>setInputVal(String(s))} style={{minWidth:52,height:62,flexShrink:0,borderRadius:10,border:'2px solid '+(isSel?'#0070BB':'rgba(255,255,255,0.2)'),background:isSel?'#0070BB':'rgba(255,255,255,0.06)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,color:'#fff',fontWeight:900}}>{s}</button>;})}</div>
         <button onClick={()=>{setScore(holeNum,pid,dv);setInputHole(null);}} style={{...S.pri,width:'100%',padding:13,fontSize:15}}>Save {dv}</button>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:8}}>
@@ -7873,7 +7917,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
     const opts=Array.from({length:10},(_,i)=>Math.max(1,hd.par-2)+i);
     const modal=(<div style={{position:'fixed',inset:0,width:'100vw',maxWidth:'100vw',overflow:'hidden',background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:16,boxSizing:'border-box'}} onClick={e=>{if(e.target===e.currentTarget)setInputHole(null);}}>
       <div style={{background:'#0d2548',border:'1px solid rgba(255,255,255,0.2)',borderRadius:16,padding:16,width:'100%',maxWidth:'min(340px,calc(100vw - 32px))',boxSizing:'border-box'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}><div><div style={{fontSize:12,color:'#60b8f0',textTransform:'uppercase'}}>Hole {holeNum} · Par {hd.par}</div><div style={{fontSize:22,color:'#fff',fontWeight:900}}>{name}</div></div><button onClick={()=>setInputHole(null)} style={{background:'none',border:'none',color:'#fff',fontSize:24,cursor:'pointer'}}>×</button></div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}><div><div style={{fontSize:12,color:'#60b8f0',textTransform:'uppercase'}}>Hole {holeNum} Â· Par {hd.par}</div><div style={{fontSize:22,color:'#fff',fontWeight:900}}>{name}</div></div><button onClick={()=>setInputHole(null)} style={{background:'none',border:'none',color:'#fff',fontSize:24,cursor:'pointer'}}>Ã—</button></div>
         <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:10,marginBottom:10}}>{opts.map(s=>{const isSel=dv===s;return <button key={s} onClick={()=>setInputVal(String(s))} style={{minWidth:52,height:62,flexShrink:0,borderRadius:10,border:'2px solid '+(isSel?'#0070BB':'rgba(255,255,255,0.2)'),background:isSel?'#0070BB':'rgba(255,255,255,0.06)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,color:'#fff',fontWeight:900}}>{s}</button>;})}</div>
         <button onClick={()=>{setScore(holeNum,pid,dv);setInputHole(null);}} style={{...S.pri,width:'100%',padding:13,fontSize:15}}>Save {dv}</button>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:8}}>
@@ -7898,7 +7942,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       <FoursomesScoreInput/>
       <div style={{padding:'10px 14px 12px',background:'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(251,191,36,0.10))',borderBottom:'1px solid rgba(96,184,240,0.18)'}}>
         <MatchplayMiniStatus/>
-        {matchFinished&&<div style={{marginTop:10,padding:'10px 12px',borderRadius:12,background:'rgba(34,197,94,0.16)',border:'1px solid rgba(34,197,94,0.35)',color:'#bbf7d0',fontSize:13,fontWeight:950,textAlign:'center'}}>🏁 Match finished · {mp.label}</div>}
+        {matchFinished&&<div style={{marginTop:10,padding:'10px 12px',borderRadius:12,background:'rgba(34,197,94,0.16)',border:'1px solid rgba(34,197,94,0.35)',color:'#bbf7d0',fontSize:13,fontWeight:950,textAlign:'center'}}>ðŸ Match finished Â· {mp.label}</div>}
       </div>
       {['FRONT 9','BACK 9'].map((label,sec)=>{const list=sec===0?front9:back9;return <div key={label}>
         <div style={{padding:'6px 12px',fontSize:11,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(0,0,0,0.3)'}}>{label}</div>
@@ -7931,7 +7975,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       <SinglesMatchplayScoreInput/>
       <div style={{padding:'10px 14px 12px',background:'linear-gradient(135deg,rgba(0,112,187,0.24),rgba(251,191,36,0.10))',borderBottom:'1px solid rgba(96,184,240,0.18)'}}>
         <MatchplayMiniStatus/>
-        {matchFinished&&<div style={{marginTop:10,padding:'10px 12px',borderRadius:12,background:'rgba(34,197,94,0.16)',border:'1px solid rgba(34,197,94,0.35)',color:'#bbf7d0',fontSize:13,fontWeight:950,textAlign:'center'}}>Match finished · {mp.label}</div>}
+        {matchFinished&&<div style={{marginTop:10,padding:'10px 12px',borderRadius:12,background:'rgba(34,197,94,0.16)',border:'1px solid rgba(34,197,94,0.35)',color:'#bbf7d0',fontSize:13,fontWeight:950,textAlign:'center'}}>Match finished Â· {mp.label}</div>}
       </div>
       {['FRONT 9','BACK 9'].map((label,sec)=>{const list=sec===0?front9:back9;return <div key={label}>
         <div style={{padding:'6px 12px',fontSize:11,color:'#60b8f0',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(0,0,0,0.3)'}}>{label}</div>
@@ -7966,7 +8010,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       setScorecardNotificationsMuted(round.id,next);
       setScorecardNotificationsOff(next);
       flash(next?'Notifications off for this scorecard':'Notifications on for this scorecard');
-    }} style={{width:38,height:38,borderRadius:10,border:'1px solid '+(muted?'rgba(148,163,184,0.34)':enabledGlobally?'rgba(34,197,94,0.42)':'rgba(245,158,11,0.38)'),background:muted?'rgba(148,163,184,0.12)':enabledGlobally?'rgba(34,197,94,0.15)':'rgba(245,158,11,0.12)',color:muted?'#94a3b8':enabledGlobally?'#86efac':'#fbbf24',fontSize:18,fontWeight:950,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,lineHeight:1}}>{muted?'🔕':'🔔'}</button>;
+    }} style={{width:38,height:38,borderRadius:10,border:'1px solid '+(muted?'rgba(148,163,184,0.34)':enabledGlobally?'rgba(34,197,94,0.42)':'rgba(245,158,11,0.38)'),background:muted?'rgba(148,163,184,0.12)':enabledGlobally?'rgba(34,197,94,0.15)':'rgba(245,158,11,0.12)',color:muted?'#94a3b8':enabledGlobally?'#86efac':'#fbbf24',fontSize:18,fontWeight:950,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,lineHeight:1}}>{muted?'ðŸ”•':'ðŸ””'}</button>;
   }
 
   function leagueSubmitToLocalDate(value){
@@ -8155,10 +8199,10 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           });
           if(snakeError)throw snakeError;
           snakeText=' + snake claim';
-          sendSnyderLeagueNotification({title:'Snake submitted',body:`🐍 ${snake.leaguePlayer.name} got the snake. That's another £10 in the curry pot.`});
+          sendSnyderLeagueNotification({title:'Snake submitted',body:`ðŸ ${snake.leaguePlayer.name} got the snake. That's another Â£10 in the curry pot.`});
         }
       }
-      const msg=`Submitted ${selected.length} League score${selected.length===1?'':'s'}${snakeText}${skipped.length?` · skipped ${skipped.length} duplicate${skipped.length===1?'':'s'}`:''}`;
+      const msg=`Submitted ${selected.length} League score${selected.length===1?'':'s'}${snakeText}${skipped.length?` Â· skipped ${skipped.length} duplicate${skipped.length===1?'':'s'}`:''}`;
       setLeagueSubmitNote(msg);
       setLeagueSubmitChoice(msg);
       flash(msg);
@@ -8318,7 +8362,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
           <div>
             <div style={{fontSize:18,color:'#fff',fontWeight:950}}>Final Stableford Scores</div>
-            <div style={{fontSize:11,color:'#90ccf0'}}>Completed round · group scorecard</div>
+            <div style={{fontSize:11,color:'#90ccf0'}}>Completed round Â· group scorecard</div>
           </div>
           <div style={{fontSize:11,color:'#86efac',fontWeight:950,letterSpacing:'0.08em'}}>FINAL</div>
         </div>
@@ -8329,7 +8373,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           <div style={{fontSize:24,color:'#60b8f0',fontWeight:950,lineHeight:1}}>{r.total} <span style={{fontSize:10,color:'#90ccf0',fontWeight:900}}>pts</span></div>
         </div>)}
       </div>
-      <SweepstakePanel throughHole={18} reviewTitle="💰 SWEEPSTAKE - WHO PAYS WHO" payUp={true} forceEnabled={!!round._spectator}/>
+      <SweepstakePanel throughHole={18} reviewTitle="ðŸ’° SWEEPSTAKE - WHO PAYS WHO" payUp={true} forceEnabled={!!round._spectator}/>
     </div>;
   }
 
@@ -8664,7 +8708,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             ))}
           </div>
           <MiniCard holeList={back9} label="BACK 9"/>
-          <SweepstakePanel throughHole={18} reviewTitle="💰 Sweepstake after Back 9" payUp={false}/>
+          <SweepstakePanel throughHole={18} reviewTitle="ðŸ’° Sweepstake after Back 9" payUp={false}/>
         </div>
       </div>
     );
@@ -8730,7 +8774,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         </div>
         <div id="stats-card" style={{padding:16,background:'linear-gradient(160deg,#0a1528 0%,#0d2040 50%,#0a1830 100%)'}}>
           <LeagueSubmitCard/>
-          <SweepstakePanel throughHole={18} reviewTitle="💰 SWEEPSTAKE - PAY UP" payUp={true}/>
+          <SweepstakePanel throughHole={18} reviewTitle="ðŸ’° SWEEPSTAKE - PAY UP" payUp={true}/>
           {grpPlayers.map(p=>{
             const st=getStats(p.id);
             return(
@@ -8776,7 +8820,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             ))}
           </div>
           <MiniCard holeList={front9} label="FRONT 9"/>
-          <SweepstakePanel throughHole={9} reviewTitle="💰 Sweepstake after Front 9" payUp={false}/>
+          <SweepstakePanel throughHole={9} reviewTitle="ðŸ’° Sweepstake after Front 9" payUp={false}/>
           <div style={{display:'flex',gap:8,marginTop:16}}>
             <button onClick={goToBack9} style={{...S.pri,flex:1,padding:12,fontSize:13}}>Back 9</button>
           </div>
@@ -8939,7 +8983,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           <div style={{marginTop:12}}>
             <div style={{...S.card,margin:'0 0 12px',background:'linear-gradient(135deg,rgba(0,112,187,0.22),rgba(255,255,255,0.05))',borderColor:'rgba(96,184,240,0.42)'}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
-                <div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>Final Stableford Scores</div><div style={{fontSize:11,color:'#90ccf0'}}>Completed round · spectator summary</div></div>
+                <div><div style={{fontSize:18,color:'#fff',fontWeight:950}}>Final Stableford Scores</div><div style={{fontSize:11,color:'#90ccf0'}}>Completed round Â· spectator summary</div></div>
                 <div style={{fontSize:11,color:'#86efac',fontWeight:950,letterSpacing:'0.08em'}}>FINAL</div>
               </div>
               {overallLeaderboardRows().map((r,idx)=><div key={'final-'+r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:idx?'1px solid rgba(255,255,255,0.08)':'none'}}>
@@ -8949,7 +8993,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
                 <div style={{fontSize:24,color:'#60b8f0',fontWeight:950,lineHeight:1}}>{r.total} <span style={{fontSize:10,color:'#90ccf0',fontWeight:900}}>pts</span></div>
               </div>)}
             </div>
-            <SweepstakePanel throughHole={18} reviewTitle="💰 SWEEPSTAKE - WHO PAYS WHO" payUp={true} forceEnabled={!!round._spectator}/>
+            <SweepstakePanel throughHole={18} reviewTitle="ðŸ’° SWEEPSTAKE - WHO PAYS WHO" payUp={true} forceEnabled={!!round._spectator}/>
           </div>
         )}
       </div> : <>
@@ -9112,7 +9156,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.78)',zIndex:9998,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={e=>{if(e.target===e.currentTarget)setShowSweepstake(false);}}>
           <div style={{width:'100%',maxWidth:520,maxHeight:'82vh',overflowY:'auto',background:'#0d2548',borderTop:'1px solid rgba(255,255,255,0.16)',borderRadius:'18px 18px 0 0',padding:16}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-              <div style={{display:'flex',alignItems:'center',gap:10}}><SweepstakeLogo size={62}/><div><div style={{fontSize:18,color:'#fff',fontWeight:900}}>Sweepstake Money</div><div style={{fontSize:12,color:'#fbbf24'}}>Net settlement only · {sweepstakePlayerRows().scope==='round'?'whole round / all groups':'my group only'}</div></div></div>
+              <div style={{display:'flex',alignItems:'center',gap:10}}><SweepstakeLogo size={62}/><div><div style={{fontSize:18,color:'#fff',fontWeight:900}}>Sweepstake Money</div><div style={{fontSize:12,color:'#fbbf24'}}>Net settlement only Â· {sweepstakePlayerRows().scope==='round'?'whole round / all groups':'my group only'}</div></div></div>
               <button onClick={()=>setShowSweepstake(false)} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Close</button>
             </div>
             <SweepstakePanel compact={false}/>
@@ -9835,7 +9879,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {already:false,changes:[],skipped:[]};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.100`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.101`;
+    const legacyMarkerNoteV4100=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.100`;
     const legacyMarkerNoteV499=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.99`;
     const legacyMarkerNoteV498=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.98`;
     const legacyMarkerNoteV497=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.97`;
@@ -9896,7 +9941,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const playable=(linkedRounds||[]).filter(r=>r&&r.id&&!isDayCompBoardRound(r));
     if(!playable.length)return {already:false,changes:[],skipped:[]};
     const roundIds=playable.map(r=>r.id);
-    const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV499},note.eq.${legacyMarkerNoteV498},note.eq.${legacyMarkerNoteV497},note.eq.${legacyMarkerNoteV496},note.eq.${legacyMarkerNoteV495},note.eq.${legacyMarkerNoteV494},note.eq.${legacyMarkerNoteV493},note.eq.${legacyMarkerNoteV492},note.eq.${legacyMarkerNoteV491},note.eq.${legacyMarkerNoteV490},note.eq.${legacyMarkerNoteV489},note.eq.${legacyMarkerNoteV488},note.eq.${legacyMarkerNoteV487},note.eq.${legacyMarkerNoteV486},note.eq.${legacyMarkerNoteV485},note.eq.${legacyMarkerNoteV484},note.eq.${legacyMarkerNoteV483},note.eq.${legacyMarkerNoteV482},note.eq.${legacyMarkerNoteV478},note.eq.${legacyMarkerNoteV460},note.eq.${legacyMarkerNoteV459},note.eq.${legacyMarkerNoteV458},note.eq.${legacyMarkerNoteV457},note.eq.${legacyMarkerNoteV456},note.eq.${legacyMarkerNoteV455},note.eq.${legacyMarkerNoteV454},note.eq.${legacyMarkerNoteV453},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`).limit(1);
+    const {data:logMarkers,error:logMarkerError}=await sb.from('payment_log').select('id').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV4100},note.eq.${legacyMarkerNoteV499},note.eq.${legacyMarkerNoteV498},note.eq.${legacyMarkerNoteV497},note.eq.${legacyMarkerNoteV496},note.eq.${legacyMarkerNoteV495},note.eq.${legacyMarkerNoteV494},note.eq.${legacyMarkerNoteV493},note.eq.${legacyMarkerNoteV492},note.eq.${legacyMarkerNoteV491},note.eq.${legacyMarkerNoteV490},note.eq.${legacyMarkerNoteV489},note.eq.${legacyMarkerNoteV488},note.eq.${legacyMarkerNoteV487},note.eq.${legacyMarkerNoteV486},note.eq.${legacyMarkerNoteV485},note.eq.${legacyMarkerNoteV484},note.eq.${legacyMarkerNoteV483},note.eq.${legacyMarkerNoteV482},note.eq.${legacyMarkerNoteV478},note.eq.${legacyMarkerNoteV460},note.eq.${legacyMarkerNoteV459},note.eq.${legacyMarkerNoteV458},note.eq.${legacyMarkerNoteV457},note.eq.${legacyMarkerNoteV456},note.eq.${legacyMarkerNoteV455},note.eq.${legacyMarkerNoteV454},note.eq.${legacyMarkerNoteV453},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`).limit(1);
     if(logMarkerError)throw logMarkerError;
     if(logMarkers&&logMarkers.length)return {already:true,changes:[],skipped:[]};
     const [{data:roundPlayers,error:roundPlayersError},{data:scoreRows,error:scoreRowsError},{data:leaguePlayers,error:leaguePlayersError},linkResult]=await Promise.all([
@@ -9951,8 +9996,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
       deltas[toId]=(deltas[toId]||0)+pounds;
       if(!details[fromId])details[fromId]={player:fromLeague,lines:[]};
       if(!details[toId])details[toId]={player:toLeague,lines:[]};
-      details[fromId].lines.push(`paid ${toLeague.name} £${pounds.toFixed(2)}`);
-      details[toId].lines.push(`received from ${fromLeague.name} £${pounds.toFixed(2)}`);
+      details[fromId].lines.push(`paid ${toLeague.name} Â£${pounds.toFixed(2)}`);
+      details[toId].lines.push(`received from ${fromLeague.name} Â£${pounds.toFixed(2)}`);
     });
     const ids=Object.keys(deltas).filter(id=>Math.abs(deltas[id])>0.0001);
     if(ids.length){
@@ -9992,7 +10037,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
       await sendSnyderLiveNotification('day_sweepstake_finished',{
         roundId:board.id,
         status:'day-sweepstake-finished',
-        title:'🏆 '+(dayCompDisplayName(rounds,board)||'Day Sweepstake')+' finished!',
+        title:'ðŸ† '+(dayCompDisplayName(rounds,board)||'Day Sweepstake')+' finished!',
         body,
         roundName:dayCompDisplayName(rounds,board)||'Day Sweepstake'
       });
@@ -10079,7 +10124,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     if(!board||!board.id||!sb)return {reversed:false,count:0};
     const key=dayCompKeyFromRound(board);
     const markerKey=`league-day-balance-${key||board.id}`;
-    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.100`;
+    const markerNote=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.101`;
+    const legacyMarkerNoteV4100=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.100`;
     const legacyMarkerNoteV499=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.99`;
     const legacyMarkerNoteV498=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.98`;
     const legacyMarkerNoteV497=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.97`;
@@ -10136,7 +10182,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyMarkerNoteV419=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.19`;
     const legacyMarkerNoteV400=`Day sweepstake League balance settlement ${markerKey} | adjustment-only | v4.00`;
     const legacyMarkerNote=`Day sweepstake League balance settlement ${markerKey}`;
-    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.100`;
+    const reverseNote=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.101`;
+    const legacyReverseNoteV4100=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.100`;
     const legacyReverseNoteV499=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.99`;
     const legacyReverseNoteV498=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.98`;
     const legacyReverseNoteV497=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.97`;
@@ -10192,10 +10239,10 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
     const legacyReverseNoteV420=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.20`;
     const legacyReverseNoteV419=`Day sweepstake League balance reversal ${markerKey} | adjustment-only | v4.19`;
     const legacyReverseNote=`Day sweepstake League balance reversal ${markerKey}`;
-    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNoteV499},note.eq.${legacyReverseNoteV498},note.eq.${legacyReverseNoteV497},note.eq.${legacyReverseNoteV496},note.eq.${legacyReverseNoteV495},note.eq.${legacyReverseNoteV494},note.eq.${legacyReverseNoteV493},note.eq.${legacyReverseNoteV492},note.eq.${legacyReverseNoteV491},note.eq.${legacyReverseNoteV490},note.eq.${legacyReverseNoteV489},note.eq.${legacyReverseNoteV488},note.eq.${legacyReverseNoteV487},note.eq.${legacyReverseNoteV486},note.eq.${legacyReverseNoteV485},note.eq.${legacyReverseNoteV484},note.eq.${legacyReverseNoteV483},note.eq.${legacyReverseNoteV482},note.eq.${legacyReverseNoteV478},note.eq.${legacyReverseNoteV460},note.eq.${legacyReverseNoteV459},note.eq.${legacyReverseNoteV458},note.eq.${legacyReverseNoteV457},note.eq.${legacyReverseNoteV456},note.eq.${legacyReverseNoteV455},note.eq.${legacyReverseNoteV454},note.eq.${legacyReverseNoteV453},note.eq.${legacyReverseNoteV452},note.eq.${legacyReverseNoteV451},note.eq.${legacyReverseNoteV450},note.eq.${legacyReverseNoteV449},note.eq.${legacyReverseNoteV448},note.eq.${legacyReverseNoteV447},note.eq.${legacyReverseNoteV446},note.eq.${legacyReverseNoteV445},note.eq.${legacyReverseNoteV444},note.eq.${legacyReverseNoteV443},note.eq.${legacyReverseNoteV442},note.eq.${legacyReverseNoteV441},note.eq.${legacyReverseNoteV440},note.eq.${legacyReverseNoteV439},note.eq.${legacyReverseNoteV438},note.eq.${legacyReverseNoteV437},note.eq.${legacyReverseNoteV436},note.eq.${legacyReverseNoteV435},note.eq.${legacyReverseNoteV434},note.eq.${legacyReverseNoteV433},note.eq.${legacyReverseNoteV432},note.eq.${legacyReverseNoteV431},note.eq.${legacyReverseNoteV430},note.eq.${legacyReverseNoteV429},note.eq.${legacyReverseNoteV428},note.eq.${legacyReverseNoteV420},note.eq.${legacyReverseNoteV419},note.eq.${legacyReverseNote}`).limit(1);
+    const {data:existingReverse,error:reverseCheckError}=await sb.from('payment_log').select('id').or(`note.eq.${reverseNote},note.eq.${legacyReverseNoteV4100},note.eq.${legacyReverseNoteV499},note.eq.${legacyReverseNoteV498},note.eq.${legacyReverseNoteV497},note.eq.${legacyReverseNoteV496},note.eq.${legacyReverseNoteV495},note.eq.${legacyReverseNoteV494},note.eq.${legacyReverseNoteV493},note.eq.${legacyReverseNoteV492},note.eq.${legacyReverseNoteV491},note.eq.${legacyReverseNoteV490},note.eq.${legacyReverseNoteV489},note.eq.${legacyReverseNoteV488},note.eq.${legacyReverseNoteV487},note.eq.${legacyReverseNoteV486},note.eq.${legacyReverseNoteV485},note.eq.${legacyReverseNoteV484},note.eq.${legacyReverseNoteV483},note.eq.${legacyReverseNoteV482},note.eq.${legacyReverseNoteV478},note.eq.${legacyReverseNoteV460},note.eq.${legacyReverseNoteV459},note.eq.${legacyReverseNoteV458},note.eq.${legacyReverseNoteV457},note.eq.${legacyReverseNoteV456},note.eq.${legacyReverseNoteV455},note.eq.${legacyReverseNoteV454},note.eq.${legacyReverseNoteV453},note.eq.${legacyReverseNoteV452},note.eq.${legacyReverseNoteV451},note.eq.${legacyReverseNoteV450},note.eq.${legacyReverseNoteV449},note.eq.${legacyReverseNoteV448},note.eq.${legacyReverseNoteV447},note.eq.${legacyReverseNoteV446},note.eq.${legacyReverseNoteV445},note.eq.${legacyReverseNoteV444},note.eq.${legacyReverseNoteV443},note.eq.${legacyReverseNoteV442},note.eq.${legacyReverseNoteV441},note.eq.${legacyReverseNoteV440},note.eq.${legacyReverseNoteV439},note.eq.${legacyReverseNoteV438},note.eq.${legacyReverseNoteV437},note.eq.${legacyReverseNoteV436},note.eq.${legacyReverseNoteV435},note.eq.${legacyReverseNoteV434},note.eq.${legacyReverseNoteV433},note.eq.${legacyReverseNoteV432},note.eq.${legacyReverseNoteV431},note.eq.${legacyReverseNoteV430},note.eq.${legacyReverseNoteV429},note.eq.${legacyReverseNoteV428},note.eq.${legacyReverseNoteV420},note.eq.${legacyReverseNoteV419},note.eq.${legacyReverseNote}`).limit(1);
     if(reverseCheckError)throw reverseCheckError;
     if(existingReverse&&existingReverse.length)return {reversed:false,already:true,count:0};
-    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV499},note.eq.${legacyMarkerNoteV498},note.eq.${legacyMarkerNoteV497},note.eq.${legacyMarkerNoteV496},note.eq.${legacyMarkerNoteV495},note.eq.${legacyMarkerNoteV494},note.eq.${legacyMarkerNoteV493},note.eq.${legacyMarkerNoteV492},note.eq.${legacyMarkerNoteV491},note.eq.${legacyMarkerNoteV490},note.eq.${legacyMarkerNoteV489},note.eq.${legacyMarkerNoteV488},note.eq.${legacyMarkerNoteV487},note.eq.${legacyMarkerNoteV486},note.eq.${legacyMarkerNoteV485},note.eq.${legacyMarkerNoteV484},note.eq.${legacyMarkerNoteV483},note.eq.${legacyMarkerNoteV482},note.eq.${legacyMarkerNoteV478},note.eq.${legacyMarkerNoteV460},note.eq.${legacyMarkerNoteV459},note.eq.${legacyMarkerNoteV458},note.eq.${legacyMarkerNoteV457},note.eq.${legacyMarkerNoteV456},note.eq.${legacyMarkerNoteV455},note.eq.${legacyMarkerNoteV454},note.eq.${legacyMarkerNoteV453},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`);
+    const {data:logs,error:logError}=await sb.from('payment_log').select('*').or(`note.eq.${markerNote},note.eq.${legacyMarkerNoteV4100},note.eq.${legacyMarkerNoteV499},note.eq.${legacyMarkerNoteV498},note.eq.${legacyMarkerNoteV497},note.eq.${legacyMarkerNoteV496},note.eq.${legacyMarkerNoteV495},note.eq.${legacyMarkerNoteV494},note.eq.${legacyMarkerNoteV493},note.eq.${legacyMarkerNoteV492},note.eq.${legacyMarkerNoteV491},note.eq.${legacyMarkerNoteV490},note.eq.${legacyMarkerNoteV489},note.eq.${legacyMarkerNoteV488},note.eq.${legacyMarkerNoteV487},note.eq.${legacyMarkerNoteV486},note.eq.${legacyMarkerNoteV485},note.eq.${legacyMarkerNoteV484},note.eq.${legacyMarkerNoteV483},note.eq.${legacyMarkerNoteV482},note.eq.${legacyMarkerNoteV478},note.eq.${legacyMarkerNoteV460},note.eq.${legacyMarkerNoteV459},note.eq.${legacyMarkerNoteV458},note.eq.${legacyMarkerNoteV457},note.eq.${legacyMarkerNoteV456},note.eq.${legacyMarkerNoteV455},note.eq.${legacyMarkerNoteV454},note.eq.${legacyMarkerNoteV453},note.eq.${legacyMarkerNoteV452},note.eq.${legacyMarkerNoteV451},note.eq.${legacyMarkerNoteV450},note.eq.${legacyMarkerNoteV449},note.eq.${legacyMarkerNoteV448},note.eq.${legacyMarkerNoteV447},note.eq.${legacyMarkerNoteV446},note.eq.${legacyMarkerNoteV445},note.eq.${legacyMarkerNoteV444},note.eq.${legacyMarkerNoteV443},note.eq.${legacyMarkerNoteV442},note.eq.${legacyMarkerNoteV441},note.eq.${legacyMarkerNoteV440},note.eq.${legacyMarkerNoteV439},note.eq.${legacyMarkerNoteV438},note.eq.${legacyMarkerNoteV437},note.eq.${legacyMarkerNoteV436},note.eq.${legacyMarkerNoteV435},note.eq.${legacyMarkerNoteV434},note.eq.${legacyMarkerNoteV433},note.eq.${legacyMarkerNoteV432},note.eq.${legacyMarkerNoteV431},note.eq.${legacyMarkerNoteV430},note.eq.${legacyMarkerNoteV429},note.eq.${legacyMarkerNoteV428},note.eq.${legacyMarkerNoteV420},note.eq.${legacyMarkerNoteV419},note.eq.${legacyMarkerNoteV400},note.eq.${legacyMarkerNote}`);
     if(logError)throw logError;
     const rows=(logs||[]).filter(r=>r&&r.player_id&&Math.abs(parseFloat(r.amount)||0)>0);
     if(!rows.length)return {reversed:false,count:0};
@@ -10256,7 +10303,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
                 <SweepstakeLogo size={66}/>
                 <div>
                   <div style={{fontSize:20,color:'#fff',fontWeight:950}}>{isLiveRound(finishPreview.board)?'Finish day?':'Check balances?'}</div>
-                  <div style={{fontSize:12,color:'#90ccf0',fontWeight:850,marginTop:2}}>{dayCompDisplayName(rounds,finishPreview.board)} · check before League balances update</div>
+                  <div style={{fontSize:12,color:'#90ccf0',fontWeight:850,marginTop:2}}>{dayCompDisplayName(rounds,finishPreview.board)} Â· check before League balances update</div>
                 </div>
               </div>
               <button onClick={()=>!finishing&&setFinishPreview(null)} disabled={finishing} style={{...S.gho,padding:'7px 12px',fontSize:12,opacity:finishing?0.55:1}}>Cancel</button>
@@ -10264,7 +10311,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
             <div style={{...S.card,marginBottom:10,borderColor:'rgba(96,184,240,0.34)',background:'linear-gradient(180deg,rgba(14,60,105,0.32),rgba(13,37,72,0.84))'}}>
               <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'baseline',marginBottom:8}}>
                 <div style={{fontSize:16,color:'#fff',fontWeight:950}}>Leaderboard summary</div>
-                <div style={{fontSize:11,color:'#90ccf0',fontWeight:900}}>{finishPreview.playable.length} scorecard{finishPreview.playable.length===1?'':'s'} · {finishPreview.leaderboardRows.length} player{finishPreview.leaderboardRows.length===1?'':'s'}</div>
+                <div style={{fontSize:11,color:'#90ccf0',fontWeight:900}}>{finishPreview.playable.length} scorecard{finishPreview.playable.length===1?'':'s'} Â· {finishPreview.leaderboardRows.length} player{finishPreview.leaderboardRows.length===1?'':'s'}</div>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'30px minmax(0,1fr) 46px 42px',gap:8,padding:'7px 0',borderBottom:'1px solid rgba(96,184,240,0.18)',fontSize:10,color:'#90ccf0',fontWeight:950,letterSpacing:'0.05em'}}>
                 <div>#</div><div>Player</div><div style={{textAlign:'right'}}>Total</div><div style={{textAlign:'right'}}>Holes</div>
@@ -10283,7 +10330,7 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
             <div style={{...S.card,marginBottom:10,borderColor:'rgba(245,158,11,0.28)',background:'linear-gradient(180deg,rgba(75,50,12,0.38),rgba(8,24,48,0.94))'}}>
               <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'baseline',marginBottom:8}}>
                 <div style={{display:'flex',alignItems:'center',gap:8}}><SweepstakeLogo size={48}/><div style={{fontSize:16,color:'#fff',fontWeight:950}}>Sweepstake check</div></div>
-                <div style={{fontSize:11,color:'#fbbf24',fontWeight:950}}>{finishPreview.settlement.entrantCount} entered · {moneyFromPence(finishPreview.settlement.amountPence)} each pot</div>
+                <div style={{fontSize:11,color:'#fbbf24',fontWeight:950}}>{finishPreview.settlement.entrantCount} entered Â· {moneyFromPence(finishPreview.settlement.amountPence)} each pot</div>
               </div>
               {(finishPreview.settlement.pots||[]).map(pot=>(
                 <div key={pot.key} style={{display:'grid',gridTemplateColumns:'76px minmax(0,1fr) auto',gap:8,alignItems:'center',padding:'9px 10px',borderRadius:12,background:pot.winner?'rgba(245,158,11,0.10)':'rgba(255,255,255,0.055)',border:'1px solid '+(pot.winner?'rgba(245,158,11,0.22)':'rgba(255,255,255,0.08)'),marginBottom:7}}>
@@ -10351,10 +10398,10 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
           <div style={{fontSize:11,color:'rgba(255,255,255,0.72)',marginTop:7}}>Players can win this amount for front 9, back 9 and overall. Max loss: {moneyFromPence((parseInt(sweepstake.amountPence)||0)*3)}.</div>
           {false&&sweepstake.enabled&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:10}}>
             <select value={sweepstake.amountPence} onChange={e=>setSweepstake(q=>({...q,amountPence:parseInt(e.target.value)||200}))} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}>
-              <option value={100}>£1 each pot</option>
-              <option value={200}>£2 each pot</option>
-              <option value={500}>£5 each pot</option>
-              <option value={1000}>£10 each pot</option>
+              <option value={100}>Â£1 each pot</option>
+              <option value={200}>Â£2 each pot</option>
+              <option value={500}>Â£5 each pot</option>
+              <option value={1000}>Â£10 each pot</option>
             </select>
             <select value={sweepstake.scope||'round'} onChange={e=>setSweepstake(q=>({...q,scope:e.target.value==='group'?'group':'round'}))} style={{...S.inp,marginBottom:0,padding:'9px 10px',fontSize:13}}>
               <option value="round">Whole day board</option>
@@ -10376,8 +10423,8 @@ function DayBoardsTab({rounds,scores,sb,flash,load}){
               <SweepstakeLogo size={50}/>
               <div style={{minWidth:0}}>
               <div style={{fontSize:15,color:'#fff',fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{dayCompDisplayName(rounds,board)}</div>
-              {boardSweepstake.enabled&&<div style={{fontSize:11,color:'#fbbf24',fontWeight:900,marginTop:4}}>Sweepstake on · {moneyFromPence((parseInt(boardSweepstake.amountPence)||200)*3)} max loss · {boardSweepstake.scope==='group'?'by group':'whole board'}</div>}
-              <div style={{fontSize:11,color:'#90ccf0',marginTop:2}}>{scorecards.length} scorecard{scorecards.length===1?'':'s'} joined · {board.status}</div>
+              {boardSweepstake.enabled&&<div style={{fontSize:11,color:'#fbbf24',fontWeight:900,marginTop:4}}>Sweepstake on Â· {moneyFromPence((parseInt(boardSweepstake.amountPence)||200)*3)} max loss Â· {boardSweepstake.scope==='group'?'by group':'whole board'}</div>}
+              <div style={{fontSize:11,color:'#90ccf0',marginTop:2}}>{scorecards.length} scorecard{scorecards.length===1?'':'s'} joined Â· {board.status}</div>
               </div>
             </div>
             <div style={{fontSize:10,color:isLiveRound(board)?'#86efac':'#8ea0ad',fontWeight:900,letterSpacing:'0.09em'}}>{isLiveRound(board)?'OPEN':'CLOSED'}</div>
@@ -10597,9 +10644,9 @@ function cupSlotTeamKey(code){return code==='A'?'gold':code==='B'?'navy':'red';}
 function cupTeamStyle(teamKey,extra={}){const t=CUP_THEME[teamKey]||CUP_THEME.gold;return {border:'1px solid '+t.primary,background:t.bg,...extra};}
 function CupTeamBadge({teamKey,label}){const t=CUP_THEME[teamKey]||CUP_THEME.gold;return <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:10,fontWeight:800,letterSpacing:'0.08em',color:t.accent,textTransform:'uppercase'}}><span style={{width:8,height:8,borderRadius:999,background:t.primary,boxShadow:'0 0 10px '+t.primary}}/> {label||t.name}</span>;}
 const CUP_RANK_TONES=[
-  {label:'🥇',bg:'linear-gradient(135deg,rgba(212,175,55,0.38),rgba(120,74,7,0.34))',border:'rgba(245,230,163,0.58)',color:'#F5E6A3',chip:'rgba(212,175,55,0.20)'},
-  {label:'🥈',bg:'linear-gradient(135deg,rgba(203,213,225,0.30),rgba(71,85,105,0.26))',border:'rgba(226,232,240,0.46)',color:'#e2e8f0',chip:'rgba(203,213,225,0.16)'},
-  {label:'🥉',bg:'linear-gradient(135deg,rgba(180,83,9,0.31),rgba(92,45,10,0.27))',border:'rgba(251,146,60,0.46)',color:'#fed7aa',chip:'rgba(251,146,60,0.15)'},
+  {label:'ðŸ¥‡',bg:'linear-gradient(135deg,rgba(212,175,55,0.38),rgba(120,74,7,0.34))',border:'rgba(245,230,163,0.58)',color:'#F5E6A3',chip:'rgba(212,175,55,0.20)'},
+  {label:'ðŸ¥ˆ',bg:'linear-gradient(135deg,rgba(203,213,225,0.30),rgba(71,85,105,0.26))',border:'rgba(226,232,240,0.46)',color:'#e2e8f0',chip:'rgba(203,213,225,0.16)'},
+  {label:'ðŸ¥‰',bg:'linear-gradient(135deg,rgba(180,83,9,0.31),rgba(92,45,10,0.27))',border:'rgba(251,146,60,0.46)',color:'#fed7aa',chip:'rgba(251,146,60,0.15)'},
   {bg:'rgba(255,255,255,0.055)',border:'rgba(96,184,240,0.18)',color:'#90ccf0',chip:'rgba(0,0,0,0.16)'},
   {bg:'linear-gradient(135deg,rgba(239,68,68,0.13),rgba(127,29,29,0.18))',border:'rgba(252,165,165,0.28)',color:'#fecaca',chip:'rgba(239,68,68,0.09)'},
   {bg:'linear-gradient(135deg,rgba(185,28,28,0.30),rgba(69,10,10,0.34))',border:'rgba(248,113,113,0.52)',color:'#fecaca',chip:'rgba(185,28,28,0.18)'}
@@ -10619,7 +10666,7 @@ function cupRankLabel(idx,total=12){
 }
 function cupForfeitMark(idx,total,overall=false){
   const last=(parseInt(total)||0)-1;
-  return last>=0&&(parseInt(idx)||0)===last?(overall?' 🎩👕✈️':' 🎩👕'):'';
+  return last>=0&&(parseInt(idx)||0)===last?(overall?' ðŸŽ©ðŸ‘•âœˆï¸':' ðŸŽ©ðŸ‘•'):'';
 }
 function getCupTeams(cup,cupTeams){const rows=(cupTeams||[]).filter(t=>t.cup_id===cup.id);return {gold:rows.find(t=>t.team_key==='gold')||{name:cup.team_a_name||'Team LIV',team_key:'gold'},navy:rows.find(t=>t.team_key==='navy')||{name:cup.team_b_name||'Team Boring',team_key:'navy'},red:rows.find(t=>t.team_key==='red')||{name:cup.team_c_name||'The Stags',team_key:'red'}};}
 function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,cupDays,cupMatches,courses,rounds}){
@@ -10640,6 +10687,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   const[cupHandicapDrafts,setCupHandicapDrafts]=useState({});
   const[courseFixDay,setCourseFixDay]=useState(null);
   const[courseFixDraft,setCourseFixDraft]=useState(null);
+  const[cupDayAwardDrafts,setCupDayAwardDrafts]=useState({});
   const cup=(cupEvents||[]).find(c=>c.id===selectedCupId)||(cupEvents||[])[0];
   const teams=cup?getCupTeams(cup,cupTeams):null;
   const cupPlayers=(cup&&cupEventPlayers||[]).filter(p=>p.cup_id===cup.id);
@@ -10695,6 +10743,54 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
   const fixedCupSavedKeys=matches.map(cupMatchTemplateKey).sort();
   const fixedCupInstalled=fixedCupExpectedKeys.length===fixedCupMatchCount&&fixedCupSavedKeys.length===fixedCupExpectedKeys.length&&fixedCupExpectedKeys.every((key,i)=>key===fixedCupSavedKeys[i]);
   const cupDayNumbers=Array.from(new Set([1,2,3,...days.map(d=>parseInt(d.day_number)||1),...matches.map(m=>parseInt(m.day_number)||1)])).filter(Boolean).sort((a,b)=>a-b);
+  const cupRoundForDay=dayNum=>(rounds||[]).find(r=>{
+    const n=String(r&&r.name||'');
+    return (parseInt(r&&r.day_number)||cupRoundDayNumber(r))===(parseInt(dayNum)||1)&&(n.includes('Snyder Cup')||n.includes('Synder Cup'));
+  })||null;
+  function cupPlayerOptionName(p){return gameName(p&&p.display_name||p&&p.name||'Player');}
+  function setCupDayAwardDraft(day,key,value){
+    setCupDayAwardDrafts(prev=>({...prev,[day]:{...(prev&&prev[day]||{}),[key]:value}}));
+  }
+  async function loadCupDayAwards(){
+    if(!sb||!cup)return;
+    const dayRounds=cupDayNumbers.map(d=>cupRoundForDay(d)).filter(Boolean);
+    const roundIds=dayRounds.map(r=>r.id).filter(Boolean);
+    if(!roundIds.length){setCupDayAwardDrafts({});return;}
+    const{data,error}=await sb.from('cup_scores').select('*').in('round_id',roundIds);
+    if(error){console.warn('Cup awards load failed',error);return;}
+    const next={};
+    (data||[]).forEach(row=>{
+      const parsed=parseCupDayAwardScoreRow(row);
+      if(!parsed)return;
+      if(!next[parsed.day])next[parsed.day]={};
+      next[parsed.day][parsed.key]=parsed.playerId;
+    });
+    setCupDayAwardDrafts(next);
+  }
+  useEffect(()=>{loadCupDayAwards();},[cup&&cup.id,cupDayNumbers.join('|'),(rounds||[]).length]);
+  async function saveCupDayAwards(dayNum){
+    if(!sb||!cup)return {ok:true};
+    const rd=cupRoundForDay(dayNum);
+    if(!rd||!rd.id)return {ok:true};
+    const draft=cupDayAwardDrafts&&cupDayAwardDrafts[dayNum]||{};
+    for(const def of CUP_DAY_AWARD_TYPES){
+      const hole=cupDayAwardHoleNumber(dayNum,def.key);
+      const existing=await sb.from('cup_scores').select('id').eq('round_id',rd.id).eq('hole_number',hole);
+      if(existing.error)return {ok:false,error:existing.error.message};
+      const ids=(existing.data||[]).map(r=>r.id).filter(Boolean);
+      if(ids.length){
+        const del=await sb.from('cup_scores').delete().in('id',ids);
+        if(del.error)return {ok:false,error:del.error.message};
+      }
+      const playerId=draft[def.key];
+      if(playerId){
+        const row={round_id:rd.id,player_id:makeCupDayAwardPlayerId(def.key,playerId),hole_number:hole,gross_score:1,stableford_points:0,par:0,stroke_index:0};
+        const saved=await saveScoreRowToCloud(sb,row);
+        if(!saved||!saved.ok)return {ok:false,error:(saved&&saved.error)||('Could not save '+def.label)};
+      }
+    }
+    return {ok:true};
+  }
   const adminDays=cupDayNumbers.map(n=>days.find(d=>(parseInt(d.day_number)||1)===n)||{day_number:n,_synthetic:true});
   const matchesByDay=groupCupMatchesByDay(matches,adminDays).filter(group=>group.matches.length);
   const cupCourseOptions=(courses||[]).filter(c=>hasCourseHoles(c));
@@ -10834,7 +10930,7 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
         <option value="">No linked account</option>
         {accountOptionsForPlayer(player).map(u=><option key={'cup-account-'+u.id} value={u.id}>{accountName(u)} - HCP {accountHandicap(u)??'-'}</option>)}
       </select>
-      {linkedAccount&&<div style={{fontSize:10,color:'#86efac',fontWeight:850,margin:'-2px 0 6px'}}>Linked to {accountName(linkedAccount)} · England Golf HCP {effectiveHcp}</div>}
+      {linkedAccount&&<div style={{fontSize:10,color:'#86efac',fontWeight:850,margin:'-2px 0 6px'}}>Linked to {accountName(linkedAccount)} Â· England Golf HCP {effectiveHcp}</div>}
       <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center'}}><label style={{fontSize:11,color:'#9fb6c9'}}>EG Handicap</label><HandicapPicker value={effectiveHcp} onChange={v=>saveCupSlotHandicap(player,v)} style={{width:76,fontSize:13,padding:'7px 8px'}} label={(nameDraft||'Player')+' EG handicap'} step={0.1} min={0} max={54} defaultValue={parseFloat(effectiveHcp)||18}/></div>
     </>;
   }
@@ -11079,6 +11175,10 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     if(rows.length===0){flash('Add matches to Day '+dayNum+' before going live','error');return;}
     const course=selectedCourseForDay(dayNum);
     if(!course){flash('Choose the course for Day '+dayNum+' before going live','error');return;}
+    if(!released){
+      const awardSave=await saveCupDayAwards(dayNum);
+      if(!awardSave.ok){flash('Day '+dayNum+' awards were not saved: '+awardSave.error,'error');return;}
+    }
     const{error}=await sb.from('snyder_cup_matches').update({status:released?'live':'locked'}).eq('cup_id',cup.id).eq('day_number',dayNum);
     if(error){flash(error.message,'error');return;}
     flash(released?'Day '+dayNum+' is now live for scoring':'Day '+dayNum+' locked');
@@ -11217,6 +11317,15 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
             </select>
             {dayCourse&&<div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center'}}><div style={{fontSize:11,color:'#8ea0ad'}}>Rating {dayCourse.course_rating||'-'} - Slope {dayCourse.slope_rating||'-'}</div><button onClick={()=>openCourseFix(d.day_number)} style={{...S.gho,padding:'6px 10px',fontSize:11}}>Fix card / shots</button></div>}
           </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7}}>
+            {CUP_DAY_AWARD_TYPES.map(def=><label key={'award-'+d.day_number+'-'+def.key} style={{display:'grid',gap:4}}>
+              <span style={{fontSize:10,color:'#8ea0ad',letterSpacing:'0.08em',textTransform:'uppercase'}}>{def.emoji} {def.label}</span>
+              <select style={{...S.inp,fontSize:12}} value={(cupDayAwardDrafts&&cupDayAwardDrafts[d.day_number]&&cupDayAwardDrafts[d.day_number][def.key])||''} onChange={e=>setCupDayAwardDraft(d.day_number,def.key,e.target.value)}>
+                <option value="">Choose player...</option>{canonicalCupSlotPlayers.map(p=><option key={def.key+'-'+d.day_number+'-'+(p.id||p.user_id)} value={cupStablePlayerId(p)}>{cupPlayerOptionName(p)}</option>)}
+              </select>
+            </label>)}
+          </div>
+          <button onClick={async()=>{const saved=await saveCupDayAwards(d.day_number);if(!saved.ok)flash('Day '+d.day_number+' awards were not saved: '+saved.error,'error');else flash('Day '+d.day_number+' awards saved');}} style={{...S.gho,padding:'7px 10px',fontSize:11,width:'100%'}}>Save closest / longest awards</button>
         </div>;})}
       </div>
       {courseFixDraft&&<div style={{...S.card,marginBottom:14,border:'1px solid rgba(212,175,55,0.34)',background:'linear-gradient(135deg,rgba(212,175,55,0.10),rgba(15,23,42,0.92))'}}>
@@ -11356,7 +11465,7 @@ function CupDayView({day,course,groups,teams,playersInCup,released,roundForGroup
       const finished=rd&&isCompletedRound(rd);
       return <div key={group.idx} role="button" tabIndex={disabled?-1:0} onClick={()=>{if(!disabled)openCupGroup(group);}} onKeyDown={(e)=>{if(!disabled&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openCupGroup(group);}}} style={{border:finished?'1px solid rgba(248,250,252,0.34)':'1px solid rgba(96,184,240,0.22)',borderRadius:16,background:'linear-gradient(180deg,rgba(0,112,187,0.12),rgba(255,255,255,0.04))',padding:12,marginBottom:14,opacity:disabled?0.58:1,cursor:disabled?'default':'pointer'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
-          <div><div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>{isStagsGroup?'🦌 THE STAGS':('GROUP '+group.idx)}</div><div style={{fontSize:11,color:finished?'#f8fafc':'#8ea0ad',fontWeight:finished?900:500}}>{opening?'Opening scorecard...':rd?finished?'FINISHED':'Scorecard live':locked?'Locked until Go Live':'No scorecard yet'}</div></div>
+          <div><div style={{fontSize:18,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>{isStagsGroup?'ðŸ¦Œ THE STAGS':('GROUP '+group.idx)}</div><div style={{fontSize:11,color:finished?'#f8fafc':'#8ea0ad',fontWeight:finished?900:500}}>{opening?'Opening scorecard...':rd?finished?'FINISHED':'Scorecard live':locked?'Locked until Go Live':'No scorecard yet'}</div></div>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <button onClick={(e)=>{e.stopPropagation(); if(rd&&!locked&&openFinesGroup)openFinesGroup(group);}} disabled={!rd||locked} style={{border:'1px solid rgba(212,175,55,0.38)',borderRadius:999,padding:'7px 10px',background:rd&&!locked?'rgba(212,175,55,0.16)':'rgba(255,255,255,0.05)',color:rd&&!locked?'#F5E6A3':'#8ea0ad',fontSize:11,fontWeight:950,cursor:rd&&!locked?'pointer':'default',whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:7}}><span>{EMOJI.moneyWings}</span><span>FINES</span><span style={{fontSize:12,color:rd&&!locked?'#fff':'#8ea0ad',fontWeight:950}}>{EMOJI.pound}{finesTotal}</span></button>
             <div style={{fontSize:11,color:finished?'#f8fafc':(disabled?'#8ea0ad':'#90ccf0'),fontWeight:900,letterSpacing:'0.08em'}}>{locked?'LOCKED':opening?'OPENING':finished?'VIEW FINISHED':'TAP TO OPEN'}</div>
@@ -11364,7 +11473,7 @@ function CupDayView({day,course,groups,teams,playersInCup,released,roundForGroup
         </div>
         <div style={{display:'grid',gap:8}}>
           {group.doubles&&<><div style={{fontSize:11,color:'#60b8f0',fontWeight:950,letterSpacing:'0.12em',margin:'2px 0 -2px'}}>DOUBLES MATCH</div><MatchRow match={group.doubles} round={rd} label="DOUBLES MATCH"/></>}
-          {group.singles.map((m,i)=><div key={m.id}><div style={{fontSize:11,color:isCupStagsMatch(m)?CUP_THEME.red.accent:'#60b8f0',fontWeight:950,letterSpacing:'0.12em',margin:'2px 0 6px'}}>{isCupStagsMatch(m)?'🦌 STAGS GROUP':('SINGLES '+(i+1))}</div><MatchRow match={m} round={rd} label={isCupStagsMatch(m)?'STAGS GROUP':('SINGLES '+(i+1))}/></div>)}
+          {group.singles.map((m,i)=><div key={m.id}><div style={{fontSize:11,color:isCupStagsMatch(m)?CUP_THEME.red.accent:'#60b8f0',fontWeight:950,letterSpacing:'0.12em',margin:'2px 0 6px'}}>{isCupStagsMatch(m)?'ðŸ¦Œ STAGS GROUP':('SINGLES '+(i+1))}</div><MatchRow match={m} round={rd} label={isCupStagsMatch(m)?'STAGS GROUP':('SINGLES '+(i+1))}/></div>)}
         </div>
       </div>;
     })}
@@ -11492,11 +11601,13 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   const[selectedCupPlayerSummary,setSelectedCupPlayerSummary]=useState(null);
   const[selectedCupPlayerDetail,setSelectedCupPlayerDetail]=useState(null);
   const[activeFinesGroup,setActiveFinesGroup]=useState(null);
+  const[cupDaySummaryPrompt,setCupDaySummaryPrompt]=useState(null);
   const[cupRoundPlayers,setCupRoundPlayers]=useState([]);
   const[cupLiveScores,setCupLiveScores]=useState([]);
   const[cupRefreshing,setCupRefreshing]=useState(false);
   useEffect(()=>{
     function handleCupBack(){
+      if(cupDaySummaryPrompt){setCupDaySummaryPrompt(null);return;}
       if(activeFinesGroup){setActiveFinesGroup(null);return;}
       if(selectedCupPlayerDetail){setSelectedCupPlayerDetail(null);return;}
       if(selectedCupPlayerSummary){setSelectedCupPlayerSummary(null);return;}
@@ -11508,7 +11619,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     }
     window.addEventListener('popstate',handleCupBack);
     return()=>window.removeEventListener('popstate',handleCupBack);
-  },[selectedDay,showCupSummary,showCupFinesSummary,showCupHandicaps,selectedCupPlayerSummary,selectedCupPlayerDetail,activeFinesGroup]);
+  },[selectedDay,showCupSummary,showCupFinesSummary,showCupHandicaps,selectedCupPlayerSummary,selectedCupPlayerDetail,activeFinesGroup,cupDaySummaryPrompt]);
   function openCupDay(day){
     try{window.history.pushState({view:'tournaments',cupDay:day},'',null);}catch(e){}
     setSelectedCupPlayerDetail(null);
@@ -11516,6 +11627,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     setShowCupSummary(false);
     setShowCupFinesSummary(false);
     setShowCupHandicaps(false);
+    setCupDaySummaryPrompt(null);
     setSelectedDay(day);
   }
   function openCupFinesGroup(group){
@@ -11528,6 +11640,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     setSelectedCupPlayerSummary(null);
     setSelectedDay(null);
     setShowCupHandicaps(false);
+    setCupDaySummaryPrompt(null);
     setShowCupFinesSummary(false);
     setShowCupSummary(true);
   }
@@ -11538,16 +11651,19 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     setSelectedDay(null);
     setShowCupHandicaps(false);
     setShowCupSummary(false);
+    setCupDaySummaryPrompt(null);
     setShowCupFinesSummary(true);
   }
   function openCupPlayerSummary(p){
     try{window.history.pushState({view:'tournaments',cupPlayer:p&&p.id},'',null);}catch(e){}
     setSelectedCupPlayerDetail(null);
+    setCupDaySummaryPrompt(null);
     setSelectedCupPlayerSummary(p||null);
   }
   function openCupPlayerDetail(daySummary){
     try{window.history.pushState({view:'tournaments',cupPlayerDetail:daySummary&&daySummary.day},'',null);}catch(e){}
     setSelectedCupPlayerDetail(daySummary||null);
+    setCupDaySummaryPrompt(null);
   }
   function openCupHandicaps(){
     try{window.history.pushState({view:'tournaments',cupHandicaps:true},'',null);}catch(e){}
@@ -11556,6 +11672,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     setSelectedDay(null);
     setShowCupSummary(false);
     setShowCupFinesSummary(false);
+    setCupDaySummaryPrompt(null);
     setShowCupHandicaps(true);
   }
   function openCupHome(){
@@ -11567,6 +11684,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     setShowCupSummary(false);
     setShowCupFinesSummary(false);
     setShowCupHandicaps(false);
+    setCupDaySummaryPrompt(null);
   }
   async function refreshCupPage(){
     if(cupRefreshing)return;
@@ -11583,6 +11701,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   }
   function goBackOnePage(){
     if(window.history&&window.history.length>1)window.history.back();
+    else if(cupDaySummaryPrompt)setCupDaySummaryPrompt(null);
     else if(activeFinesGroup)setActiveFinesGroup(null);
     else if(selectedCupPlayerDetail)setSelectedCupPlayerDetail(null);
     else if(selectedCupPlayerSummary)setSelectedCupPlayerSummary(null);
@@ -11870,6 +11989,17 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     }));
     return{...totals,projected,bonusRows:[]};
   }
+  function cupDayTeamScore(day){
+    const totals={gold:0,navy:0,red:0};
+    cupDayGroups(day).forEach(group=>{
+      const rd=roundForGroup(group.day,group.idx);
+      [group.doubles,...group.singles].filter(Boolean).filter(isCupTeamScoringMatch).forEach(match=>{
+        const res=matchResult(match,rd);
+        if(res.complete&&res.pointsByTeam)Object.keys(res.pointsByTeam).forEach(k=>{totals[k]=(totals[k]||0)+(parseFloat(res.pointsByTeam[k])||0);});
+      });
+    });
+    return{gold:totals.gold||0,navy:totals.navy||0,red:totals.red||0};
+  }
   const teamTotals=teamPoints();
   const goldPts=teamTotals.gold;
   const navyPts=teamTotals.navy;
@@ -11944,9 +12074,20 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     if(!isCupDayComplete(day))return null;
     const rows=cupDaySinglesRows(day);
     if(!rows.length)return null;
-    const top=rows[0];
-    const bottom=rows[rows.length-1];
-    return {winner:top,loser:bottom,winnerId:normaliseId(cupStablePlayerId(top)),loserId:normaliseId(cupStablePlayerId(bottom))};
+    const topTotal=parseInt(rows[0].total)||0;
+    const bottomTotal=parseInt(rows[rows.length-1].total)||0;
+    const winners=rows.filter(r=>(parseInt(r.total)||0)===topTotal);
+    const losers=rows.filter(r=>(parseInt(r.total)||0)===bottomTotal);
+    return {
+      winner:winners[0],
+      loser:losers[0],
+      winners,
+      losers,
+      winnerIds:winners.map(p=>normaliseId(cupStablePlayerId(p))).filter(Boolean),
+      loserIds:losers.map(p=>normaliseId(cupStablePlayerId(p))).filter(Boolean),
+      winnerId:normaliseId(cupStablePlayerId(winners[0])),
+      loserId:normaliseId(cupStablePlayerId(losers[0]))
+    };
   }
   function cupPlayerAdjustmentForDay(p,day){
     const n=parseInt(day)||1;
@@ -11955,13 +12096,15 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     const previous=cupDaySinglesResult(n-1);
     if(!previous||!pid)return 0;
     let adjustment=0;
-    if(pid===previous.winnerId)adjustment=-1;
-    if(pid===previous.loserId)adjustment=1;
+    const wasWinner=(previous.winnerIds||[previous.winnerId]).includes(pid);
+    const wasLoser=(previous.loserIds||[previous.loserId]).includes(pid);
+    if(wasWinner&&!wasLoser)adjustment=-1;
+    if(wasLoser&&!wasWinner)adjustment=1;
     if(n===3&&adjustment!==0){
       const dayOne=cupDaySinglesResult(1);
       if(dayOne){
-        if(adjustment<0&&pid===dayOne.winnerId)adjustment=-2;
-        if(adjustment>0&&pid===dayOne.loserId)adjustment=2;
+        if(adjustment<0&&(dayOne.winnerIds||[dayOne.winnerId]).includes(pid))adjustment=-2;
+        if(adjustment>0&&(dayOne.loserIds||[dayOne.loserId]).includes(pid))adjustment=2;
       }
     }
     return adjustment;
@@ -12032,6 +12175,53 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
       return {...p,_fineDays:daysMap,_fineTotal:total};
     }).sort((a,b)=>(b._fineTotal||0)-(a._fineTotal||0)||String(cupDisplayName(a)).localeCompare(String(cupDisplayName(b))));
   }
+  function cupDayAwardSelections(day){
+    const awards={};
+    (cupScores||[]).forEach(row=>{
+      const parsed=parseCupDayAwardScoreRow(row);
+      if(!parsed||(parseInt(parsed.day)||1)!==(parseInt(day)||1))return;
+      awards[parsed.key]=findCupPlayer(parsed.playerId)||{id:parsed.playerId,display_name:'Not picked'};
+    });
+    return awards;
+  }
+  function tiedNames(rows,scoreKey){
+    if(!rows||!rows.length)return 'Not settled yet';
+    const top=parseInt(rows[0][scoreKey])||0;
+    return rows.filter(r=>(parseInt(r[scoreKey])||0)===top).map(cupDisplayName).join(' & ');
+  }
+  function cupDaySummaryData(day){
+    const dayNum=parseInt(day)||1;
+    if(!isCupDayComplete(dayNum))return null;
+    const score=cupDayTeamScore(dayNum);
+    const singlesRows=cupDaySinglesRows(dayNum);
+    const singlesWinnerNames=tiedNames(singlesRows,'total');
+    const goldRows=singlesLeaderboard().map(p=>{
+      const kept=(p.dayScores||[]).filter(d=>(parseInt(d.day)||1)<=dayNum);
+      return {...p,total:kept.reduce((t,d)=>t+(parseInt(d.points)||0),0),holes:kept.reduce((t,d)=>t+(parseInt(d.holes)||0),0)};
+    }).filter(p=>(parseInt(p.holes)||0)>0).sort((a,b)=>(b.total||0)-(a.total||0)||String(cupDisplayName(a)).localeCompare(String(cupDisplayName(b))));
+    const goldShirtNames=tiedNames(goldRows,'total');
+    const fineRows=cupFinesSummaryRows().map(p=>({...p,_dayFineTotal:(p._fineDays&&p._fineDays[dayNum])||0})).sort((a,b)=>(b._dayFineTotal||0)-(a._dayFineTotal||0)||String(cupDisplayName(a)).localeCompare(String(cupDisplayName(b))));
+    const fineTop=(fineRows[0]&&parseInt(fineRows[0]._dayFineTotal))||0;
+    const fineNames=fineTop?fineRows.filter(p=>(parseInt(p._dayFineTotal)||0)===fineTop).map(cupDisplayName).join(' & '):'No fines yet';
+    const awards=cupDayAwardSelections(dayNum);
+    return{
+      day:dayNum,
+      score,
+      singlesWinnerNames,
+      singlesWinnerPoints:singlesRows[0]?(parseInt(singlesRows[0].total)||0):0,
+      goldShirtNames,
+      goldShirtPoints:goldRows[0]?(parseInt(goldRows[0].total)||0):0,
+      fineNames,
+      fineTotal:fineTop,
+      closestName:awards.closest?cupDisplayName(awards.closest):'Not picked yet',
+      longestName:awards.longest?cupDisplayName(awards.longest):'Not picked yet'
+    };
+  }
+  useEffect(()=>{
+    if(!selectedDay||activeFinesGroup||selectedCupPlayerSummary||selectedCupPlayerDetail||showCupSummary||showCupFinesSummary||showCupHandicaps)return;
+    const summary=cupDaySummaryData(selectedDay);
+    if(summary)setCupDaySummaryPrompt(summary);
+  },[selectedDay,activeFinesGroup,selectedCupPlayerSummary,selectedCupPlayerDetail,showCupSummary,showCupFinesSummary,showCupHandicaps,cupScores.length,cupDayNumbers.join('|')]);
   function singlesLeaderboard(){
     // Cup home overall singles is live: include every saved score row from every Cup day,
     // not just finished days, so the home screen moves as scores are entered.
@@ -12393,6 +12583,21 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   return <div style={{minHeight:'100vh',paddingBottom:80}}>
     <div style={{background:'linear-gradient(135deg,#064E3B,#042F2E)',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(94,234,212,0.18)'}}><button onClick={goBackOnePage} style={{...S.gho,padding:'6px 12px',fontSize:13}}>Back</button><div style={{display:'flex',alignItems:'center',gap:8,fontSize:16,color:'#fff',fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.12em'}}><span style={{color:'#D4AF37'}}>{EMOJI.trophy}</span><span>SNYDER CUP</span></div><div style={{width:60}}/></div>
     <div style={{padding:16}}>
+      {cupDaySummaryPrompt&&<div style={{position:'fixed',inset:0,zIndex:2200,background:'rgba(2,8,23,0.82)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',padding:18}} onClick={()=>setCupDaySummaryPrompt(null)}>
+        <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:430,border:'1px solid rgba(212,175,55,0.42)',borderRadius:22,background:'linear-gradient(150deg,rgba(6,78,59,0.98),rgba(11,31,77,0.98) 48%,rgba(88,28,135,0.94))',boxShadow:'0 28px 90px rgba(0,0,0,0.62)',padding:18,color:'#fff'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',gap:10,marginBottom:12}}><div><div style={{fontSize:34,fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.08em'}}>DAY {cupDaySummaryPrompt.day} WRAP-UP {CUP_SUMMARY_EMOJI.party}</div><div style={{fontSize:12,color:'#bfdbfe',fontWeight:850}}>Snyder Cup drama report, fresh from the clubhouse.</div></div><button onClick={()=>setCupDaySummaryPrompt(null)} style={{...S.gho,padding:'6px 10px',fontSize:12}}>Close</button></div>
+          <div style={{display:'grid',gridTemplateColumns:`repeat(${CUP_TEAM_KEYS.length},1fr)`,gap:8,marginBottom:12}}>{CUP_TEAM_KEYS.map(k=><div key={'prompt-score-'+k} style={{border:'1px solid rgba(255,255,255,0.18)',borderRadius:14,background:'rgba(0,0,0,0.18)',padding:10,textAlign:'center'}}><CupTeamBadge teamKey={k} label={teams[k].name}/><div style={{fontSize:30,fontWeight:950,lineHeight:1,marginTop:6}}>{fmtCupPoint(cupDaySummaryPrompt.score[k]||0)}</div></div>)}</div>
+          <div style={{display:'grid',gap:8}}>
+            <div style={{border:'1px solid rgba(94,234,212,0.24)',borderRadius:14,background:'rgba(6,78,59,0.36)',padding:11}}><div style={{fontSize:11,color:'#5eead4',fontWeight:950,letterSpacing:'0.10em'}}>{CUP_SUMMARY_EMOJI.golfer} DAY SINGLES KING</div><div style={{fontSize:18,fontWeight:950,marginTop:3}}>{cupDaySummaryPrompt.singlesWinnerNames} - {cupDaySummaryPrompt.singlesWinnerPoints} pts {CUP_SUMMARY_EMOJI.fire}</div></div>
+            <div style={{border:'1px solid rgba(250,204,21,0.30)',borderRadius:14,background:'rgba(113,63,18,0.28)',padding:11}}><div style={{fontSize:11,color:'#fde68a',fontWeight:950,letterSpacing:'0.10em'}}>{CUP_SUMMARY_EMOJI.shirt} GOLD SHIRT TONIGHT</div><div style={{fontSize:18,fontWeight:950,marginTop:3}}>{cupDaySummaryPrompt.goldShirtNames} - {cupDaySummaryPrompt.goldShirtPoints} pts overall {CUP_SUMMARY_EMOJI.beer}</div></div>
+            <div style={{border:'1px solid rgba(248,113,113,0.28)',borderRadius:14,background:'rgba(127,29,29,0.24)',padding:11}}><div style={{fontSize:11,color:'#fecaca',fontWeight:950,letterSpacing:'0.10em'}}>{CUP_SUMMARY_EMOJI.money} FINES CHAMPION</div><div style={{fontSize:18,fontWeight:950,marginTop:3}}>{cupDaySummaryPrompt.fineNames} - {'\u00A3'}{cupDaySummaryPrompt.fineTotal} in the jar {CUP_SUMMARY_EMOJI.grimace}</div></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <div style={{border:'1px solid rgba(96,184,240,0.24)',borderRadius:14,background:'rgba(0,112,187,0.18)',padding:11}}><div style={{fontSize:11,color:'#90ccf0',fontWeight:950}}>{CUP_SUMMARY_EMOJI.target} Closest</div><div style={{fontSize:16,fontWeight:950,marginTop:3}}>{cupDaySummaryPrompt.closestName}</div></div>
+              <div style={{border:'1px solid rgba(192,132,252,0.26)',borderRadius:14,background:'rgba(88,28,135,0.24)',padding:11}}><div style={{fontSize:11,color:'#ddd6fe',fontWeight:950}}>{CUP_SUMMARY_EMOJI.bomb} Longest</div><div style={{fontSize:16,fontWeight:950,marginTop:3}}>{cupDaySummaryPrompt.longestName}</div></div>
+            </div>
+          </div>
+        </div>
+      </div>}
       {!cup?<div style={{...S.card,textAlign:'center',padding:28}}><div style={{fontSize:18,color:'#fff',fontWeight:800,marginBottom:8}}>No Cup set up yet</div><div style={{fontSize:13,color:'#8ea0ad',marginBottom:14}}>Admin can create the Cup in the Admin Cup tab.</div>{isAdmin&&<button onClick={()=>setView('admin')} style={S.pri}>Open Admin</button>}</div>:<>
         {selectedCupPlayerDetail?(()=>{const p=selectedCupPlayerSummary;const d=selectedCupPlayerDetail;const rows=Array.from({length:18},(_,i)=>i+1).map(h=>{const hd=(d.courseHoles||[]).find(x=>parseInt(x.hole)===h)||{hole:h,par:'-',stroke_index:'-',yards:'-'};return {hole:h,hd,row:d.byHole[h]};});const totalPar=(d.courseHoles||[]).reduce((t,h)=>t+(parseInt(h.par)||0),0);const totalYards=(d.courseHoles||[]).reduce((t,h)=>t+(parseInt(h.yards)||0),0);return <>
           <div style={{fontSize:30,color:'#fff',fontWeight:950,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'0.06em',margin:'2px 0 8px'}}>{cupDisplayName(p)} - DAY {d.day}</div>
