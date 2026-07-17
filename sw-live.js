@@ -1,5 +1,5 @@
-// SNYDER GOLF v5.17 service worker
-const CACHE_NAME = "snyder-golf-v5-17";
+// SNYDER GOLF v5.18 service worker
+const CACHE_NAME = "snyder-golf-v5-18";
 const ASSETS = ['./','./index.html','./styles.css','./league-section.js','./app.js','./manifest-live.json','./snyder-golf-logo.png','./snyder-golf-logo-clean.png','./sweepstake-logo.png','./icon-golf-192.png','./icon-golf-512.png','./icon-live-192.png','./icon-live-512.png','./notification-badge-v2.png','./money-fix.js','./course-whitley-bay.png','./course-goswick.png','./course-tynemouth.svg','./course-quinta-do-lago.png','./course-ombria.png'];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.map(key => key !== CACHE_NAME ? caches.delete(key) : null))).then(() => self.clients.claim())); });
@@ -24,6 +24,7 @@ async function mutedRoundIds(){
 }
 self.addEventListener('message', event => {
   const data=event.data||{};
+  if(data.type==='snyder-skip-waiting'){self.skipWaiting();return;}
   if(data.type!=='snyder-live-muted-rounds')return;
   event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.put('./muted-scorecard-notifications.json',new Response(JSON.stringify({roundIds:(data.roundIds||[]).map(String)}),{headers:{'Content-Type':'application/json'}}))));
 });
