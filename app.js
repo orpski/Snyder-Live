@@ -359,13 +359,31 @@ const OMBRIA_PRESETS=[
   ]}
 ];
 
+const MONTGOMERIE_MAXX_ROYAL_BADGE='course-montgomerie-maxx-royal.svg';
+const MONTGOMERIE_MAXX_ROYAL_PARS=[5,3,4,5,3,4,4,3,4,4,5,4,5,3,4,3,4,5];
+const MONTGOMERIE_MAXX_ROYAL_STROKE_INDEXES=[7,17,13,9,11,1,5,15,3,16,10,2,8,14,6,18,12,4];
+function montgomerieMaxxRoyalHoles(yards){
+  return yards.map((distance,index)=>({hole:index+1,par:MONTGOMERIE_MAXX_ROYAL_PARS[index],stroke_index:MONTGOMERIE_MAXX_ROYAL_STROKE_INDEXES[index],yards:distance}));
+}
+const MONTGOMERIE_MAXX_ROYAL_BLACK_HOLES=montgomerieMaxxRoyalHoles([571,162,401,576,224,482,459,182,446,362,570,490,564,176,337,180,392,558]);
+const MONTGOMERIE_MAXX_ROYAL_WHITE_HOLES=montgomerieMaxxRoyalHoles([514,143,336,502,202,413,439,160,404,318,522,435,506,150,304,172,361,530]);
+const MONTGOMERIE_MAXX_ROYAL_YELLOW_HOLES=montgomerieMaxxRoyalHoles([484,143,312,468,168,388,419,160,382,293,501,412,486,150,304,148,336,491]);
+const MONTGOMERIE_MAXX_ROYAL_RED_HOLES=montgomerieMaxxRoyalHoles([448,117,277,413,96,367,351,132,351,269,468,372,460,130,257,119,313,441]);
+const MONTGOMERIE_MAXX_ROYAL_PRESETS=[
+  {name:'Montgomerie Maxx Royal Golf Club - Black Men Tee',location:'Belek, Antalya, Turkey',image_url:MONTGOMERIE_MAXX_ROYAL_BADGE,course_rating:74.3,slope_rating:143,holes:MONTGOMERIE_MAXX_ROYAL_BLACK_HOLES},
+  {name:'Montgomerie Maxx Royal Golf Club - White Men Tee',location:'Belek, Antalya, Turkey',image_url:MONTGOMERIE_MAXX_ROYAL_BADGE,course_rating:70.9,slope_rating:136,holes:MONTGOMERIE_MAXX_ROYAL_WHITE_HOLES},
+  {name:'Montgomerie Maxx Royal Golf Club - Yellow Men Tee',location:'Belek, Antalya, Turkey',image_url:MONTGOMERIE_MAXX_ROYAL_BADGE,course_rating:69.4,slope_rating:125,holes:MONTGOMERIE_MAXX_ROYAL_YELLOW_HOLES},
+  {name:'Montgomerie Maxx Royal Golf Club - Yellow Women Tee',location:'Belek, Antalya, Turkey',image_url:MONTGOMERIE_MAXX_ROYAL_BADGE,course_rating:74.5,slope_rating:142,holes:MONTGOMERIE_MAXX_ROYAL_YELLOW_HOLES},
+  {name:'Montgomerie Maxx Royal Golf Club - Red Women Tee',location:'Belek, Antalya, Turkey',image_url:MONTGOMERIE_MAXX_ROYAL_BADGE,course_rating:70.9,slope_rating:130,holes:MONTGOMERIE_MAXX_ROYAL_RED_HOLES}
+];
+
 
 function cleanCourseName(name){return String(name||'').replace(/\s*-\s*[^-]+?\s*Tee\s*$/i,'').trim();}
 function courseTeeFromName(name){const m=String(name||'').match(/\s*-\s*([^-]+?)\s*Tee\s*$/i);return m?m[1].trim().replace(/\s+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()):'';}
 function getCourseName(course,round){return cleanCourseName((course&&course.name)||(round&&round.course_name)||'');}
 function getCourseDisplayName(course,round){return getCourseName(course,round);}
 function courseKey(course){return cleanCourseName(course&&course.name).toLowerCase()+'|'+(courseTeeFromName(course&&course.name)||course&&course.tee||'White').toLowerCase();}
-function isProtectedCourse(course){const name=cleanCourseName(course&&course.name).toLowerCase();return name==='whitley bay golf club'||name.includes('whitley bay golf club')||name==='goswick golf club'||name.includes('goswick golf club')||name==='tynemouth golf club'||name.includes('tynemouth golf club')||name==='quinta do lago north course'||name.includes('quinta do lago north course')||name==='quinta do lago south course'||name.includes('quinta do lago south course')||name==='ombria golf course'||name.includes('ombria golf course');}
+function isProtectedCourse(course){const name=cleanCourseName(course&&course.name).toLowerCase();return name==='whitley bay golf club'||name.includes('whitley bay golf club')||name==='goswick golf club'||name.includes('goswick golf club')||name==='tynemouth golf club'||name.includes('tynemouth golf club')||name==='quinta do lago north course'||name.includes('quinta do lago north course')||name==='quinta do lago south course'||name.includes('quinta do lago south course')||name==='ombria golf course'||name.includes('ombria golf course')||name==='montgomerie maxx royal golf club'||name.includes('montgomerie maxx royal golf club');}
 function presetIdForCourse(preset){return 'preset-'+cleanCourseName(preset.name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'-'+(courseTeeFromName(preset.name)||preset.tee||'white').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
 function isRealDbId(id){return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id||''));}
 function safeCourseIdForDb(course,setupCourseId){const id=(course&&course.id)||setupCourseId||null;return isRealDbId(id)?id:null;}
@@ -389,7 +407,7 @@ function presetShouldOverrideSavedCourseHoles(preset){
   return cleanCourseName(preset&&preset.name).toLowerCase()==='whitley bay golf club';
 }
 function mergePresetCourses(dbCourses){
-  const presets=[...WHITLEY_BAY_PRESETS,...GOSWICK_PRESETS,...TYNEMOUTH_PRESETS,...QUINTA_DO_LAGO_PRESETS,...OMBRIA_PRESETS].map(preset=>{
+  const presets=[...WHITLEY_BAY_PRESETS,...GOSWICK_PRESETS,...TYNEMOUTH_PRESETS,...QUINTA_DO_LAGO_PRESETS,...OMBRIA_PRESETS,...MONTGOMERIE_MAXX_ROYAL_PRESETS].map(preset=>{
     const tee=courseTeeFromName(preset.name)||preset.tee||'White';
     return {...preset,id:preset.id||presetIdForCourse(preset),tee};
   });
