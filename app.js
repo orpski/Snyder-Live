@@ -1,4 +1,4 @@
-// SNYDER GOLF v5.19
+// SNYDER GOLF v5.20
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -107,7 +107,7 @@ function pushSubscriptionUsesKey(subscription,publicKey){
 async function registerSnyderServiceWorker(){
   if(!('serviceWorker' in navigator))return null;
   try{
-    const registration=await navigator.serviceWorker.register('./sw-live.js?v=5.19',{updateViaCache:'none'});
+    const registration=await navigator.serviceWorker.register('./sw-live.js?v=5.20',{updateViaCache:'none'});
     try{registration.update&&registration.update();}catch(e){}
     return registration;
   }
@@ -158,7 +158,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.19',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.20',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -207,7 +207,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.19',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.20',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -2320,7 +2320,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v5.19" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v5.19</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v5.20" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v5.20</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -3127,7 +3127,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
       const g=(rdGroups&&rdGroups[0])||{id:'group',group_number:1,participants:[]};
       const publicParts=(publicRoundPlayers[rd.id]||[]).map(rp=>mapRoundPlayerForScorecard(rp,isSnyderCupRound(rd)));
       const savedCfg=matchplayConfigFromRows(allRows,rd,g);
-      const cfg=(savedCfg&&savedCfg.enabled)?savedCfg:inferSinglesMatchplayConfig(rd,{...g,participants:[...((g&&g.participants)||[]),...publicParts]},allRows,true);
+      const cfg=(savedCfg&&savedCfg.enabled)?savedCfg:null;
       if(!cfg||!cfg.enabled||cfg.mode==='foursomes')return null;
       const mode=normaliseMatchplayMode(cfg.mode);
       const teamA=(cfg.teamA||[]).map(normaliseId).filter(Boolean);
@@ -4130,35 +4130,6 @@ function groupFromRoundPlayers(round,roundPlayers,isCupRound){
   }:null;
 }
 
-function inferSinglesMatchplayConfig(round,group,rows,force=false){
-  if(!group||round&&round._cupScoring)return null;
-  if(!force&&!(round&&round._spectator))return null;
-  const people=[
-    ...((group&&group.participants)||[]),
-    ...((group&&group.player_ids)||[]).map(id=>({id,name:'Player'}))
-  ].filter(p=>p&&p.id&&!isFoursomesTeamPlayerId(p.id));
-  const byKey={};
-  people.forEach(p=>{
-    const key=normaliseId(p.id);
-    if(key&&!byKey[key])byKey[key]=p;
-  });
-  const list=Object.values(byKey);
-  if(list.length!==2)return null;
-  const scoreRows=(rows||[]).filter(r=>r&&(!round||r.round_id===round.id)&&!isMetaScoreRow(r));
-  if(scoreRows.length){
-    const known=list.flatMap(scoreAliasesForPerson).map(normaliseId);
-    const unknown=scoreRows.some(r=>!known.includes(normaliseId(r.player_id)));
-    if(unknown)return null;
-  }
-  const ph=(group&&group.playing_handicaps)||{};
-  const hcpFor=p=>parseInt(ph[p.id]??ph[normaliseId(p.id)]??p.playing_handicap??p.current_handicap??p.handicap??0)||0;
-  const aH=hcpFor(list[0]);
-  const bH=hcpFor(list[1]);
-  const diff=Math.abs(aH-bH);
-  const nameFor=p=>gameFirstName((p&&p.display_name)||(p&&p.name)||'Player');
-  return {enabled:true,mode:'singles',teamA:[String(list[0].id)],teamB:[String(list[1].id)],teamAName:nameFor(list[0]),teamBName:nameFor(list[1]),teamAShots:aH>bH?diff:0,teamBShots:bH>aH?diff:0,keepStableford:false,_inferred:true};
-}
-
 function foursomesConfigFromGroupMeta(group){
   const ph=(group&&group.playing_handicaps)||{};
   const foursomesEmbedded=parseMaybeJsonObject(group&&group.foursomesConfig)||parseMaybeJsonObject(group&&group.foursomes_config);
@@ -4294,8 +4265,7 @@ function matchplayConfigFromRows(rows,round,group){
   const cloud={enabled:parsed.length>0||!!(meta&&meta.mode)||!!groupMeta||hasFoursomesScores,mode:cloudMode,teamA:inferSingles?[uniqueGroupIds[0]]:parsedA,teamB:inferSingles?[uniqueGroupIds[1]]:parsedB,teamAName:(meta&&meta.teamAName)||(groupMeta&&groupMeta.teamAName)||'Team 1',teamBName:(meta&&meta.teamBName)||(groupMeta&&groupMeta.teamBName)||'Team 2',teamAShots:(meta&&meta.teamAShots)||(groupMeta&&groupMeta.teamAShots)||0,teamBShots:(meta&&meta.teamBShots)||(groupMeta&&groupMeta.teamBShots)||0,keepStableford:meta&&meta.keepStableford!==undefined?meta.keepStableford:true};
   const local=round&&round.id?loadLocalMatchplayConfig(round.id,groupKey):null;
   const fallback=round&&round._matchplay;
-  const inferred=(!cloud.enabled&&!(local&&local.enabled)&&!(fallback&&fallback.enabled))?inferSinglesMatchplayConfig(round,group,rows,false):null;
-  const cfg=cloud.enabled?{...cloud,...(local&&local.enabled?{teamAName:local.teamAName,teamBName:local.teamBName,keepStableford:local.keepStableford}: {})}:(local&&local.enabled?local:(fallback&&fallback.enabled?fallback:(inferred||{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,keepStableford:true})));
+  const cfg=cloud.enabled?{...cloud,...(local&&local.enabled?{teamAName:local.teamAName,teamBName:local.teamBName,keepStableford:local.keepStableford}: {})}:(local&&local.enabled?local:(fallback&&fallback.enabled?fallback:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,keepStableford:true}));
   const mode=normaliseMatchplayMode(cfg.mode);
   const teamA=Array.from(new Set((cfg.teamA||[]).map(String).filter(Boolean)));
   const teamB=Array.from(new Set((cfg.teamB||[]).map(String).filter(Boolean)));
