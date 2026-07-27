@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">Vila Sol Golf Resort</title>
+  <desc id="desc">A sun over a green golf course</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0879ad"/>
+      <stop offset="1" stop-color="#074066"/>
+    </linearGradient>
+    <linearGradient id="grass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4b9d45"/>
+      <stop offset="1" stop-color="#17643c"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="160" rx="28" fill="url(#sky)"/>
+  <circle cx="80" cy="51" r="24" fill="#ffd333" stroke="#fff2a6" stroke-width="4"/>
+  <g fill="#ffd333">
+    <path d="M80 13l6 15H74z"/><path d="M80 89l-6-15h12z"/>
+    <path d="M42 51l15-6v12z"/><path d="M118 51l-15 6V45z"/>
+    <path d="M53 24l15 6-9 9z"/><path d="M107 78l-15-6 9-9z"/>
+    <path d="M107 24l-6 15-9-9z"/><path d="M53 78l6-15 9 9z"/>
+  </g>
+  <path d="M0 105c35-25 63-18 92-4 24 12 43 9 68-4v63H0z" fill="url(#grass)"/>
+  <path d="M88 89v43" stroke="#fff" stroke-width="3"/>
+  <path d="M90 90l28 10-28 10z" fill="#e43d30"/>
+  <ellipse cx="87" cy="134" rx="20" ry="5" fill="#d5edb2" opacity=".9"/>
+  <text x="80" y="153" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="700" letter-spacing="2" fill="#fff">VILA SOL</text>
+</svg>

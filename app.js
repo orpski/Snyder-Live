@@ -1,4 +1,4 @@
-// SNYDER GOLF v5.20
+// SNYDER GOLF v5.21
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -107,7 +107,7 @@ function pushSubscriptionUsesKey(subscription,publicKey){
 async function registerSnyderServiceWorker(){
   if(!('serviceWorker' in navigator))return null;
   try{
-    const registration=await navigator.serviceWorker.register('./sw-live.js?v=5.20',{updateViaCache:'none'});
+    const registration=await navigator.serviceWorker.register('./sw-live.js?v=5.21',{updateViaCache:'none'});
     try{registration.update&&registration.update();}catch(e){}
     return registration;
   }
@@ -158,7 +158,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.20',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.21',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -207,7 +207,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.20',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.21',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -377,13 +377,63 @@ const MONTGOMERIE_MAXX_ROYAL_PRESETS=[
   {name:'Montgomerie Maxx Royal Golf Club - Red Women Tee',location:'Belek, Antalya, Turkey',image_url:MONTGOMERIE_MAXX_ROYAL_BADGE,course_rating:70.9,slope_rating:130,holes:MONTGOMERIE_MAXX_ROYAL_RED_HOLES}
 ];
 
+const VILA_SOL_BADGE='course-vila-sol.svg';
+const VILA_SOL_LOOP_DATA={
+  prime:{
+    label:'Prime',
+    pars:[4,4,4,3,4,5,3,5,4],
+    yards:{White:[416,445,421,208,429,563,197,546,319],Yellow:[400,401,407,173,394,525,177,528,311]}
+  },
+  challenge:{
+    label:'Challenge',
+    pars:[4,5,4,3,5,3,4,4,4],
+    yards:{White:[388,499,394,174,553,216,378,404,441],Yellow:[374,488,373,164,501,176,370,382,391]}
+  },
+  prestige:{
+    label:'Prestige',
+    pars:[5,3,4,4,5,4,3,4,4],
+    yards:{White:[534,181,402,374,573,350,161,435,404],Yellow:[514,172,373,339,530,330,156,405,393]}
+  }
+};
+const VILA_SOL_ROUTES=[
+  {key:'prime-challenge',label:'Prime then Challenge',loops:['prime','challenge'],total_yards:{White:6991,Yellow:6534},course_rating:{White:74.4,Yellow:72.3},slope_rating:{White:134,Yellow:130},stroke_indexes:[[3,7,1,15,11,9,13,5,17],[10,16,6,18,2,14,8,12,4]]},
+  {key:'challenge-prestige',label:'Challenge then Prestige',loops:['challenge','prestige'],total_yards:{White:6861,Yellow:6430},course_rating:{White:72.3,Yellow:70.0},slope_rating:{White:130,Yellow:125},stroke_indexes:[[10,16,6,18,2,14,8,12,4],[5,15,7,11,1,13,17,3,9]]},
+  {key:'prestige-prime',label:'Prestige then Prime',loops:['prestige','prime'],total_yards:{White:6959,Yellow:6528},course_rating:{White:73.6,Yellow:71.6},slope_rating:{White:133,Yellow:129},stroke_indexes:[[6,16,8,12,2,14,18,4,10],[3,7,1,15,11,9,13,5,17]]}
+];
+function vilaSolHoles(route,tee){
+  const holes=route.loops.flatMap((loopKey,loopIndex)=>{
+    const loop=VILA_SOL_LOOP_DATA[loopKey];
+    return loop.pars.map((par,index)=>({
+      hole:(loopIndex*9)+index+1,
+      par,
+      stroke_index:route.stroke_indexes[loopIndex][index],
+      yards:loop.yards[tee][index],
+      nine:loop.label
+    }));
+  });
+  const convertedTotal=holes.reduce((sum,hole)=>sum+hole.yards,0);
+  holes[holes.length-1].yards+=route.total_yards[tee]-convertedTotal;
+  return holes;
+}
+const VILA_SOL_PRESETS=VILA_SOL_ROUTES.flatMap(route=>['White','Yellow'].map(tee=>({
+  name:'Vila Sol Golf Resort - '+route.loops.map(key=>VILA_SOL_LOOP_DATA[key].label).join(' / ')+' - '+tee+' Tee',
+  selection_name:'Vila Sol Golf Resort',
+  route_key:route.key,
+  route_label:route.label,
+  location:'Vilamoura, Algarve, Portugal',
+  image_url:VILA_SOL_BADGE,
+  course_rating:route.course_rating[tee],
+  slope_rating:route.slope_rating[tee],
+  holes:vilaSolHoles(route,tee)
+})));
+
 
 function cleanCourseName(name){return String(name||'').replace(/\s*-\s*[^-]+?\s*Tee\s*$/i,'').trim();}
 function courseTeeFromName(name){const m=String(name||'').match(/\s*-\s*([^-]+?)\s*Tee\s*$/i);return m?m[1].trim().replace(/\s+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()):'';}
 function getCourseName(course,round){return cleanCourseName((course&&course.name)||(round&&round.course_name)||'');}
 function getCourseDisplayName(course,round){return getCourseName(course,round);}
 function courseKey(course){return cleanCourseName(course&&course.name).toLowerCase()+'|'+(courseTeeFromName(course&&course.name)||course&&course.tee||'White').toLowerCase();}
-function isProtectedCourse(course){const name=cleanCourseName(course&&course.name).toLowerCase();return name==='whitley bay golf club'||name.includes('whitley bay golf club')||name==='goswick golf club'||name.includes('goswick golf club')||name==='tynemouth golf club'||name.includes('tynemouth golf club')||name==='quinta do lago north course'||name.includes('quinta do lago north course')||name==='quinta do lago south course'||name.includes('quinta do lago south course')||name==='ombria golf course'||name.includes('ombria golf course')||name==='montgomerie maxx royal golf club'||name.includes('montgomerie maxx royal golf club');}
+function isProtectedCourse(course){const name=cleanCourseName(course&&course.name).toLowerCase();return name==='whitley bay golf club'||name.includes('whitley bay golf club')||name==='goswick golf club'||name.includes('goswick golf club')||name==='tynemouth golf club'||name.includes('tynemouth golf club')||name==='quinta do lago north course'||name.includes('quinta do lago north course')||name==='quinta do lago south course'||name.includes('quinta do lago south course')||name==='ombria golf course'||name.includes('ombria golf course')||name==='montgomerie maxx royal golf club'||name.includes('montgomerie maxx royal golf club')||name.includes('vila sol golf resort');}
 function presetIdForCourse(preset){return 'preset-'+cleanCourseName(preset.name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'-'+(courseTeeFromName(preset.name)||preset.tee||'white').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
 function isRealDbId(id){return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id||''));}
 function safeCourseIdForDb(course,setupCourseId){const id=(course&&course.id)||setupCourseId||null;return isRealDbId(id)?id:null;}
@@ -407,7 +457,7 @@ function presetShouldOverrideSavedCourseHoles(preset){
   return cleanCourseName(preset&&preset.name).toLowerCase()==='whitley bay golf club';
 }
 function mergePresetCourses(dbCourses){
-  const presets=[...WHITLEY_BAY_PRESETS,...GOSWICK_PRESETS,...TYNEMOUTH_PRESETS,...QUINTA_DO_LAGO_PRESETS,...OMBRIA_PRESETS,...MONTGOMERIE_MAXX_ROYAL_PRESETS].map(preset=>{
+  const presets=[...WHITLEY_BAY_PRESETS,...GOSWICK_PRESETS,...TYNEMOUTH_PRESETS,...QUINTA_DO_LAGO_PRESETS,...OMBRIA_PRESETS,...MONTGOMERIE_MAXX_ROYAL_PRESETS,...VILA_SOL_PRESETS].map(preset=>{
     const tee=courseTeeFromName(preset.name)||preset.tee||'White';
     return {...preset,id:preset.id||presetIdForCourse(preset),tee};
   });
@@ -418,6 +468,9 @@ function mergePresetCourses(dbCourses){
     return {
       ...course,
       tee:course.tee||preset.tee,
+      selection_name:course.selection_name||preset.selection_name,
+      route_key:course.route_key||preset.route_key,
+      route_label:course.route_label||preset.route_label,
       image_url:course.image_url||preset.image_url,
       holes:presetShouldOverrideSavedCourseHoles(preset)?preset.holes:(hasCourseHoles(course)?course.holes:preset.holes),
       course_rating:hasCourseRatingValue(course.course_rating)?course.course_rating:preset.course_rating,
@@ -428,17 +481,21 @@ function mergePresetCourses(dbCourses){
   presets.forEach(preset=>{if(!keys.has(courseKey(preset))){merged.push(preset);keys.add(courseKey(preset));}});
   return merged;
 }
-function getCourseOptions(courses){const byName=new Map();(courses||[]).forEach(c=>{if(!c)return;const base=cleanCourseName(c.name);if(!base)return;const tee=courseTeeFromName(c.name)||c.tee||'White';if(!byName.has(base))byName.set(base,{name:base,course:c,tees:{}});const item=byName.get(base);item.tees[tee]=c;if(!item.course||tee==='White')item.course=c;});return Array.from(byName.values()).sort((a,b)=>a.name.localeCompare(b.name));}
+function getCourseOptions(courses){const byName=new Map();(courses||[]).forEach(c=>{if(!c)return;const base=c.selection_name||cleanCourseName(c.name);if(!base)return;const tee=courseTeeFromName(c.name)||c.tee||'White';if(!byName.has(base))byName.set(base,{name:base,course:c,tees:{},routes:{}});const item=byName.get(base);if(c.route_key){if(!item.routes[c.route_key])item.routes[c.route_key]={key:c.route_key,label:c.route_label||c.route_key,course:c,tees:{}};const route=item.routes[c.route_key];route.tees[tee]=c;if(!route.course||tee==='White')route.course=c;if(!item.course||tee==='White')item.course=c;}else{item.tees[tee]=c;if(!item.course||tee==='White')item.course=c;}});return Array.from(byName.values()).sort((a,b)=>a.name.localeCompare(b.name));}
 function normaliseTeeName(tee){return String(tee||'').trim().replace(/\s+/g,' ').toLowerCase();}
-function findCourseForTee(courses,baseName,tee){
+function findCourseForTee(courses,baseName,tee,routeKey){
   const cleanBase=cleanCourseName(baseName);
   const wanted=normaliseTeeName(tee||'White');
-  const option=getCourseOptions(courses).find(o=>o.name===cleanBase);
+  const direct=(courses||[]).find(course=>cleanCourseName(course&&course.name)===cleanBase&&normaliseTeeName(courseTeeFromName(course&&course.name)||course&&course.tee||'White')===wanted);
+  if(direct)return direct;
+  const option=getCourseOptions(courses).find(o=>o.name===baseName||o.name===cleanBase);
   if(!option)return null;
-  const exactKey=Object.keys(option.tees||{}).find(k=>normaliseTeeName(k)===wanted);
-  if(exactKey&&option.tees[exactKey])return option.tees[exactKey];
-  const fallbackKey=Object.keys(option.tees||{}).find(k=>normaliseTeeName(k)==='white');
-  return (fallbackKey&&option.tees[fallbackKey])||option.course||Object.values(option.tees||{})[0]||null;
+  const route=(routeKey&&option.routes&&option.routes[routeKey])||Object.values(option.routes||{})[0]||null;
+  const tees=route?route.tees:option.tees;
+  const exactKey=Object.keys(tees||{}).find(k=>normaliseTeeName(k)===wanted);
+  if(exactKey&&tees[exactKey])return tees[exactKey];
+  const fallbackKey=Object.keys(tees||{}).find(k=>normaliseTeeName(k)==='white');
+  return (fallbackKey&&tees[fallbackKey])||(route&&route.course)||option.course||Object.values(tees||{})[0]||null;
 }
 function whitleyBayPresetForTee(tee){
   const wanted=normaliseTeeName(tee||'White');
@@ -2320,7 +2377,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v5.20" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v5.20</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v5.21" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v5.21</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -4559,7 +4616,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   const[setupQuestion,setSetupQuestion]=useState('day');
   const[activeRound,setActiveRound]=useState(()=>initialSelectedRound||null);
   const[activeGroup,setActiveGroup]=useState(()=>initialSelectedRound?initialSelectedRound._group:null);
-  const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',tee:'White',is_private:false,allowance:0.95,dayCompMode:'none',dayCompKey:'',sweepstake:{enabled:false,amountPence:200,scope:'round'},matchplay:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,keepStableford:true}});
+  const[setup,setSetup]=useState({name:'',course_id:'',course_name:'',course_route:'',tee:'White',is_private:false,allowance:0.95,dayCompMode:'none',dayCompKey:'',sweepstake:{enabled:false,amountPence:200,scope:'round'},matchplay:{enabled:false,mode:'doubles',teamA:[],teamB:[],teamAName:'Team 1',teamBName:'Team 2',teamAShots:0,teamBShots:0,keepStableford:true}});
   const[dayJoinPromptDone,setDayJoinPromptDone]=useState(false);
   const[dayJoinChoice,setDayJoinChoice]=useState('unasked');
   const[daySweepstakeEntryMode,setDaySweepstakeEntryMode]=useState('all');
@@ -4578,8 +4635,10 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
   const myLiveRounds=myRounds.filter(isLiveRound);
   const courseOptions=getCourseOptions(courses);
   const selectedCourseOption=courseOptions.find(o=>o.name===setup.course_name)||courseOptions.find(o=>o.course&&o.course.id===setup.course_id)||null;
-  const availableTees=selectedCourseOption?Object.keys(selectedCourseOption.tees):['White','Yellow','Red','Orange'];
-  const selectedCourse=courses.find(co=>co.id===setup.course_id)||findCourseForTee(courses,setup.course_name,setup.tee);
+  const selectedCourseRoutes=selectedCourseOption?Object.values(selectedCourseOption.routes||{}):[];
+  const selectedCourseRoute=selectedCourseRoutes.find(route=>route.key===setup.course_route)||selectedCourseRoutes[0]||null;
+  const availableTees=selectedCourseOption?Object.keys(selectedCourseRoute?selectedCourseRoute.tees:selectedCourseOption.tees):['White','Yellow','Red','Orange'];
+  const selectedCourse=courses.find(co=>co.id===setup.course_id)||findCourseForTee(courses,setup.course_name,setup.tee,setup.course_route);
   const isSingleGroupDay=(playerRange==='1-4'||groupSetup.length<=1);
   const activeDayBoards=Array.from((rounds||[]).filter(r=>dayCompKeyFromRound(r)&&isSameLocalDay(roundStartValue(r),Date.now())).reduce((map,r)=>{const key=dayCompKeyFromRound(r);if(key&&(!map.has(key)||isDayCompBoardRound(r)))map.set(key,r);return map;},new Map()).values());
   const promptDayBoard=activeDayBoards.find(isDayCompBoardRound)||activeDayBoards[0]||null;
@@ -4641,8 +4700,9 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
     setGroupSetup(nextGroups);
     setParticipants(nextGroups.flat());
   }
-  function chooseCourse(baseName){const option=courseOptions.find(o=>o.name===baseName);const nextCourse=option?(option.tees[setup.tee]||option.tees.White||option.course):null;const nextTee=nextCourse?(courseTeeFromName(nextCourse.name)||nextCourse.tee||setup.tee):setup.tee;setSetup(q=>({...q,course_name:baseName,course_id:nextCourse?nextCourse.id:'',tee:nextTee}));}
-  function chooseTee(tee){const baseName=setup.course_name||(selectedCourseOption&&selectedCourseOption.name)||'';const nextCourse=findCourseForTee(courses,baseName,tee);setSetup(q=>({...q,tee,course_id:nextCourse?nextCourse.id:q.course_id}));}
+  function chooseCourse(baseName){const option=courseOptions.find(o=>o.name===baseName);const route=option&&Object.values(option.routes||{})[0];const routeKey=route?route.key:'';const nextCourse=option?findCourseForTee(courses,baseName,setup.tee,routeKey):null;const nextTee=nextCourse?(courseTeeFromName(nextCourse.name)||nextCourse.tee||setup.tee):setup.tee;setSetup(q=>({...q,course_name:baseName,course_route:routeKey,course_id:nextCourse?nextCourse.id:'',tee:nextTee}));}
+  function chooseCourseRoute(routeKey){const nextCourse=findCourseForTee(courses,setup.course_name,setup.tee,routeKey);setSetup(q=>({...q,course_route:routeKey,course_id:nextCourse?nextCourse.id:q.course_id}));}
+  function chooseTee(tee){const baseName=setup.course_name||(selectedCourseOption&&selectedCourseOption.name)||'';const nextCourse=findCourseForTee(courses,baseName,tee,setup.course_route);setSetup(q=>({...q,tee,course_id:nextCourse?nextCourse.id:q.course_id}));}
   useEffect(()=>{
     if(!selectedCourse)return;
     const next=groupSetup.map(g=>g.map(p=>withPlayingHandicap(p,selectedCourse,setup.allowance)));
@@ -4970,7 +5030,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
     }
     setSaving(true);
     try{
-      const course=courses.find(co=>co.id===setup.course_id)||findCourseForTee(courses,setup.course_name,setup.tee);
+      const course=courses.find(co=>co.id===setup.course_id)||findCourseForTee(courses,setup.course_name,setup.tee,setup.course_route);
       const today=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
       const creatorName=currentUser&&currentUser.display_name?currentUser.display_name.split(' ')[0]+"'s Round":null;
       const courseBaseName=getCourseDisplayName(course)||setup.course_name;
@@ -5327,6 +5387,12 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
               <option value="">Select course...</option>
               {courseOptions.map(co=><option key={co.name} value={co.name}>{co.name}</option>)}
             </select>
+            {selectedCourseRoutes.length>0&&<>
+              <label style={S.lbl}>Playing order</label>
+              <select style={{...S.inp,marginBottom:12}} value={selectedCourseRoute&&selectedCourseRoute.key||''} onChange={e=>chooseCourseRoute(e.target.value)}>
+                {selectedCourseRoutes.map(route=><option key={route.key} value={route.key}>{route.label}</option>)}
+              </select>
+            </>}
             <label style={S.lbl}>Tee</label>
             <select style={{...S.inp,marginBottom:12}} value={setup.tee} onChange={e=>chooseTee(e.target.value)} disabled={!setup.course_name}>
               {(availableTees.length?availableTees:['White','Yellow','Red','Orange']).map(t=><option key={t}>{t}</option>)}
@@ -5499,6 +5565,12 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
             <option value="">Select course...</option>
             {courseOptions.map(co=><option key={co.name} value={co.name}>{co.name}</option>)}
           </select>
+          {selectedCourseRoutes.length>0&&<>
+            <label style={S.lbl}>Playing order</label>
+            <select style={{...S.inp,marginBottom:12}} value={selectedCourseRoute&&selectedCourseRoute.key||''} onChange={e=>chooseCourseRoute(e.target.value)}>
+              {selectedCourseRoutes.map(route=><option key={route.key} value={route.key}>{route.label}</option>)}
+            </select>
+          </>}
           <label style={S.lbl}>Tee</label>
           <select style={{...S.inp,marginBottom:12}} value={setup.tee} onChange={e=>chooseTee(e.target.value)} disabled={!setup.course_name}>
             {(availableTees.length?availableTees:['White','Yellow','Red','Orange']).map(t=><option key={t}>{t}</option>)}
