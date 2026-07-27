@@ -1,4 +1,4 @@
-// SNYDER GOLF v5.21
+// SNYDER GOLF v5.22
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -107,7 +107,7 @@ function pushSubscriptionUsesKey(subscription,publicKey){
 async function registerSnyderServiceWorker(){
   if(!('serviceWorker' in navigator))return null;
   try{
-    const registration=await navigator.serviceWorker.register('./sw-live.js?v=5.21',{updateViaCache:'none'});
+    const registration=await navigator.serviceWorker.register('./sw-live.js?v=5.22',{updateViaCache:'none'});
     try{registration.update&&registration.update();}catch(e){}
     return registration;
   }
@@ -158,7 +158,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.21',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.22',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -207,7 +207,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.21',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.22',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -2061,7 +2061,7 @@ function App(){
     const hm={};roundPlayers.forEach(rp=>addRoundPlayerHandicaps(hm,rp,isCupRound));
     await hydrateRoundScores(rd.id);
     const{data:latestDbScores}=await sb.from('cup_scores').select('*').eq('round_id',rd.id);
-    const groupMetaRows=(rdGroups||[]).flatMap(g=>foursomesScoreRowsFromGroupMeta(rd.id,g));
+    const groupMetaRows=(rdGroups||[]).flatMap(g=>[...foursomesScoreRowsFromGroupMeta(rd.id,g),...scrambleScoreRowsFromGroupMeta(rd.id,g)]);
     const latestRows=normaliseFoursomesScoreRows([...(scores||[]),...(publicScores||[]),...(latestDbScores||[]),...groupMetaRows,...localScoreRowsForRound(rd.id)]).filter(r=>r&&r.round_id===rd.id);
     const latestMatchplay=foursomesConfigForLiveSnapshot(rd,rdGroups,latestRows)||matchplayConfigFromRows(latestRows,rd,rdGroups[0]||{id:'group',group_number:1});
     const fallbackGroup=(latestMatchplay&&latestMatchplay.enabled&&latestMatchplay.mode==='foursomes')?foursomesFallbackGroup(rd,latestMatchplay):null;
@@ -2324,7 +2324,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-          <span onClick={tapVersionForTestMode} aria-label="App version v5.21" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v5.21</span>
+          <span onClick={tapVersionForTestMode} aria-label="App version v5.22" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v5.22</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -2516,7 +2516,7 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
       const cupDay=cupRoundDayNumber(rd);
       const cupGroup=cupRoundGroupNumber(rd);
       const cupDayRounds=isCup?(rounds||[]).filter(r=>cupRoundDayNumber(r)===cupDay&&isSnyderCupRound(r)):[];
-      const groupMetaRows=(rdGroups||[]).flatMap(g=>foursomesScoreRowsFromGroupMeta(rd.id,g));
+      const groupMetaRows=(rdGroups||[]).flatMap(g=>[...foursomesScoreRowsFromGroupMeta(rd.id,g),...scrambleScoreRowsFromGroupMeta(rd.id,g)]);
       const latestRows=normaliseFoursomesScoreRows([...(scores||[]),...(publicScores||[]),...(dbScores||[]),...groupMetaRows,...localScoreRowsForRound(rd.id)]).filter(r=>r&&r.round_id===rd.id);
       const latestMatchplay=foursomesConfigForLiveSnapshot(rd,rdGroups,latestRows)||matchplayConfigFromRows(latestRows,rd,rdGroups[0]||{id:'group',group_number:1});
       const fallbackGroup=(latestMatchplay&&latestMatchplay.enabled&&latestMatchplay.mode==='foursomes')?foursomesFallbackGroup(rd,latestMatchplay):null;
@@ -4032,6 +4032,11 @@ const MATCHPLAY_CONFIG_HOLE=960001;
 const SCRAMBLE_TEAM_PREFIX='__scramble_team__|';
 function scrambleTeamPlayerId(teamId){return SCRAMBLE_TEAM_PREFIX+encodeURIComponent(normaliseId(teamId||'team'));}
 function isScrambleTeamPlayerId(pid){return String(pid||'').startsWith(SCRAMBLE_TEAM_PREFIX);}
+function scrambleTeamIdFromPlayerId(pid){
+  const text=String(pid||'');
+  if(!text.startsWith(SCRAMBLE_TEAM_PREFIX))return '';
+  try{return decodeURIComponent(text.slice(SCRAMBLE_TEAM_PREFIX.length));}catch(e){return text.slice(SCRAMBLE_TEAM_PREFIX.length);}
+}
 function defaultScrambleSetup(){
   return {enabled:false,teams:[
     {id:'team-1',name:'Team 1',memberIds:[],shots:0},
@@ -4091,6 +4096,52 @@ async function saveScrambleConfigToGroupMeta(sb,group,config){
   const clean=cleanScrambleSetup(config);
   if(!clean.enabled||!clean.teams.some(team=>team.memberIds.length===2))return {ok:false};
   const ph={...((group&&group.playing_handicaps)||{}),__scramble_enabled:1,__scramble_config:clean};
+  const res=await sb.from('cup_groups').update({playing_handicaps:ph}).eq('id',group.id);
+  if(!res.error)group.playing_handicaps=ph;
+  return {ok:!res.error,error:res.error&&res.error.message};
+}
+function scrambleScoreRowsFromGroupMeta(roundId,group){
+  const ph=(group&&group.playing_handicaps)||{};
+  const raw=ph.__scramble_scores&&typeof ph.__scramble_scores==='object'?ph.__scramble_scores:{};
+  const rows=[];
+  Object.keys(raw).forEach(teamId=>{
+    Object.keys(raw[teamId]||{}).forEach(holeKey=>{
+      const hole=parseInt(holeKey);
+      const rec=(raw[teamId]||{})[holeKey];
+      if(!hole||!rec||!hasEnteredGross(rec.gross_score))return;
+      rows.push({
+        round_id:roundId,
+        player_id:scrambleTeamPlayerId(teamId),
+        hole_number:hole,
+        gross_score:parseInt(rec.gross_score),
+        stableford_points:stablefordPointsValue(rec.stableford_points),
+        par:parseInt(rec.par)||4,
+        stroke_index:parseInt(rec.stroke_index)||hole,
+        _scrambleGroupMeta:true
+      });
+    });
+  });
+  return rows;
+}
+async function saveScrambleScoreToGroupMeta(sb,group,row){
+  if(!sb||!group||!group.id||!row||!isScrambleTeamPlayerId(row.player_id))return {ok:false,error:'No scramble cloud group found'};
+  let latest=group;
+  try{const result=await sb.from('cup_groups').select('*').eq('id',group.id).single();if(result&&result.data)latest=result.data;}catch(e){}
+  const ph={...((latest&&latest.playing_handicaps)||{})};
+  const scores={...(ph.__scramble_scores||{})};
+  const teamId=scrambleTeamIdFromPlayerId(row.player_id);
+  const teamScores={...(scores[teamId]||{})};
+  const hole=String(parseInt(row.hole_number));
+  if(!hole||hole==='NaN')return {ok:false,error:'Invalid scramble hole'};
+  if(row.gross_score===undefined||row.gross_score===null||row.gross_score==='')delete teamScores[hole];
+  else teamScores[hole]={
+    gross_score:parseInt(row.gross_score),
+    stableford_points:stablefordPointsValue(row.stableford_points),
+    par:parseInt(row.par)||4,
+    stroke_index:parseInt(row.stroke_index)||parseInt(row.hole_number)
+  };
+  if(Object.keys(teamScores).length)scores[teamId]=teamScores; else delete scores[teamId];
+  ph.__scramble_scores=scores;
   const res=await sb.from('cup_groups').update({playing_handicaps:ph}).eq('id',group.id);
   if(!res.error)group.playing_handicaps=ph;
   return {ok:!res.error,error:res.error&&res.error.message};
@@ -4757,7 +4808,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       let local={};
       try{local=JSON.parse(localStorage.getItem('scores_'+rd.id)||'{}')||{};}catch(e){local={};}
       const{data:dbScores}=await sb.from('cup_scores').select('*').eq('round_id',rd.id);
-      const groupMetaRows=(rdGroups||[]).flatMap(g=>foursomesScoreRowsFromGroupMeta(rd.id,g));
+      const groupMetaRows=(rdGroups||[]).flatMap(g=>[...foursomesScoreRowsFromGroupMeta(rd.id,g),...scrambleScoreRowsFromGroupMeta(rd.id,g)]);
       const latestRows=normaliseFoursomesScoreRows([...(scores||[]),...(dbScores||[]),...groupMetaRows,...localScoreRowsForRound(rd.id)]).filter(r=>r&&r.round_id===rd.id);
       const latestMatchplay=foursomesConfigForLiveSnapshot(rd,rdGroups,latestRows)||matchplayConfigFromRows(latestRows,rd,rdGroups[0]||{id:'group',group_number:1});
       const fallbackGroup=(latestMatchplay&&latestMatchplay.enabled&&latestMatchplay.mode==='foursomes')?foursomesFallbackGroup(rd,latestMatchplay):null;
@@ -4765,7 +4816,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
       if(!userGroup){flash('No scorecard group found for this round','error');return;}
       const canScore=(fallbackGroup&&userGroup===fallbackGroup)?userCanScoreFoursomesRound(currentUser,rd,rdGroups[0],rps):userCanScoreRound(currentUser,userGroup,rps);
       const dbMap={};
-      normaliseFoursomesScoreRows(dbScores||[]).filter(r=>!isMetaScoreRow(r)).forEach(s=>{
+      normaliseFoursomesScoreRows(latestRows||[]).filter(r=>!isMetaScoreRow(r)).forEach(s=>{
         if(!dbMap[s.hole_number])dbMap[s.hole_number]={};
         dbMap[s.hole_number][s.player_id]=s.gross_score;
       });
@@ -4804,7 +4855,7 @@ function PlayGolf({players,courses,rounds,groups,scores,sb,flash,setView,setSele
     if(selectedRound&&selectedRound._group){
       setActiveRound(selectedRound);
       setActiveGroup(selectedRound._group);
-      const immediateRows=[...(scores||[]).filter(s=>s&&s.round_id===selectedRound.id),...localScoreRowsForRound(selectedRound.id),...((selectedRound&&selectedRound._extraScores)||[]),...foursomesScoreRowsFromGroupMeta(selectedRound&&selectedRound.id,selectedRound&&selectedRound._group)];
+      const immediateRows=[...(scores||[]).filter(s=>s&&s.round_id===selectedRound.id),...localScoreRowsForRound(selectedRound.id),...((selectedRound&&selectedRound._extraScores)||[]),...foursomesScoreRowsFromGroupMeta(selectedRound&&selectedRound.id,selectedRound&&selectedRound._group),...scrambleScoreRowsFromGroupMeta(selectedRound&&selectedRound.id,selectedRound&&selectedRound._group)];
       if(immediateRows.length)applySelectedRoundScores(selectedRound,immediateRows,false);
       else if(!activeRound||activeRound.id!==selectedRound.id)setHoleScores({});
       setStep('scorecard');
@@ -5996,6 +6047,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   const isJoinedDaySweepstake=!!(dayCompKeyFromRound(round)&&!isDayCompBoardRound(round));
   const isCupSpectatorScorecard=!!(round._cupScoring&&(round._spectator||!canEdit));
   const localFoursomesSyncRef=useRef('');
+  const scrambleScoreSaveRef=useRef(Promise.resolve());
 
   const[saving,setSaving]=useState(false);
   const[cloudStatus,setCloudStatus]=useState('');
@@ -6066,6 +6118,14 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       }
     }catch(e){}
     return null;
+  }
+  function queueScrambleScoreSave(row){
+    const next=scrambleScoreSaveRef.current.catch(()=>{}).then(async()=>{
+      const cloudGroup=await ensureFoursomesCloudGroup();
+      return cloudGroup?saveScrambleScoreToGroupMeta(sb,cloudGroup,row):{ok:false,error:'No scramble cloud group found'};
+    });
+    scrambleScoreSaveRef.current=next;
+    return next;
   }
   function visibleFoursomesScoreRows(){
     const rows=[];
@@ -6164,7 +6224,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           sb.from('cup_scores').select('*').eq('round_id',round.id)
         ]);
         if(!alive)return;
-        const cleanScores=normaliseFoursomesScoreRows(scs||[]);
+        const groupScoreRows=(grps||[]).flatMap(g=>[...foursomesScoreRowsFromGroupMeta(round.id,g),...scrambleScoreRowsFromGroupMeta(round.id,g)]);
+        const cleanScores=normaliseFoursomesScoreRows([...(scs||[]),...groupScoreRows]);
         setCloudScoreRows(cleanScores);
         setSweepstakeConfig(sweepstakeConfigFromRows(cleanScores,round));
         setMatchplayConfig(matchplayConfigFromRows(cleanScores,round,activeScoreGroup||group));
@@ -6328,7 +6389,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       if(error)throw error;
       if(groupError)throw groupError;
       const rows=normaliseFoursomesScoreRows(data||[]);
-      const groupMetaRows=(groupRows||[]).flatMap(g=>foursomesScoreRowsFromGroupMeta(round.id,g));
+      const groupMetaRows=(groupRows||[]).flatMap(g=>[...foursomesScoreRowsFromGroupMeta(round.id,g),...scrambleScoreRowsFromGroupMeta(round.id,g)]);
       const allScoreRows=normaliseFoursomesScoreRows([...rows,...groupMetaRows]);
       setCloudScoreRows(allScoreRows);
       if(round._cupScoring)refreshCupDayScoreCache();
@@ -6432,11 +6493,12 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       });
       if(scramblePlayers.length)players=scramblePlayers.filter((p,idx,arr)=>p&&arr.findIndex(x=>normaliseId(x&&x.id)===normaliseId(p.id))===idx);
       if(!players.length)players=(grpPlayers||[]).map(p=>({id:normaliseId(p.id),name:p.display_name||p.name||'Player',playing_handicap:p.playing_handicap||p.current_handicap||0}));
+      const boardScoreRows=[...(scs||[]),...groupsForBoard.flatMap(g=>scrambleScoreRowsFromGroupMeta(g.round_id||round.id,g))];
       setOverallPlayers(players);
       setOverallMode('round');
-      setOverallScores((scs||[]).filter(r=>!isMetaScoreRow(r)));
+      setOverallScores(boardScoreRows.filter(r=>!isMetaScoreRow(r)));
       setOverallRefreshNote('Refreshed '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
-      const boardSnakes=rowsToSnakeMarks(scs||[]);
+      const boardSnakes=rowsToSnakeMarks(boardScoreRows);
       if(Object.keys(boardSnakes).length>0){
         mergeSnakeMarksSafe(boardSnakes);
       }
@@ -7068,6 +7130,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         const rowPid=player&&player.id;
         const gross=(holeScores&&holeScores[holeNum]||{})[rowPid];
         if(!rowPid||!hasEnteredGross(gross))continue;
+        if(isScrambleTeamPlayerId(rowPid))continue;
         const hcp=parseFloat(playingHcps[rowPid]!=null?playingHcps[rowPid]:(player&&player.current_handicap)||0);
         const pts=(gross===-1||isGivenGross(gross))?0:calcStableford(gross,hd.par,hd.stroke_index,hcp)||0;
         const shouldFlag=checked&&normaliseId(rowPid)===normaliseId(pid);
@@ -7341,12 +7404,16 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       return;
     }
     const row=buildScoreRow(holeNum,scorePid,val);
+    const isScrambleScore=isScrambleTeamPlayerId(scorePid);
+    const cloudSave=isScrambleScore
+      ?queueScrambleScoreSave(row)
+      :saveScoreRowToCloud(sb,row);
     setCloudStatus('');
     setCloudError('');
-    saveScoreRowToCloud(sb,row)
+    cloudSave
       .then(result=>{
         if(!result.ok){
-          try{
+          if(!isScrambleScore)try{
             const key='pending_scores_'+round.id;
             const pending=JSON.parse(localStorage.getItem(key)||'[]');
             pending.push(row);
@@ -8660,7 +8727,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
           rows.push(buildScoreRow(parseInt(hNum),canonicalFoursomesPlayerId(pid),gross));
         }
       }
-      const cloudRows=isFoursomesScorecard?rows.filter(r=>!isFoursomesTeamPlayerId(r.player_id)):rows;
+      const cloudRows=rows.filter(r=>!isFoursomesTeamPlayerId(r.player_id)&&!isScrambleTeamPlayerId(r.player_id));
       const result=await saveScoreRowsToCloud(sb,cloudRows);
       if(!result.ok)failed.push(result.error||'Unknown cloud save error');
       if(isFoursomesScorecard){
@@ -8672,6 +8739,16 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
             if(gm&&!gm.ok)failed.push(gm.error||'Foursomes group metadata save error');
           }
         }else failed.push('No foursomes cloud group found');
+      }
+      const scrambleRows=rows.filter(r=>isScrambleTeamPlayerId(r.player_id));
+      if(scrambleRows.length){
+        const cloudGroup=await ensureFoursomesCloudGroup();
+        if(cloudGroup){
+          for(const row of scrambleRows){
+            const saved=await saveScrambleScoreToGroupMeta(sb,cloudGroup,row);
+            if(saved&&!saved.ok)failed.push(saved.error||'Scramble group metadata save error');
+          }
+        }else failed.push('No scramble cloud group found');
       }
       if(failed.length){
         const msg=failed[0];

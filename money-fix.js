@@ -1,4 +1,4 @@
-// SNYDER GOLF v5.21 League Money display repair
+// SNYDER GOLF v5.22 League Money display repair
 // Adds completed Day Sweepstake net to the Money table without changing payments.paid.
 // Balance = Paid + Sweepstake net - Entry - Extra Rounds - Snakes.
 (function(){
@@ -14,7 +14,7 @@
   var sweepById={};
   var lastSweepLoad=0;
   var COLS='minmax(72px,1fr) 42px 42px 46px 42px 54px';
-  var FIX_VERSION='v5.21';
+  var FIX_VERSION='v5.22';
   var SURL='https://qggylmfyrnlwnkhjldjl.supabase.co';
   var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnZ3lsbWZ5cm5sd25raGpsZGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTU5ODQsImV4cCI6MjA5MjE3MTk4NH0.StHB-C5UZfxpBTWSmKvGWMGPp0q9O35XGcKtKed4cnw';
 
@@ -115,7 +115,7 @@
     if(c.length!==6&&c.length!==7)return false;
     var first=cleanText(c[0]).toLowerCase();
     if(!first||first==='player'||first.indexOf('round')===-1)return false;
-    // The original League row has a hidden entry cell, but v5.21 removes it visually.
+    // The original League row has a hidden entry cell, but v5.22 removes it visually.
     return cleanText(row).indexOf('£')!==-1;
   }
   function normaliseMoneyRow(row){
@@ -196,7 +196,7 @@
   }
   function ensureEntryNote(table){
     if(!table||table.getAttribute('data-money-entry-note')===FIX_VERSION)return;
-    if(!table||table.getAttribute('data-money-entry-note')==='v5.20'||table.getAttribute('data-money-entry-note')==='v5.19'||table.getAttribute('data-money-entry-note')==='v5.18'||table.getAttribute('data-money-entry-note')==='v5.17'||table.getAttribute('data-money-entry-note')==='v5.16'||table.getAttribute('data-money-entry-note')==='v5.15'||table.getAttribute('data-money-entry-note')==='v5.14'||table.getAttribute('data-money-entry-note')==='v5.13'||table.getAttribute('data-money-entry-note')==='v5.12'||table.getAttribute('data-money-entry-note')==='v5.11'||table.getAttribute('data-money-entry-note')==='v5.10'||table.getAttribute('data-money-entry-note')==='v5.09'||table.getAttribute('data-money-entry-note')==='v5.08'||table.getAttribute('data-money-entry-note')==='v5.07'||table.getAttribute('data-money-entry-note')==='v5.06'||table.getAttribute('data-money-entry-note')==='v5.05'||table.getAttribute('data-money-entry-note')==='v5.04'||table.getAttribute('data-money-entry-note')==='v5.03'||table.getAttribute('data-money-entry-note')==='v5.02'||table.getAttribute('data-money-entry-note')==='v5.01'||table.getAttribute('data-money-entry-note')==='v5.00'||table.getAttribute('data-money-entry-note')==='v4.101'||table.getAttribute('data-money-entry-note')==='v4.100'||table.getAttribute('data-money-entry-note')==='v4.99'||table.getAttribute('data-money-entry-note')==='v4.98'||table.getAttribute('data-money-entry-note')==='v4.97'||table.getAttribute('data-money-entry-note')==='v4.96'||table.getAttribute('data-money-entry-note')==='v4.95'||table.getAttribute('data-money-entry-note')==='v4.94')return;
+    if(!table||table.getAttribute('data-money-entry-note')==='v5.21'||table.getAttribute('data-money-entry-note')==='v5.20'||table.getAttribute('data-money-entry-note')==='v5.19'||table.getAttribute('data-money-entry-note')==='v5.18'||table.getAttribute('data-money-entry-note')==='v5.17'||table.getAttribute('data-money-entry-note')==='v5.16'||table.getAttribute('data-money-entry-note')==='v5.15'||table.getAttribute('data-money-entry-note')==='v5.14'||table.getAttribute('data-money-entry-note')==='v5.13'||table.getAttribute('data-money-entry-note')==='v5.12'||table.getAttribute('data-money-entry-note')==='v5.11'||table.getAttribute('data-money-entry-note')==='v5.10'||table.getAttribute('data-money-entry-note')==='v5.09'||table.getAttribute('data-money-entry-note')==='v5.08'||table.getAttribute('data-money-entry-note')==='v5.07'||table.getAttribute('data-money-entry-note')==='v5.06'||table.getAttribute('data-money-entry-note')==='v5.05'||table.getAttribute('data-money-entry-note')==='v5.04'||table.getAttribute('data-money-entry-note')==='v5.03'||table.getAttribute('data-money-entry-note')==='v5.02'||table.getAttribute('data-money-entry-note')==='v5.01'||table.getAttribute('data-money-entry-note')==='v5.00'||table.getAttribute('data-money-entry-note')==='v4.101'||table.getAttribute('data-money-entry-note')==='v4.100'||table.getAttribute('data-money-entry-note')==='v4.99'||table.getAttribute('data-money-entry-note')==='v4.98'||table.getAttribute('data-money-entry-note')==='v4.97'||table.getAttribute('data-money-entry-note')==='v4.96'||table.getAttribute('data-money-entry-note')==='v4.95'||table.getAttribute('data-money-entry-note')==='v4.94')return;
     table.setAttribute('data-money-entry-note',FIX_VERSION);
     try{
       var note=document.createElement('div');
@@ -269,7 +269,7 @@
           var original=kids(row);
           var entry=10;
           var rounds=NaN, snake=NaN, paid=NaN;
-          // v5.21: make the repair idempotent. v4.16 overwrote the Entry cell with Rounds,
+          // v5.22: make the repair idempotent. v4.16 overwrote the Entry cell with Rounds,
           // then a later pass parsed the already-repaired row as if Entry still existed.
           // Store the original money inputs on the row the first time we see them, and reuse them
           // on every later MutationObserver/interval pass so Rounds/Snake cannot be cleared.
@@ -288,7 +288,7 @@
             // Already-repaired order is Player, Rounds, Snake, Sweep, Paid, Balance.
             // Detect repaired rows from our data flag or the visible sweep sub-label.
             var currentRepairVersion=row.getAttribute('data-money-repaired')===FIX_VERSION;
-            var alreadyRepaired=row.getAttribute('data-money-repaired')==='v5.20' || row.getAttribute('data-money-repaired')==='v5.19' || row.getAttribute('data-money-repaired')==='v5.18' || row.getAttribute('data-money-repaired')==='v5.17' || row.getAttribute('data-money-repaired')==='v5.16' || row.getAttribute('data-money-repaired')==='v5.15' || row.getAttribute('data-money-repaired')==='v5.14' || row.getAttribute('data-money-repaired')==='v5.13' || row.getAttribute('data-money-repaired')==='v5.12' || row.getAttribute('data-money-repaired')==='v5.11' || row.getAttribute('data-money-repaired')==='v5.10' || row.getAttribute('data-money-repaired')==='v5.09' || row.getAttribute('data-money-repaired')==='v5.08' || row.getAttribute('data-money-repaired')==='v5.07' || row.getAttribute('data-money-repaired')==='v5.06' || row.getAttribute('data-money-repaired')==='v5.05' || row.getAttribute('data-money-repaired')==='v5.04' || row.getAttribute('data-money-repaired')==='v5.03' || row.getAttribute('data-money-repaired')==='v5.02' || row.getAttribute('data-money-repaired')==='v5.01' || row.getAttribute('data-money-repaired')==='v5.00' || row.getAttribute('data-money-repaired')==='v4.101' || row.getAttribute('data-money-repaired')==='v4.100' || row.getAttribute('data-money-repaired')==='v4.99' || row.getAttribute('data-money-repaired')==='v4.98' || row.getAttribute('data-money-repaired')==='v4.97' || row.getAttribute('data-money-repaired')==='v4.96' || row.getAttribute('data-money-repaired')==='v4.95' || row.getAttribute('data-money-repaired')==='v4.94' || rowText.indexOf(' sweep ')!==-1 || cleanText(original[3]).toLowerCase().indexOf('sweep')!==-1;
+            var alreadyRepaired=row.getAttribute('data-money-repaired')==='v5.21' || row.getAttribute('data-money-repaired')==='v5.20' || row.getAttribute('data-money-repaired')==='v5.19' || row.getAttribute('data-money-repaired')==='v5.18' || row.getAttribute('data-money-repaired')==='v5.17' || row.getAttribute('data-money-repaired')==='v5.16' || row.getAttribute('data-money-repaired')==='v5.15' || row.getAttribute('data-money-repaired')==='v5.14' || row.getAttribute('data-money-repaired')==='v5.13' || row.getAttribute('data-money-repaired')==='v5.12' || row.getAttribute('data-money-repaired')==='v5.11' || row.getAttribute('data-money-repaired')==='v5.10' || row.getAttribute('data-money-repaired')==='v5.09' || row.getAttribute('data-money-repaired')==='v5.08' || row.getAttribute('data-money-repaired')==='v5.07' || row.getAttribute('data-money-repaired')==='v5.06' || row.getAttribute('data-money-repaired')==='v5.05' || row.getAttribute('data-money-repaired')==='v5.04' || row.getAttribute('data-money-repaired')==='v5.03' || row.getAttribute('data-money-repaired')==='v5.02' || row.getAttribute('data-money-repaired')==='v5.01' || row.getAttribute('data-money-repaired')==='v5.00' || row.getAttribute('data-money-repaired')==='v4.101' || row.getAttribute('data-money-repaired')==='v4.100' || row.getAttribute('data-money-repaired')==='v4.99' || row.getAttribute('data-money-repaired')==='v4.98' || row.getAttribute('data-money-repaired')==='v4.97' || row.getAttribute('data-money-repaired')==='v4.96' || row.getAttribute('data-money-repaired')==='v4.95' || row.getAttribute('data-money-repaired')==='v4.94' || rowText.indexOf(' sweep ')!==-1 || cleanText(original[3]).toLowerCase().indexOf('sweep')!==-1;
             alreadyRepaired=currentRepairVersion||alreadyRepaired;
             if(alreadyRepaired){
               rounds=moneyFromCell(original[1]);
