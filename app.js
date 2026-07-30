@@ -2588,12 +2588,13 @@ function LiveScoringView({rounds,groups,scores,players,courses,cupUsers,cupEvent
         const groupData=dayGroups.find(g=>parseInt(g.idx)===cupGroup)||{day:cupDay,idx:cupGroup,players:po.map(p=>p.id),doubles:null,singles:[]};
         const cupGroupPlayers=cupPlayersForGroupData(groupData,(cupEventPlayers||[]).filter(p=>!cup||p.cup_id===cup.id));
         if(cupGroupPlayers.length){
-          const cupAccountHandicap=p=>{
-            const user=p&&p.user_id?(cupUsers||[]).find(u=>normaliseId(u.id)===normaliseId(p.user_id)):null;
-            const n=parseFloat((user&&(user.handicap??user.current_handicap??user.handicap_index))??'');
-            return Number.isFinite(n)?n:null;
-          };
-          const cupParticipants=cupGroupPlayers.map(p=>{const stored=parseFloat(p.handicap??p.eg_handicap??p.current_handicap??p.playing_handicap??0)||0;const h=cupAccountHandicap(p)??stored;return {id:p.id,name:cupPlayerDisplayName(p),display_name:cupPlayerDisplayName(p),current_handicap:h,handicap:h,handicap_index:h,user_id:p.user_id,guest_id:p.guest_id,cup_player_id:p.id};});
+          const cupParticipants=cupGroupPlayers.map(p=>{
+            const nm=cupPlayerDisplayName(p);
+            const roundPlayer=roundPlayers.find(rp=>String(rp.display_name||'').trim().toLowerCase()===String(nm).trim().toLowerCase());
+            const stored=parseFloat(p.handicap??p.eg_handicap??p.current_handicap??p.playing_handicap??0)||0;
+            const h=roundPlayer&&Number.isFinite(parseFloat(roundPlayer.playing_handicap))?parseFloat(roundPlayer.playing_handicap):stored;
+            return {id:p.id,name:nm,display_name:nm,current_handicap:h,handicap:h,handicap_index:stored,playing_handicap:h,user_id:p.user_id,guest_id:p.guest_id,cup_player_id:p.id,round_player_id:roundPlayer&&roundPlayer.id};
+          });
           const cupHm={};cupParticipants.forEach(p=>{cupHm[p.id]=p.current_handicap||0;});
           selected._group={...selected._group,participants:cupParticipants,player_ids:cupParticipants.map(p=>p.id),playing_handicaps:{...selected._group.playing_handicaps,...cupHm}};
         }
@@ -11056,10 +11057,13 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       const draft=parseFloat(cupHandicapDrafts[draftKey]);
       if(Number.isFinite(draft))return draft;
     }
+    const stored=parseFloat(player&&(player.handicap??player.eg_handicap??player.current_handicap??player.playing_handicap));
+    // Saving the fixed fixtures also snapshots each player's Cup index. Once
+    // installed, keep showing and using that snapshot instead of later EG syncs.
+    if(fixedCupInstalled&&Number.isFinite(stored))return stored;
     const linked=accountForPlayer(player);
     const linkedHcp=accountHandicap(linked);
     if(linked&&linkedHcp!==null)return linkedHcp;
-    const stored=parseFloat(player&&(player.handicap??player.eg_handicap??player.current_handicap??player.playing_handicap));
     return Number.isFinite(stored)?stored:0;
   };
   const accountOptionsForPlayer=player=>accountOptions.filter(u=>!(canonicalCupSlotPlayers||[]).some(p=>p.id!==(player&&player.id)&&normaliseId(p.user_id)===normaliseId(u.id)));
@@ -11319,6 +11323,26 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
     const{data:freshPlayerRows,error:playerLoadError}=await sb.from('snyder_cup_players').select('*').eq('cup_id',cup.id);
     if(playerLoadError){flash(playerLoadError.message,'error');return;}
     const freshPlayers=normaliseCupPlayerRows(freshPlayerRows||[]);
+    const snapshotPlayers=[];
+    for(const player of freshPlayers){
+      const draftKey=String(player&&player.id||'');
+      const hasDraft=Object.prototype.hasOwnProperty.call(cupHandicapDrafts,draftKey);
+      const draft=hasDraft?parseFloat(cupHandicapDrafts[draftKey]):NaN;
+      const linked=player&&player.user_id?accountForId(player.user_id):null;
+      const linkedHcp=accountHandicap(linked);
+      const stored=parseFloat(player&&(player.handicap??player.eg_handicap??player.current_handicap??player.playing_handicap));
+      const lockedIndex=Number.isFinite(draft)
+        ?draft
+        :(fixedCupInstalled&&Number.isFinite(stored)
+          ?stored
+          :(linkedHcp!==null?linkedHcp:(Number.isFinite(stored)?stored:0)));
+      const savedIndex=await sb.from('snyder_cup_players').update({handicap:lockedIndex}).eq('id',player.id).select('id').maybeSingle();
+      if(savedIndex.error||!savedIndex.data){
+        flash((savedIndex.error&&savedIndex.error.message)||('Could not lock '+cupDisplayName(player)+' handicap'),'error');
+        return;
+      }
+      snapshotPlayers.push({...player,handicap:lockedIndex});
+    }
     for(const dayNum of [1,2,3]){
       const selected=selectedCourseForDay(dayNum);
       if(!selected){flash('Choose the course for Day '+dayNum+' before saving fixtures','error');return;}
@@ -11326,9 +11350,9 @@ function CupAdminTab({sb,flash,load,cupUsers,cupEvents,cupTeams,cupEventPlayers,
       if(!saved.ok){flash('Day '+dayNum+' course was not saved: '+saved.error,'error');return;}
     }
     await sb.from('snyder_cup_matches').delete().eq('cup_id',cup.id);
-    const{error}=await sb.from('snyder_cup_matches').insert(fixedScheduleRows(freshPlayers||cupPlayers));
+    const{error}=await sb.from('snyder_cup_matches').insert(fixedScheduleRows(snapshotPlayers.length?snapshotPlayers:(freshPlayers||cupPlayers)));
     if(error){flash(error.message,'error');return;}
-    flash('Team LIV v Team Boring matchups built');
+    flash('Matchups and weekend handicap indexes locked');
     await load();
   }
   async function removeCupPlayer(p){
@@ -12020,6 +12044,8 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   const cup=(cupEvents||[])[0];
   const teams=cup?getCupTeams(cup,cupTeams):null;
   const rawPlayersInCup=(cupEventPlayers||[]).filter(p=>cup&&p.cup_id===cup.id);
+  const matches=(cupMatches||[]).filter(m=>cup&&m.cup_id===cup.id);
+  const cupIndexesLocked=matches.length>0;
   const cupAccountForPlayer=p=>p&&p.user_id?(cupUsers||[]).find(u=>normaliseId(u.id)===normaliseId(p.user_id)):null;
   const cupLinkedAccountHandicap=p=>{
     const u=cupAccountForPlayer(p);
@@ -12028,11 +12054,11 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   };
   const playersInCup=CUP_SLOT_TEAMS.flatMap(t=>{
     return cupCanonicalSlotRows(rawPlayersInCup,t.key,t.code,parseInt(t.slots)||4).map(p=>{
+      if(cupIndexesLocked)return p;
       const linkedHcp=cupLinkedAccountHandicap(p);
       return linkedHcp===null?p:{...p,handicap:linkedHcp,current_handicap:linkedHcp,handicap_index:linkedHcp,_linkedAccountHandicap:linkedHcp};
     });
   });
-  const matches=(cupMatches||[]).filter(m=>cup&&m.cup_id===cup.id);
   const days=(cupDays||[]).filter(d=>cup&&d.cup_id===cup.id);
   const cupDayNumbers=Array.from(new Set([1,2,3,...days.map(d=>parseInt(d.day_number)||1),...matches.map(m=>parseInt(m.day_number)||1)])).filter(Boolean).sort((a,b)=>a-b);
   const matchesByDay=groupCupMatchesByDay(matches,cupDayNumbers.map(day_number=>({day_number})));
@@ -12448,6 +12474,7 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
     };
   }
   function cupPlayerEgHandicap(p){
+    if(cupIndexesLocked)return parseFloat((p&&(p.handicap??p.eg_handicap??p.current_handicap??p.playing_handicap))??0)||0;
     const linked=cupLinkedAccountHandicap(p);
     if(linked!==null)return linked;
     return parseFloat((p&&(p.handicap??p.eg_handicap??p.current_handicap??p.playing_handicap))??0)||0;
