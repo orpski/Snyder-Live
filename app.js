@@ -1,4 +1,4 @@
-// SNYDER GOLF v5.24
+// SNYDER GOLF v5.26
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -107,7 +107,7 @@ function pushSubscriptionUsesKey(subscription,publicKey){
 async function registerSnyderServiceWorker(){
   if(!('serviceWorker' in navigator))return null;
   try{
-      const registration=await navigator.serviceWorker.register('./sw-live.js?v=5.24',{updateViaCache:'none'});
+      const registration=await navigator.serviceWorker.register('./sw-live.js?v=5.26',{updateViaCache:'none'});
     try{registration.update&&registration.update();}catch(e){}
     return registration;
   }
@@ -158,7 +158,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.24',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.26',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -207,7 +207,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.24',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.26',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -4511,13 +4511,18 @@ function cupFineTotalForRound(round,scores,playerIdGroups){
     if(canonical)doubleFineHoleByPlayer.set(canonical,parseInt(parsed.hole)||0);
   });
   const fineMultiplier=(canonical,h)=>doubleFineHoleByPlayer.get(canonical)===(parseInt(h)||0)?2:1;
+  const countedFineKeys=new Set();
   let total=fineRows.reduce((t,sc)=>{
     const parsed=parseFineScoreRow(sc);
     if(!parsed)return t;
     if(parsed.key===CUP_DOUBLE_FINE_KEY)return t;
     const canonical=canonicalFor(parsed.pid);
     if(scopedGroups&&!canonical)return t;
-    return t+(fineAmount(parsed.key,parseInt(sc.gross_score)||0)*fineMultiplier(canonical,parsed.hole));
+    const count=Math.max(0,parseInt(sc.gross_score)||0);
+    const fineKey=canonical+'|'+parsed.key+'|'+(parseInt(parsed.hole)||0);
+    if(!canonical||!count||countedFineKeys.has(fineKey))return t;
+    countedFineKeys.add(fineKey);
+    return t+(fineAmount(parsed.key,count)*fineMultiplier(canonical,parsed.hole));
   },0);
   const storedBlobKeys=new Set(fineRows.map(sc=>{
     const parsed=parseFineScoreRow(sc);
@@ -4526,7 +4531,7 @@ function cupFineTotalForRound(round,scores,playerIdGroups){
     return canonical?canonical+'|'+(parseInt(parsed.hole)||0):null;
   }).filter(Boolean));
   const autoBlobKeys=new Set();
-  roundScores.filter(sc=>!isMetaScoreRow(sc)&&!isFineScoreRow(sc)&&stablefordPointsValue(sc.stableford_points)===0).forEach(sc=>{
+  roundScores.filter(sc=>!isMetaScoreRow(sc)&&!isFineScoreRow(sc)&&!isFoursomesTeamPlayerId(sc.player_id)&&stablefordPointsValue(sc.stableford_points)===0).forEach(sc=>{
     const canonical=canonicalFor(sc.player_id);
     if(scopedGroups&&!canonical)return;
     if(!canonical)return;
@@ -12641,19 +12646,34 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
       return parsed&&parsed.key===CUP_DOUBLE_FINE_KEY&&ids.has(normaliseId(parsed.pid))&&(parseInt(sc.gross_score)||0)>0?(parseInt(parsed.hole)||0):hole;
     },0);
     const fineMultiplier=h=>doubleFineHole===(parseInt(h)||0)?2:1;
-    let total=fineRows.reduce((t,sc)=>{
+    // A Cup player can have several historical aliases (user, guest and round-player IDs).
+    // The group card uses the active ID, while this summary deliberately accepts every alias.
+    // Merge those aliases before totalling so an old and a current row for the same fine cannot
+    // both be charged. Keep the highest stored count for genuine counter fines such as bunkers.
+    const fineCountsByKey=new Map();
+    fineRows.forEach(sc=>{
       const parsed=parseFineScoreRow(sc);
-      if(!parsed||parsed.key===CUP_DOUBLE_FINE_KEY||!ids.has(normaliseId(parsed.pid)))return t;
-      return t+(fineAmount(parsed.key,parseInt(sc.gross_score)||0)*fineMultiplier(parsed.hole));
-    },0);
-    const storedBlobKeys=new Set(fineRows.map(sc=>{
+      if(!parsed||parsed.key===CUP_DOUBLE_FINE_KEY||!ids.has(normaliseId(parsed.pid)))return;
+      const count=Math.max(0,parseInt(sc.gross_score)||0);
+      if(!count)return;
+      const fineKey=parsed.key+'|'+(parseInt(parsed.hole)||0);
+      fineCountsByKey.set(fineKey,Math.max(fineCountsByKey.get(fineKey)||0,count));
+    });
+    let total=0;
+    fineCountsByKey.forEach((count,fineKey)=>{
+      const split=fineKey.lastIndexOf('|');
+      const key=fineKey.slice(0,split);
+      const hole=parseInt(fineKey.slice(split+1))||0;
+      total+=fineAmount(key,count)*fineMultiplier(hole);
+    });
+    const storedBlobHoles=new Set(fineRows.map(sc=>{
       const parsed=parseFineScoreRow(sc);
-      return parsed&&parsed.key==='blob'&&ids.has(normaliseId(parsed.pid))?normaliseId(parsed.pid)+'|'+(parseInt(parsed.hole)||0):null;
+      return parsed&&parsed.key==='blob'&&ids.has(normaliseId(parsed.pid))?(parseInt(parsed.hole)||0):null;
     }).filter(Boolean));
     const autoBlobHoles=new Set();
-    roundScores.filter(sc=>!isMetaScoreRow(sc)&&!isFineScoreRow(sc)&&ids.has(normaliseId(sc.player_id))&&stablefordPointsValue(sc.stableford_points)===0).forEach(sc=>{
+    roundScores.filter(sc=>!isMetaScoreRow(sc)&&!isFineScoreRow(sc)&&!isFoursomesTeamPlayerId(sc.player_id)&&ids.has(normaliseId(sc.player_id))&&stablefordPointsValue(sc.stableford_points)===0).forEach(sc=>{
       const h=parseInt(sc.hole_number)||0;
-      const blobAlreadyStored=[...ids].some(id=>storedBlobKeys.has(normaliseId(id)+'|'+h));
+      const blobAlreadyStored=storedBlobHoles.has(h);
       if(blobAlreadyStored||autoBlobHoles.has(h))return;
       autoBlobHoles.add(h);
       total+=fineAmount('blob',1)*fineMultiplier(h);
