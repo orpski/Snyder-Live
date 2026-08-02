@@ -1,4 +1,4 @@
-// SNYDER GOLF v5.26
+// SNYDER GOLF v5.27
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -107,7 +107,7 @@ function pushSubscriptionUsesKey(subscription,publicKey){
 async function registerSnyderServiceWorker(){
   if(!('serviceWorker' in navigator))return null;
   try{
-      const registration=await navigator.serviceWorker.register('./sw-live.js?v=5.26',{updateViaCache:'none'});
+      const registration=await navigator.serviceWorker.register('./sw-live.js?v=5.24',{updateViaCache:'none'});
     try{registration.update&&registration.update();}catch(e){}
     return registration;
   }
@@ -158,7 +158,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.26',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.27',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -207,7 +207,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.26',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.27',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -2380,7 +2380,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-                <span onClick={tapVersionForTestMode} aria-label="App version v5.26" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v5.26</span>
+                <span onClick={tapVersionForTestMode} aria-label="App version v5.27" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v5.27</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -4483,53 +4483,21 @@ function localFoursomesScoreRowsForRound(roundId){
   return normaliseFoursomesScoreRows(localScoreRowsForRound(roundId)).filter(r=>r&&isFoursomesTeamPlayerId(r.player_id)&&hasEnteredGross(r.gross_score));
 }
 function fineAmount(key,count){const def=fineDef(key);return def?(parseInt(count)||0)*(def.amount||0):0;}
-
-function isAutomaticCupBlobScoreRow(row){
-  if(!row||isMetaScoreRow(row)||isFineScoreRow(row)||isFoursomesTeamPlayerId(row.player_id))return false;
-  const hole=parseInt(row.hole_number)||0;
-  if(hole<1||hole>18)return false;
-  if(!normaliseId(row.player_id))return false;
-  return stablefordPointsValue(row.stableford_points)===0;
-}
-function dedupedCupFineTotal(roundScores,canonicalFor,scoped){
-  const fineRows=(roundScores||[]).filter(isFineScoreRow);
-  const doubleFineHoleByPlayer=new Map();
-  const fineCounts=new Map();
-  fineRows.forEach(sc=>{
+// Fine rows exist in both legacy and current storage formats on some Cup rounds.
+// Consolidate aliases before calculating money so the same player/hole/fine is counted once.
+function consolidatedFineCounts(fineRows,canonicalFor,scopedGroups){
+  const counts=new Map();
+  (fineRows||[]).forEach(sc=>{
     const parsed=parseFineScoreRow(sc);
     if(!parsed)return;
     const canonical=canonicalFor(parsed.pid);
-    if(scoped&&!canonical)return;
+    if(scopedGroups&&!canonical)return;
     if(!canonical)return;
-    const hole=parseInt(parsed.hole)||0;
-    if(hole<1||hole>18)return;
+    const key=canonical+'|'+parsed.key+'|'+(parseInt(parsed.hole)||0);
     const count=Math.max(0,parseInt(sc.gross_score)||0);
-    if(parsed.key===CUP_DOUBLE_FINE_KEY){
-      if(count>0)doubleFineHoleByPlayer.set(canonical,hole);
-      return;
-    }
-    const key=canonical+'|'+parsed.key+'|'+hole;
-    fineCounts.set(key,Math.max(fineCounts.get(key)||0,count));
+    counts.set(key,Math.max(counts.get(key)||0,count));
   });
-  const autoBlobKeys=new Set();
-  (roundScores||[]).filter(isAutomaticCupBlobScoreRow).forEach(sc=>{
-    const canonical=canonicalFor(sc.player_id);
-    if(scoped&&!canonical)return;
-    if(!canonical)return;
-    const hole=parseInt(sc.hole_number)||0;
-    const key=canonical+'|blob|'+hole;
-    if(fineCounts.has(key)||autoBlobKeys.has(key))return;
-    autoBlobKeys.add(key);
-    fineCounts.set(key,1);
-  });
-  let total=0;
-  fineCounts.forEach((count,key)=>{
-    const parts=key.split('|');
-    const canonical=parts[0],fineKey=parts[1],hole=parseInt(parts[2])||0;
-    const multiplier=doubleFineHoleByPlayer.get(canonical)===hole?2:1;
-    total+=fineAmount(fineKey,count)*multiplier;
-  });
-  return total;
+  return counts;
 }
 
 function cupFineTotalForRound(round,scores,playerIdGroups){
@@ -4549,8 +4517,38 @@ function cupFineTotalForRound(round,scores,playerIdGroups){
     return canonicalById.get(key)||'';
   };
   const roundScores=(scores||[]).filter(sc=>sc&&normaliseId(sc.round_id)===normaliseId(round.id));
-  return dedupedCupFineTotal(roundScores,canonicalFor,!!scopedGroups);
+  const fineRows=roundScores.filter(isFineScoreRow);
+  const counts=consolidatedFineCounts(fineRows,canonicalFor,scopedGroups);
+  const doubleFineHoleByPlayer=new Map();
+  counts.forEach((count,key)=>{
+    const [canonical,fineKey,hole]=key.split('|');
+    if(fineKey===CUP_DOUBLE_FINE_KEY&&count>0)doubleFineHoleByPlayer.set(canonical,parseInt(hole)||0);
+  });
+  const fineMultiplier=(canonical,h)=>doubleFineHoleByPlayer.get(canonical)===(parseInt(h)||0)?2:1;
+  let total=0;
+  const storedBlobKeys=new Set();
+  counts.forEach((count,key)=>{
+    const [canonical,fineKey,holeText]=key.split('|');
+    const hole=parseInt(holeText)||0;
+    if(fineKey===CUP_DOUBLE_FINE_KEY)return;
+    if(fineKey==='blob')storedBlobKeys.add(canonical+'|'+hole);
+    total+=fineAmount(fineKey,count)*fineMultiplier(canonical,hole);
+  });
+  const autoBlobKeys=new Set();
+  roundScores.filter(sc=>!isMetaScoreRow(sc)&&!isFoursomesTeamPlayerId(sc.player_id)&&stablefordPointsValue(sc.stableford_points)===0).forEach(sc=>{
+    const canonical=canonicalFor(sc.player_id);
+    if(scopedGroups&&!canonical)return;
+    if(!canonical)return;
+    const hole=parseInt(sc.hole_number)||0;
+    if(hole<1||hole>18)return;
+    const key=canonical+'|'+hole;
+    if(storedBlobKeys.has(key)||autoBlobKeys.has(key))return;
+    autoBlobKeys.add(key);
+    total+=fineAmount('blob',1)*fineMultiplier(canonical,hole);
+  });
+  return total;
 }
+
 function rowsToSnakeMarks(rows){
   const marks={};
   (rows||[]).forEach(row=>{
@@ -11763,8 +11761,9 @@ function CupDayView({day,course,groups,teams,playersInCup,released,roundForGroup
 
 function CupFinesCard({group,day,round,teams,playersInCup,courses,scores,sb,flash,load,onScoresChanged,onClose}){
   const[playerFineRows,setPlayerFineRows]=useState({});
-  const findPlayer=id=>(playersInCup||[]).find(p=>p.id===id||p.user_id===id||p.guest_id===id)||null;
-  const playerIds=Array.from(new Set([...(group&&group.players||[]),...((group&&group.doubles&&group.doubles.gold_player_ids)||[]),...((group&&group.doubles&&group.doubles.navy_player_ids)||[]),...((group&&group.singles||[]).flatMap(m=>[...(m.gold_player_ids||[]),...(m.navy_player_ids||[])]))].filter(Boolean)));
+  const findPlayer=id=>{const key=normaliseId(id);return (playersInCup||[]).find(p=>[p.id,p.user_id,p.guest_id,p.round_player_id,p.cup_player_id].map(normaliseId).includes(key))||null;};
+  const rawPlayerIds=[...(group&&group.players||[]),...((group&&group.doubles&&group.doubles.gold_player_ids)||[]),...((group&&group.doubles&&group.doubles.navy_player_ids)||[]),...((group&&group.singles||[]).flatMap(m=>[...(m.gold_player_ids||[]),...(m.navy_player_ids||[])]))].filter(Boolean);
+  const playerIds=Array.from(new Map(rawPlayerIds.map(id=>{const p=findPlayer(id);const stable=normaliseId(cupStablePlayerId(p)||id);return [stable,cupStablePlayerId(p)||id];})).values());
   const normalScores=(scores||[]).filter(sc=>round&&sc.round_id===round.id&&!isMetaScoreRow(sc));
   const course=(courses||[]).find(c=>round&&normaliseId(c.id)===normaliseId(round.course_id))||null;
   const courseHoles=(course&&Array.isArray(course.holes)&&course.holes.length)?course.holes:Array.from({length:18},(_,i)=>({hole:i+1,par:4,stroke_index:i+1,yards:0}));
@@ -12644,12 +12643,36 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   },0),0);
   function cupFineTotalForRoundAndPlayer(round,p){
     if(!round||!p)return 0;
-    const ids=new Set(cupScoreIdsForRound(round,p).map(normaliseId).filter(Boolean));
-    [p.id,p.user_id,p.guest_id,p.round_player_id,p.cup_player_id,cupStablePlayerId(p)].forEach(id=>{const key=normaliseId(id);if(key)ids.add(key);});
-    const canonical=normaliseId(cupStablePlayerId(p)||p.id||p.user_id||p.guest_id)||'player';
+    const ids=new Set(cupScoreIdsForRound(round,p));
+    cupScoreIds(cupStablePlayerId(p)).forEach(id=>ids.add(normaliseId(id)));
+    [p.id,p.user_id,p.guest_id,p.round_player_id,p.cup_player_id].forEach(id=>{const key=normaliseId(id);if(key)ids.add(key);});
+    const canonical='player';
     const canonicalFor=id=>ids.has(normaliseId(id))?canonical:'';
-    return dedupedCupFineTotal(cupScoreRowsForRound(round),canonicalFor,true);
+    const roundScores=cupScoreRowsForRound(round);
+    const fineRows=roundScores.filter(isFineScoreRow);
+    const counts=consolidatedFineCounts(fineRows,canonicalFor,true);
+    let doubleFineHole=0;
+    counts.forEach((count,key)=>{const [,fineKey,hole]=key.split('|');if(fineKey===CUP_DOUBLE_FINE_KEY&&count>0)doubleFineHole=parseInt(hole)||0;});
+    const fineMultiplier=h=>doubleFineHole===(parseInt(h)||0)?2:1;
+    let total=0;
+    const storedBlobHoles=new Set();
+    counts.forEach((count,key)=>{
+      const [,fineKey,holeText]=key.split('|');
+      const hole=parseInt(holeText)||0;
+      if(fineKey===CUP_DOUBLE_FINE_KEY)return;
+      if(fineKey==='blob')storedBlobHoles.add(hole);
+      total+=fineAmount(fineKey,count)*fineMultiplier(hole);
+    });
+    const autoBlobHoles=new Set();
+    roundScores.filter(sc=>!isMetaScoreRow(sc)&&!isFoursomesTeamPlayerId(sc.player_id)&&ids.has(normaliseId(sc.player_id))&&stablefordPointsValue(sc.stableford_points)===0).forEach(sc=>{
+      const h=parseInt(sc.hole_number)||0;
+      if(h<1||h>18||storedBlobHoles.has(h)||autoBlobHoles.has(h))return;
+      autoBlobHoles.add(h);
+      total+=fineAmount('blob',1)*fineMultiplier(h);
+    });
+    return total;
   }
+
   function cupFinesSummaryRows(){
     return [...(playersInCup||[])].sort((a,b)=>String(cupDisplayName(a)).localeCompare(String(cupDisplayName(b)))).map(p=>{
       const daysMap={};
