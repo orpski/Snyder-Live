@@ -4484,6 +4484,54 @@ function localFoursomesScoreRowsForRound(roundId){
 }
 function fineAmount(key,count){const def=fineDef(key);return def?(parseInt(count)||0)*(def.amount||0):0;}
 
+function isAutomaticCupBlobScoreRow(row){
+  if(!row||isMetaScoreRow(row)||isFineScoreRow(row)||isFoursomesTeamPlayerId(row.player_id))return false;
+  const hole=parseInt(row.hole_number)||0;
+  if(hole<1||hole>18)return false;
+  if(!normaliseId(row.player_id))return false;
+  return stablefordPointsValue(row.stableford_points)===0;
+}
+function dedupedCupFineTotal(roundScores,canonicalFor,scoped){
+  const fineRows=(roundScores||[]).filter(isFineScoreRow);
+  const doubleFineHoleByPlayer=new Map();
+  const fineCounts=new Map();
+  fineRows.forEach(sc=>{
+    const parsed=parseFineScoreRow(sc);
+    if(!parsed)return;
+    const canonical=canonicalFor(parsed.pid);
+    if(scoped&&!canonical)return;
+    if(!canonical)return;
+    const hole=parseInt(parsed.hole)||0;
+    if(hole<1||hole>18)return;
+    const count=Math.max(0,parseInt(sc.gross_score)||0);
+    if(parsed.key===CUP_DOUBLE_FINE_KEY){
+      if(count>0)doubleFineHoleByPlayer.set(canonical,hole);
+      return;
+    }
+    const key=canonical+'|'+parsed.key+'|'+hole;
+    fineCounts.set(key,Math.max(fineCounts.get(key)||0,count));
+  });
+  const autoBlobKeys=new Set();
+  (roundScores||[]).filter(isAutomaticCupBlobScoreRow).forEach(sc=>{
+    const canonical=canonicalFor(sc.player_id);
+    if(scoped&&!canonical)return;
+    if(!canonical)return;
+    const hole=parseInt(sc.hole_number)||0;
+    const key=canonical+'|blob|'+hole;
+    if(fineCounts.has(key)||autoBlobKeys.has(key))return;
+    autoBlobKeys.add(key);
+    fineCounts.set(key,1);
+  });
+  let total=0;
+  fineCounts.forEach((count,key)=>{
+    const parts=key.split('|');
+    const canonical=parts[0],fineKey=parts[1],hole=parseInt(parts[2])||0;
+    const multiplier=doubleFineHoleByPlayer.get(canonical)===hole?2:1;
+    total+=fineAmount(fineKey,count)*multiplier;
+  });
+  return total;
+}
+
 function cupFineTotalForRound(round,scores,playerIdGroups){
   if(!round)return 0;
   const scopedGroups=Array.isArray(playerIdGroups)&&playerIdGroups.length?playerIdGroups:null;
@@ -4500,47 +4548,8 @@ function cupFineTotalForRound(round,scores,playerIdGroups){
     if(!canonicalById)return key;
     return canonicalById.get(key)||'';
   };
-  const roundScores=(scores||[]).filter(sc=>sc&&sc.round_id===round.id);
-  const fineRows=roundScores.filter(isFineScoreRow);
-  const doubleFineHoleByPlayer=new Map();
-  fineRows.forEach(sc=>{
-    const parsed=parseFineScoreRow(sc);
-    if(!parsed||parsed.key!==CUP_DOUBLE_FINE_KEY||(parseInt(sc.gross_score)||0)<=0)return;
-    const canonical=canonicalFor(parsed.pid);
-    if(scopedGroups&&!canonical)return;
-    if(canonical)doubleFineHoleByPlayer.set(canonical,parseInt(parsed.hole)||0);
-  });
-  const fineMultiplier=(canonical,h)=>doubleFineHoleByPlayer.get(canonical)===(parseInt(h)||0)?2:1;
-  const countedFineKeys=new Set();
-  let total=fineRows.reduce((t,sc)=>{
-    const parsed=parseFineScoreRow(sc);
-    if(!parsed)return t;
-    if(parsed.key===CUP_DOUBLE_FINE_KEY)return t;
-    const canonical=canonicalFor(parsed.pid);
-    if(scopedGroups&&!canonical)return t;
-    const count=Math.max(0,parseInt(sc.gross_score)||0);
-    const fineKey=canonical+'|'+parsed.key+'|'+(parseInt(parsed.hole)||0);
-    if(!canonical||!count||countedFineKeys.has(fineKey))return t;
-    countedFineKeys.add(fineKey);
-    return t+(fineAmount(parsed.key,count)*fineMultiplier(canonical,parsed.hole));
-  },0);
-  const storedBlobKeys=new Set(fineRows.map(sc=>{
-    const parsed=parseFineScoreRow(sc);
-    if(!parsed||parsed.key!=='blob')return null;
-    const canonical=canonicalFor(parsed.pid);
-    return canonical?canonical+'|'+(parseInt(parsed.hole)||0):null;
-  }).filter(Boolean));
-  const autoBlobKeys=new Set();
-  roundScores.filter(sc=>!isMetaScoreRow(sc)&&!isFineScoreRow(sc)&&!isFoursomesTeamPlayerId(sc.player_id)&&stablefordPointsValue(sc.stableford_points)===0).forEach(sc=>{
-    const canonical=canonicalFor(sc.player_id);
-    if(scopedGroups&&!canonical)return;
-    if(!canonical)return;
-    const key=canonical+'|'+(parseInt(sc.hole_number)||0);
-    if(storedBlobKeys.has(key)||autoBlobKeys.has(key))return;
-    autoBlobKeys.add(key);
-    total+=fineAmount('blob',1)*fineMultiplier(canonical,sc.hole_number);
-  });
-  return total;
+  const roundScores=(scores||[]).filter(sc=>sc&&normaliseId(sc.round_id)===normaliseId(round.id));
+  return dedupedCupFineTotal(roundScores,canonicalFor,!!scopedGroups);
 }
 function rowsToSnakeMarks(rows){
   const marks={};
@@ -12635,50 +12644,11 @@ function TournamentsView({competitions,rounds,groups,scores,players,courses,sb,f
   },0),0);
   function cupFineTotalForRoundAndPlayer(round,p){
     if(!round||!p)return 0;
-    const ids=new Set(cupScoreIds(cupStablePlayerId(p)));
-    ids.add(normaliseId(p.id));
-    ids.add(normaliseId(p.user_id));
-    ids.add(normaliseId(p.guest_id));
-    const roundScores=cupScoreRowsForRound(round);
-    const fineRows=roundScores.filter(isFineScoreRow);
-    const doubleFineHole=fineRows.reduce((hole,sc)=>{
-      const parsed=parseFineScoreRow(sc);
-      return parsed&&parsed.key===CUP_DOUBLE_FINE_KEY&&ids.has(normaliseId(parsed.pid))&&(parseInt(sc.gross_score)||0)>0?(parseInt(parsed.hole)||0):hole;
-    },0);
-    const fineMultiplier=h=>doubleFineHole===(parseInt(h)||0)?2:1;
-    // A Cup player can have several historical aliases (user, guest and round-player IDs).
-    // The group card uses the active ID, while this summary deliberately accepts every alias.
-    // Merge those aliases before totalling so an old and a current row for the same fine cannot
-    // both be charged. Keep the highest stored count for genuine counter fines such as bunkers.
-    const fineCountsByKey=new Map();
-    fineRows.forEach(sc=>{
-      const parsed=parseFineScoreRow(sc);
-      if(!parsed||parsed.key===CUP_DOUBLE_FINE_KEY||!ids.has(normaliseId(parsed.pid)))return;
-      const count=Math.max(0,parseInt(sc.gross_score)||0);
-      if(!count)return;
-      const fineKey=parsed.key+'|'+(parseInt(parsed.hole)||0);
-      fineCountsByKey.set(fineKey,Math.max(fineCountsByKey.get(fineKey)||0,count));
-    });
-    let total=0;
-    fineCountsByKey.forEach((count,fineKey)=>{
-      const split=fineKey.lastIndexOf('|');
-      const key=fineKey.slice(0,split);
-      const hole=parseInt(fineKey.slice(split+1))||0;
-      total+=fineAmount(key,count)*fineMultiplier(hole);
-    });
-    const storedBlobHoles=new Set(fineRows.map(sc=>{
-      const parsed=parseFineScoreRow(sc);
-      return parsed&&parsed.key==='blob'&&ids.has(normaliseId(parsed.pid))?(parseInt(parsed.hole)||0):null;
-    }).filter(Boolean));
-    const autoBlobHoles=new Set();
-    roundScores.filter(sc=>!isMetaScoreRow(sc)&&!isFineScoreRow(sc)&&!isFoursomesTeamPlayerId(sc.player_id)&&ids.has(normaliseId(sc.player_id))&&stablefordPointsValue(sc.stableford_points)===0).forEach(sc=>{
-      const h=parseInt(sc.hole_number)||0;
-      const blobAlreadyStored=storedBlobHoles.has(h);
-      if(blobAlreadyStored||autoBlobHoles.has(h))return;
-      autoBlobHoles.add(h);
-      total+=fineAmount('blob',1)*fineMultiplier(h);
-    });
-    return total;
+    const ids=new Set(cupScoreIdsForRound(round,p).map(normaliseId).filter(Boolean));
+    [p.id,p.user_id,p.guest_id,p.round_player_id,p.cup_player_id,cupStablePlayerId(p)].forEach(id=>{const key=normaliseId(id);if(key)ids.add(key);});
+    const canonical=normaliseId(cupStablePlayerId(p)||p.id||p.user_id||p.guest_id)||'player';
+    const canonicalFor=id=>ids.has(normaliseId(id))?canonical:'';
+    return dedupedCupFineTotal(cupScoreRowsForRound(round),canonicalFor,true);
   }
   function cupFinesSummaryRows(){
     return [...(playersInCup||[])].sort((a,b)=>String(cupDisplayName(a)).localeCompare(String(cupDisplayName(b)))).map(p=>{
