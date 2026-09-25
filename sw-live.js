@@ -1,12 +1,12 @@
-// SNYDER GOLF v5.28 service worker
-const CACHE_NAME = "snyder-golf-v5-28";
-const ASSETS = ['./','./index.html','./styles.css','./league-section.js','./app.js','./manifest-live.json','./snyder-golf-logo.png','./snyder-golf-logo-clean.png','./sweepstake-logo.png','./icon-golf-192.png','./icon-golf-512.png','./icon-live-192.png','./icon-live-512.png','./notification-badge-v2.png','./money-fix.js','./course-whitley-bay.png','./course-goswick.png','./course-tynemouth.svg','./course-quinta-do-lago.png','./course-ombria.png','./course-montgomerie-maxx-royal.svg','./course-vila-sol.svg'];
+// SNYDER GOLF v5.29 service worker
+const CACHE_NAME = "snyder-golf-v5-29";
+const ASSETS = ['./','./index.html','./styles.css','./league-season.js','./league-section.js','./app.js','./manifest-live.json','./snyder-golf-logo.png','./snyder-golf-logo-clean.png','./sweepstake-logo.png','./icon-golf-192.png','./icon-golf-512.png','./icon-live-192.png','./icon-live-512.png','./notification-badge-v2.png','./money-fix.js','./course-whitley-bay.png','./course-goswick.png','./course-tynemouth.svg','./course-quinta-do-lago.png','./course-ombria.png','./course-montgomerie-maxx-royal.svg','./course-vila-sol.svg'];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.map(key => key !== CACHE_NAME ? caches.delete(key) : null))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  const isAppScript = url.pathname.endsWith('/app.js') || url.pathname.endsWith('/league-section.js') || url.pathname.endsWith('/money-fix.js');
+  const isAppScript = url.pathname.endsWith('/app.js') || url.pathname.endsWith('/league-section.js') || url.pathname.endsWith('/league-season.js') || url.pathname.endsWith('/money-fix.js');
   if (isAppScript) {
     event.respondWith(fetch(event.request, { cache: 'no-store' }).catch(() => caches.match(event.request).then(cached => cached || caches.match('./' + url.pathname.split('/').pop()))));
     return;

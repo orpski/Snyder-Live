@@ -1,4 +1,4 @@
-// SNYDER GOLF v5.28
+// SNYDER GOLF v5.29
 const SNYDER_GOLF_LOGO='./snyder-golf-logo.png';
 const CUP_TEAM_C_STORAGE_PREFIX='[Team C] ';
 
@@ -107,7 +107,7 @@ function pushSubscriptionUsesKey(subscription,publicKey){
 async function registerSnyderServiceWorker(){
   if(!('serviceWorker' in navigator))return null;
   try{
-      const registration=await navigator.serviceWorker.register('./sw-live.js?v=5.28',{updateViaCache:'none'});
+      const registration=await navigator.serviceWorker.register('./sw-live.js?v=5.29',{updateViaCache:'none'});
     try{registration.update&&registration.update();}catch(e){}
     return registration;
   }
@@ -158,7 +158,7 @@ async function sendSnyderLiveNotification(type,payload){
       snyderNotifySent.add(key);
       setTimeout(()=>snyderNotifySent.delete(key),1000*60*20);
     }
-    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.28',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type,app:'snyder-live',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.29',createdAt:new Date().toISOString(),...(payload||{})};
     delete body.mutedRoundIds;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder Notify] TEST MODE blocked',type,body);
@@ -207,7 +207,7 @@ function snyderLeagueScoreNotificationText(name,points){
 }
 async function sendSnyderLeagueNotification(payload){
   try{
-    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.28',createdAt:new Date().toISOString(),...(payload||{})};
+    const body={type:'league_score_submitted',app:'snyder-live',source:'snyder-league',subscriptionTable:SNYDER_PUSH_TABLE,version:'v5.29',createdAt:new Date().toISOString(),...(payload||{})};
     if(body.body&&!body.message)body.message=body.body;
     if(snyderNotificationsTestMode()){
       console.log('[Snyder League Notify] TEST MODE blocked',body);
@@ -2380,7 +2380,7 @@ function App(){
         <button onClick={()=>setView('admin')} style={bottomTabStyle('rgba(255,255,255,0.4)')}>
           <div style={bottomIconStyle}>{EMOJI.admin}</div>
           <div style={bottomLabelStyle}>ADMIN</div>
-                <span onClick={tapVersionForTestMode} aria-label="App version v5.28" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v5.28</span>
+                <span onClick={tapVersionForTestMode} aria-label="App version v5.29" title="Version" style={{fontSize:8,fontWeight:700,letterSpacing:'0.06em',lineHeight:'9px',color:testMode?'#fbbf24':'rgba(255,255,255,0.32)',padding:'2px 4px',marginTop:-2}}>v5.29</span>
         </button>
       </div>
       {testMode&&<div style={{position:'fixed',left:10,right:10,bottom:78,zIndex:1300,padding:'8px 10px',borderRadius:10,background:'rgba(245,158,11,0.94)',color:'#1f1300',fontSize:12,fontWeight:950,textAlign:'center',boxShadow:'0 8px 20px rgba(0,0,0,0.28)'}}>TEST MODE - notifications muted on this device</div>}
@@ -7729,7 +7729,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
         if(err)throw err;
         const links=(linkResult&&linkResult.links)||{};
         const scoreCount={}, snakeCount={}, paidById={}, sweepNetPence={};
-        (leagueScores||[]).forEach(s=>{const id=normaliseId(s&&s.player_id);if(id)scoreCount[id]=(scoreCount[id]||0)+1;});
+        (leagueScores||[]).filter(s=>window.SnyderLeagueSeason.eligible(s.date)).forEach(s=>{const id=normaliseId(s&&s.player_id);if(id)scoreCount[id]=(scoreCount[id]||0)+1;});
         (snakeRows||[]).forEach(s=>{const id=normaliseId(s&&s.player_id);if(id&&s.confirmed)snakeCount[id]=(snakeCount[id]||0)+1;});
         (paymentRows||[]).forEach(p=>{const id=normaliseId(p&&p.player_id);if(id)paidById[id]=Math.round((parseFloat(p.paid)||0)*100);});
         (logRows||[]).forEach(row=>{
@@ -8261,7 +8261,8 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
       const weekCount=leaguePlayer?leagueSubmitScoresInWeek(leaguePlayer.id,approved,pending,dateKey):0;
       let status='Ready';
       let ready=true;
-      if(!leaguePlayer){status='Not in League';ready=false;}
+      if(!window.SnyderLeagueSeason.eligible(roundStartDate(round))){status='League closed · no £2 fee';ready=false;}
+      else if(!leaguePlayer){status='Not in League';ready=false;}
       else if(holesPlayed<18){status=`${holesPlayed}/18 holes`;ready=false;}
       else if(already){status='Already submitted';ready=false;}
       else if(weekCount>=2){status='2 this week';ready=false;}
@@ -8310,6 +8311,7 @@ function LiveScorecard({round,group,players,courses,rounds,scores,sb,flash,load,
   },[round&&round.id,round&&round.status,activeGroupId]);
 
   async function submitCompletedRoundToLeague(){
+    if(!window.SnyderLeagueSeason.eligible(roundStartDate(round))){const msg='League scoring ended on 16 September. Playoff rounds have no £2 fee; admin enters results in League → Playoffs.';flash(msg,'error');return {ok:false,msg};}
     if(leagueSubmitSubmittingRef.current)return {ok:false,msg:'League submit is already running'};
     if(!leagueSubmitData)return {ok:false,msg:'League scores are still being checked'};
     let selected=(leagueSubmitData.rows||[]).filter(r=>r.ready&&leagueSubmitSelected[r.key]);
